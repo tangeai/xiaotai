@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "artifact_sha256": "90fc89d449ee8490c64fc3de9226ea3dcb3ac39aa026ec86e138495c7303ca9b",
+  "identity": {
+    "soc": "BK7258",
+    "chip_revision": null,
+    "board_model": "立创·实战派BK7258",
+    "pcb_revision": null,
+    "sdk": {
+      "name": "bk_avdk_smp",
+      "version": "release/v3.1.1.8",
+      "revision": "1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7"
+    },
+    "board_config_sha256": "7a5cc0e94ce9ec14ebb3462f6ea4377647e88fc6ec15ad9cc26f6b3ff5ba1aab"
+  },
+  "flash": {
+    "state": "declared",
+    "method": "project partition table",
+    "source": "partitions/bk7258/auto_partitions.csv",
+    "jedec_id": null,
+    "recognized": null,
+    "physical_bytes": null,
+    "mapped_bytes": null,
+    "application_usable_bytes": 1949696
+  },
+  "memory": {
+    "internal_sram": {
+      "state": "declared",
+      "total_bytes": null,
+      "free_boot_bytes": null,
+      "minimum_free_bytes": null,
+      "largest_free_block_bytes": null
+    },
+    "psram": {
+      "state": "declared",
+      "present": true,
+      "total_bytes": 16777216,
+      "free_boot_bytes": null,
+      "minimum_free_bytes": null,
+      "largest_free_block_bytes": null
+    }
+  },
+  "display": {
+    "state": "declared",
+    "method": "compiled board profile",
+    "source": "ap/src/xiaotai_ui.c",
+    "controller": "ST7789V2",
+    "bus": "SPI1",
+    "width_px": 320,
+    "height_px": 240,
+    "width_mm": null,
+    "height_mm": null,
+    "pixel_format": "RGB565",
+    "test": "not_run"
+  },
+  "touch": {
+    "state": "unsupported",
+    "method": "exact board profile",
+    "source": "default LCKFB board BOM/BSP",
+    "controller": null,
+    "bus": null,
+    "points": null,
+    "test": "not_run"
+  },
+  "camera": {
+    "state": "declared",
+    "method": "compiled DVP/H.264 profile",
+    "source": "docs/BK7258_SCHEMATIC_REFERENCE.md, pinned BSP and product implementation",
+    "sensor": null,
+    "output_profiles": ["H264 640x480@20"],
+    "test": "not_run"
+  },
+  "audio": {
+    "microphone": {
+      "state": "declared",
+      "method": "compiled onboard ADC profile",
+      "source": "ap/src/xiaotai_audio.c",
+      "channels": 1,
+      "sample_rates_hz": [8000],
+      "sample_bits": [16],
+      "formats": ["pcm_s16le"],
+      "test": "not_run"
+    },
+    "speaker": {
+      "state": "declared",
+      "method": "compiled onboard DAC and amplifier-control profile",
+      "source": "supplied schematic and ap/src/xiaotai_audio.c",
+      "channels": 1,
+      "sample_rates_hz": [8000],
+      "sample_bits": [16],
+      "formats": ["pcm_s16le"],
+      "test": "not_run"
+    },
+    "duplex": {
+      "simultaneous": true,
+      "playback_reference": false,
+      "aec_available": false,
+      "aec_test": "not_run"
+    }
+  },
+  "controls": {
+    "verified_buttons": 0,
+    "intent_map_approved": true
+  },
+  "integration": {
+    "tirtc_sdk_compatible": null,
+    "audio_uplink_pipeline": true,
+    "audio_downlink_pipeline": true,
+    "video_uplink_pipeline": true,
+    "session_arbiter": true,
+    "device_call_protocol": true,
+    "wechat_voip_protocol": true
+  },
+  "requested_features": [
+    "h5_audio",
+    "h5_video",
+    "h5_talkback",
+    "ai_talk",
+    "device_call",
+    "wechat_voip"
+  ],
+  "issues": [
+    "PCB revision is not recorded",
+    "Flash JEDEC ID and runtime heap measurements require the exact board",
+    "Display, camera, microphone and speaker active tests have not run",
+    "GPIO9 camera power and GPIO8 amplifier power are assumed active high pending voltage measurement",
+    "Audio adapter has no playback reference and no AEC stage",
+    "TiRTC DTLS/WHIP compatibility requires an on-device handshake"
+  ]
+}

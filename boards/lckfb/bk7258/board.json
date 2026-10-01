@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "lckfb-bk7258",
+  "vendor": "LCKFB",
+  "model": "立创·实战派 BK7258",
+  "revision": null,
+  "platform": "beken",
+  "target": "bk7258",
+  "sdk": {"name": "bk_avdk_smp", "version": "release/v3.1.1.8"},
+  "project_dir": "firmware/beken/bk7258/lckfb-bk7258-xiaotai",
+  "capabilities": ["audio", "buttons", "camera-h264", "display", "touch", "wifi"],
+  "resources": {"flash_bytes": 8388608, "psram_bytes": 16777216},
+  "evidence": {
+    "probe_report": "firmware/beken/bk7258/lckfb-bk7258-xiaotai/probe-report.hardware.json"
+  },
+  "variants": [{"name": "default", "default": true, "interaction_profile": "touch-full", "layout_profile": "compact"}],
+  "migration": {"stage": "platform-project"}
+}

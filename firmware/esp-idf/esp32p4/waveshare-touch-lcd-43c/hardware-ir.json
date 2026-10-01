@@ -1,0 +1,337 @@
+{
+  "schema_version": 2,
+  "board": {
+    "id": "waveshare_esp32p4_wifi6_touch_lcd_43c_v1_0",
+    "vendor": "Waveshare（微雪电子）",
+    "model": "ESP32-P4-WIFI6-Touch-LCD-4.3",
+    "hardware_revision": "V1.0"
+  },
+  "sources": [
+    {
+      "id": "vendor-wiki",
+      "kind": "official-board-wiki",
+      "location": ".references/微雪ESP32-P4-WIFI6-Touch-LCD-4.3-C/ESP32-P4-WIFI6-Touch-LCD-4.3 _ 微雪文档.pdf",
+      "revision": "微雪文档平台 ESP32-P4-WIFI6-Touch-LCD-4.3（含 SKU 33874/33875），2026-09-22 本地核对"
+    },
+    {
+      "id": "vendor-schematic",
+      "kind": "schematic",
+      "location": ".references/微雪ESP32-P4-WIFI6-Touch-LCD-4.3-C/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf",
+      "revision": "ESP32-P4-WIFI6-Touch-LCD-4.3 原理图，用户确认对应实物 PCB V1.0"
+    },
+    {
+      "id": "vendor-repo",
+      "kind": "reference-code",
+      "location": ".references/微雪ESP32-P4-WIFI6-Touch-LCD-4.3-C/esp32-p4-wifi6-touch-lcd-4.3",
+      "revision": "git commit 74d1a81（fix: esp32-p4 partition table build error）"
+    },
+    {
+      "id": "vendor-bsp",
+      "kind": "bsp",
+      "location": ".references/微雪ESP32-P4-WIFI6-Touch-LCD-4.3-C/esp32-p4-wifi6-touch-lcd-4.3/examples/esp-idf/09_video_lcd_display/components/esp32_p4_wifi6_touch_lcd_4_3",
+      "revision": "waveshare/esp32_p4_wifi6_touch_lcd_4_3 BSP 组件 v1.0.1（随 vendor-repo 分发）"
+    },
+    {
+      "id": "product-docs",
+      "kind": "product-contract",
+      "location": "docs/product/PRODUCT_REQUIREMENTS.md",
+      "revision": "小钛桌面 AI 机器人 V2.2（docs/product/README.md / PRODUCT_REQUIREMENTS.md / ROOM_REQUIREMENTS.md）"
+    },
+    {
+      "id": "lckfb-reference",
+      "kind": "reference-project",
+      "location": "../../esp32s3/lckfb-esp32s3-xiaotai",
+      "revision": "ES7210 TDM MIC1+MIC3 回采 AEC 参考实现（S3 板实测通过）"
+    },
+    {
+      "id": "kit-src",
+      "kind": "reference-code",
+      "location": "../../../../../tirtc-device-builder/kit-src",
+      "revision": "tirtc-device-builder 0.10.0（commit a9c93e1）；device-sim-p4 为 1.4.0 快照，P4 SDK 2.5.0 基线 9b4e35c7…"
+    },
+    {
+      "id": "server-example",
+      "kind": "platform-contract",
+      "location": "../../../../../tirtc-server-example",
+      "revision": "commit adba29c（device-call.md / device-voip.md / api-reference.md）"
+    },
+    {
+      "id": "user-input-20260922",
+      "kind": "user-input",
+      "location": "user-input://2026-09-22/board-facts",
+      "revision": "用户确认：该型号实物带 OV5647 模组；PCB V1.0；产品界面采用横屏 800×480（原生 480×800 旋转 90°）"
+    }
+  ],
+  "soc": {
+    "target": "esp32p4",
+    "module": "ESP32-P4NRW32（芯片封装内叠封 32MB PSRAM）+ 板载 32MB Nor Flash；ESP32-C6-MINI-1-N4（Wi-Fi6/BLE5，SDIO 从机）",
+    "flash_mb": 32,
+    "psram_mb": 32,
+    "source_refs": [
+      "vendor-wiki",
+      "vendor-schematic"
+    ]
+  },
+  "toolchain": {
+    "framework": "esp-idf",
+    "framework_version": "5.5.4",
+    "verification": "build_verified",
+    "tirtc": {
+      "platform": "espressif-esp32p4",
+      "version": "2.3.0-P4-validation-rebuild",
+      "sdk_path": "components/tirtc_sdk",
+      "build_contract": "components/tirtc_sdk/manifest/build-contract.env"
+    },
+    "source_refs": [
+      "kit-src"
+    ]
+  },
+  "camera": {
+    "present": true,
+    "sensor": "OV5647",
+    "interface": "mipi-csi-2lane-15pin",
+    "selected_video_profile": "h264-annexb",
+    "video_profiles": [
+      {
+        "id": "h264-annexb",
+        "codec": "h264",
+        "available": true,
+        "output_format": "h264_annex_b_access_units",
+        "refresh_frame_control": true,
+        "stream_id": 11,
+        "verification": "build_verified",
+        "source_refs": [
+          "vendor-repo",
+          "vendor-wiki",
+          "user-input-20260922"
+        ]
+      }
+    ],
+    "verification": "corroborated",
+    "source_refs": [
+      "vendor-wiki",
+      "vendor-schematic",
+      "user-input-20260922",
+      "vendor-repo"
+    ]
+  },
+  "audio_input": {
+    "present": true,
+    "interface": "i2s1_tdm_es7210",
+    "codecs": [
+      {
+        "name": "ES7210",
+        "model": "ES7210",
+        "role": "adc-mic-array-and-reference",
+        "channels": 4,
+        "sample_rates_hz": [
+          16000
+        ],
+        "verification": "build_verified"
+      },
+      {
+        "name": "ALAW",
+        "model": "software-pcm-to-g711",
+        "role": "16kHz PCM 重采样后编码 G.711 A-law 8 kHz 单声道（stream 10）",
+        "channels": 1,
+        "sample_rates_hz": [
+          8000
+        ],
+        "verification": "build_verified"
+      }
+    ],
+    "verification": "corroborated",
+    "source_refs": [
+      "vendor-schematic",
+      "vendor-bsp",
+      "lckfb-reference"
+    ]
+  },
+  "audio_output": {
+    "present": true,
+    "interface": "i2s1_std_es8311",
+    "codecs": [
+      {
+        "name": "ES8311",
+        "model": "ES8311",
+        "role": "dac-speaker",
+        "pa_gpio": 53,
+        "sample_rates_hz": [
+          16000
+        ],
+        "verification": "build_verified"
+      },
+      {
+        "name": "ALAW",
+        "model": "software-g711-to-pcm",
+        "role": "G.711 A-law 8 kHz 下行解码后重采样 16 kHz 播放（stream 14）",
+        "channels": 1,
+        "sample_rates_hz": [
+          8000
+        ],
+        "verification": "build_verified"
+      }
+    ],
+    "verification": "corroborated",
+    "source_refs": [
+      "vendor-schematic",
+      "vendor-bsp",
+      "vendor-repo"
+    ]
+  },
+  "hardware_resources": {
+    "i2c": {
+      "used": true,
+      "driver_family": "ng",
+      "single_driver_family": true,
+      "verification": "build_verified"
+    },
+    "i2s": {
+      "used": true,
+      "controller_and_gpio_ownership_resolved": true,
+      "verification": "build_verified"
+    },
+    "audio_semantic_contract": "board-audio-contract.json",
+    "video_semantic_contract": "board-video-contract.json",
+    "runtime_semantic_contract": "tirtc-runtime-contract.json",
+    "audio_channel_mapping": {
+      "required": true,
+      "resolved": true,
+      "verification": "build_verified"
+    },
+    "duplex_audio": {
+      "simultaneous_capture_playback": true,
+      "playback_reference_available": true,
+      "aec_implementation_available": true,
+      "verification": "build_verified"
+    },
+    "camera_realtime": {
+      "pipeline_safe": true,
+      "verification": "build_verified"
+    },
+    "memory": {
+      "startup_and_media_budgeted": true,
+      "verification": "build_verified"
+    },
+    "source_refs": [
+      "vendor-bsp",
+      "vendor-schematic",
+      "vendor-repo",
+      "lckfb-reference"
+    ]
+  },
+  "onboarding": {
+    "wifi_credentials": {
+      "selected_method": "softap",
+      "methods": [
+        {
+          "id": "softap",
+          "type": "softap",
+          "ssid_prefix": "XiaoTai-",
+          "auth_mode": "open",
+          "ipv4_address": "192.168.6.1",
+          "captive_portal": true,
+          "available": true,
+          "credentials_committed_to_source": false,
+          "reprovisioning_defined": true,
+          "verification": "build_verified",
+          "source_refs": [
+            "product-docs"
+          ]
+        }
+      ],
+      "credentials_committed_to_source": false,
+      "reprovisioning_defined": true
+    },
+    "device_binding": {
+      "selected_method": "verification-code-6digit",
+      "methods": [
+        {
+          "id": "verification-code-6digit",
+          "type": "verification_code",
+          "available": true,
+          "verification": "build_verified",
+          "source_refs": [
+            "product-docs"
+          ]
+        }
+      ],
+      "credentials_committed_to_source": false,
+      "stored_credential_state_handled": true,
+      "clear_binding_control": true
+    },
+    "source_refs": [
+      "product-docs"
+    ]
+  },
+  "build_evidence": {
+    "artifacts": [
+      {
+        "path": "build/xiaotai_esp32p4.bin",
+        "label": "43c-port.20 application BIN",
+        "size_bytes": 4415680,
+        "sha256": "d27c480ad088af13c9372a8a005b516907d578ccf8b57d1c595471d553755643"
+      },
+      {
+        "path": "build/xiaotai_esp32p4.elf",
+        "label": "43c-port.20 full ELF",
+        "size_bytes": 35710204,
+        "sha256": "0fcb72b320abf8fe16e5be5ce51a3df93d4e40146b23f4e805e55b29d1af5a57"
+      }
+    ]
+  },
+  "runtime_evidence": [
+    {
+      "artifact_sha256": "0b48933f8e11d5b6bb8e2d4db7207d87567ed4aee877de023e7640ad736f36ba",
+      "label": "43c-port.1 真机首启日志（用户串口提供，2026-09-22）",
+      "acceptance_levels": [
+        "L2"
+      ],
+      "features": [
+        "h5_live_audio",
+        "h5_talkback"
+      ],
+      "notes": "P4 rev v1.3 正常启动无 panic；32MB PSRAM 自检通过；ST7701 DSI 初始化成功（480x800，UI 800x480 ROT_90）；GT911 0x5D 触摸就绪；OV5647 PID=0x5647 检出；H264 编码器/scaler/转换器就绪；C6 SDIO 建链（CLK18/CMD19/D0-3=14-17/RST54）；XiaoTai-A5A5 配网成功；STA 连接测试 AP 成功；绑定验证码屏幕+播报正常。注：该版本音频采集仍为 3.5 拓扑（ES8311 双工），43c-port.2 已切换 ES7210。",
+      "source_refs": [
+        "user-input-20260922"
+      ]
+    }
+  ],
+  "features": {
+    "requested": [
+      "h5_live_audio",
+      "h5_live_video",
+      "h5_talkback",
+      "ai_talk",
+      "device_call",
+      "wechat_voip"
+    ]
+  },
+  "product_notes": {
+    "room_intercom": "产品 V2.2 多人对讲（6 位房间码/可选 4 位密码/100 人/PTT）由参考工程 main/application 与协议侧承载；Skill FEATURES 无对应门禁，随参考实现整树迁移，不单独新增 gate。",
+    "display": "用户确认横屏 800×480：原生 480×800 ST7701 面板经 esp_lv_adapter 旋转 90°，沿用现有 480×320 横屏布局比例并适配到 800×480。",
+    "sdk_policy": "保留参考工程实测过的 TiRTC P4 SDK 2.3.0 验证重建（a7a01ffd…，含 feedback-stack 批）；kit 的 2.5.0 基线（9b4e35c7…）作为后续可切换钉扎，不在本次板卡移植中同时变更 SDK。",
+    "issues": [
+      {
+        "id": "es7210-slot-mapping",
+        "detail": "原理图显示板载双麦克风接 ES7210 MIC2_P/MIC2_N（差分对），ES8311 OUTN 经 R81+1uF 耦合至 ADC_MIC3_N 作回采参考；TDM 串行顺序 CH1/CH3/CH2/CH4 与参考通道在 slot 中的具体索引需在 bring-up 用 i2c_tools 与声道实测确认（复用 lckfb 的 MIC1/MIC3 压实机制，改 mic_select 通道掩码）。",
+        "classification": "implementation_resolvable"
+      },
+      {
+        "id": "es7210-i2c-addr",
+        "detail": "ES8311 固定 0x40；ES7210 地址由 AD0/AD1 跳线决定（J303-J306），可能与 0x40 冲突，bring-up 时探测 0x40/0x41/0x42。",
+        "classification": "hil_resolvable"
+      },
+      {
+        "id": "key-button-mapping",
+        "detail": "原理图 K1=GPIO21、K2=GPIO23、K3=GPIO28；POWER 按键与 PMIC/电源路径（U2003 KEY、U1701 开关）的联动以及 K2/K3 的产品语义需真机确认；BOOT 为 GPIO35 strap，RESET 为 EN。",
+        "classification": "hil_resolvable"
+      },
+      {
+        "id": "vendor-bsp-touch-rst-conflict",
+        "detail": "vendor BSP 07/08 例程 touch RST=GPIO23 与本板 K2 按键 GPIO23 冲突；09/11 例程（v1.0.1）为 RST=NC/INT=NC（GT911 轮询模式），与原理图一致，采用后者。",
+        "classification": "implementation_resolvable"
+      }
+    ]
+  }
+}

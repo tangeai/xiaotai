@@ -1,0 +1,16 @@
+build/
+build-*/
+.cache/
+sdk/
+*.log
+*.bin
+*.alaw
+*.elf
+*.map
+*.pem
+*.key
+secrets.*
+runtime-config.*
+# Local comparison archives are diagnostic inputs, not release dependencies.
+third_party/tirtc/lib/libTiRTC_known_good.a
+third_party/tirtc/lib/libTiRTC_sdp_compat.a

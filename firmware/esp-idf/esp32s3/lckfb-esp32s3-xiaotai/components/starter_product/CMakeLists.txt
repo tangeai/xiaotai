@@ -1,0 +1,7 @@
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/xiaotai_repository.cmake")
+xiaotai_find_repository_root(XIAOTAI_REPO_ROOT)
+set(board_dir "${XIAOTAI_REPO_ROOT}/boards/lckfb/esp32s3")
+set(XIAOTAI_STARTER_PRODUCT_ASSET_DIR "${XIAOTAI_REPO_ROOT}/product/assets/audio")
+set(XIAOTAI_STARTER_PRODUCT_EXTRA_SRCS "${board_dir}/board_display.c")
+set(XIAOTAI_STARTER_PRODUCT_EXTRA_PRIV_INCLUDE_DIRS "${board_dir}")
+include("${XIAOTAI_REPO_ROOT}/platforms/esp-idf/components/starter_product/CMakeLists.txt")

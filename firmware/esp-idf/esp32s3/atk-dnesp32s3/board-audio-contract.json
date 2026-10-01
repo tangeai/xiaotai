@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "evidence": ["local-v14-schematic", "vendor-board"],
+  "clock": {
+    "sample_rate_hz": 16000,
+    "mclk_ratio": 256,
+    "mclk_hz": 4096000,
+    "codec_tables": [
+      {"codec": "ES8388 board clock", "source": "@repo/boards/alientek/atk-dnesp32s3/atk_board.c"}
+    ]
+  },
+  "capture": {
+    "controller": 0,
+    "role": "master",
+    "mode": "standard",
+    "tdm_enabled": false,
+    "slot_count": 2,
+    "slot_bit_width": 16,
+    "selected_slot": 0,
+    "selected_signal": "onboard microphone",
+    "mapping_evidence": "V1.4 ES8388 MIC input and vendor recorder chapter 42: input channel 1 routes MIC to both ADC slots"
+  },
+  "playback": {
+    "controller": 0,
+    "role": "master",
+    "mode": "standard",
+    "slot_count": 2,
+    "slot_bit_width": 16
+  },
+  "shared_clock": {
+    "gpios": [3, 46, 9],
+    "directions_simultaneous": true,
+    "paired_channels": true,
+    "handoff": "none"
+  },
+  "echo_cancellation": {"enabled": false},
+  "implementation_assertions": [
+    {
+      "file": "@repo/boards/alientek/atk-dnesp32s3/atk_board.c",
+      "contains_compact": [
+        "{4096000,16000,I2S_MCLK_MULTIPLE_256}",
+        "i2s_new_channel(&channel,&s_tx,&s_rx)",
+        ".bclk=ATK_I2S_BCLK",
+        ".ws=ATK_I2S_WS",
+        ".dout=ATK_I2S_DOUT",
+        ".din=ATK_I2S_DIN",
+        ".mclk=ATK_I2S_MCLK",
+        "i2s_channel_enable(s_tx)",
+        "i2s_channel_enable(s_rx)",
+        "{0x02,0x00}",
+        "{0x0A,0x00}",
+        "expander_set(ATK_XL9555_SPK_EN,false)"
+      ]
+    },
+    {
+      "file": "@repo/boards/alientek/atk-dnesp32s3/board_config.h",
+      "contains_compact": [
+        "#defineATK_I2S_MCLKGPIO_NUM_3",
+        "#defineATK_I2S_BCLKGPIO_NUM_46",
+        "#defineATK_I2S_WSGPIO_NUM_9",
+        "#defineATK_I2S_DOUTGPIO_NUM_10",
+        "#defineATK_I2S_DINGPIO_NUM_14"
+      ]
+    },
+    {
+      "file": "components/starter_media/src/starter_media.c",
+      "contains_compact": [
+        "starter_tirtc_send_alaw(timestamp_ms(),encoded,sizeof(encoded))",
+        "alaw_to_pcm(item.payload[offset+i])",
+        "s_audio_adapter->write_pcm(s_audio_adapter->context,pcm,count*2U,&written)",
+        "mode==STARTER_TIRTC_AI"
+      ]
+    }
+  ]
+}

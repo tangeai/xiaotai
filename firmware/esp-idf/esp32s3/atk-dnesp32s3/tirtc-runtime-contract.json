@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "platform_contract": "platform-media-contract.json",
+  "files": {
+    "platform_client": "components/platform_client/src/platform_client.c",
+    "app_main": "main/app_main.c",
+    "starter_tirtc": "components/starter_tirtc/src/starter_tirtc.c",
+    "starter_runtime": "components/starter_runtime/src/starter_runtime.c"
+  },
+  "business": {
+    "features": [],
+    "protocol_revision": null,
+    "session_arbiter": {
+      "single_foreground_owner": null,
+      "pending_capacity": null,
+      "generation_guard": null,
+      "monotonic_deadlines": null,
+      "deferred_lifecycle": null,
+      "restore_h5_after_call": null
+    },
+    "implementation_assertions": []
+  }
+}

@@ -1,0 +1,53 @@
+# A .local directory is always machine-local, regardless of its parent path.
+# Never commit its contents.
+**/.local/
+# Board SDKs, schematics, manuals, and examples kept only as local references.
+/.references/
+# Private acoustic samples are local diagnostic inputs, not release assets.
+docs/wake-samples/
+# Local SDK drop used as an import source. Board SDK packages that are intentionally
+# vendored live below their canonical firmware project directories.
+/tirtc-sdk/
+/.tools/
+/output/
+/build-artifacts/
+/.agents/
+/.aws/
+/.claude/
+/.codex/
+/.idea/
+/.vscode/
+/.venv/
+/venv/
+node_modules/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Board-local release, validation, and diagnostic products. Release bundles
+# are generated under /output and are never source inputs.
+firmware/**/artifacts/
+firmware/**/output/
+
+# ESP-IDF generated build output.
+**/build/
+**/build-*/
+**/sdkconfig
+**/sdkconfig.old
+
+# Host-test coverage and tool caches.
+*.gcda
+*.gcno
+*.gcov
+/.coverage
+/coverage/
+/.pytest_cache/
+
+# Local inspection output. JSON manifests, hardware evidence, lock metadata,
+# component checksums, and CSV partition tables are source inputs by default;
+# ignore only the known root-level generated reports.
+/capability-assessment.json
+/doctor.json
+**/__pycache__/

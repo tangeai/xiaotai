@@ -1,0 +1,17 @@
+build*/
+.vscode/
+.agents/
+firmware/
+managed_components/
+logs/
+sdkconfig.old
+*.bin
+*.elf
+*.map
+*.log
+*-webflash-*.zip
+*-webinstall-*.zip
+*.pyc
+__pycache__/
+.playwright-cli/
+sdkconfig

@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "platform_contract": "platform-media-contract.json",
+  "evidence": ["local-v14-schematic", "local-mc2640-schematic", "local-mc5640-schematic", "vendor-board"],
+  "dependencies": {
+    "espressif/esp32-camera": "2.1.7",
+    "idf": "5.5.4"
+  },
+  "scheduler": {
+    "wifi_core": 0,
+    "camera_core": 1,
+    "config_files": ["sdkconfig.defaults"],
+    "wifi_config_files": ["sdkconfig.defaults"]
+  },
+  "camera": {
+    "codec": "mjpeg",
+    "stream_id": 11,
+    "media": "TIRTC_VIDEO_JPEG",
+    "complete_jpeg_per_send": true,
+    "frame_buffers": 2,
+    "accepted_sensor_pids": [38, 22080],
+    "unknown_sensor_policy": "reject"
+  },
+  "memory": {
+    "max_send_buffer_bytes": 262144,
+    "max_complete_jpeg_bytes": 131072,
+    "video_backpressure_bytes": 196608
+  },
+  "implementation_assertions": [
+    {
+      "file": "main/app_main.c",
+      "contains_compact": [".max_send_buffer_bytes=256U*1024U"]
+    },
+    {
+      "file": "@repo/boards/alientek/atk-dnesp32s3/atk_board.c",
+      "contains_compact": [
+        ".pixel_format=PIXFORMAT_JPEG",
+        ".frame_size=FRAMESIZE_QVGA",
+        ".fb_count=2",
+        ".fb_location=CAMERA_FB_IN_PSRAM",
+        ".pin_d0=ATK_CAMERA_D0",
+        ".pin_d7=ATK_CAMERA_D7",
+        ".pin_sccb_sda=ATK_CAMERA_SCCB_SDA",
+        ".xclk_freq_hz=ATK_CAMERA_XCLK_HZ",
+        "sensor->id.PID!=OV2640_PID&&sensor->id.PID!=OV5640_PID",
+        "esp_camera_fb_get()",
+        "esp_camera_fb_return(frame)"
+      ]
+    },
+    {
+      "file": "@repo/boards/alientek/atk-dnesp32s3/board_config.h",
+      "contains_compact": [
+        "#defineATK_CAMERA_SCCB_SDAGPIO_NUM_39",
+        "#defineATK_CAMERA_D0GPIO_NUM_4",
+        "#defineATK_CAMERA_D7GPIO_NUM_18",
+        "#defineATK_CAMERA_XCLK_HZ24000000"
+      ]
+    },
+    {
+      "file": "components/starter_media/src/starter_media.c",
+      "contains_compact": [
+        "#defineVIDEO_MAX_BYTES(128U*1024U)",
+        "#defineVIDEO_SEND_BUFFER_LIMIT(192U*1024U)",
+        "frame.data[0]==0xff",
+        "frame.data[1]==0xd8",
+        "frame.data[frame.size-2]==0xff",
+        "frame.data[frame.size-1]==0xd9",
+        "starter_tirtc_send_jpeg(timestamp_ms(),frame.data,frame.size)==0",
+        "starter_tirtc_send_buffer_used()<VIDEO_SEND_BUFFER_LIMIT"
+      ]
+    },
+    {
+      "file": "components/starter_tirtc/src/starter_tirtc.c",
+      "contains_compact": [
+        "caseSTARTER_VIDEO_MJPEG:media=TIRTC_VIDEO_JPEG",
+        ".stream_id=H5_VIDEO_STREAM",
+        "returnTiRtcSendVideoStream(connection,&frame,data)"
+      ]
+    }
+  ]
+}

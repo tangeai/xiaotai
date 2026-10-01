@@ -1,0 +1,296 @@
+{
+  "schema_version": 2,
+  "board": {
+    "id": "alientek_atk_dnesp32s3_screenless_intake",
+    "vendor": "ALIENTEK",
+    "model": "ATK-DNESP32S3",
+    "hardware_revision": "unspecified"
+  },
+  "sources": [
+    {
+      "id": "user-board",
+      "kind": "user-declaration",
+      "location": "user-input://ATK-DNESP32S3-screenless-camera",
+      "revision": "unspecified"
+    },
+    {
+      "id": "user-atk-media-3-boot-log",
+      "kind": "user-runtime-log",
+      "location": "user-input://atk-media.3-ov5640-audio-probe-dhcp-crash",
+      "revision": "atk-media.3"
+    },
+    {
+      "id": "vendor-board",
+      "kind": "official-board-repository",
+      "location": "https://github.com/openedv/ATK-DNESP32S3-Board/tree/c7434a3da5b9e6feda05added5d6a686f1c95f13",
+      "revision": "c7434a3da5b9e6feda05added5d6a686f1c95f13"
+    },
+    {
+      "id": "vendor-schematic",
+      "kind": "official-schematic",
+      "location": "https://github.com/openedv/ATK-DNESP32S3-Board/blob/c7434a3da5b9e6feda05added5d6a686f1c95f13/1_docs/1_sch/ATK_DNESP32S3%20V1.2.pdf",
+      "revision": "V1.2"
+    },
+    {
+      "id": "product-contract",
+      "kind": "product-requirements",
+      "location": "docs/product/PRODUCT_REQUIREMENTS.md",
+      "revision": "V2.2"
+    },
+    {
+      "id": "local-v14-schematic",
+      "kind": "official-schematic",
+      "location": ".references/正点原子ATK-DNESP32S3/3，原理图/ATK_DNESP32S3_V1.4.pdf",
+      "revision": "V1.4"
+    },
+    {
+      "id": "local-mc2640-schematic",
+      "kind": "official-schematic",
+      "location": ".references/正点原子ATK-DNESP32S3/3，原理图/ATK-MC2640 V2.2.pdf",
+      "revision": "MC2640 V2.2"
+    },
+    {
+      "id": "local-mc5640-schematic",
+      "kind": "official-schematic",
+      "location": ".references/正点原子ATK-DNESP32S3/3，原理图/ATK-MC5640_V1.2.pdf",
+      "revision": "MC5640 V1.2"
+    },
+    {
+      "id": "project-wifi-manager",
+      "kind": "project-source",
+      "location": "firmware/esp-idf/esp32s3/atk-dnesp32s3/components/wifi_manager/src/wifi_manager.c",
+      "revision": "atk-media.11"
+    },
+    {
+      "id": "project-app-root",
+      "kind": "project-source",
+      "location": "firmware/esp-idf/esp32s3/atk-dnesp32s3/main/app_main.c",
+      "revision": "atk-media.11"
+    },
+    {
+      "id": "project-board-adapter",
+      "kind": "project-source",
+      "location": "boards/alientek/atk-dnesp32s3/atk_board.c",
+      "revision": "atk-media.11"
+    },
+    {
+      "id": "local-es8388-datasheet",
+      "kind": "official-datasheet",
+      "location": ".references/正点原子ATK-DNESP32S3/7，硬件资料/2，芯片资料/ES8388-DS.pdf",
+      "revision": "local vendor bundle"
+    }
+  ],
+  "soc": {
+    "target": "esp32s3",
+    "module": "ATK-MWS3S",
+    "flash_mb": 16,
+    "psram_mb": 8,
+    "source_refs": [
+      "vendor-board"
+    ]
+  },
+  "toolchain": {
+    "framework": "esp-idf",
+    "framework_version": "5.5.x",
+    "verification": "build_verified",
+    "tirtc": {
+      "platform": "espressif-esp32s3",
+      "version": "2.5.0",
+      "sdk_path": "third_party/tirtc",
+      "build_contract": "manifest/build-contract.env"
+    },
+    "source_refs": [
+      "vendor-board"
+    ]
+  },
+  "camera": {
+    "present": true,
+    "sensor": "OV5640",
+    "interface": "DVP via onboard camera connector; OV5640 PID 0x5640 observed during startup",
+    "selected_video_profile": "atk-ov-jpeg-qvga",
+    "video_profiles": [
+      {
+        "id": "atk-ov-jpeg-qvga",
+        "codec": "mjpeg",
+        "available": true,
+        "output_format": "jpeg_complete_frames",
+        "refresh_frame_control": true,
+        "stream_id": 11,
+        "verification": "build_verified",
+        "source_refs": [
+          "vendor-board",
+          "local-v14-schematic",
+          "local-mc2640-schematic",
+          "local-mc5640-schematic",
+          "project-board-adapter"
+        ]
+      }
+    ],
+    "source_refs": [
+      "user-board",
+      "vendor-board",
+      "local-v14-schematic",
+      "local-mc2640-schematic",
+      "local-mc5640-schematic",
+      "user-atk-media-3-boot-log"
+    ]
+  },
+  "audio_input": {
+    "present": true,
+    "interface": "onboard MIC to ES8388 ADC, I2S0; physical unit unverified",
+    "codecs": [
+      {
+        "name": "alaw",
+        "sample_rates_hz": [
+          8000
+        ],
+        "verification": "build_verified"
+      }
+    ],
+    "source_refs": [
+      "vendor-board",
+      "vendor-schematic",
+      "local-v14-schematic"
+    ]
+  },
+  "audio_output": {
+    "present": true,
+    "interface": "ES8388 DAC and onboard speaker, I2S0; physical unit unverified",
+    "codecs": [
+      {
+        "name": "alaw",
+        "sample_rates_hz": [
+          8000
+        ],
+        "verification": "build_verified"
+      }
+    ],
+    "source_refs": [
+      "vendor-board",
+      "vendor-schematic",
+      "local-v14-schematic"
+    ]
+  },
+  "hardware_resources": {
+    "i2c": {
+      "used": true,
+      "driver_family": "ng",
+      "single_driver_family": true,
+      "verification": "build_verified"
+    },
+    "i2s": {
+      "used": true,
+      "controller_and_gpio_ownership_resolved": true,
+      "verification": "build_verified"
+    },
+    "audio_semantic_contract": "board-audio-contract.json",
+    "video_semantic_contract": "board-video-contract.json",
+    "runtime_semantic_contract": "tirtc-runtime-contract.json",
+    "audio_channel_mapping": {
+      "required": true,
+      "resolved": true,
+      "verification": "build_verified"
+    },
+    "duplex_audio": {
+      "simultaneous_capture_playback": true,
+      "playback_reference_available": false,
+      "aec_implementation_available": false,
+      "verification": "build_verified"
+    },
+    "camera_realtime": {
+      "pipeline_safe": true,
+      "verification": "build_verified"
+    },
+    "memory": {
+      "startup_and_media_budgeted": null,
+      "verification": "extracted"
+    },
+    "source_refs": [
+      "vendor-board",
+      "vendor-schematic",
+      "local-v14-schematic",
+      "project-board-adapter",
+      "local-es8388-datasheet"
+    ]
+  },
+  "onboarding": {
+    "wifi_credentials": {
+      "selected_method": "atk-softap",
+      "methods": [
+        {
+          "id": "atk-softap",
+          "type": "softap",
+          "available": true,
+          "ssid_prefix": "XiaoTai-",
+          "auth_mode": "open",
+          "ipv4_address": "192.168.6.1",
+          "captive_portal": true,
+          "verification": "build_verified",
+          "source_refs": [
+            "project-wifi-manager",
+            "project-app-root"
+          ]
+        }
+      ],
+      "credentials_committed_to_source": false,
+      "reprovisioning_defined": true
+    },
+    "device_binding": {
+      "selected_method": "verification-code",
+      "methods": [
+        {
+          "id": "verification-code",
+          "type": "verification_code",
+          "available": true,
+          "verification": "build_verified",
+          "source_refs": [
+            "product-contract",
+            "project-app-root"
+          ]
+        }
+      ],
+      "credentials_committed_to_source": false,
+      "stored_credential_state_handled": true,
+      "clear_binding_control": true
+    },
+    "source_refs": [
+      "product-contract",
+      "vendor-board"
+    ]
+  },
+  "build_evidence": {
+    "artifacts": [
+      {
+        "path": "artifacts/atk-media.11/atk_xiaotai_s3.bin",
+        "size_bytes": 1946640,
+        "sha256": "6bdb92a9b5acf0e2745f22a9bb8a21e31e9ae435f40c9b5019e08c78f3a0f555"
+      },
+      {
+        "path": "artifacts/atk-media.11/atk_xiaotai_s3.elf",
+        "size_bytes": 15286888,
+        "sha256": "c53573a12e9d8769668ca2d4dfb9d45f8db0688e97c8602e342c4e9be228b554"
+      },
+      {
+        "path": "artifacts/atk-media.11/bootloader.bin",
+        "size_bytes": 20832,
+        "sha256": "a84064beb2ad43563a23c5bed761f4e654e02c3f32d20c5ec255cc7a1c4a50e2"
+      },
+      {
+        "path": "artifacts/atk-media.11/partition-table.bin",
+        "size_bytes": 3072,
+        "sha256": "1edad21a69d0791cb6fe8a4f47ea7c64cfd302031f8db2c9f68cdc9568ca124c"
+      }
+    ]
+  },
+  "runtime_evidence": [],
+  "features": {
+    "requested": [
+      "h5_live_audio",
+      "h5_live_video",
+      "h5_talkback",
+      "ai_talk",
+      "device_call",
+      "wechat_voip"
+    ]
+  }
+}

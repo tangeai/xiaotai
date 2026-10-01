@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "profiles": {
+    "headless-key": {
+      "required_capabilities": [],
+      "presentation": "audio-led",
+      "navigation": "voice-and-physical-intents"
+    },
+    "display-key": {
+      "required_capabilities": ["display"],
+      "presentation": "status-caption-qr-display",
+      "navigation": "voice-and-physical-intents"
+    },
+    "touch-full": {
+      "required_capabilities": ["display", "touch"],
+      "presentation": "complete-touch-ui",
+      "navigation": "touch-and-common-intents"
+    }
+  },
+  "layouts": {
+    "none": {"required_capabilities": []},
+    "compact": {"required_capabilities": ["display"]},
+    "large": {"required_capabilities": ["display"]}
+  }
+}

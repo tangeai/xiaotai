@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "platform_contract": "platform-media-contract.json",
+  "dependencies": {
+    "espressif/esp_h264": "1.3.8",
+    "espressif/esp_video": "0.8.0~3",
+    "espressif/esp_jpeg": "1.3.1",
+    "espressif/esp_hosted": "1.4.7",
+    "espressif/esp_wifi_remote": "0.14.5",
+    "espressif/esp_lvgl_port": "2.7.2"
+  },
+  "camera": {
+    "codec": "h264",
+    "media": "TIRTC_VIDEO_H264",
+    "complete_access_unit_per_send": true,
+    "stream_id": 11,
+    "frame_buffers": 3,
+    "accepted_sensor_pids": [22151],
+    "unknown_sensor_policy": "reject"
+  },
+  "scheduler": {
+    "wifi_core": 0,
+    "camera_core": 1,
+    "note": "P4 双核分配：网络/RTC 走 core 0，UI/音频/视频转换走 core 1（main/platform/app_task_affinity.h）。Wi-Fi 协议栈整体运行在 C6 协处理器上，P4 端只有 ESP-Hosted SDIO 宿主任务；ESP-IDF 的 CONFIG_CAMERA_CORE/ESP_WIFI_TASK_PINNED_TO_CORE 符号在本 P4 工程不存在，S3 模板式 scheduler 文本核验不适用于本板。",
+    "config_files": ["sdkconfig.defaults"],
+    "wifi_config_files": ["sdkconfig.defaults"]
+  },
+  "memory": {
+    "max_send_buffer_bytes": 2097152,
+    "max_complete_access_unit_bytes": 262144,
+    "video_backpressure_bytes": 1572864
+  },
+  "evidence": [
+    "reference-project",
+    "vendor-wiki",
+    "user-input-20260922"
+  ],
+  "implementation_assertions": [
+    {
+      "file": "main/protocols/tirtc/tirtc_session_options.h",
+      "contains": [
+        "TIRTC_SESSION_MAX_SEND_BUFFER"
+      ],
+      "absent": []
+    },
+    {
+      "file": "main/services/call_video_renderer_config.h",
+      "contains": [
+        "CALL_VIDEO_RENDER_WIDTH             640U",
+        "CALL_VIDEO_RENDER_HEIGHT            384U"
+      ],
+      "absent": []
+    },
+    {
+      "file": "sdkconfig.defaults",
+      "contains": [
+        "CONFIG_CAMERA_OV5647=y",
+        "CONFIG_CAMERA_OV5647_MIPI_RAW10_1280x960_BINNING_45FPS=y"
+      ],
+      "absent": []
+    }
+  ]
+}

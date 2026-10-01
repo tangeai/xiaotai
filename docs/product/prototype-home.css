@@ -1,0 +1,151 @@
+.tap-surface { position:absolute; inset:37px 0 0; width:100%; padding:0; border:0; background:transparent; color:#fff; cursor:pointer; }
+.tap-surface .chip { top:11px; }
+.tap-surface .face { inset:55px 45px 72px; }
+.clock-home { display:flex; flex-direction:column; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 45%,#17313e,#071218 70%); }
+.clock-home small { font-size:11px; color:#8da5b1; letter-spacing:.06em; }
+.clock-home strong { font-size:68px; line-height:1.12; letter-spacing:-.04em; font-weight:650; }
+.clock-home span { margin-top:8px; font-size:11px; color:#8fdcf0; }
+.home-dots { position:absolute; z-index:14; left:50%; bottom:13px; transform:translateX(-50%); display:flex; }
+.home-dots button { position:relative; width:28px; height:28px; padding:0; border:0; background:transparent; }
+.home-dots button::after { content:""; position:absolute; width:6px; height:6px; left:11px; top:11px; border-radius:50%; background:#ffffff42; }
+.home-dots button.active::after { width:15px; left:6px; border-radius:5px; background:#75dff8; }
+.home-hint { position:absolute; z-index:18; left:50%; bottom:54px; transform:translate(-50%,10px); white-space:nowrap; padding:9px 13px; border:1px solid #ffffff18; border-radius:99px; background:#071017e8; color:#dff7ff; font-size:10px; opacity:0; pointer-events:none; transition:opacity .28s ease,transform .28s ease; }
+.home-hint span { color:#6fe0fa; margin-right:5px; }
+.home-hint.show { opacity:1; transform:translate(-50%,0); }
+.subtitle { z-index:20; min-height:38px; line-height:1.45; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+.sleep-options { display:grid!important; grid-template-columns:repeat(5,1fr); gap:5px; margin-top:10px; }
+.sleep-options button { height:30px; border:1px solid #ffffff0d; border-radius:8px; background:#172b36; color:#9fb2bc; font-size:9px; }
+.sleep-options button.active { border-color:#69dbf8; background:#163b49; color:#81e5ff; }
+.screen-off { position:absolute; inset:0; width:100%; border:0; background:#000; color:#1a2a31; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; }
+.screen-off span { font-size:12px; color:#10232b; }
+.screen-off small { font-size:8px; letter-spacing:.12em; opacity:.55; }
+.call-choice { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin:20px auto 0; width:88%; }
+.call-choice button { height:58px; border:0; border-radius:15px; background:#17313d; color:#d9f6ff; font-size:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; }
+.call-choice button:last-child { background:#146e48; color:#fff; }
+.call-choice button b { font-size:20px; }
+.call-choice button:disabled { opacity:.35; }
+.call-choice.voice-only { grid-template-columns:1fr; width:62%; }
+.call-toolbar { position:absolute; z-index:30; left:25px; right:25px; bottom:20px; display:flex; justify-content:center; gap:22px; }
+.call-toolbar button { width:62px; height:62px; padding:0; border:0; border-radius:50%; background:#ffffff25; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; backdrop-filter:blur(8px); }
+.call-toolbar button b { font-size:18px; line-height:1; }
+.call-toolbar button span { font-size:7px; }
+.call-toolbar button.off { background:#f4f6f7; color:#15212c; }
+.call-toolbar .end-call { background:#ef4f5d; transform:rotate(0); }
+.call.video { position:absolute; inset:0; z-index:1; }
+.video-stage { position:absolute; z-index:0; inset:0; background:linear-gradient(160deg,#294652,#0a151b); overflow:hidden; display:grid; place-items:center; }
+.remote-person { width:150px; height:205px; padding-top:45px; border-radius:76px 76px 24px 24px; background:#365c6d; color:#bceafa; font-size:60px; }
+.self-view { position:absolute; right:12px; top:42px; width:76px; height:100px; border:2px solid #ffffff45; border-radius:13px; background:#17252c; display:grid; place-items:center; font-size:8px; color:#b9cad2; box-shadow:0 8px 20px #0008; }
+.video-stage.camera-off .self-view { background:#090d0f; color:#79878e; }
+.call.video .source { position:relative; z-index:2; padding-top:9px; }
+.call.video h2 { position:absolute; z-index:2; left:0; right:0; bottom:124px; text-shadow:0 2px 8px #000; }
+.call.video p { position:absolute; z-index:2; left:0; right:0; bottom:99px; color:#e9f4f7; }
+
+/* Deep-ocean product theme: pure black is reserved for the real screen-off state. */
+.screen {
+  background:
+    radial-gradient(circle at 50% 24%, rgba(35, 100, 123, .35), transparent 43%),
+    linear-gradient(165deg, #0c2029 0%, #07151c 58%, #061117 100%);
+  box-shadow: inset 0 0 0 1px rgba(132, 224, 248, .07), inset 0 -25px 60px rgba(0, 0, 0, .24);
+}
+
+.top {
+  position: relative;
+  z-index: 40;
+  color: #91b0bc;
+  background: linear-gradient(180deg, rgba(5, 15, 20, .62), transparent);
+}
+
+.chip {
+  color: #bfe9f3;
+  border-color: rgba(119, 221, 247, .16);
+  background: rgba(17, 45, 56, .62);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, .16);
+}
+.chip.privacy { color:#bfffe0; border-color:rgba(69,220,139,.3); background:rgba(13,67,45,.86); box-shadow:0 0 18px rgba(55,211,127,.18); }
+
+.eye {
+  background: #f4fcff;
+  box-shadow: 0 0 22px rgba(104, 220, 248, .38), 0 0 55px rgba(48, 152, 185, .14);
+}
+
+.subtitle {
+  color: #edfaff;
+  background: rgba(10, 29, 37, .9);
+  border-color: rgba(116, 218, 244, .14);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, .28);
+  backdrop-filter: blur(8px);
+}
+
+.device-menu,
+.contacts,
+.settings-screen,
+.network-screen,
+.conversation-screen,
+.emoji-screen,
+.detail-screen,
+.emoji-preview-screen {
+  background:
+    radial-gradient(circle at 85% 0%, rgba(42, 115, 139, .18), transparent 38%),
+    linear-gradient(160deg, #0b2029, #07151c 70%);
+}
+
+.device-menu-grid button,
+.device-setting,
+.emoji-item,
+.bubble {
+  background: linear-gradient(145deg, rgba(25, 54, 66, .92), rgba(14, 36, 45, .9));
+  border-color: rgba(132, 224, 248, .09);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .025), 0 7px 20px rgba(0, 0, 0, .12);
+}
+
+.device-menu-grid button:active,
+.emoji-item:active,
+.row:active {
+  background: #173b49;
+  transform: scale(.98);
+}
+
+.row { border: 1px solid transparent; }
+.row:hover { background: rgba(31, 67, 80, .58); border-color: rgba(111, 216, 243, .08); }
+.bubble.user { background: linear-gradient(145deg, #2c6680, #24556c); }
+.home-menu-button { background: rgba(20, 49, 60, .84); border-color: rgba(126, 224, 249, .16); box-shadow: 0 7px 22px rgba(0, 0, 0, .25); }
+.home-hint { background: rgba(10, 31, 40, .94); border-color: rgba(117, 223, 250, .18); box-shadow: 0 8px 28px rgba(0, 0, 0, .3); }
+.clock-home { background: radial-gradient(circle at 50% 42%, #1b4657 0%, #0c2732 34%, #07151c 73%); }
+.screen-off { background: #000; }
+.binding-screen { position:absolute; z-index:60; inset:0; padding:30px 22px 18px; background:radial-gradient(circle at 50% 0,#164254,#081820 64%); color:#effbff; text-align:center; }
+.binding-icon { width:42px; height:42px; margin:0 auto 9px; border-radius:14px; display:grid; place-items:center; background:#173b49; color:#72def8; font-size:23px; }
+.binding-label { color:#9fb8c2; font-size:10px; letter-spacing:.12em; }
+.binding-screen h2 { margin:10px 0 10px; font-size:34px; letter-spacing:.12em; color:#fff; }
+.binding-screen p { margin:0; color:#abc0c9; font-size:10px; line-height:1.6; }
+.binding-screen button { width:100%; height:36px; margin-top:17px; border:0; border-radius:11px; background:#65d9f8; color:#07202a; font-weight:800; font-size:10px; }
+.binding-screen .binding-done { margin-top:8px; background:#173b49; color:#bfe9f3; border:1px solid #ffffff18; }
+.binding-screen small { display:block; margin-top:11px; color:#6f8994; font-size:7px; }
+.ap-setup { position:absolute; z-index:60; inset:0; padding:24px 25px 16px; background:radial-gradient(circle at 50% 0,#164254,#081820 60%); color:#effbff; text-align:center; }
+.ap-icon { width:50px; height:50px; margin:0 auto 8px; border-radius:17px; display:grid; place-items:center; background:#173b49; color:#72def8; font-size:28px; }
+.ap-setup h2 { margin:0; font-size:18px; }
+.ap-setup>p { margin:5px 0 12px; color:#91aab5; font-size:10px; }
+.ap-setup ol { margin:0; padding:0; list-style:none; display:grid; gap:7px; text-align:left; }
+.ap-setup li { min-height:50px; padding:7px 10px; border:1px solid #ffffff0d; border-radius:13px; background:#112c37; display:grid; grid-template-columns:32px 1fr; align-items:center; }
+.ap-setup li>b { width:25px; height:25px; border-radius:50%; display:grid; place-items:center; background:#65d9f8; color:#06202a; font-size:11px; }
+.ap-setup li span { font-size:9px; line-height:1.45; color:#abc0c9; }
+.ap-setup li strong { color:#f0fbff; font-size:10px; }
+.ap-setup>button { width:100%; height:38px; margin-top:11px; border:0; border-radius:12px; background:#65d9f8; color:#07202a; font-weight:800; }
+.ap-setup>small { display:block; margin-top:6px; color:#6f8994; font-size:7px; }
+.actions.labeled button { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
+.actions.labeled button b { font-size:20px; line-height:1; }
+.actions.labeled button span { font-size:7px; }
+.home-wechat-call { position:absolute; z-index:16; right:13px; bottom:66px; width:44px; height:44px; padding:0; border:1px solid rgba(143,255,187,.24); border-radius:15px; background:linear-gradient(145deg,#31d46f,#1ca854); color:#fff; box-shadow:0 8px 24px rgba(14,139,68,.32); }
+.home-wechat-call b { display:grid; place-items:center; width:28px; height:25px; margin:auto; border-radius:50%; background:#fff; color:#20b65b; font-size:11px; font-style:normal; }
+.home-wechat-call:active { transform:scale(.95); }
+.wechat-auth-screen { position:absolute; z-index:50; inset:37px 0 0; padding:12px 20px 13px; background:radial-gradient(circle at 50% 4%,rgba(38,168,91,.18),transparent 42%),linear-gradient(165deg,#0b2028,#07151b 72%); text-align:center; }
+.wechat-auth-screen .screen-head { margin-bottom:6px; }
+.wechat-auth-icon { width:38px; height:38px; margin:4px auto 6px; border-radius:13px; display:grid; place-items:center; background:#2bc66b; color:#fff; font-size:15px; font-weight:800; }
+.wechat-auth-screen h2 { margin:0; font-size:15px; }
+.wechat-auth-screen>p { margin:4px 0 7px; color:#99afb8; font-size:9px; line-height:1.45; }
+.miniapp-code { width:104px; height:104px; margin:0 auto 6px; padding:7px; border-radius:12px; background:#fff; color:#12242c; box-shadow:0 9px 24px rgba(0,0,0,.25); }
+.qr-pattern { height:73px; border-radius:5px; background:repeating-conic-gradient(#12242c 0 25%,#fff 0 50%) 0/14px 14px; box-shadow:inset 0 0 0 5px #fff; }
+.miniapp-code b { display:block; margin-top:4px; font-size:8px; }
+.wechat-auth-status { margin:5px 0; color:#71d99b; font-size:8px; }
+.wechat-auth-status i { display:inline-block; width:6px; height:6px; margin-right:5px; border-radius:50%; background:#39d97d; animation:blink 1.5s infinite; }
+.other-contact-button { width:76%; height:36px; border:1px solid rgba(127,221,247,.14); border-radius:11px; background:#15323e; color:#e6f8fd; font-size:10px; font-weight:700; }
+.wechat-auth-screen>small { display:block; margin-top:6px; color:#6f8994; font-size:7px; }

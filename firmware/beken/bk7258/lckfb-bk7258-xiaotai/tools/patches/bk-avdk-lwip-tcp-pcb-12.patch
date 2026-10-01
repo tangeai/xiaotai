@@ -1,0 +1,12 @@
+diff --git a/ap/components/lwip_intf_v2_1/lwip-2.1.2/port/lwipopts.h b/ap/components/lwip_intf_v2_1/lwip-2.1.2/port/lwipopts.h
+--- a/ap/components/lwip_intf_v2_1/lwip-2.1.2/port/lwipopts.h
++++ b/ap/components/lwip_intf_v2_1/lwip-2.1.2/port/lwipopts.h
+@@ -217,7 +217,7 @@
+ #define MEM_STATS                        CONFIG_LWIP_MEM_STATS
+ 
+ 
+-#define MAX_SOCKETS_TCP 8
++#define MAX_SOCKETS_TCP 12
+ #define MAX_LISTENING_SOCKETS_TCP 4
+ #define MAX_SOCKETS_UDP 8
+ #define TCP_SND_BUF_COUNT 5

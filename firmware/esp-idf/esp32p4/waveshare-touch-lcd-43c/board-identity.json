@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "declared": {
+    "vendor": "Waveshare（微雪电子）",
+    "model": "ESP32-P4-WIFI6-Touch-LCD-4.3",
+    "hardware_revision": null
+  },
+  "observed": {
+    "target": "esp32p4",
+    "module": "ESP32-P4NRW32（芯片内叠封 32MB PSRAM）+ 板载 32MB Nor Flash + ESP32-C6-MINI-1-N4",
+    "flash_mb": 32,
+    "psram_mb": 32,
+    "components": [
+      {"kind": "camera", "model": "OV5647（MIPI-CSI 2lane，15PIN 0.5mm 连接器，基础版随板附带；-C 版本是否带模组待用户确认）"},
+      {"kind": "audio_codec", "model": "ES8311（DAC/功放输出）+ ES7210（四通道 ADC，板载双麦克风阵列）"},
+      {"kind": "display", "model": "ST7701 4.3寸 480×800 IPS，MIPI-DSI 2lane"},
+      {"kind": "touch", "model": "GT911（I2C 0x5D/0x14）"},
+      {"kind": "network", "model": "ESP32-C6-MINI-1-N4（ESP-Hosted SDIO）"}
+    ],
+    "probes": []
+  }
+}

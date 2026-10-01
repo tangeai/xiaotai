@@ -1,0 +1,40 @@
+menu "Board Support Package"
+
+    config BSP_ERROR_CHECK
+        bool "Error check"
+        default y
+
+    config BSP_I2C_NUM
+        int "I2C peripheral index"
+        default 1
+
+    config BSP_I2C_FAST_MODE
+        bool "Enable I2C fast mode"
+        default y
+
+    config BSP_I2C_CLK_SPEED_HZ
+        int "I2C clock speed (Hz)"
+        default 400000 if BSP_I2C_FAST_MODE
+        default 100000
+
+    config BSP_DISPLAY_BRIGHTNESS_LEDC_CH
+        int "LEDC channel index"
+        default 1
+
+    choice BSP_LCD_COLOR_FORMAT
+        prompt "LCD color format"
+        default BSP_LCD_COLOR_FORMAT_RGB565
+        help
+            Select LCD color format.
+
+        config BSP_LCD_COLOR_FORMAT_RGB565
+            bool "RGB565"
+        config BSP_LCD_COLOR_FORMAT_RGB888
+            bool "RGB888"
+    endchoice
+
+    config BSP_LCD_DPI_BUFFER_NUMS
+        int "Set number of frame buffers"
+        default 3
+
+endmenu

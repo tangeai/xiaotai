@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "canonical_emotions": [
+    "neutral",
+    "happy",
+    "laughing",
+    "funny",
+    "sad",
+    "angry",
+    "crying",
+    "loving",
+    "embarrassed",
+    "surprised",
+    "shocked",
+    "thinking",
+    "winking",
+    "cool",
+    "relaxed",
+    "delicious",
+    "kissy",
+    "confident",
+    "sleepy",
+    "silly",
+    "confused"
+  ],
+  "themes": [
+    {
+      "id": "pixel-robot-glossy-v1",
+      "display_name": "像素机器人·圆润高光",
+      "status": "concept-sheet",
+      "runtime_ready": false,
+      "animated": false,
+      "coverage": "partial",
+      "contact_sheet": "pixel-robot-glossy-v1/contact-sheet.png",
+      "pixel_size": [1402, 1122],
+      "sha256": "16d0caa8fdbb3aebe634dcd971779e15d6afc8ae9101dc56a476f04d5f7683da",
+      "emotion_order": [
+        "neutral",
+        "happy",
+        "surprised",
+        "winking",
+        "silly",
+        "cool",
+        "sad",
+        "angry",
+        "crying"
+      ],
+      "provenance": "OpenAI image generation for the XiaoTai expression exploration on 2026-10-01",
+      "notes": "Rounded close-up robot concept. Labels and background must be removed when producing runtime frames."
+    },
+    {
+      "id": "pixel-robot-compact-v1",
+      "display_name": "像素机器人·紧凑全身",
+      "status": "concept-sheet",
+      "runtime_ready": false,
+      "animated": false,
+      "coverage": "partial",
+      "contact_sheet": "pixel-robot-compact-v1/contact-sheet.png",
+      "pixel_size": [1448, 1086],
+      "sha256": "1cbc0a9aeab53a8ef602aeb00ae801add107cdd583c42d34377cecc05efa74d6",
+      "emotion_order": [
+        "neutral",
+        "happy",
+        "surprised",
+        "winking",
+        "silly",
+        "cool",
+        "sad",
+        "angry",
+        "crying"
+      ],
+      "provenance": "OpenAI image generation for the XiaoTai expression exploration on 2026-10-01",
+      "notes": "Compact full-body robot concept. Labels and background must be removed when producing runtime frames."
+    }
+  ]
+}

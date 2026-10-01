@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "artifact_sha256": "2e4ebce6918fd65aac5055fa2a2553cc3ea9e1dbf7c511f25e504b287d56d89f",
+  "identity": {
+    "soc": "BK7258",
+    "chip_id": "0x72360101",
+    "chip_revision": null,
+    "board_model": "立创·实战派BK7258",
+    "pcb_revision": null,
+    "sdk": {
+      "name": "bk_avdk_smp",
+      "version": "release/v3.1.1.8",
+      "revision": "1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7"
+    },
+    "board_config_sha256": "020ed5cb8c4f89ad65c35c62642677c5a5d44da02cb0d9336bfd4f7c037eb3a7"
+  },
+  "flash": {
+    "state": "unknown",
+    "method": "AP flash-client API unavailable",
+    "source": "bk_avdk_smp flash_client stub",
+    "jedec_id": null,
+    "recognized": null,
+    "physical_bytes": null,
+    "mapped_bytes": null,
+    "application_usable_bytes": 1949696
+  },
+  "memory": {
+    "internal_sram": {
+      "state": "measured",
+      "total_bytes": 178024,
+      "free_boot_bytes": 80952,
+      "minimum_free_bytes": 80952,
+      "largest_free_block_bytes": null
+    },
+    "psram": {
+      "state": "measured",
+      "present": true,
+      "total_bytes": 11075584,
+      "free_boot_bytes": 11061792,
+      "minimum_free_bytes": 11061792,
+      "largest_free_block_bytes": null
+    }
+  },
+  "display": {
+    "state": "detected",
+    "method": "bk_display_open",
+    "source": "runtime",
+    "controller": "ST7789V2",
+    "bus": "SPI1",
+    "width_px": 320,
+    "height_px": 240,
+    "width_mm": null,
+    "height_mm": null,
+    "pixel_format": "RGB565",
+    "test": "not_run"
+  },
+  "touch": {
+    "state": "unsupported",
+    "method": "exact_board_profile",
+    "source": "LCKFB default board BOM/BSP",
+    "controller": null,
+    "bus": null,
+    "points": null,
+    "test": "not_run"
+  },
+  "camera": {
+    "state": "declared",
+    "method": "compiled_dvp_h264_profile",
+    "source": "pinned-bsp",
+    "sensor": null,
+    "output_profiles": [
+      "H264 1280x720@10"
+    ],
+    "test": "not_run"
+  },
+  "audio": {
+    "microphone": {
+      "state": "declared",
+      "method": "compiled_board_profile",
+      "source": "lckfb-bk7258-xiaotai",
+      "channels": 1,
+      "sample_rates_hz": [
+        8000
+      ],
+      "sample_bits": [
+        16
+      ],
+      "formats": [
+        "pcm_s16le"
+      ],
+      "test": "not_run"
+    },
+    "speaker": {
+      "state": "declared",
+      "method": "compiled_board_profile",
+      "source": "lckfb-bk7258-xiaotai",
+      "channels": 1,
+      "sample_rates_hz": [
+        8000
+      ],
+      "sample_bits": [
+        16
+      ],
+      "formats": [
+        "pcm_s16le"
+      ],
+      "test": "not_run"
+    },
+    "duplex": {
+      "simultaneous": true,
+      "playback_reference": false,
+      "aec_available": false,
+      "aec_test": "not_run"
+    }
+  },
+  "controls": {
+    "verified_buttons": 0,
+    "intent_map_approved": true
+  },
+  "integration": {
+    "tirtc_sdk_compatible": null,
+    "audio_uplink_pipeline": true,
+    "audio_downlink_pipeline": true,
+    "video_uplink_pipeline": true,
+    "session_arbiter": true,
+    "device_call_protocol": true,
+    "wechat_voip_protocol": true
+  },
+  "requested_features": [
+    "h5_audio",
+    "h5_video",
+    "h5_talkback",
+    "ai_talk",
+    "device_call",
+    "wechat_voip"
+  ],
+  "issues": [
+    "active display/audio/camera probes not run",
+    "AP flash client cannot read JEDEC ID; collect it on CP",
+    "audio adapter lacks playback reference and AEC",
+    "TiRTC DTLS/WHIP runtime compatibility not verified"
+  ]
+}

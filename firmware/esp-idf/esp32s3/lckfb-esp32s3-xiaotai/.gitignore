@@ -1,0 +1,8 @@
+/build/
+/managed_components/
+/sdkconfig
+/sdkconfig.old
+
+# Local firmware snapshots are generated deliverables, not source files.
+# Add a validated release bundle explicitly with `git add -f artifacts/<name>`.
+/artifacts/

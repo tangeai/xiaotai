@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "promotion_status": "candidate",
+  "package_id": "waveshare_esp32p4_wifi6_touch_lcd_43c_v1_0",
+  "identity": {
+    "vendor": "Waveshare（微雪电子）",
+    "model": "ESP32-P4-WIFI6-Touch-LCD-4.3",
+    "aliases": [],
+    "hardware_revision": "V1.0",
+    "target": "esp32p4",
+    "module": "ESP32-P4NRW32（芯片封装内叠封 32MB PSRAM）+ 板载 32MB Nor Flash；ESP32-C6-MINI-1-N4（Wi-Fi6/BLE5，SDIO 从机）",
+    "flash_mb": 32,
+    "psram_mb": 32,
+    "components": [
+      {
+        "kind": "audio_input",
+        "model": "ALAW"
+      },
+      {
+        "kind": "audio_input",
+        "model": "ES7210"
+      },
+      {
+        "kind": "audio_output",
+        "model": "ALAW"
+      },
+      {
+        "kind": "audio_output",
+        "model": "ES8311"
+      },
+      {
+        "kind": "camera",
+        "model": "OV5647"
+      }
+    ],
+    "probes": []
+  },
+  "compatibility": {
+    "idf": "5.5.4",
+    "tirtc_sdk": "2.3.0-P4-validation-rebuild"
+  },
+  "proposed_artifacts": {
+    "hardware_ir": "hardware-ir.json",
+    "adapter": null,
+    "config_overlay": "sdkconfig.defaults",
+    "contracts": [
+      "board-audio-contract.json",
+      "board-video-contract.json",
+      "tirtc-runtime-contract.json"
+    ]
+  },
+  "lessons": [],
+  "promotion_requirements": [
+    "resolve exact PCB revision and every required runtime probe",
+    "copy project-relative Hardware IR, adapter, config overlay and contracts into the registry package",
+    "bind hardware/HIL lessons to an exact artifact SHA-256",
+    "add a focused regression test before promoting a generic invariant",
+    "review and commit the candidate; never mutate an installed Skill automatically"
+  ]
+}

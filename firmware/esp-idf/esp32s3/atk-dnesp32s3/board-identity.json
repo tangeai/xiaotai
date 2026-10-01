@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "declared": {
+    "vendor": "ALIENTEK",
+    "model": "ATK-DNESP32S3",
+    "hardware_revision": null
+  },
+  "observed": {
+    "target": null,
+    "module": null,
+    "flash_mb": null,
+    "psram_mb": null,
+    "components": [],
+    "probes": []
+  }
+}

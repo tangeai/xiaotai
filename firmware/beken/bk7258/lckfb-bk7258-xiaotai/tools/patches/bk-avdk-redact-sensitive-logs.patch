@@ -1,0 +1,28 @@
+diff --git a/ap/components/bk_wifi/src/wifi_api.c b/ap/components/bk_wifi/src/wifi_api.c
+index 0bcdd48..8db1f78 100755
+--- a/ap/components/bk_wifi/src/wifi_api.c
++++ b/ap/components/bk_wifi/src/wifi_api.c
+@@ -160,8 +160,8 @@ static int wifi_sta_set_global_config(const wifi_sta_config_t *config)
+     os_memcpy(g_sta_param_ptr->key, config->password, g_sta_param_ptr->key_len);
+     g_sta_param_ptr->key[g_sta_param_ptr->key_len] = 0;
+ 
+-    WDRV_LOGD("sta config, ssid=%s password=%s security=%d\n",
+-                      config->ssid, config->password, config->security);
++    WDRV_LOGD("sta config, ssid=%s password_len=%u security=%d\n",
++                      config->ssid, (unsigned)g_sta_param_ptr->key_len, config->security);
+     return BK_OK;
+ }
+ 
+diff --git a/ap/components/webclient/webclient.c b/ap/components/webclient/webclient.c
+index 2501ae1..bbd8c5b 100755
+--- a/ap/components/webclient/webclient.c
++++ b/ap/components/webclient/webclient.c
+@@ -741,7 +741,7 @@ int webclient_send_header(struct webclient_session *session, int method)
+ 
+             if (header_line_len > 0)
+             {
+-                BK_LOGD(TAG,"%.*s\r\n", header_line_len, header_str);
++                BK_LOGD(TAG,"request header line bytes=%d (value redacted)\r\n", header_line_len);
+             }
+             header_str = header_ptr + strlen("\r\n");
+         }

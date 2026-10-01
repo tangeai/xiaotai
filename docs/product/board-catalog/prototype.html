@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>开发板目录原型 — 探鸽·小钛</title>
+  <link rel="stylesheet" href="prototype.css?v=1">
+  <link rel="stylesheet" href="prototype-detail.css?v=1">
+  <link rel="stylesheet" href="prototype-header.css?v=1">
+  <link rel="stylesheet" href="prototype-notice.css?v=1">
+  <link rel="stylesheet" href="prototype-video.css?v=1">
+</head>
+<body>
+  <header class="site-header"><nav class="shell site-nav" aria-label="主导航"><a class="brand" href="#" aria-label="探鸽 · 小钛首页"><i class="brand-mark" aria-hidden="true"></i><span>探鸽 · 小钛</span></a><div class="nav-links"><a href="#">快速入门</a><a class="active" href="#">开发板</a><a href="#">功能示例</a><a href="https://docs.tange.ai/products/tirtc/download.html" target="_blank" rel="noreferrer">设备端 SDK 下载</a><a href="https://community.tange-ai.com" target="_blank" rel="noreferrer">开放社区</a></div><div class="nav-actions"><a class="nav-github" href="https://github.com/tangeai/tirtc-server-example" target="_blank" rel="noreferrer"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .7a11.5 11.5 0 0 0-3.64 22.4c.58.1.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.17.08 1.78 1.2 1.78 1.2 1.03 1.77 2.7 1.26 3.36.97.1-.75.4-1.26.73-1.55-2.57-.29-5.27-1.28-5.27-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.16 1.18A10.9 10.9 0 0 1 12 6.12c.98 0 1.95.13 2.87.39 2.2-1.49 3.16-1.18 3.16-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.42-2.71 5.39-5.29 5.68.42.36.79 1.07.79 2.16v3.22c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z"/></svg>GitHub</a><a class="nav-login" href="#">登录</a><a class="console-link" href="#">免费注册</a></div></nav></header>
+  <main class="shell">
+    <section class="intro"><div><span>SUPPORTED BOARDS</span><h1>开发板</h1><p>查看小钛支持的开发板及相关资源。</p></div></section>
+    <section id="featured-list" class="featured-list" aria-label="开发板"></section>
+    <section class="section-heading more-heading"><h2>更多型号</h2></section>
+    <div class="list-head"><span>厂商 / 开发板</span><span>完整型号</span><span>芯片平台</span><span>核心能力</span><span>状态</span><span></span></div>
+    <section id="board-list" class="board-list" aria-live="polite"></section>
+    <section class="request-board"><div><b>没有找到你的开发板？</b><p>前往开放社区提交期望适配的型号、硬件资料和使用场景。</p></div><a href="https://community.tange-ai.com" target="_blank" rel="noreferrer">提交适配需求 <span>↗</span></a></section>
+  </main>
+  <dialog id="detail-dialog" class="detail-dialog"><button class="dialog-close" aria-label="关闭详情">×</button><div class="detail-image"><img id="detail-image" alt=""><a id="detail-video" class="detail-video" target="_blank" rel="noreferrer"><span>▶</span> 播放效果视频</a></div><div class="detail-content"><small id="detail-vendor"></small><h2 id="detail-name"></h2><p id="detail-summary"></p><dl><div><dt>完整型号</dt><dd id="detail-model"></dd></div><div><dt>芯片</dt><dd id="detail-chip"></dd></div><div><dt>厂商</dt><dd id="detail-maker"></dd></div></dl><div class="detail-links"><a id="detail-buy" target="_blank" rel="noreferrer">购买链接 ↗</a><a id="detail-repo" target="_blank" rel="noreferrer">仓库链接 ↗</a><a id="detail-firmware" target="_blank" rel="noreferrer">固件链接 ↗</a><a id="detail-guide" target="_blank" rel="noreferrer">烧录指南 ↗</a></div><p class="merchant-note">购买由第三方商家提供，商品、订单及售后问题请联系对应商家。小钛仅提供信息指引，与商家不存在合作、代理或担保关系。</p></div></dialog>
+  <script>
+    const real=[
+      {vendor:'立创开发板',name:'立创·实战派 ESP32-S3',model:'ESP32-S3-WROOM-1-N16R8 / PCB V1.0.1',chip:'ESP32-S3',summary:'320×240 触摸屏与完整音频能力，适合 AI 语音聊天、设备互呼及微信语音呼叫。',caps:['语音','触摸屏','H5画面'],status:'已适配',tone:'s3',buy:'https://wiki.lckfb.com/zh-hans/szpi-esp32s3/',repo:'https://github.com/tangeai/xiaotai',firmware:'https://github.com/tangeai/xiaotai/releases',guide:'../../boards/lckfb-esp32s3/README.md',video:'https://demo-open.tange-ai.com/download/videos/ai-call.mp4'},
+      {vendor:'Waveshare 微雪',name:'ESP32-P4-WIFI6-Touch-LCD-4.3',model:'ESP32-P4-WIFI6-Touch-LCD-4.3',chip:'ESP32-P4',summary:'4.3 寸触摸屏、摄像头与 Wi-Fi 6，面向设备端音视频交互。',caps:['音视频','触摸屏','摄像头'],status:'已适配',tone:'p4',buy:'https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4.3.htm',repo:'https://github.com/tangeai/xiaotai',firmware:'https://github.com/tangeai/xiaotai/releases',guide:'https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/',video:'https://demo-open.tange-ai.com/download/videos/simulator-live-view.mp4'}
+    ];
+    const placeholders=Array.from({length:22},(_,i)=>({vendor:'示例厂商',name:`开发板型号 ${String(i+3).padStart(2,'0')}`,model:`BOARD-MODEL-${String(i+3).padStart(2,'0')}`,chip:i%3===0?'ESP32-P4':'ESP32-S3',summary:'用于演示开发板目录与详情布局。',caps:i%3===0?['音视频','触摸屏']:['语音','显示屏'],status:i%4===0?'适配中':'计划中',tone:i%3===0?'p4':'s3'}));
+    const boards=[...real,...placeholders];
+    const featured=document.querySelector('#featured-list'),list=document.querySelector('#board-list');
+    const mockImage=b=>`data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 110"><rect width="160" height="110" rx="12" fill="${b.tone==='p4'?'#182833':'#e5f5f6'}"/><rect x="38" y="20" width="84" height="70" rx="8" fill="${b.tone==='p4'?'#294653':'#2b929c'}"/><rect x="50" y="31" width="60" height="38" rx="3" fill="#101b20"/><text x="80" y="55" text-anchor="middle" fill="#78d2dc" font-size="14" font-family="Arial">${b.chip.replace('ESP32-','')}</text><circle cx="48" cy="80" r="3" fill="#d6b45d"/><circle cx="112" cy="80" r="3" fill="#d6b45d"/></svg>`)}`;
+    featured.innerHTML=boards.slice(0,20).map((b,i)=>`<article class="featured-card"><img src="${mockImage(b)}" alt="${b.name}示意图"><div><small>${b.vendor}</small><h2>${b.name}</h2><code>${b.model}</code></div><span class="status ${b.status==='已适配'?'ready':b.status==='适配中'?'doing':'planned'}">${b.status}</span><button data-detail="${i}" ${i>1?'disabled title="占位数据"':''}>详情 →</button></article>`).join('');
+    list.innerHTML=boards.slice(20).map(b=>`<article class="board-row"><div class="identity"><small>${b.vendor}</small><h2>${b.name}</h2></div><code class="model">${b.model}</code><b class="chip">${b.chip}</b><span class="capabilities">${b.caps.join(' · ')}</span><span class="status ${b.status==='已适配'?'ready':b.status==='适配中'?'doing':'planned'}">${b.status}</span><button class="detail" disabled title="演示数据">详情 <span>→</span></button></article>`).join('');
+    const dialog=document.querySelector('#detail-dialog');featured.addEventListener('click',e=>{const i=e.target.dataset.detail;if(i===undefined)return;const b=boards[Number(i)],video=document.querySelector('#detail-video');document.querySelector('#detail-image').src=mockImage(b);document.querySelector('#detail-image').alt=`${b.name}产品图`;video.hidden=!b.video;if(b.video)video.href=b.video;document.querySelector('#detail-vendor').textContent=b.vendor;document.querySelector('#detail-name').textContent=b.name;document.querySelector('#detail-summary').textContent=b.summary;document.querySelector('#detail-model').textContent=b.model;document.querySelector('#detail-chip').textContent=b.chip;document.querySelector('#detail-maker').textContent=b.vendor;document.querySelector('#detail-buy').href=b.buy;document.querySelector('#detail-repo').href=b.repo;document.querySelector('#detail-firmware').href=b.firmware;document.querySelector('#detail-guide').href=b.guide;dialog.showModal()});document.querySelector('.dialog-close').onclick=()=>dialog.close();dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close()});
+  </script>
+</body>
+</html>

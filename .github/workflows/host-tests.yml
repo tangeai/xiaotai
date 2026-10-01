@@ -1,0 +1,29 @@
+name: Host tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: host-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install host test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential libcjson-dev python3
+
+      - name: Run full repository checks
+        run: bash tools/check.sh

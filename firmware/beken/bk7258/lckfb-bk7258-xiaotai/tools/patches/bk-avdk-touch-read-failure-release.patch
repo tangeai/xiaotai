@@ -1,0 +1,47 @@
+diff --git a/ap/middleware/driver/tp/tp_driver.c b/ap/middleware/driver/tp/tp_driver.c
+--- a/ap/middleware/driver/tp/tp_driver.c
++++ b/ap/middleware/driver/tp/tp_driver.c
+@@ -434,6 +434,7 @@ void tp_process_task(beken_thread_arg_t arg)
+ {
+ 	int ret;
+ 	tp_data_t tp_data[TP_SUPPORT_MAX_NUM];
++	bool touch_active = false;
+ 
+ 	while (1)
+ 	{
+@@ -449,6 +450,19 @@ void tp_process_task(beken_thread_arg_t arg)
+ 			if (BK_OK != current_sensor->read_tp_info(&tp_i2c_cb, TP_SUPPORT_MAX_NUM, (void *)tp_data))
+ 			{
+ 				LOGE("%s get tp info fail!\r\n", __func__);
++				if (touch_active)
++				{
++					/* UINT16_MAX coordinates distinguish a controller-failure
++					 * cancellation from a real finger-up.  The product adapter
++					 * releases PTT but never turns this into a click. */
++					tp_data[0].event = TP_EVENT_TYPE_UP;
++					tp_data[0].x_coordinate = UINT16_MAX;
++					tp_data[0].y_coordinate = UINT16_MAX;
++					bk_tp_read_info_callback(&tp_data[0]);
++					touch_active = false;
++					LOGW("%s synthesized release after controller read failure.\r\n",
++						 __func__);
++				}
+ 			}
+ 			else
+ 			{
+@@ -463,6 +477,15 @@ void tp_process_task(beken_thread_arg_t arg)
+ 									tp_data[i].width,
+ 									tp_data[i].timestamp);
+ 					}
++					if ((TP_EVENT_TYPE_DOWN == tp_data[i].event) ||
++						(TP_EVENT_TYPE_MOVE == tp_data[i].event))
++					{
++						touch_active = true;
++					}
++					else if (TP_EVENT_TYPE_UP == tp_data[i].event)
++					{
++						touch_active = false;
++					}
+ 
+ 					bk_tp_read_info_callback(&tp_data[i]);
+ 				}

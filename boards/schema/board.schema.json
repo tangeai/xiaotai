@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xiaotai.chat/schemas/board.schema.json",
+  "title": "XiaoTai board build manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "vendor",
+    "model",
+    "revision",
+    "platform",
+    "target",
+    "sdk",
+    "project_dir",
+    "capabilities",
+    "resources",
+    "variants",
+    "migration"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "vendor": {"type": "string", "minLength": 1},
+    "model": {"type": "string", "minLength": 1},
+    "revision": {"type": ["string", "null"]},
+    "platform": {"enum": ["esp-idf", "beken"]},
+    "target": {"enum": ["esp32s3", "esp32p4", "bk7258", "bk7259"]},
+    "sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "project_dir": {"type": "string", "pattern": "^[^/].*"},
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flash_bytes", "psram_bytes"],
+      "properties": {
+        "flash_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "psram_bytes": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hardware_ir": {"type": "string"},
+        "probe_report": {"type": "string"}
+      }
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "default", "interaction_profile", "layout_profile"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+          "default": {"type": "boolean"},
+          "interaction_profile": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "layout_profile": {
+            "enum": ["none", "compact", "large"]
+          }
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage"],
+      "properties": {
+        "stage": {"enum": ["legacy-project", "platform-project", "board-adapter"]}
+      }
+    }
+  }
+}

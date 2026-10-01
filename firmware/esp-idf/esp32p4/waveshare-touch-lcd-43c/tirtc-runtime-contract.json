@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "files": {
+    "platform_client": "main/services/thing_connect/thing_service_registry.c",
+    "app_main": "main/application/app.c",
+    "starter_tirtc": "main/protocols/tirtc/tirtc_session.c",
+    "starter_runtime": "main/services/ai_chat.c"
+  },
+  "platform_contract": "platform-media-contract.json",
+  "business": {
+    "features": ["device_call", "wechat_voip"],
+    "protocol_revision": "adba29c3e84b61d959ed17b001e810f57b5cff99",
+    "session_arbiter": {
+      "single_foreground_owner": true,
+      "generation_guard": true,
+      "monotonic_deadlines": true,
+      "deferred_lifecycle": true,
+      "restore_h5_after_call": true,
+      "pending_capacity": 1
+    },
+    "implementation_assertions": [
+      {
+        "file": "main/services/device_call/device_call.c",
+        "contains": [
+          "/v1/call/request",
+          "/v1/call/device/info",
+          "/v1/call/reject",
+          "/v1/call/cancel",
+          "/v1/call/hangup",
+          "/v1/call/room",
+          "room_cancel"
+        ]
+      },
+      {
+        "file": "main/services/device_call/device_call.h",
+        "contains": [
+          "call_reject"
+        ]
+      },
+      {
+        "file": "main/services/wechat_voip/wechat_voip_api.c",
+        "contains": [
+          "/v1/voip/device/profile",
+          "/v1/voip/device/contacts",
+          "/v1/voip/device/call"
+        ]
+      },
+      {
+        "file": "main/services/wechat_voip/wechat_voip_service.c",
+        "contains": [
+          "call_incoming"
+        ]
+      },
+      {
+        "file": "main/services/wechat_voip/wechat_voip_thing.c",
+        "contains": [
+          "callers_update"
+        ]
+      }
+    ]
+  }
+}

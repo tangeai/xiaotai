@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "contract_id": "thingconnect-tirtc-h5-ai-v1",
+  "sources": [
+    "device-h5-live.md",
+    "device-ai.md",
+    "TiRTC SDK 2.5.0 tiRTC.h"
+  ],
+  "h5": {
+    "audio_up": {
+      "stream_id": 10,
+      "codec": "alaw",
+      "sample_rate_hz": 8000,
+      "channels": 1,
+      "media": "TIRTC_AUDIO_ALAW",
+      "flags": "TIRTC_AUDIOSAMPLE_8K16B1C"
+    },
+    "video_up": {
+      "stream_id": 11,
+      "supported_profiles": [
+        {
+          "codec": "mjpeg",
+          "media": "TIRTC_VIDEO_JPEG",
+          "send_boundary": "complete_jpeg"
+        },
+        {
+          "codec": "h264",
+          "media": "TIRTC_VIDEO_H264",
+          "send_boundary": "annex_b_access_unit"
+        },
+        {
+          "codec": "h265",
+          "media": "TIRTC_VIDEO_H265",
+          "send_boundary": "annex_b_access_unit"
+        }
+      ]
+    },
+    "audio_down": {
+      "stream_id": 14,
+      "codec": "alaw",
+      "sample_rate_hz": 8000,
+      "channels": 1,
+      "media": "TIRTC_AUDIO_ALAW",
+      "flags": "TIRTC_AUDIOSAMPLE_8K16B1C"
+    }
+  },
+  "ai": {
+    "audio_up": {
+      "stream_id": 1,
+      "codec": "alaw",
+      "sample_rate_hz": 8000,
+      "channels": 1,
+      "media": "TIRTC_AUDIO_ALAW",
+      "flags": "TIRTC_AUDIOSAMPLE_8K16B1C"
+    },
+    "audio_down": {
+      "stream_id": 1,
+      "codec": "alaw",
+      "sample_rate_hz": 8000,
+      "channels": 1,
+      "media": "TIRTC_AUDIO_ALAW",
+      "flags": "TIRTC_AUDIOSAMPLE_8K16B1C"
+    },
+    "start_session_response": {
+      "required_fields": [
+        "id",
+        "result.session_id",
+        "result.input_audio",
+        "result.output_audio"
+      ],
+      "response_formats_authoritative": true
+    }
+  }
+}

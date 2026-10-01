@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "clock": {
+    "sample_rate_hz": 16000,
+    "mclk_ratio": 256,
+    "mclk_hz": 4096000,
+    "codec_tables": [
+      {
+        "codec": "ES8311",
+        "source": "components/espressif__esp_codec_dev/device/es8311/es8311.c"
+      },
+      {
+        "codec": "ES7210",
+        "source": "components/espressif__esp_codec_dev/device/es7210/es7210.c"
+      }
+    ]
+  },
+  "capture": {
+    "controller": 1,
+    "mode": "tdm",
+    "role": "master",
+    "tdm_enabled": true,
+    "slot_count": 4,
+    "slot_bit_width": 16,
+    "slot_order": ["MIC1", "MIC3", "MIC2", "MIC4"],
+    "slot_signals": ["MIC1", "MIC3", "MIC2", "MIC4"],
+    "selected_slot": 2,
+    "selected_signal": "MIC2",
+    "mapping_evidence": "main/drivers/audio/audio.c: ES7210 TDM 四槽（ES7210 串行顺序 CH1/CH3/CH2/CH4），板载差分麦克风接入 ES7210 MIC2（串行第 3 槽、DMA 通道 2），ES8311 OUTN 经交流耦合进 ES7210 MIC3（串行第 2 槽、DMA 通道 1）作 AEC 参考；通道索引由 hardware_board_config.h 的 ADC_PRIMARY/REFERENCE_CHANNEL 固定。"
+  },
+  "playback": {
+    "controller": 1,
+    "mode": "standard",
+    "role": "master",
+    "slot_count": 4,
+    "slot_bit_width": 16,
+    "mapping_evidence": "main/drivers/audio/audio.c: 同一 I2S1 控制器配对 TX/RX 共享 MCLK/BCLK/WS（TDM 64-BCLK 帧）；ES8311 DAC（STD 双槽）消费共享帧的前两槽，其余帧内数据线空闲。该共享时钟混合模式与 lckfb-szpi-esp32s3-tirtc 板级验证过的拓扑一致。"
+  },
+  "shared_clock": {
+    "gpios": [13, 12, 10],
+    "directions_simultaneous": true,
+    "handoff": "none",
+    "paired_channels": true
+  },
+  "echo_cancellation": {
+    "enabled": true,
+    "sample_rate_hz": 16000,
+    "microphone_slot": 2,
+    "microphone_signal": "MIC2",
+    "reference_slot": 1,
+    "reference_signal": "MIC3"
+  },
+  "evidence": [
+    "vendor-schematic",
+    "vendor-bsp",
+    "lckfb-reference"
+  ],
+  "implementation_assertions": [
+    {
+      "file": "@repo/boards/waveshare/esp32p4-touch-lcd-43c/board_config.h",
+      "contains": [
+        "HARDWARE_BOARD_AUDIO_ADC_PRIMARY_CHANNEL 2",
+        "HARDWARE_BOARD_AUDIO_ADC_REFERENCE_CHANNEL 1",
+        "HARDWARE_BOARD_AUDIO_ADC_CHANNELS       4",
+        "HARDWARE_AUDIO_CODEC_ES7210",
+        "ES7210_SEL_MIC1 | ES7210_SEL_MIC2",
+        "ES7210_SEL_MIC3 | ES7210_SEL_MIC4"
+      ],
+      "absent": []
+    },
+    {
+      "file": "@repo/platforms/esp-idf/waveshare_p4/hardware_board.c",
+      "contains": [
+        "HARDWARE_BOARD_MICROPHONE_CODEC",
+        "HARDWARE_BOARD_MICROPHONE_CODEC_ADDR",
+        "HARDWARE_BOARD_MICROPHONE_SELECT_MASK"
+      ],
+      "absent": []
+    },
+    {
+      "file": "components/starter_media/src/starter_media.c",
+      "contains": [
+        "i2s_channel_init_tdm_mode(s_i2s_rx, &rx_config)",
+        "i2s_channel_init_std_mode(s_i2s_tx, &tx_config)",
+        "i2s_new_channel(&audio_channel, &s_i2s_tx, &s_i2s_rx)",
+        "es7210_codec_new",
+        "ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1)",
+        "ESP_CODEC_DEV_MAKE_CHANNEL_MASK(2)",
+        "starter_aec_process_capture",
+        "audio_capture_task"
+      ],
+      "absent": []
+    },
+    {
+      "file": "components/espressif__esp_codec_dev/device/include/es7210_adc.h",
+      "contains": [
+        "ES7210_SEL_MIC3"
+      ],
+      "absent": []
+    }
+  ]
+}

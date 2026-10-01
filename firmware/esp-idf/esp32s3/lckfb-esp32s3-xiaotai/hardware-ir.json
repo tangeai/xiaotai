@@ -1,0 +1,604 @@
+{
+  "schema_version": 1,
+  "board": {
+    "id": "lckfb_esp32s3",
+    "vendor": "深圳嘉立创科技集团股份有限公司（立创开发板）",
+    "model": "立创·实战派 ESP32-S3 开发板",
+    "hardware_revision": "V1.0.1",
+    "schematic_revision": "V1.0.1",
+    "schematic_design_id": "ESP32-S3-V1_0_1 / XD-ESP32S3-V1_0_1",
+    "physical_revision_confirmed": true,
+    "physical_revision_confirmation": "User confirmed on 2026-08-27 that docs/立创实战派ESP32-S3开发板原理图.pdf is the resource for the physical board in hand."
+  },
+  "sources": [
+    {
+      "id": "user-board-description",
+      "kind": "user-supplied-board-description",
+      "location": "user-supplied://2026-08-27/board-description",
+      "revision": "physical board resources explicitly confirmed by user as schematic/design V1.0.1 on 2026-08-27"
+    },
+    {
+      "id": "user-media-contract",
+      "kind": "user-supplied-media-contract",
+      "location": "user-supplied://2026-08-27/h5-video-formats",
+      "revision": "H5 supports MJPEG, H.264 and H.265; selected device video format is MJPEG"
+    },
+    {
+      "id": "user-runtime-gc2145-probe",
+      "kind": "user-supplied-runtime-boot-log",
+      "location": "user-supplied://2026-08-27/elf-1c041527-camera-probe",
+      "revision": "ELF SHA-256 prefix 1c0415270; esp32-camera selected the GC2145 driver, configured two 153600-byte QVGA RGB565 framebuffers in PSRAM, then the project-specific GC0308-only gate returned ESP_ERR_NOT_FOUND"
+    },
+    {
+      "id": "user-runtime-online-media",
+      "kind": "user-supplied-runtime-and-h5-test",
+      "location": "user-supplied://2026-08-28/elf-386eb350-online-media",
+      "revision": "Predecessor ELF SHA-256 prefix 386eb350: GC2145 accepted, Wi-Fi/IP/service discovery/device token/MQTT/TiRTC reached online state; H5 MJPEG and Web-to-device audio worked, while device-to-Web audio was silent"
+    },
+    {
+      "id": "user-runtime-h5-bidirectional",
+      "kind": "user-supplied-runtime-and-h5-test",
+      "location": "user-supplied://2026-08-28/http-256k-h5-bidirectional",
+      "revision": "HTTP discovery and 256 KiB TiRTC send-buffer artifact reached online/H5 active; user heard both audio directions. Media was poor at BSSID a4:ba:70:0c:bf:ad RSSI -75 dBm and improved at BSSID a4:39:b3:c6:e0:00 RSSI -28 dBm; one cam_hal EV-VSYNC-OVF remained."
+    },
+    {
+      "id": "user-runtime-media-wdt-2026-08-30",
+      "kind": "user-supplied-runtime-h5-ai-test",
+      "location": "user-supplied://2026-08-30/full-duplex-aec-task-watchdog",
+      "revision": "The delivered AEC build reached h5-active and ai-active. H5 then starved IDLE0/IDLE1 while rtc_thread, board_mjpeg and board_audio_tx were runnable and ended with -40008. With AI video disabled, IDLE0 again timed out and the backtrace resolved board_audio_tx -> starter_aec_process_capture -> aec_process, while CPU1 IDLE1 remained healthy. The excerpts omit the boot ELF SHA, so they diagnose scheduling but are not promoted to artifact-bound HIL PASS."
+    },
+    {
+      "id": "espressif-idf55-task-scheduling",
+      "kind": "official-sdk-documentation",
+      "location": "https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32s3/api-guides/performance/speed.html",
+      "revision": "ESP-IDF 5.5.4 task-priority and CPU-yield guidance; Wi-Fi task defaults to priority 23 on CPU0 and high-throughput tasks must block or delay to avoid starving lower-priority tasks and triggering TWDT"
+    },
+    {
+      "id": "espressif-idf55-fpu-affinity",
+      "kind": "official-sdk-documentation",
+      "location": "https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32s3/api-reference/system/freertos_idf.html",
+      "revision": "ESP-IDF 5.5.4 FreeRTOS FPU rule: an unpinned task is automatically pinned to the current core when its call flow first uses float"
+    },
+    {
+      "id": "user-runtime-ai-stack-overflow-2026-08-30",
+      "kind": "user-supplied-runtime-ai-test",
+      "location": "user-supplied://2026-08-30/elf-8b90f59c-ai-start-stack-overflow",
+      "revision": "Pre-fix BIN c51cf578... / ELF 8b90f59c... booted with GC2145 and target 8 fps, completed platform discovery, device token, MQTT and TiRTC start, then entered ai-connecting and hit the FreeRTOS starter_session stack overflow hook after ai-start"
+    },
+    {
+      "id": "user-runtime-tirtc-low-memory",
+      "kind": "user-supplied-runtime-boot-log",
+      "location": "user-supplied://2026-08-28/tirtc-start-low-internal-heap",
+      "revision": "HTTPS service discovery and device token succeeded; TiRtcStart returned -1 with internal-free/largest 21035/11264 bytes, then 14571/7680 bytes after MQTT became connected"
+    },
+    {
+      "id": "lckfb-product-page",
+      "kind": "official-vendor-product-page",
+      "location": "https://wiki.lckfb.com/zh-hans/szpi-esp32s3/",
+      "revision": "retrieved 2026-08-27"
+    },
+    {
+      "id": "lckfb-schematic-v1.0.1",
+      "kind": "official-vendor-open-source-hardware-page",
+      "location": "https://wiki.lckfb.com/zh-hans/szpi-esp32s3/open-source-hardware/",
+      "revision": "official schematic and open-source project entry; retrieved 2026-09-30"
+    },
+    {
+      "id": "local-schematic-pdf-v1.0.1",
+      "kind": "user-supplied-schematic-pdf",
+      "location": "user-supplied://2026-08-27/lckfb-esp32s3-schematic-v1.0.1",
+      "revision": "3 pages; ESP32-S3-V1_0_1 / XD-ESP32S3-V1_0_1; drawing version V1.0.1; SHA-256 5b3718f8caa136597fb9a48e44aa7fd1ebf0001be6dd1506492538fee600fa79"
+    },
+    {
+      "id": "datasheet-es7210-r9.1",
+      "kind": "user-supplied-component-datasheet",
+      "location": "user-supplied://2026-08-27/datasheet-es7210-r9.1",
+      "revision": "Revision 9.1, January 2019; 11 pages; SHA-256 909a13dcd8770835914ef0de0cb5a44aba6d4312daf1d99768e0dab65f0e87e6"
+    },
+    {
+      "id": "datasheet-es8311-r5.0",
+      "kind": "user-supplied-component-datasheet",
+      "location": "user-supplied://2026-08-27/datasheet-es8311-r5.0",
+      "revision": "Revision 5.0, March 2019; 12 pages; SHA-256 69cc689b6afbd586ecfa97ff8a84566116814beb0f3027f547c2a079714156e4"
+    },
+    {
+      "id": "datasheet-ns4150b-v1.1",
+      "kind": "user-supplied-component-datasheet",
+      "location": "user-supplied://2026-08-27/datasheet-ns4150b-v1.1",
+      "revision": "V1.1, March 2021; 9 pages; SHA-256 8f26ce641fd0ead96cc949a23e7ebc8d3d51d066ed7de7f958ac6327a9fbb7c5"
+    },
+    {
+      "id": "datasheet-pca9557-rev7",
+      "kind": "user-supplied-component-datasheet",
+      "location": "user-supplied://2026-08-27/datasheet-pca9557-rev7",
+      "revision": "NXP Rev. 7, 10 December 2013; 30 pages; SHA-256 ff284d4b9b052950d7cfed5cb12441010a9fe78d52af90c7fa74d199a01759b5"
+    },
+    {
+      "id": "datasheet-esp32-s3-wroom-1-v1.3",
+      "kind": "user-supplied-component-datasheet",
+      "location": "user-supplied://2026-08-27/datasheet-esp32-s3-wroom-1-v1.3",
+      "revision": "Espressif v1.3; 37 pages; SHA-256 d053da7fbeb6896bff4bd973239d1512924867d58e6ef6317fd678f7bf881ebe"
+    },
+    {
+      "id": "datasheet-zts6216-ds1.4",
+      "kind": "user-supplied-component-datasheet",
+      "location": "user-supplied://2026-08-27/datasheet-zts6216-ds1.4",
+      "revision": "DS-1.4; 10 pages; SHA-256 6182ab4592edea6b49ec6a94b8d31d5d1efcdc11904bd572796a105ff9f68eb1"
+    },
+    {
+      "id": "datasheet-ch340k-v3c",
+      "kind": "user-supplied-component-datasheet",
+      "location": "user-supplied://2026-08-27/datasheet-ch340k-v3c",
+      "revision": "Version 3C; 10 pages; SHA-256 9dce91d3045e1a9df2e18a9c922c69f341daddcce2d3a9c7adae3b6c38b7c6f8"
+    },
+    {
+      "id": "datasheet-ch334f-v2.4",
+      "kind": "user-supplied-component-datasheet",
+      "location": "user-supplied://2026-08-27/datasheet-ch334f-v2.4",
+      "revision": "CH334/CH335 V2.4; 28 pages; SHA-256 86f8fe7957df701e4d318dd3d9c0590078d5b1fa9a0d341fec29f6c6313e68d5"
+    },
+    {
+      "id": "datasheet-qmi8658a-reva",
+      "kind": "user-supplied-component-datasheet",
+      "location": "user-supplied://2026-08-27/datasheet-qmi8658a-reva",
+      "revision": "Revision A, 20 June 2022; 88 pages; SHA-256 bc371af17cd94fca481a3b40a89417776996b7baa50dacf20e9f53d5a6a57b85"
+    },
+    {
+      "id": "lckfb-camera-tutorial",
+      "kind": "official-vendor-example-documentation",
+      "location": "https://wiki.lckfb.com/zh-hans/szpi-esp32s3/beginner/camera.html",
+      "revision": "unversioned wiki; retrieved 2026-08-27"
+    },
+    {
+      "id": "lckfb-es7210-tutorial",
+      "kind": "official-vendor-example-documentation",
+      "location": "https://wiki.lckfb.com/zh-hans/szpi-esp32s3/beginner/audio-input-es7210.html",
+      "revision": "unversioned wiki; retrieved 2026-08-27"
+    },
+    {
+      "id": "lckfb-es8311-tutorial",
+      "kind": "official-vendor-example-documentation",
+      "location": "https://wiki.lckfb.com/zh-hans/szpi-esp32s3/beginner/audio-output-es8311.html",
+      "revision": "unversioned wiki; retrieved 2026-08-27"
+    },
+    {
+      "id": "lckfb-speech-tutorial",
+      "kind": "official-vendor-example-documentation",
+      "location": "https://wiki.lckfb.com/zh-hans/szpi-esp32s3/beginner/voice-recognition.html",
+      "revision": "unversioned wiki; retrieved 2026-08-27"
+    },
+    {
+      "id": "tirtc-esp32s3-2.3.0-integration-notes",
+      "kind": "official-tirtc-integration-documentation",
+      "location": "https://docs.tange.ai/products/tirtc/guides/integration-notes/espressif/esp32-s3.html",
+      "revision": "retrieved 2026-08-28; TiRTC 2.3.0 ESP32-S3 package supports HTTPS and requires TLS client/TLS 1.2 plus valid system time"
+    },
+    {
+      "id": "espressif-esp32-camera",
+      "kind": "official-upstream-driver-documentation",
+      "location": "https://github.com/espressif/esp32-camera",
+      "revision": "component 2.1.7 locked in dependencies.lock; img_converters.h accepts RGB565 or YUYV"
+    },
+    {
+      "id": "espressif-es7210-1.0.1",
+      "kind": "official-component-registry",
+      "location": "https://components.espressif.com/components/espressif/es7210/versions/1.0.1",
+      "revision": "1.0.1"
+    },
+    {
+      "id": "espressif-es8311-1.0.0",
+      "kind": "official-component-registry",
+      "location": "https://components.espressif.com/components/espressif/es8311/versions/1.0.0",
+      "revision": "1.0.0"
+    },
+    {
+      "id": "espressif-esp-audio-codec-2.4.0",
+      "kind": "official-component-registry",
+      "location": "https://components.espressif.com/components/espressif/esp_audio_codec/versions/2.4.0/readme",
+      "revision": "2.4.0"
+    },
+    {
+      "id": "espressif-esp-sr-2.4.6-aec",
+      "kind": "official-component-registry-and-documentation",
+      "location": "https://components.espressif.com/components/espressif/esp-sr/versions/2.4.6/readme",
+      "revision": "2.4.6; direct AEC API at 16 kHz; FD_LOW_COST selected"
+    },
+    {
+      "id": "espressif-esp-h264-1.3.8",
+      "kind": "official-component-registry-and-source",
+      "location": "https://components.espressif.com/components/espressif/esp_h264/versions/1.3.8",
+      "revision": "1.3.8"
+    },
+    {
+      "id": "openh264-2.2.0",
+      "kind": "official-upstream-codec-documentation",
+      "location": "https://github.com/cisco/openh264/tree/v2.2.0",
+      "revision": "2.2.0"
+    },
+    {
+      "id": "thingconnect-workspace",
+      "kind": "managed-device-kit-generation",
+      "location": "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/README.md",
+      "revision": "Generated from ESP32 Device Kit 1.1.1; Doctor resolves the managed Kit and the self-contained TiRTC SDK 2.3.0"
+    }
+  ],
+  "soc": {
+    "target": "esp32s3",
+    "module": "ESP32-S3-WROOM-1-N16R8",
+    "flash_mb": 16,
+    "psram_mb": 8,
+    "psram_interface": "octal",
+    "source_refs": [
+      "user-board-description",
+      "lckfb-product-page",
+      "lckfb-schematic-v1.0.1",
+      "local-schematic-pdf-v1.0.1",
+      "datasheet-esp32-s3-wroom-1-v1.3"
+    ]
+  },
+  "toolchain": {
+    "framework": "esp-idf",
+    "framework_version": "5.5.4",
+    "framework_git_revision": "735507283d5b2f9fb363a1901172dbd9e847945d",
+    "verification": "build_verified",
+    "tirtc": {
+      "platform": "espressif-esp32s3",
+      "version": "2.3.0",
+      "sdk_path": "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/third_party/tirtc",
+      "build_contract": "manifest/build-contract.env",
+      "archive_sha256": "43b06d1da421c7d24cc7fdb1385d600ecdffbfd2d3801f7faf0c540fb5cdbaa2",
+      "required_config": {
+        "CONFIG_FREERTOS_HZ": "1000",
+        "CONFIG_FREERTOS_USE_TRACE_FACILITY": "off",
+        "CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS": "off",
+        "CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS": "off",
+        "STATIC_SEMAPHORE_T_SIZE": "84"
+      }
+    },
+    "source_refs": [
+      "thingconnect-workspace"
+    ]
+  },
+  "camera": {
+    "present": true,
+    "sensor": "GC0308 documented variant / GC2145 PID 0x2145 observed on the physical board",
+    "interface": {
+      "type": "8-bit DVP plus SCCB/I2C",
+      "xclk_hz": 24000000,
+      "capture_mode": "QVGA 320x240 RGB565",
+      "pins": {
+        "xclk": 5,
+        "siod": 1,
+        "sioc": 2,
+        "d0": 16,
+        "d1": 18,
+        "d2": 8,
+        "d3": 17,
+        "d4": 15,
+        "d5": 6,
+        "d6": 4,
+        "d7": 9,
+        "vsync": 3,
+        "href": 46,
+        "pclk": 7,
+        "pwdn": "PCA9557 I/O2 / DVP_PWDN"
+      }
+    },
+    "native_formats": [
+      "RGB565",
+      "YUV/YCbCr 4:2:2"
+    ],
+    "selected_video_format": "mjpeg",
+    "mjpeg": {
+      "available": true,
+      "implementation": "Runtime-probed GC2145 or documented GC0308 RGB565 capture followed by Espressif esp32-camera frame2jpg software JPEG conversion",
+      "input_formats": [
+        "RGB565",
+        "YUYV"
+      ],
+      "output_format": "one complete JPEG image per TiRtcSendVideoStream call",
+      "tirtc_media": "TIRTC_VIDEO_JPEG",
+      "stream_id": 11,
+      "independent_frames": true,
+      "key_frame_control_required": false,
+      "verification": "build_verified",
+      "source_refs": [
+        "user-media-contract",
+        "lckfb-camera-tutorial",
+        "espressif-esp32-camera",
+        "user-runtime-gc2145-probe",
+        "thingconnect-workspace"
+      ]
+    },
+    "h264": {
+      "available": true,
+      "selected": false,
+      "implementation": "espressif/esp_h264 1.3.8 software encoder on ESP32-S3",
+      "input_format": "YUYV 320x240",
+      "output_format": "h264_annex_b",
+      "sps_pps": "emitted for every IDR",
+      "key_frame_control": true,
+      "key_frame_strategy": "GOP=1 so the next encoded frame is always an IDR and satisfies any key-frame request",
+      "estimated_reference_performance": "320x240 YUYV, about 11.23 fps and about 1 MB encoder memory in Espressif reference measurement",
+      "verification": "corroborated",
+      "hardware_encoder": false
+    },
+    "source_refs": [
+      "lckfb-schematic-v1.0.1",
+      "local-schematic-pdf-v1.0.1",
+      "lckfb-camera-tutorial",
+      "datasheet-pca9557-rev7",
+      "espressif-esp32-camera",
+      "user-runtime-gc2145-probe",
+      "user-runtime-h5-bidirectional",
+      "espressif-esp-h264-1.3.8",
+      "openh264-2.2.0",
+      "user-media-contract",
+      "thingconnect-workspace"
+    ]
+  },
+  "audio_input": {
+    "present": true,
+    "hardware": {
+      "adc": "ES7210",
+      "microphones": "2 x ZTS6216 analog microphones",
+      "aec_reference": "ES8311 differential output is also routed to ES7210 MIC3",
+      "unused_channel": "MIC4 is grounded",
+      "i2c_address": "0x41"
+    },
+    "interface": {
+      "type": "I2S TDM",
+      "i2c_port": 0,
+      "i2c_sda": 1,
+      "i2c_scl": 2,
+      "i2s_port": 0,
+      "mclk": 38,
+      "bclk": 14,
+      "ws": 13,
+      "din": 12,
+      "observed_tdm_order": [
+        "MIC1/channel1",
+        "MIC3/playback-reference/channel3",
+        "MIC2/channel2",
+        "MIC4/ground/channel4"
+      ]
+    },
+    "codecs": [
+      {
+        "name": "alaw",
+        "sample_rates_hz": [8000],
+        "channels": 1,
+        "path": "ES7210 MIC1 + MIC3 reference at 16 kHz -> ESP-SR 2.4.6 FD_LOW_COST AEC -> 8 kHz PCM -> espressif/esp_audio_codec G711-A encoder",
+        "verification": "build_verified"
+      },
+      {
+        "name": "pcm_s16le",
+        "sample_rates_hz": [8000, 16000, 32000, 48000],
+        "channels": 2,
+        "verification": "corroborated"
+      }
+    ],
+    "source_refs": [
+      "lckfb-schematic-v1.0.1",
+      "local-schematic-pdf-v1.0.1",
+      "lckfb-es7210-tutorial",
+      "lckfb-speech-tutorial",
+      "datasheet-es7210-r9.1",
+      "datasheet-zts6216-ds1.4",
+      "espressif-es7210-1.0.1",
+      "espressif-esp-audio-codec-2.4.0",
+      "espressif-esp-sr-2.4.6-aec",
+      "user-runtime-online-media",
+      "user-runtime-h5-bidirectional"
+    ]
+  },
+  "audio_output": {
+    "present": true,
+    "hardware": {
+      "dac": "ES8311",
+      "amplifier": "NS4150B",
+      "speaker": "DB1811AB50 1 W",
+      "i2c_address": "0x18",
+      "amplifier_enable": "PCA9557 I/O1 / PA_EN, active high",
+      "io_expander_address": "0x19"
+    },
+    "interface": {
+      "type": "I2S standard",
+      "i2c_port": 0,
+      "i2c_sda": 1,
+      "i2c_scl": 2,
+      "i2s_port": 0,
+      "mclk": 38,
+      "bclk": 14,
+      "ws": 13,
+      "dout": 45
+    },
+    "codecs": [
+      {
+        "name": "alaw",
+        "sample_rates_hz": [8000],
+        "channels": 1,
+        "path": "espressif/esp_audio_codec G711-A decoder -> linear interpolation 8 kHz to 16 kHz -> ES8311 -> NS4150B; ES7210 MIC3 captures the board playback reference",
+        "verification": "build_verified"
+      },
+      {
+        "name": "pcm_s16le",
+        "sample_rates_hz": [8000, 16000],
+        "channels": 1,
+        "verification": "corroborated"
+      }
+    ],
+    "source_refs": [
+      "lckfb-schematic-v1.0.1",
+      "local-schematic-pdf-v1.0.1",
+      "lckfb-es8311-tutorial",
+      "lckfb-speech-tutorial",
+      "datasheet-es8311-r5.0",
+      "datasheet-ns4150b-v1.1",
+      "datasheet-pca9557-rev7",
+      "espressif-es8311-1.0.0",
+      "espressif-esp-audio-codec-2.4.0"
+    ]
+  },
+  "media_policy": {
+    "initial_duplex_mode": "full_duplex_aec",
+    "reason": "The exact-board schematic routes ES8311 playback to ES7210 MIC3, the lichuang-dev BSP identifies that reference channel, ESP-IDF I2S v2 supports paired TX/RX on I2S0, and Espressif ESP-SR 2.4.6 provides a 16 kHz FD_LOW_COST AEC. This proves the implementation and build policy, not exact-board acoustic performance.",
+    "controller_policy": "ES8311 standard-I2S TX and ES7210 four-slot TDM RX are allocated together on I2S0 and remain enabled concurrently. At 16 kHz, TX uses two 32-bit slots and RX uses four 16-bit slots, so both directions share 64 BCLK/frame and a 4.096 MHz / 256 Fs MCLK without an I2S1 master or GPIO handoff.",
+    "capture_channel_policy": "ES7210 TDM-I2S serial order is channel 1, channel 3, channel 2, channel 4. MIC1/slot 0 is the near-end signal; MIC3/slot 1 is the synchronous ES8311 playback reference. Both feed ESP-SR AEC before 16-to-8 kHz downsampling and G.711 encoding.",
+    "realtime_task_policy": "The ESP-IDF Wi-Fi driver task runs on CPU0. The esp32-camera VSYNC/EOF event consumer, floating-point AEC task and software JPEG task are pinned to CPU1. AEC and JPEG loops each block for one RTOS tick per completed work frame so both idle watchdog tasks can run even when DMA or frame pacing is backlogged. AEC/JPEG maximum processing time and deadline misses are exposed by status. AEC state/work frames and playback resampling buffers use PSRAM while the I2S capture target stays internal. This build-verified policy is pending HIL on artifact 56104cf2... .",
+    "promotion_to_full_duplex": "Full-duplex transport and AEC are implemented. HIL acceptance requires simultaneous audio-tx/audio-rx/AEC growth, zero processing errors/reference clipping, far-end single-talk echo attenuation, intelligible double-talk, and AI reply-time barge-in without self-triggering."
+  },
+  "auxiliary_components": {
+    "usb_uart": {
+      "part": "CH340K",
+      "current_media_path_relevance": "debug/serial fallback only",
+      "source_refs": [
+        "datasheet-ch340k-v3c"
+      ]
+    },
+    "usb_hub": {
+      "part": "CH334F",
+      "current_media_path_relevance": "USB topology and debugging only",
+      "source_refs": [
+        "datasheet-ch334f-v2.4"
+      ]
+    },
+    "imu": {
+      "part": "QMI8658A",
+      "current_media_path_relevance": "not used by H5 video/audio or AI intercom",
+      "source_refs": [
+        "datasheet-qmi8658a-reva"
+      ]
+    }
+  },
+  "build_evidence": {
+    "firmware_version": "ui-stack-opt.58",
+    "verification": "local_build_only",
+    "note": "The paths below are reproducible build outputs and are intentionally excluded from source control.",
+    "artifacts": [
+      {
+        "path": "build/lckfb_esp32s3_xiaotai.bin",
+        "size_bytes": 3967808,
+        "sha256": "8110b4accaa60085cd1f4b3e97204ee347791c1a8922d7f6f9c183adb8af9b6b"
+      },
+      {
+        "path": "build/lckfb_esp32s3_xiaotai.elf",
+        "size_bytes": 28530044,
+        "sha256": "f4147786cd1e35294e414de157a4e206f27698f90138cca5150c263ee7a969f6"
+      }
+    ]
+  },
+  "features": {
+    "h5_video_format": "mjpeg",
+    "h5_video_stream_id": 11,
+    "requested": [
+      "h5_live_audio",
+      "h5_live_video",
+      "h5_talkback",
+      "ai_talk"
+    ]
+  },
+  "issues": [
+    {
+      "id": "HW-REV-001",
+      "severity": "resolved-by-user-attestation",
+      "summary": "Physical board resources are confirmed as schematic/design V1.0.1.",
+      "evidence": "The official schematic images and user-supplied 3-page PDF both identify design V1.0.1; the user explicitly confirmed that this PDF is the resource for the physical board in hand.",
+      "resolution": "Set board.hardware_revision to V1.0.1 and physical_revision_confirmed to true."
+    },
+    {
+      "id": "BSP-REV-001",
+      "severity": "non-blocking-for-this-pinned-port",
+      "summary": "The supplied BSP/example URL is an unversioned tutorial entry, not a pinned source archive or commit.",
+      "evidence": "Official software and download pages point to Baidu Netdisk shares; the tutorial pages expose code excerpts but no immutable BSP revision.",
+      "resolution": "This project locks Espressif component versions in dependencies.lock and records the retrieved tutorial snapshots. A versioned vendor archive is still required before registering a reusable board adapter."
+    },
+    {
+      "id": "DOC-CONTRADICTION-001",
+      "severity": "resolved-by-stronger-evidence",
+      "summary": "One vendor introduction paragraph says ES8310, while the product table, schematic, audio-output tutorial and user description say ES8311.",
+      "resolution": "Record ES8311 because it is confirmed by the schematic designator/value and multiple independent official references."
+    },
+    {
+      "id": "MEDIA-HIL-001",
+      "severity": "post-port-verification",
+    "summary": "An HTTP/256 KiB 5 fps artifact accepted GC2145 and demonstrated H5 MJPEG plus audible Web-to-device and device-to-Web audio. The pre-fix camera-CPU1/8 fps artifact booted and reached online state but failed AI start with a session-task stack overflow. A subsequent 24 KiB session-stack run failed TiRtcStart after esp-aes reported an allocation failure. The exact 7eeda2ed... / eebcaa452... artifact restored the persistent JPEG callback contract, booted with 144599 bytes internal free and 100527-byte recorded minimum after SDK startup, reached H5 active, and produced decodable MJPEG whose pixels were severely fragmented into horizontal lines while direct PSRAM DMA was enabled. The delivered AEC build then reached both h5-active and ai-active, but user logs exposed task-watchdog starvation: H5 involved both software JPEG and AEC load, while AI isolated CPU0 board_audio_tx inside aec_process with CPU1 idle. Artifact 56104cf2... pins AEC/JPEG to CPU1, adds one-tick cooperative blocking and deadline telemetry, and has build evidence only.",
+    "smallest_next_action": "Run artifact 56104cf2... for at least 90 seconds each in H5 and AI, verify no task_wdt or starvation-driven -40008, and capture two status snapshots per mode showing increasing audio/AEC counters, zero AEC errors, max-aec normally below 32000 us, JPEG deadline misses, heap headroom and stack-min-free. Then measure far-end single-talk echo attenuation, intelligible double-talk and AI barge-in."
+    },
+    {
+      "id": "CAM-SENSOR-001",
+      "severity": "resolved-by-runtime-evidence",
+      "summary": "Vendor documentation identifies GC0308, while the physical board supplied by the user probes as GC2145.",
+      "evidence": "The pinned esp32-camera 2.1.7 GC2145 detector reads CHIP_ID_HIGH/LOW registers 0xF0/0xF1 and only selects GC2145 for exact PID 0x2145. The user log from ELF 1c0415270 then shows successful QVGA RGB565 framebuffer and GC2145 framesize configuration.",
+      "resolution": "Keep the documented GC0308 and runtime-observed GC2145 as an explicit two-variant allowlist. Reject every other sensor PID. The selected QVGA RGB565 to software-JPEG contract is common to both variants."
+    },
+    {
+      "id": "TOOL-RULE-001",
+      "severity": "tooling-limitation",
+      "summary": "The installed Device Kit strict H5-video assessor is hard-coded to test H.264 Annex-B, while the selected and SDK-supported format is MJPEG.",
+      "evidence": "TiRTC ESP32-S3 SDK 2.3.0 declares TIRTC_VIDEO_JPEG and ThingConnect maps the mjpeg format to it; the user's H5 contract confirms MJPEG support.",
+      "resolution": "Keep the unmodified strict assessment for the project gate, and record a separate corroborated MJPEG target-profile assessment. The generated port must add a JPEG send seam instead of calling starter_tirtc_send_h264."
+    },
+    {
+      "id": "AUDIO-I2S-001",
+      "severity": "resolved-in-current-port-pending-hil",
+      "summary": "The predecessor allocated capture and playback separately on I2S0, producing controller-occupied and GPIO-not-usable warnings.",
+      "evidence": "The user boot log reports I2S0 occupied and GPIO38/13/14 unusable. The exact-board lichuang-dev BSP uses paired TX/RX handles on I2S0, and ESP-IDF 5.5.4 I2S v2 shares BCLK/WS for paired full-duplex channels.",
+      "resolution": "Allocate ES8311 TX and ES7210 RX together on I2S0, match both directions at 64 BCLK/frame and 4.096 MHz MCLK, and keep both DMA directions enabled. A post-link policy gate rejects I2S1, split allocation, GPIO handoff and playback-gated capture."
+    },
+    {
+      "id": "AUDIO-UPLINK-001",
+      "severity": "resolved-and-user-heard-on-pre-core1-artifact",
+      "summary": "H5 device-to-Web audio was silent because the predecessor extracted ES7210 TDM slot 1, which is channel 3 and carries the board playback reference, instead of MIC1.",
+      "evidence": "ES7210 Rev 9.1 Figure 2e gives the TDM-I2S serialized order as channel 1, channel 3, channel 2, channel 4. The V1.0.1 schematic routes the physical microphone to MIC1 and the ES8311 output reference to MIC3.",
+      "resolution": "Extract slot index 0 for MIC1. The post-link audio policy gate enforces slot 0 and nonnegative TiRTC send return handling. The user heard device-to-Web audio; quantitative counters/latency and the current artifact still require HIL."
+    },
+    {
+      "id": "HTTPS-001",
+    "severity": "resolved-by-user-choice-pending-hil",
+    "summary": "Platform discovery uses HTTP, while the user explicitly selected the TiRTC SDK built-in service endpoint and its default TLS path.",
+    "resolution": "Use http://ep-open.tangeopen.com/services for platform discovery, retain TLS client/TLS 1.2/certificate-bundle support and valid system time, and leave TIRTC_OPT_SERVICE_ENDPOINT unset. Preserve enough internal/DMA memory for the SDK default TLS endpoint and verify it on hardware."
+    },
+    {
+      "id": "TIRTC-MEM-001",
+    "severity": "resolved-in-build-pending-hil",
+    "summary": "A 1 MiB send-buffer artifact exhausted TiRTC startup memory. After that was reduced to 256 KiB, a later 24 KiB starter_session stack again starved the SDK default TLS/AES path: esp-aes reported an allocation failure and TiRtcStart returned TIRTC_E_HTTP_SSL with about 35 KiB internal free and an 18 KiB largest block.",
+    "evidence": "The 24 KiB task was created through xTaskCreate before TiRtcStart, so it consumed 12 KiB more internal RAM than the previously booting 12 KiB baseline. The repeated failure held internal free near 35-36 KiB and largest at 18432 bytes, which indicates persistent headroom/capability pressure rather than a growing retry leak.",
+    "resolution": "Keep the 256 KiB TiRTC send buffer and 192 KiB video backpressure and retain the SDK default endpoint. Keep camera framebuffers in PSRAM but use internal staging DMA because direct PSRAM DMA corrupted this board's RGB565 rows; move eligible network BSS, platform requests, downlink audio slots, decode/playback/AEC scratch and the persistent JPEG buffer to PSRAM; reuse starter_start as the deferred HTTP worker after TiRtcStart; keep starter_session at 13 KiB; and log failed allocations plus internal/DMA/PSRAM headroom. The AEC ELF uses 144215 bytes static DIRAM; its runtime AEC allocation is logged separately. Hardware verification remains required."
+    },
+    {
+      "id": "WIFI-REALTIME-001",
+      "severity": "environment-sensitive-pending-l7",
+      "summary": "The same SSID resolved to different BSSIDs with radically different RSSI and media behavior.",
+      "evidence": "At BSSID a4:ba:70:0c:bf:ad and RSSI -75 dBm, MJPEG and device-to-Web audio lagged heavily. At BSSID a4:39:b3:c6:e0:00 and RSSI -28 dBm, media improved significantly.",
+      "resolution": "Keep Wi-Fi power save disabled. Reduce static RX DMA buffers from 10 to the configured AMPDU RX window minimum of 6 and verify throughput/roaming on hardware. Record BSSID/channel/RSSI, reconnects, queue watermarks and drops for every L5/L7 run; establish the first performance baseline on a stable strong AP before controlled weak-network testing."
+    },
+    {
+      "id": "CAM-VSYNC-001",
+      "severity": "resolved-in-build-pending-hil",
+      "summary": "One cam_hal EV-VSYNC-OVF occurred even during the stronger Wi-Fi run; the camera ISR event could not be queued in time.",
+      "evidence": "The previous sdkconfig pinned the camera event task to CPU0, where the boot log also places the Wi-Fi driver task. esp32-camera cam_hal stops/resets capture after the ISR queue send fails.",
+      "resolution": "Pin the camera event task to CPU1 and enforce 8 fps pacing. Direct PSRAM DMA is disabled because exact-artifact HIL showed RGB565 row fragmentation; PSRAM framebuffers remain, fed through the driver's internal staging DMA. Compare against the earlier 5 fps HIL baseline and check for corruption, timeout and EV-VSYNC-OVF before acceptance."
+    },
+    {
+      "id": "AI-STACK-001",
+      "severity": "resolved-in-build-pending-hil",
+      "summary": "The pre-fix 8 fps artifact entered ai-connecting and then overflowed the 12288-byte starter_session stack while submitting TiRtcWhipConnect.",
+      "evidence": "The pre-fix ELF had a 2080-byte handle_ai_token frame and an 8272-byte TiRtcWhipConnect frame; the known synchronous chain consumed 10480 bytes before nested SDK/RTOS calls, leaving 1808 bytes. The user runtime log hit vApplicationStackOverflowHook in starter_session.",
+    "resolution": "Move peer_id/token to a short-lived heap object, use a 13312-byte starter_session stack, expose stack-min-free in status, and enforce the final ELF plus pre-TiRTC memory budget with tools/check_ai_stack_policy.sh. The new ELF has an 8432-byte known chain and 4880-byte reserve; the 13 KiB cap also preserves TLS/AES internal RAM. HIL remains required."
+    },
+    {
+      "id": "MEDIA-WDT-001",
+      "severity": "resolved-in-build-pending-hil",
+      "summary": "The first full-duplex AEC run reached H5 and AI active states but starved FreeRTOS idle tasks long enough to trigger the 5-second task watchdog; H5 later ended with -40008.",
+      "evidence": "In AI mode video was disabled and CPU1 IDLE1 remained healthy, while the CPU0 backtrace resolved board_audio_tx -> starter_aec_process_capture -> aec_process. ESP-IDF automatically pins an unpinned task to the core where its call flow first uses the FPU, making AEC placement nondeterministic. H5 additionally showed board_mjpeg inside software JPEG conversion while both cores were saturated.",
+      "resolution": "Pin board_audio_tx and board_mjpeg to CPU1, away from CPU0 Wi-Fi priority-23 work; force both loops to block for one RTOS tick after each processed frame; retain both idle-task watchdog subscriptions; expose AEC/JPEG maximum processing time and deadline misses; and enforce this policy with tools/check_media_cpu_fairness_policy.sh. Artifact 56104cf2... passes the build gate and requires HIL."
+    },
+    {
+      "id": "SERIAL-001",
+      "severity": "non-blocking-this-round",
+    "summary": "The user used /dev/ttyACM0 to flash and monitor predecessor artifacts, while the agent does not own the serial device during this build cycle.",
+    "resolution": "The current artifact remains unflashed by the agent; rerun flash/monitor on /dev/ttyACM0 and bind HIL observations to 56104cf2...."
+    }
+  ]
+}

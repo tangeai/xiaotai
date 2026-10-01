@@ -1,0 +1,63 @@
+#pragma once
+
+#include "driver/gpio.h"
+#include "driver/i2c_master.h"
+#include "driver/i2s_std.h"
+#include "driver/spi_master.h"
+#include "esp_bit_defs.h"
+
+/* LCKFB SZPI ESP32-S3 V1.0.1 wiring; media policy remains in starter_media. */
+#define BOARD_I2C_PORT I2C_NUM_0
+#define BOARD_I2C_SDA GPIO_NUM_1
+#define BOARD_I2C_SCL GPIO_NUM_2
+#define BOARD_I2C_HZ 100000U
+
+#define BOARD_AI_BUTTON_GPIO GPIO_NUM_0
+
+#define PCA9557_ADDRESS 0x19U
+#define PCA9557_INPUT_REG 0x00U
+#define PCA9557_OUTPUT_REG 0x01U
+#define PCA9557_CONFIG_REG 0x03U
+#define PCA9557_LCD_CS_MASK BIT(0)
+#define PCA9557_PA_EN_MASK BIT(1)
+#define PCA9557_DVP_PWDN_MASK BIT(2)
+
+#define CAMERA_XCLK GPIO_NUM_5
+#define CAMERA_PCLK GPIO_NUM_7
+#define CAMERA_VSYNC GPIO_NUM_3
+#define CAMERA_HREF GPIO_NUM_46
+#define CAMERA_D0 GPIO_NUM_16
+#define CAMERA_D1 GPIO_NUM_18
+#define CAMERA_D2 GPIO_NUM_8
+#define CAMERA_D3 GPIO_NUM_17
+#define CAMERA_D4 GPIO_NUM_15
+#define CAMERA_D5 GPIO_NUM_6
+#define CAMERA_D6 GPIO_NUM_4
+#define CAMERA_D7 GPIO_NUM_9
+#define CAMERA_XCLK_HZ 24000000U
+
+#define I2S_MCLK GPIO_NUM_38
+#define I2S_BCLK GPIO_NUM_14
+#define I2S_WS GPIO_NUM_13
+#define I2S_ADC_DIN GPIO_NUM_12
+#define I2S_DAC_DOUT GPIO_NUM_45
+#define I2S_AUDIO_PORT I2S_NUM_0
+#define AUDIO_TDM_SLOTS 4U
+#define AUDIO_HW_SAMPLE_RATE_HZ 16000U
+#define AUDIO_MCLK_MULTIPLE 256U
+#define NS4150B_STARTUP_MS 120U
+
+#define LCD_HOST SPI3_HOST
+#define LCD_H_RES 320
+#define LCD_V_RES 240
+#define LCD_NATIVE_H_RES 240
+#define LCD_NATIVE_V_RES 320
+#define LCD_PIN_MOSI GPIO_NUM_40
+#define LCD_PIN_SCLK GPIO_NUM_41
+#define LCD_PIN_DC GPIO_NUM_39
+#define LCD_PIN_BL GPIO_NUM_42
+#define LCD_BACKLIGHT_ON_LEVEL 0
+#define LCD_BACKLIGHT_OFF_LEVEL 1
+#define LCD_DRAW_LINES 10
+#define LCD_PIXEL_CLOCK_HZ (80U * 1000U * 1000U)
+#define TOUCH_I2C_HZ 100000U

@@ -1,0 +1,19 @@
+diff --git a/ap/components/bk_peripheral/src/dvp/dvp_gc0308.c b/ap/components/bk_peripheral/src/dvp/dvp_gc0308.c
+--- a/ap/components/bk_peripheral/src/dvp/dvp_gc0308.c
++++ b/ap/components/bk_peripheral/src/dvp/dvp_gc0308.c
+@@ -454,13 +454,13 @@ const dvp_sensor_config_t dvp_sensor_gc0308 =
+ const dvp_sensor_config_t dvp_sensor_gc0308 =
+ {
+     .name = "gc0308",
+-    .clk = MCLK_24M,
++    .clk = MCLK_20M,
+     .fmt = PIXEL_FMT_YUYV,
+     .vsync = SYNC_HIGH_LEVEL,
+     .hsync = SYNC_HIGH_LEVEL,
+     /* default config */
+     .def_ppi = PPI_CAP_640X480,
+-    .def_fps = FPS25,
++    .def_fps = FPS20,
+     /* capability config */
+     .fps_cap = FPS5 | FPS10 | FPS20 | FPS25 | FPS30,
+     .ppi_cap = PPI_CAP_320X240 | PPI_CAP_320X480 | PPI_CAP_480X272 | PPI_CAP_640X480 | PPI_CAP_480X320,

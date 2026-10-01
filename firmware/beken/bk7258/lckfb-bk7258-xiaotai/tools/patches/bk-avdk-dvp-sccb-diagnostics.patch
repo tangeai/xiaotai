@@ -1,0 +1,124 @@
+diff --git a/ap/components/bk_dvp/src/bk_dvp.c b/ap/components/bk_dvp/src/bk_dvp.c
+index abfde34..df44455 100755
+--- a/ap/components/bk_dvp/src/bk_dvp.c
++++ b/ap/components/bk_dvp/src/bk_dvp.c
+@@ -1514,7 +1514,21 @@ const dvp_sensor_config_t *bk_dvp_detect(bk_dvp_config_t *config)
+     // step 4: init i2c
+     i2c_config.baud_rate = config->i2c_config.baud_rate;
+     i2c_config.addr_mode = I2C_ADDR_MODE_7BIT;
+-    bk_i2c_init(config->i2c_config.id, &i2c_config);
++    bk_err_t i2c_rc = bk_i2c_init(config->i2c_config.id, &i2c_config);
++    LOGI("DVP probe bus=%u baud=%u init_rc=%d mclk_cfg=%u SCL=GPIO%u SDA=GPIO%u idle=%d/%d\n",
++         (unsigned)config->i2c_config.id,
++         (unsigned)config->i2c_config.baud_rate,
++         i2c_rc,
++         (unsigned)config->clk_source,
++         (unsigned)config->i2c_config.scl_pin,
++         (unsigned)config->i2c_config.sda_pin,
++         bk_gpio_get_input((gpio_id_t)config->i2c_config.scl_pin),
++         bk_gpio_get_input((gpio_id_t)config->i2c_config.sda_pin));
++    if (i2c_rc != BK_OK)
++    {
++        LOGE("DVP SCCB init failed rc=%d\n", i2c_rc);
++        return NULL;
++    }
+ 
+     // step 5: detect sensor
+     sensor = bk_dvp_get_sensor_auto_detect();
+diff --git a/ap/components/bk_peripheral/src/dvp/dvp_sensor_devices.c b/ap/components/bk_peripheral/src/dvp/dvp_sensor_devices.c
+index a97a59d..641f47b 100755
+--- a/ap/components/bk_peripheral/src/dvp/dvp_sensor_devices.c
++++ b/ap/components/bk_peripheral/src/dvp/dvp_sensor_devices.c
+@@ -14,13 +14,16 @@
+ 
+ #include "dvp_sensor_devices.h"
+ #include <components/dvp_camera.h>
++#include <components/log.h>
+ #include <driver/i2c.h>
+ 
+ #define DVP_I2C_TIMEOUT (50)
++#define TAG "dvp_probe"
+ 
+ int dvp_camera_i2c_read_uint8(uint8_t addr, uint8_t reg, uint8_t *value)
+ {
+     i2c_mem_param_t mem_param = {0};
++    int rc;
+ 
+     mem_param.dev_addr = addr;
+     mem_param.mem_addr_size = I2C_MEM_ADDR_SIZE_8BIT;
+@@ -29,12 +32,17 @@ int dvp_camera_i2c_read_uint8(uint8_t addr, uint8_t reg, uint8_t *value)
+     mem_param.mem_addr = reg;
+     mem_param.data = value;
+ 
+-    return bk_i2c_memory_read(CONFIG_DVP_CAMERA_I2C_ID, &mem_param);
++    *value = 0;
++    rc = bk_i2c_memory_read(CONFIG_DVP_CAMERA_I2C_ID, &mem_param);
++    BK_LOGI(TAG, "SCCB read addr=0x%02x reg8=0x%02x rc=%d value=0x%02x\n",
++            addr, reg, rc, *value);
++    return rc;
+ }
+ 
+ int dvp_camera_i2c_read_uint16(uint8_t addr, uint16_t reg, uint8_t *value)
+ {
+     i2c_mem_param_t mem_param = {0};
++    int rc;
+ 
+     mem_param.dev_addr = addr;
+     mem_param.mem_addr_size = I2C_MEM_ADDR_SIZE_16BIT;
+@@ -43,7 +51,11 @@ int dvp_camera_i2c_read_uint16(uint8_t addr, uint16_t reg, uint8_t *value)
+     mem_param.mem_addr = reg;
+     mem_param.data = value;
+ 
+-    return bk_i2c_memory_read(CONFIG_DVP_CAMERA_I2C_ID, &mem_param);
++    *value = 0;
++    rc = bk_i2c_memory_read(CONFIG_DVP_CAMERA_I2C_ID, &mem_param);
++    BK_LOGI(TAG, "SCCB read addr=0x%02x reg16=0x%04x rc=%d value=0x%02x\n",
++            addr, reg, rc, *value);
++    return rc;
+ }
+ 
+ int dvp_camera_i2c_write_uint8(uint8_t addr, uint8_t reg, uint8_t value)
+
+diff --git a/ap/middleware/driver/i2c/sim_i2c_driver.c b/ap/middleware/driver/i2c/sim_i2c_driver.c
+index 90cff93..67924f0 100755
+--- a/ap/middleware/driver/i2c/sim_i2c_driver.c
++++ b/ap/middleware/driver/i2c/sim_i2c_driver.c
+@@ -653,8 +653,8 @@ bk_err_t bk_i2c_driver_deinit_v2(void)
+ 
+ bk_err_t bk_i2c_init_v2(i2c_id_t id, const i2c_config_t *cfg)
+ {
+-	bk_gpio_pull_down(HWD_GPIO_I2C_SDA);
+-	bk_gpio_pull_down(HWD_GPIO_I2C_SCL);
++	bk_gpio_pull_up(HWD_GPIO_I2C_SDA);
++	bk_gpio_pull_up(HWD_GPIO_I2C_SCL);
+ 	gpio_dev_unmap(HWD_GPIO_I2C_SDA);
+ 	gpio_dev_unmap(HWD_GPIO_I2C_SCL);
+ 	I2cInit();
+@@ -686,14 +686,12 @@ static bool I2cMemRead(i2c_id_t id, const i2c_mem_param_t *mem_param)
+ // For non-CONFIG_SIM_I2C_HW_BOARD_V3: Export sim_i2c_* functions
+ bk_err_t sim_i2c_memory_write(i2c_id_t id, const i2c_mem_param_t *mem_param)
+ {
+-	I2cMemWrite(id, mem_param);
+-	return BK_OK;
++	return I2cMemWrite(id, mem_param) ? BK_OK : BK_FAIL;
+ }
+ 
+ bk_err_t sim_i2c_memory_read(i2c_id_t id, const i2c_mem_param_t *mem_param)
+ {
+-	I2cMemRead(id, mem_param);
+-	return BK_OK;
++	return I2cMemRead(id, mem_param) ? BK_OK : BK_FAIL;
+ }
+ 
+ bk_err_t sim_i2c_init(i2c_id_t id, const i2c_config_t *cfg)
+@@ -709,8 +707,8 @@ bk_err_t sim_i2c_init(i2c_id_t id, const i2c_config_t *cfg)
+ 		}
+ 	}
+ 
+-	bk_gpio_pull_down(HWD_GPIO_I2C_SDA);
+-	bk_gpio_pull_down(HWD_GPIO_I2C_SCL);
++	bk_gpio_pull_up(HWD_GPIO_I2C_SDA);
++	bk_gpio_pull_up(HWD_GPIO_I2C_SCL);
+ 	gpio_dev_unmap(HWD_GPIO_I2C_SDA);
+ 	gpio_dev_unmap(HWD_GPIO_I2C_SCL);
+ 	I2cInit();

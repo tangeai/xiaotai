@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "waveshare-esp32p4-touch-lcd-43c-v10",
+  "vendor": "Waveshare",
+  "model": "ESP32-P4-WIFI6-Touch-LCD-4.3",
+  "revision": "V1.0",
+  "platform": "esp-idf",
+  "target": "esp32p4",
+  "sdk": {"name": "ESP-IDF", "version": "5.5.4"},
+  "project_dir": "firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c",
+  "capabilities": ["aec", "audio", "buttons", "camera-h264", "display", "touch", "wifi-hosted"],
+  "resources": {"flash_bytes": 33554432, "psram_bytes": 33554432},
+  "evidence": {
+    "hardware_ir": "firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/hardware-ir.json"
+  },
+  "variants": [{"name": "default", "default": true, "interaction_profile": "touch-full", "layout_profile": "large"}],
+  "migration": {"stage": "platform-project"}
+}

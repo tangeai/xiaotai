@@ -1,0 +1,8 @@
+/build/
+/managed_components/
+/sdkconfig
+/sdkconfig.old
+/artifacts/*/
+!/artifacts/atk-media.10/
+!/artifacts/atk-media.11/
+/third_party/tirtc23/

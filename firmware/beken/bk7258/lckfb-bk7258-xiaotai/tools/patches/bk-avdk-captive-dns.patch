@@ -1,0 +1,122 @@
+diff --git a/ap/components/lwip_intf_v2_1/dhcpd/dhcp-server.c b/ap/components/lwip_intf_v2_1/dhcpd/dhcp-server.c
+--- a/ap/components/lwip_intf_v2_1/dhcpd/dhcp-server.c
++++ b/ap/components/lwip_intf_v2_1/dhcpd/dhcp-server.c
+@@ -295,55 +295,86 @@ static int send_response(int sock, struct sockaddr *addr, char *msg, int len)
+ 	return 0;
+ }
+ 
+-#define ERROR_REFUSED 5
++#define DNS_HEADER_SIZE 12
++#define DNS_A_RECORD_SIZE 16
++#define DNS_TYPE_A 1
++#define DNS_CLASS_IN 1
+ static int process_dns_message(char *msg, int len, struct sockaddr_in *fromaddr)
+ {
+ 	struct dns_header *hdr;
+-	char *endp = msg + len;
+-	int nq;
++	char *cursor;
++	char *endp;
++	uint16_t request_flags;
++	uint16_t query_type;
++	uint16_t query_class;
++	int response_len;
+ 
+-	if (len < sizeof(struct dns_header)) {
++	if (len < DNS_HEADER_SIZE) {
+ 		dhcp_e("DNS request is not complete, hence ignoring it\r\n");
+ 		return -1;
+ 	}
+ 
+ 	hdr = (struct dns_header *)msg;
+-
+-	dhcp_d("DNS transaction id: 0x%x\r\n", htons(hdr->id));
+-
+-	if (hdr->flags.fields.qr) {
+-		dhcp_e("ignoring this dns message (not a query)\r\n");
++	request_flags = ntohs(hdr->flags.num);
++	if ((request_flags & 0x8000U) != 0U ||
++	    (request_flags & 0x7800U) != 0U ||
++	    ntohs(hdr->num_questions) != 1U) {
++		dhcp_e("ignoring unsupported DNS query\r\n");
+ 		return -1;
+ 	}
+ 
+-	nq = ntohs(hdr->num_questions);
+-	dhcp_d("we were asked %d questions\r\n", nq);
+-
+-	if (nq <= 0) {
+-		dhcp_e("ignoring this dns msg (not a query or 0 questions)\r\n");
++	endp = msg + len;
++	cursor = msg + DNS_HEADER_SIZE;
++	for (;;) {
++		uint8_t label_len;
++		if (cursor >= endp)
++			return -1;
++		label_len = (uint8_t)*cursor++;
++		if (label_len == 0U)
++			break;
++		if ((label_len & 0xc0U) != 0U || label_len > 63U ||
++		    cursor + label_len > endp)
++			return -1;
++		cursor += label_len;
++	}
++	if (cursor + 4 > endp)
+ 		return -1;
+-	}
+ 
+-	/* make the header represent a response */
+-	hdr->flags.fields.qr = 1;
+-	hdr->flags.fields.opcode = 0;
+-	/* Errors are never authoritative (unless they are
+-	   NXDOMAINS, which this is not) */
+-	hdr->flags.fields.aa = 0;
+-	hdr->flags.fields.tc = 0;
+-	hdr->flags.fields.rd = 1;
+-	hdr->flags.fields.ra = 0;
+-	hdr->flags.fields.rcode = ERROR_REFUSED;
+-	hdr->flags.num = htons(hdr->flags.num);
+-	/* number of entries in questions section */
+-	hdr->num_questions  = htons(0x01);
+-	hdr->answer_rrs = 0; /* number of resource records in answer section */
++	query_type = ((uint16_t)(uint8_t)cursor[0] << 8) |
++	             (uint16_t)(uint8_t)cursor[1];
++	query_class = ((uint16_t)(uint8_t)cursor[2] << 8) |
++	              (uint16_t)(uint8_t)cursor[3];
++	cursor += 4;
++
++	hdr->flags.num = htons(0x8000U | (request_flags & 0x0100U) | 0x0080U);
++	hdr->num_questions = htons(1U);
++	hdr->answer_rrs = 0;
+ 	hdr->authority_rrs = 0;
+ 	hdr->additional_rrs = 0;
+-	SEND_RESPONSE(dhcps.dnssock, (struct sockaddr *)fromaddr,
+-		      msg, endp - msg);
+ 
+-	return -1;
++	if (query_type == DNS_TYPE_A && query_class == DNS_CLASS_IN) {
++		if (cursor - msg + DNS_A_RECORD_SIZE > SERVER_BUFFER_SIZE)
++			return -1;
++		*cursor++ = (char)0xc0;
++		*cursor++ = (char)0x0c;
++		*cursor++ = 0;
++		*cursor++ = DNS_TYPE_A;
++		*cursor++ = 0;
++		*cursor++ = DNS_CLASS_IN;
++		*cursor++ = 0;
++		*cursor++ = 0;
++		*cursor++ = 0;
++		*cursor++ = 30;
++		*cursor++ = 0;
++		*cursor++ = 4;
++		memcpy(cursor, &dhcps.router_ip, sizeof(dhcps.router_ip));
++		cursor += sizeof(dhcps.router_ip);
++		hdr->answer_rrs = htons(1U);
++	}
++
++	response_len = cursor - msg;
++	return SEND_RESPONSE(dhcps.dnssock, (struct sockaddr *)fromaddr,
++	                     msg, response_len);
+ }
+ 
+ static int process_dhcp_message(char *msg, int len)

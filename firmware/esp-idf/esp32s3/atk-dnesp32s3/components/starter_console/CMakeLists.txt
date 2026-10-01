@@ -1,0 +1,7 @@
+idf_component_register(
+    SRCS "src/starter_console.c"
+    INCLUDE_DIRS "include"
+    REQUIRES console
+    PRIV_REQUIRES esp_system heap freertos platform_client runtime_config
+                  starter_media starter_runtime starter_tirtc wifi_manager
+)

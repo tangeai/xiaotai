@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "alientek-atk-dnesp32s3",
+  "vendor": "ALIENTEK",
+  "model": "ATK-DNESP32S3",
+  "revision": "V1.4",
+  "platform": "esp-idf",
+  "target": "esp32s3",
+  "sdk": {"name": "ESP-IDF", "version": "5.5.x"},
+  "project_dir": "firmware/esp-idf/esp32s3/atk-dnesp32s3",
+  "capabilities": ["audio", "buttons", "camera-mjpeg", "wifi"],
+  "resources": {"flash_bytes": 16777216, "psram_bytes": 8388608},
+  "evidence": {"hardware_ir": "firmware/esp-idf/esp32s3/atk-dnesp32s3/hardware-ir.json"},
+  "variants": [{"name": "default", "default": true, "interaction_profile": "headless-key", "layout_profile": "none"}],
+  "migration": {"stage": "platform-project"}
+}

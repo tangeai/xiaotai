@@ -1,0 +1,22 @@
+diff --git a/cp/components/bk_wifi/include/skbuff.h b/cp/components/bk_wifi/include/skbuff.h
+--- a/cp/components/bk_wifi/include/skbuff.h
++++ b/cp/components/bk_wifi/include/skbuff.h
+@@ -315,5 +315,18 @@ static inline struct sk_buff *__skb_dequeue(struct sk_buff_head *list)
+ {
+ 	struct sk_buff *skb = skb_peek(list);
++	/* A disconnect can race queued CP Wi-Fi work in the vendor SDK. If a
++	 * temporary push list is already broken, __skb_unlink would dereference
++	 * NULL at next->prev/prev->next and reboot the device. Drop this damaged
++	 * batch head, detach the current skb and let the caller retain its normal
++	 * send/free ownership instead of leaking it. */
++	if (skb && (!skb->next || !skb->prev)) {
++		list->next = (struct sk_buff *)list;
++		list->prev = (struct sk_buff *)list;
++		list->qlen = 0;
++		skb->next = NULL;
++		skb->prev = NULL;
++		return skb;
++	}
+ 	if (skb)
+ 		__skb_unlink(skb, list);
+ 	return skb;
