@@ -1,0 +1,59 @@
+.room-leave-confirm {
+  display: flex;
+  flex-direction: column;
+}
+
+.room-confirm-card {
+  margin: auto 0;
+  text-align: center;
+}
+
+.room-confirm-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #ff7e8918;
+  color: #ff8e98;
+  font-size: 23px;
+  font-weight: 800;
+}
+
+.room-confirm-card h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.room-confirm-card p {
+  margin: 0;
+  color: #8da5af;
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.room-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.room-confirm-actions button {
+  height: 43px;
+  border: 0;
+  border-radius: 12px;
+  background: #18343f;
+  color: #dff7ff;
+  font-size: 10px;
+}
+
+.room-confirm-actions .danger {
+  background: #e65d68;
+  color: #fff;
+}
+
+.live-room .ptt-wrap {
+  grid-template-columns: 1fr 72px;
+}

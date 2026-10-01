@@ -139,6 +139,8 @@ require('"$project_dir/tools/patches/bk-avdk-gc0308-20fps.patch"' in
         "official SDK builds must reproducibly select the GC0308 20 fps profile")
 require('"$project_dir/tools/patches/bk-avdk-redact-sensitive-logs.patch"' in
         build_script and
+        'apply --check --ignore-whitespace "$sdk_patch"' in build_script and
+        'apply --ignore-whitespace "$sdk_patch"' in build_script and
         'password_len=%u' in sdk_sensitive_log_patch and
         '+    WDRV_LOGD("sta config, ssid=%s password=%s' not in
         sdk_sensitive_log_patch and
@@ -147,6 +149,12 @@ require('"$project_dir/tools/patches/bk-avdk-redact-sensitive-logs.patch"' in
         "official SDK builds must redact Wi-Fi passwords and HTTP headers")
 require('"$project_dir/tools/patches/bk-avdk-touch-read-failure-release.patch"' in
         build_script and
+        "TP_THREAD_STACK_SIZE (2048)" in sdk_touch_release_patch and
+        "TP_READ_RETRY_COUNT (3)" in sdk_touch_release_patch and
+        "TP_READ_RETRY_DELAY_MS (2)" in sdk_touch_release_patch and
+        "tp_recover_sensor" in sdk_touch_release_patch and
+        "consecutive_read_failures" in sdk_touch_release_patch and
+        "read recovered after attempt=%u" in sdk_touch_release_patch and
         "bool touch_active = false;" in sdk_touch_release_patch and
         "if (touch_active)" in sdk_touch_release_patch and
         "tp_data[0].event = TP_EVENT_TYPE_UP;" in sdk_touch_release_patch and
@@ -327,9 +335,21 @@ require("XIAOTAI_UI_ACTION_ROOM_TALK_START" in app_source and
         "XIAOTAI_ROOM_ACTION_TALK_STOP" in app_source and
         ".input_event = (uint8_t)touch" in app_source,
         "compact touch room UI must preserve DOWN/UP for hold-to-talk")
+require("static void room_service_task" in app_source and
+        "ROOM_SERVICE_TASK_STACK_SIZE" in app_source and
+        "rtos_create_psram_thread(NULL" in app_source and
+        "wait_for_room_transport_release" in app_source,
+        "room HTTP must run off the control task and leave must wait for the RTC transport to close")
 touch_start = app_source.index("static void handle_touch(")
 touch_end = app_source.index("\nstatic ", touch_start + 1)
 touch_handler = app_source[touch_start:touch_end]
+leave_confirm_start = touch_handler.index(
+    "XIAOTAI_UI_ACTION_ROOM_LEAVE_CONFIRM")
+leave_confirm_end = touch_handler.index("return;", leave_confirm_start)
+leave_confirm_branch = touch_handler[leave_confirm_start:leave_confirm_end]
+require('s_ui_page = UI_PAGE_HOME' in leave_confirm_branch and
+        'xiaotai_ui_show_status("READY")' in leave_confirm_branch,
+        "confirmed room leave must return home as soon as the request is queued")
 require(touch_handler.find("s_room_touch_talking") <
         touch_handler.find("if (incoming_waiting)"),
         "room touch release must stop PTT before an incoming-call foreground consumes the gesture")
@@ -908,8 +928,62 @@ require("XIAOTAI_UI_ROOM_LEAVE_X 8U" in ui_hit_header and
         "XIAOTAI_UI_ACTION_ROOM_PAGE_PREV" in ui_hit_test_source and
         "XIAOTAI_UI_ACTION_ROOM_PAGE_NEXT" in ui_hit_test_source and
         "s_ui_page = UI_PAGE_HOME;" in app_source and
-        '"room back to home rc=%d' in app_source,
+        '"room menu exited target=%d rc=%d' in app_source,
         "touch room UI must use two rectangular controls, down-triggered leave, home back and pagination")
+require("static void navigate_to(ui_page_t page)" in app_source and
+        "room_menu_page(s_ui_page) && !room_menu_page(page)" in app_source and
+        "XIAOTAI_ROOM_ACTION_END" in app_source[
+            app_source.index("static void navigate_to(ui_page_t page)"):
+            app_source.index("static void", app_source.index(
+                "static void navigate_to(ui_page_t page)") + 1)
+        ] and
+        "s_ui_page = page;" in app_source and
+        "room->foreground = false;" in room_source and
+        "bool available = room->foreground &&" in room_source and
+        "if (!room->foreground" in room_source,
+        "touch room media must be owned only while the room menu is foreground")
+require("static void room_state_changed" in app_source and
+        "if (room_menu_page(s_ui_page)) room_render();" in app_source and
+        "XIAOTAI_ROOM_DIAG_LEAVE_FAILED" in app_source and
+        'xiaotai_ui_show_status("ROOM LEAVE FAILED")' in app_source,
+        "late room callbacks must not redraw a departed page and leave failures must be visible")
+require("UI_PAGE_ROOM_LEAVE_CONFIRM" in app_source and
+        "xiaotai_ui_show_room_leave_confirm" in app_source and
+        "xiaotai_ui_room_leave_confirm_action" in app_source and
+        "if (event->input_event != XIAOTAI_TOUCH_DOWN) return;" in app_source[
+            app_source.index("if (s_ui_page == UI_PAGE_ROOM_LEAVE_CONFIRM)"):
+            app_source.index("if (s_ui_page == UI_PAGE_ROOM &&", app_source.index(
+                "if (s_ui_page == UI_PAGE_ROOM_LEAVE_CONFIRM)"))
+        ] and
+        '"ROOM PAUSED"' in app_source and
+        '"确认退出房间？"' in ui_source and
+        '"将取消本设备的房间分配"' in ui_source and
+        '"房间已保留，再次进入可连接"' in ui_source,
+        "room back must preserve assignment while room leave requires confirmation")
+require('xiaotai_metrics_set_state(room->talking ? "ROOM TALK" : "ROOM LIST");' in
+        ui_source and
+        'xiaotai_metrics_set_state("ROOM ENTRY");' in ui_source and
+        'xiaotai_metrics_set_state("ROOM JOIN");' in ui_source and
+        'xiaotai_metrics_set_state("ROOM LEAVE");' in ui_source,
+        "every room screen must publish its current foreground state")
+require("UI_PAGE_ROOM_JOIN_CODE" in app_source and
+        "xiaotai_ui_show_room_entry" in app_source and
+        "xiaotai_ui_show_room_join_code" in app_source and
+        "xiaotai_ui_room_entry_action" in app_source and
+        "XIAOTAI_ROOM_ACTION_CREATE" in app_source and
+        '"创建房间"' in ui_source and
+        '"加入房间"' in ui_source and
+        '"尚未加入房间"' in ui_source and
+        '"/v1/call/group/device/create"' in room_source,
+        "unassigned touch room UI must offer create and numeric-code join")
+reject_pending_source = app_source[
+    app_source.index("static void request_reject_pending(void)"):
+    app_source.index("static void handle_intent", app_source.index(
+        "static void request_reject_pending(void)"))
+]
+require("s_ui_page = UI_PAGE_ROOM;" in reject_pending_source and
+        "room_render();" in reject_pending_source,
+        "rejecting a call over room UI must restore the live room page")
 require("bk_wifi_scan_start(NULL)" in network_source and
         "bk_wifi_scan_get_result(&result)" in network_source and
         "bk_wifi_scan_free_result(&result)" in network_source and

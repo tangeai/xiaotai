@@ -214,6 +214,9 @@ class RepositoryLayoutTests(unittest.TestCase):
         self.assertNotIn("quickWechatCall", prototype_js)
         self.assertIn("quickFirstContactCall", prototype_js)
         self.assertIn("visibleContacts()[0]", prototype_js)
+        self.assertIn("roomLeaveConfirm", prototype_js)
+        self.assertIn("确认退出房间？", prototype_js)
+        self.assertIn("房间已保留，再次进入可连接", prototype_js)
         for stream_contract in (
             "音频 10、视频 11",
             "音频 14、视频 15",

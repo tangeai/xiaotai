@@ -35,7 +35,8 @@ typedef enum {
 } xiaotai_room_response_t;
 
 typedef enum {
-    XIAOTAI_ROOM_ACTION_JOIN = 1,
+    XIAOTAI_ROOM_ACTION_CREATE = 1,
+    XIAOTAI_ROOM_ACTION_JOIN,
     XIAOTAI_ROOM_ACTION_LEAVE,
     XIAOTAI_ROOM_ACTION_TALK_START,
     XIAOTAI_ROOM_ACTION_TALK_STOP,
@@ -55,6 +56,7 @@ typedef enum {
     XIAOTAI_ROOM_DIAG_MEDIA_START_FAILED,
     XIAOTAI_ROOM_DIAG_LEASE_EXPIRED,
     XIAOTAI_ROOM_DIAG_DISCONNECTED,
+    XIAOTAI_ROOM_DIAG_LEAVE_FAILED,
 } xiaotai_room_diagnostic_t;
 
 typedef void (*xiaotai_room_service_response_fn)(const char *body,
@@ -94,6 +96,8 @@ typedef struct {
     xiaotai_room_port_t port;
     bool assigned;
     bool request_pending;
+    bool foreground;
+    bool leave_pending;
     bool connecting;
     bool joined;
     bool ptt;

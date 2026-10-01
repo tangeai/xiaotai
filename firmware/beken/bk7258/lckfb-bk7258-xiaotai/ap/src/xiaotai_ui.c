@@ -628,6 +628,9 @@ static const char *status_hint(const char *status)
     if (strcmp(status, "DUP CONTACT") == 0) return "请说出完整名称";
     if (strcmp(status, "CONTACT OFFLINE") == 0) return "请稍后再试";
     if (strcmp(status, "REMOTE") == 0) return "设备画面正在共享";
+    if (strcmp(status, "ROOM PAUSED") == 0) {
+        return "房间已保留，再次进入可连接";
+    }
     if (strcmp(status, "DEVICE CALL") == 0) return "请选择接听或拒绝";
     if (strcmp(status, "DEVICE OUT") == 0) return "等待对方接听";
     if (strcmp(status, "DEVICE CONNECT") == 0) return "请稍候";
@@ -659,6 +662,7 @@ static const char *status_title(const char *status)
     if (strcmp(status, "DUP CONTACT") == 0) return "找到多个联系人";
     if (strcmp(status, "CONTACT OFFLINE") == 0) return "呼叫对象不在线";
     if (strcmp(status, "REMOTE") == 0) return "远程查看中";
+    if (strcmp(status, "ROOM PAUSED") == 0) return "已结束本机对讲";
     if (strcmp(status, "DEVICE CALL") == 0) return "设备来电";
     if (strcmp(status, "DEVICE OUT") == 0) return "正在呼叫设备";
     if (strcmp(status, "DEVICE CONNECT") == 0) return "正在接通";
@@ -1060,6 +1064,7 @@ void xiaotai_ui_show_settings(uint8_t volume, bool speaker_muted,
 void xiaotai_ui_show_room(const xiaotai_room_snapshot_t *room, size_t page)
 {
     if (room == NULL) return;
+    xiaotai_metrics_set_state(room->talking ? "ROOM TALK" : "ROOM LIST");
     frame_buffer_t *frame = page_frame("多人对讲");
     if (frame == NULL) return;
     char state[40];
@@ -1137,6 +1142,77 @@ void xiaotai_ui_show_room(const xiaotai_room_snapshot_t *room, size_t page)
         (int)XIAOTAI_UI_ROOM_TALK_X + button_w / 2, button_y + 16,
         room->talking ? "正在说话" : "按住说话", 1,
         room->talking ? 0xffff : 0x0000, button_w - 8);
+    flush_page(frame);
+}
+
+void xiaotai_ui_show_room_entry(bool request_pending)
+{
+    xiaotai_metrics_set_state("ROOM ENTRY");
+    frame_buffer_t *frame = page_frame("多人对讲");
+    if (frame == NULL) return;
+    centered_mixed_text(frame, 58,
+                        request_pending ? "正在提交" : "尚未加入房间",
+                        2, request_pending ? 0xfbe0 : 0xffff);
+    centered_mixed_text(frame, 104,
+                        request_pending ? "请稍候" : "创建新房间或输入房间码",
+                        1, 0xbdf7);
+    rectangle(frame, (int)XIAOTAI_UI_ROOM_LEAVE_X,
+              (int)XIAOTAI_UI_ROOM_BUTTON_Y,
+              (int)XIAOTAI_UI_ROOM_BUTTON_WIDTH,
+              (int)XIAOTAI_UI_ROOM_BUTTON_HEIGHT, 0x0320);
+    rectangle(frame, (int)XIAOTAI_UI_ROOM_TALK_X,
+              (int)XIAOTAI_UI_ROOM_BUTTON_Y,
+              (int)XIAOTAI_UI_ROOM_BUTTON_WIDTH,
+              (int)XIAOTAI_UI_ROOM_BUTTON_HEIGHT, 0x10a4);
+    centered_mixed_in(frame, 82, 200, "创建房间", 1, 0xffff, 140);
+    centered_mixed_in(frame, 238, 200, "加入房间", 1, 0xffff, 140);
+    flush_page(frame);
+}
+
+void xiaotai_ui_show_room_join_code(const char *room_code)
+{
+    xiaotai_metrics_set_state("ROOM JOIN");
+    frame_buffer_t *frame = page_frame("加入房间");
+    if (frame == NULL) return;
+    char value[16];
+    size_t length = room_code == NULL ? 0U : strlen(room_code);
+    snprintf(value, sizeof(value), "%s%.*s", room_code == NULL ? "" : room_code,
+             (int)(6U - (length > 6U ? 6U : length)), "------");
+    centered_mixed_in(frame, 160, 39, value, 1, 0x2d7f, 300);
+    static const char *keys[4][3] = {
+        {"1", "2", "3"}, {"4", "5", "6"},
+        {"7", "8", "9"}, {"删除", "0", ""},
+    };
+    for (unsigned row = 0U; row < 4U; ++row) {
+        for (unsigned column = 0U; column < 3U; ++column) {
+            if (keys[row][column][0] == '\0') continue;
+            int x = (int)column * 107 + 4;
+            int y = 64 + (int)row * 29;
+            rectangle(frame, x, y, 99, 25, 0x10a4);
+            centered_mixed_in(frame, x + 49, y + 4, keys[row][column],
+                              1, 0xffff, 91);
+        }
+    }
+    rectangle(frame, 8, 190, 304, 42,
+              length == 6U ? 0x0320 : 0x4208);
+    centered_mixed_in(frame, 160, 201, "加入房间", 1, 0xffff, 296);
+    flush_page(frame);
+}
+
+void xiaotai_ui_show_room_leave_confirm(void)
+{
+    xiaotai_metrics_set_state("ROOM LEAVE");
+    frame_buffer_t *frame = page_frame("退出房间");
+    if (frame == NULL) return;
+    centered_mixed_text(frame, 62, "确认退出房间？", 2, 0xffff);
+    centered_mixed_text(frame, 108, "将取消本设备的房间分配", 1, 0xfbe0);
+    centered_mixed_text(frame, 132, "再次使用需要重新加入", 1, 0xbdf7);
+    rectangle(frame, 8, (int)XIAOTAI_UI_ROOM_BUTTON_Y, 148,
+              (int)XIAOTAI_UI_ROOM_BUTTON_HEIGHT, 0x2104);
+    rectangle(frame, 164, (int)XIAOTAI_UI_ROOM_BUTTON_Y, 148,
+              (int)XIAOTAI_UI_ROOM_BUTTON_HEIGHT, 0xa800);
+    centered_mixed_in(frame, 82, 200, "取消", 1, 0xffff, 140);
+    centered_mixed_in(frame, 238, 200, "退出房间", 1, 0xffff, 140);
     flush_page(frame);
 }
 

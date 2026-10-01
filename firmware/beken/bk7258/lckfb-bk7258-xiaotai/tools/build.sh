@@ -81,9 +81,12 @@ if ! grep -Fq 'CONFIG_PSA_MBEDTLS=y' "$ap_config"; then
 fi
 
 for sdk_patch in "${sdk_patches[@]}"; do
-    if git -C "$sdk_dir" apply --check "$sdk_patch" 2>/dev/null; then
-        git -C "$sdk_dir" apply "$sdk_patch"
-    elif git -C "$sdk_dir" apply --reverse --check "$sdk_patch" 2>/dev/null; then
+    # The pinned SDK contains sources whose whitespace can differ after CRLF
+    # normalization. Allow whitespace variation while still requiring each
+    # patch hunk to match the surrounding source context.
+    if git -C "$sdk_dir" apply --check --ignore-whitespace "$sdk_patch" 2>/dev/null; then
+        git -C "$sdk_dir" apply --ignore-whitespace "$sdk_patch"
+    elif git -C "$sdk_dir" apply --reverse --check --ignore-whitespace "$sdk_patch" 2>/dev/null; then
         : # Project SDK patch is already applied.
     else
         echo "SDK patch does not match $sdk_dir: $sdk_patch" >&2

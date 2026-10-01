@@ -1,23 +1,90 @@
 diff --git a/ap/middleware/driver/tp/tp_driver.c b/ap/middleware/driver/tp/tp_driver.c
+index bcb648f..3b3314c 100755
 --- a/ap/middleware/driver/tp/tp_driver.c
 +++ b/ap/middleware/driver/tp/tp_driver.c
-@@ -434,6 +434,7 @@ void tp_process_task(beken_thread_arg_t arg)
+@@ -60,7 +60,10 @@
+ 
+ // task parameters.
+ #define TP_THREAD_PRIORITY   (4)
+-#define TP_THREAD_STACK_SIZE (1024)
++#define TP_THREAD_STACK_SIZE (2048)
++#define TP_READ_RETRY_COUNT (3)
++#define TP_READ_RETRY_DELAY_MS (2)
++#define TP_RECOVERY_FAILURE_COUNT (3)
+ 
+ 
+ static beken_semaphore_t tp_sema = NULL;
+@@ -430,10 +433,34 @@ bk_err_t bk_tp_int_deinit(void)
+ 	return BK_OK;
+ }
+ 
++static int tp_recover_sensor(void)
++{
++	if (current_sensor == NULL || current_sensor->init == NULL)
++	{
++		return BK_FAIL;
++	}
++	tp_sensor_user_config_t config = {
++		.x_size = (tp_device.ppi >> 16) & 0xFFFF,
++		.y_size = tp_device.ppi & 0xFFFF,
++		.int_type = tp_device.int_type,
++		.refresh_rate = tp_device.refresh_rate,
++		.tp_num = tp_device.tp_num,
++	};
++
++	LOGW("%s reset controller after consecutive read failures.\r\n", __func__);
++	BK_LOG_ON_ERR(bk_gpio_set_output_low(TP_RST_GPIO_ID));
++	rtos_delay_milliseconds(20);
++	BK_LOG_ON_ERR(bk_gpio_set_output_high(TP_RST_GPIO_ID));
++	rtos_delay_milliseconds(300);
++	return current_sensor->init(&tp_i2c_cb, &config);
++}
++
+ void tp_process_task(beken_thread_arg_t arg)
  {
  	int ret;
  	tp_data_t tp_data[TP_SUPPORT_MAX_NUM];
 +	bool touch_active = false;
++	uint32_t consecutive_read_failures = 0;
  
  	while (1)
  	{
-@@ -449,6 +450,19 @@ void tp_process_task(beken_thread_arg_t arg)
- 			if (BK_OK != current_sensor->read_tp_info(&tp_i2c_cb, TP_SUPPORT_MAX_NUM, (void *)tp_data))
+@@ -446,12 +473,53 @@ void tp_process_task(beken_thread_arg_t arg)
+ 		os_memset(tp_data, 0x00, sizeof(tp_data));
+ 		if (NULL != current_sensor->read_tp_info)
+ 		{
+-			if (BK_OK != current_sensor->read_tp_info(&tp_i2c_cb, TP_SUPPORT_MAX_NUM, (void *)tp_data))
++			int read_rc = BK_FAIL;
++			uint32_t attempt = 0;
++			for (attempt = 1; attempt <= TP_READ_RETRY_COUNT; attempt++)
++			{
++				read_rc = current_sensor->read_tp_info(&tp_i2c_cb,
++					TP_SUPPORT_MAX_NUM, (void *)tp_data);
++				if (BK_OK == read_rc)
++				{
++					break;
++				}
++				if (attempt < TP_READ_RETRY_COUNT)
++				{
++					rtos_delay_milliseconds(TP_READ_RETRY_DELAY_MS);
++				}
++			}
++			if (BK_OK != read_rc)
  			{
- 				LOGE("%s get tp info fail!\r\n", __func__);
+-				LOGE("%s get tp info fail!\r\n", __func__);
++				consecutive_read_failures++;
++				LOGE("%s get tp info fail attempts=%u consecutive=%u!\r\n",
++					__func__, (unsigned)attempt - 1U,
++					(unsigned)consecutive_read_failures);
++				if (consecutive_read_failures >= TP_RECOVERY_FAILURE_COUNT)
++				{
++					int recovery_rc = tp_recover_sensor();
++					LOGW("%s controller recovery rc=%d.\r\n",
++						__func__, recovery_rc);
++					consecutive_read_failures = 0;
++				}
 +				if (touch_active)
 +				{
-+					/* UINT16_MAX coordinates distinguish a controller-failure
-+					 * cancellation from a real finger-up.  The product adapter
-+					 * releases PTT but never turns this into a click. */
 +					tp_data[0].event = TP_EVENT_TYPE_UP;
 +					tp_data[0].x_coordinate = UINT16_MAX;
 +					tp_data[0].y_coordinate = UINT16_MAX;
@@ -29,7 +96,16 @@ diff --git a/ap/middleware/driver/tp/tp_driver.c b/ap/middleware/driver/tp/tp_dr
  			}
  			else
  			{
-@@ -463,6 +477,15 @@ void tp_process_task(beken_thread_arg_t arg)
++				if (attempt > 1U)
++				{
++					LOGI("%s read recovered after attempt=%u.\r\n",
++						__func__, (unsigned)attempt);
++				}
++				consecutive_read_failures = 0;
+ 				for (uint8_t i=0; i<TP_SUPPORT_MAX_NUM; i++)
+ 				{
+ 					if ((TP_EVENT_TYPE_DOWN == tp_data[i].event) || (TP_EVENT_TYPE_UP == tp_data[i].event) || (TP_EVENT_TYPE_MOVE == tp_data[i].event))
+@@ -464,6 +532,15 @@ void tp_process_task(beken_thread_arg_t arg)
  									tp_data[i].width,
  									tp_data[i].timestamp);
  					}

@@ -42,6 +42,9 @@ void xiaotai_ui_show_settings(uint8_t volume, bool speaker_muted,
                               uint8_t microphone_sensitivity,
                               const char *screen_timeout);
 void xiaotai_ui_show_room(const xiaotai_room_snapshot_t *room, size_t page);
+void xiaotai_ui_show_room_entry(bool request_pending);
+void xiaotai_ui_show_room_join_code(const char *room_code);
+void xiaotai_ui_show_room_leave_confirm(void);
 int xiaotai_ui_set_backlight(bool enabled);
 bool xiaotai_ui_backlight_on(void);
 const void *xiaotai_ui_probe_lcd(void);

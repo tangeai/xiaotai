@@ -75,6 +75,31 @@ int main(void)
     assert(xiaotai_ui_action_triggers_on_down(
                XIAOTAI_UI_ACTION_ROOM_LEAVE));
 
+    assert(xiaotai_ui_room_entry_action(60U, 208U) ==
+           XIAOTAI_UI_ACTION_ROOM_CREATE);
+    assert(xiaotai_ui_room_entry_action(260U, 208U) ==
+           XIAOTAI_UI_ACTION_ROOM_JOIN);
+    assert(xiaotai_ui_room_entry_action(160U, 120U) ==
+           XIAOTAI_UI_ACTION_NONE);
+    assert(xiaotai_ui_room_entry_action(16U, 17U) ==
+           XIAOTAI_UI_ACTION_BACK);
+    assert(xiaotai_ui_room_keypad_key(45U, 70U) == 1);
+    assert(xiaotai_ui_room_keypad_key(160U, 127U) == 8);
+    assert(xiaotai_ui_room_keypad_key(160U, 163U) == 0);
+    assert(xiaotai_ui_room_keypad_key(45U, 163U) ==
+           XIAOTAI_UI_ROOM_KEY_DELETE);
+    assert(xiaotai_ui_room_keypad_key(160U, 210U) ==
+           XIAOTAI_UI_ROOM_KEY_SUBMIT);
+
+    assert(xiaotai_ui_room_leave_confirm_action(60U, 208U) ==
+           XIAOTAI_UI_ACTION_ROOM_LEAVE_CANCEL);
+    assert(xiaotai_ui_room_leave_confirm_action(260U, 208U) ==
+           XIAOTAI_UI_ACTION_ROOM_LEAVE_CONFIRM);
+    assert(xiaotai_ui_room_leave_confirm_action(160U, 120U) ==
+           XIAOTAI_UI_ACTION_NONE);
+    assert(xiaotai_ui_room_leave_confirm_action(16U, 17U) ==
+           XIAOTAI_UI_ACTION_ROOM_LEAVE_CANCEL);
+
     assert(xiaotai_ui_settings_action(185U, 54U) ==
            XIAOTAI_UI_ACTION_VOLUME_DOWN);
     assert(xiaotai_ui_settings_action(290U, 54U) ==

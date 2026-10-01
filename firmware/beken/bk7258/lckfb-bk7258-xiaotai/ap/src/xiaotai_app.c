@@ -49,6 +49,8 @@
 #define AI_END_FINAL_AUDIO_ARRIVAL_MS 1500U
 #define AI_END_DRAIN_TIMEOUT_MS 5000U
 #define CONTROL_TASK_STACK_SIZE (12U * 1024U)
+#define ROOM_SERVICE_TASK_STACK_SIZE (12U * 1024U)
+#define ROOM_TRANSPORT_RELEASE_TIMEOUT_MS 3000U
 #define TIRTC_SUPERVISOR_STACK_SIZE (32U * 1024U)
 
 typedef enum {
@@ -92,6 +94,8 @@ typedef enum {
     UI_PAGE_CONTACTS,
     UI_PAGE_CONTACT_DETAIL,
     UI_PAGE_ROOM,
+    UI_PAGE_ROOM_JOIN_CODE,
+    UI_PAGE_ROOM_LEAVE_CONFIRM,
     UI_PAGE_EXPRESSIONS,
     UI_PAGE_SETTINGS,
     UI_PAGE_NETWORK,
@@ -143,6 +147,8 @@ static bool s_tirtc_config_ready;
 static xiaotai_room_t s_room;
 static xiaotai_room_snapshot_t s_room_snapshot;
 static size_t s_room_participant_page;
+static char s_room_code_input[7];
+static size_t s_room_code_input_length;
 static bool s_room_key_talking;
 static bool s_room_touch_talking;
 static bool s_touch_wake_consumed;
@@ -493,34 +499,60 @@ static void render_network(void)
     xiaotai_ui_show_network(rssi, ip[0] == '\0' ? NULL : ip);
 }
 
+static bool room_menu_page(ui_page_t page)
+{
+    return page == UI_PAGE_ROOM || page == UI_PAGE_ROOM_JOIN_CODE ||
+           page == UI_PAGE_ROOM_LEAVE_CONFIRM;
+}
+
+static void navigate_to(ui_page_t page)
+{
+    if (s_ui_page == page) return;
+    if (room_menu_page(s_ui_page) && !room_menu_page(page)) {
+        s_room_key_talking = false;
+        s_room_touch_talking = false;
+        int rc = xiaotai_room_action(&s_room, XIAOTAI_ROOM_ACTION_END, NULL);
+        BK_LOGI(TAG, "room menu exited target=%d rc=%d\n", (int)page, rc);
+    }
+    s_ui_page = page;
+}
+
+static void return_home_from_room(void)
+{
+    navigate_to(UI_PAGE_HOME);
+    s_home_last_refresh_ms = 0U;
+    s_home_defer_until_ms = rtos_get_time() + 2000U;
+    xiaotai_ui_show_status("ROOM PAUSED");
+}
+
 static bool open_launcher_item(unsigned item)
 {
     switch (item % 6U) {
     case 0:
-        s_ui_page = UI_PAGE_HOME;
+        navigate_to(UI_PAGE_HOME);
         return true;
     case 1:
-        s_ui_page = UI_PAGE_CONTACTS;
+        navigate_to(UI_PAGE_CONTACTS);
         s_contact_page = 0U;
         s_contact_selected = 0U;
         render_contacts();
         break;
     case 2:
-        s_ui_page = UI_PAGE_ROOM;
+        navigate_to(UI_PAGE_ROOM);
         s_room_participant_page = 0U;
         (void)xiaotai_room_action(&s_room, XIAOTAI_ROOM_ACTION_SYNC, NULL);
         room_render();
         break;
     case 3:
-        s_ui_page = UI_PAGE_EXPRESSIONS;
+        navigate_to(UI_PAGE_EXPRESSIONS);
         render_expressions();
         break;
     case 4:
-        s_ui_page = UI_PAGE_SETTINGS;
+        navigate_to(UI_PAGE_SETTINGS);
         render_settings();
         break;
     default:
-        s_ui_page = UI_PAGE_NETWORK;
+        navigate_to(UI_PAGE_NETWORK);
         render_network();
         break;
     }
@@ -640,6 +672,7 @@ static void request_reject_pending(void)
     }
 
     if (xiaotai_room_active(&s_room)) {
+        s_ui_page = UI_PAGE_ROOM;
         room_render();
     } else if (active == XIAOTAI_OWNER_AI) {
         xiaotai_ui_show_ai(s_ai_view.phase, s_ai_view.emotion,
@@ -663,7 +696,7 @@ static void handle_intent(xiaotai_intent_t intent)
         rtos_unlock_mutex(&s_runtime_mutex);
         if (idle) {
             s_qr_waiting_for_wechat = false;
-            s_ui_page = UI_PAGE_HOME;
+            navigate_to(UI_PAGE_HOME);
             s_home_last_refresh_ms = 0U;
             BK_LOGI(TAG, "WeChat QR dismissed by KEY\n");
             return;
@@ -738,9 +771,7 @@ static void handle_intent(xiaotai_intent_t intent)
     if (xiaotai_room_active(&s_room)) {
         /* A room short press exits local media; it must not be replayed as
          * an idle primary action, which would incorrectly start AI. */
-        s_ui_page = UI_PAGE_HOME;
-        s_home_last_refresh_ms = 0U;
-        xiaotai_room_disconnect(&s_room, "suspended");
+        return_home_from_room();
         return;
     }
     rtos_lock_mutex(&s_runtime_mutex);
@@ -967,32 +998,111 @@ static void handle_touch(const control_event_t *event)
         }
         return;
     }
+    if (s_ui_page == UI_PAGE_ROOM_JOIN_CODE) {
+        if (event->input_event != XIAOTAI_TOUCH_DOWN) return;
+        if (event->x < XIAOTAI_UI_BACK_HIT_X &&
+            event->y < XIAOTAI_UI_BACK_HIT_Y) {
+            s_touch_action_consumed = true;
+            navigate_to(UI_PAGE_ROOM);
+            room_render();
+            return;
+        }
+        int key = xiaotai_ui_room_keypad_key(event->x, event->y);
+        if (key >= 0 && key <= 9 && s_room_code_input_length < 6U) {
+            s_room_code_input[s_room_code_input_length++] = (char)('0' + key);
+            s_room_code_input[s_room_code_input_length] = '\0';
+            s_touch_action_consumed = true;
+            xiaotai_ui_show_room_join_code(s_room_code_input);
+        } else if (key == XIAOTAI_UI_ROOM_KEY_DELETE) {
+            if (s_room_code_input_length > 0U) {
+                s_room_code_input[--s_room_code_input_length] = '\0';
+            }
+            s_touch_action_consumed = true;
+            xiaotai_ui_show_room_join_code(s_room_code_input);
+        } else if (key == XIAOTAI_UI_ROOM_KEY_SUBMIT &&
+                   s_room_code_input_length == 6U) {
+            char request[48];
+            int length = snprintf(request, sizeof(request),
+                                  "{\"room_code\":\"%s\",\"password\":\"\"}",
+                                  s_room_code_input);
+            int rc = length > 0 && (size_t)length < sizeof(request) ?
+                xiaotai_room_action(&s_room, XIAOTAI_ROOM_ACTION_JOIN,
+                                    request) : BK_ERR_PARAM;
+            BK_LOGI(TAG, "room join submitted code=%s rc=%d\n",
+                    s_room_code_input, rc);
+            s_touch_action_consumed = true;
+            if (rc == BK_OK) {
+                navigate_to(UI_PAGE_ROOM);
+                room_render();
+            }
+        }
+        return;
+    }
+    if (s_ui_page == UI_PAGE_ROOM_LEAVE_CONFIRM) {
+        if (event->input_event != XIAOTAI_TOUCH_DOWN) return;
+        xiaotai_ui_action_t action = xiaotai_ui_room_leave_confirm_action(
+            event->x, event->y);
+        if (action == XIAOTAI_UI_ACTION_ROOM_LEAVE_CANCEL) {
+            s_touch_action_consumed = true;
+            navigate_to(UI_PAGE_ROOM);
+            room_render();
+        } else if (action == XIAOTAI_UI_ACTION_ROOM_LEAVE_CONFIRM) {
+            s_touch_action_consumed = true;
+            int rc = xiaotai_room_action(&s_room,
+                                         XIAOTAI_ROOM_ACTION_LEAVE, NULL);
+            BK_LOGI(TAG, "room leave confirmed rc=%d\n", rc);
+            if (rc == BK_OK) {
+                s_ui_page = UI_PAGE_HOME;
+                s_home_last_refresh_ms = 0U;
+                xiaotai_ui_show_status("READY");
+            }
+        }
+        return;
+    }
+    if (s_ui_page == UI_PAGE_ROOM) {
+        xiaotai_room_snapshot_t snapshot;
+        xiaotai_room_snapshot(&s_room, &snapshot);
+        if (!snapshot.assigned) {
+            if (event->input_event != XIAOTAI_TOUCH_DOWN) return;
+            xiaotai_ui_action_t action = xiaotai_ui_room_entry_action(
+                event->x, event->y);
+            if (action == XIAOTAI_UI_ACTION_BACK) {
+                s_touch_action_consumed = true;
+                return_home_from_room();
+            } else if (action == XIAOTAI_UI_ACTION_ROOM_CREATE &&
+                       !snapshot.request_pending) {
+                static const char request[] = "{\"password\":\"\"}";
+                int rc = xiaotai_room_action(&s_room,
+                    XIAOTAI_ROOM_ACTION_CREATE, request);
+                BK_LOGI(TAG, "open room create submitted rc=%d\n", rc);
+                s_touch_action_consumed = true;
+                room_render();
+            } else if (action == XIAOTAI_UI_ACTION_ROOM_JOIN &&
+                       !snapshot.request_pending) {
+                memset(s_room_code_input, 0, sizeof(s_room_code_input));
+                s_room_code_input_length = 0U;
+                s_touch_action_consumed = true;
+                navigate_to(UI_PAGE_ROOM_JOIN_CODE);
+                xiaotai_ui_show_room_join_code(s_room_code_input);
+            }
+            return;
+        }
+    }
     if (s_ui_page == UI_PAGE_ROOM &&
         event->input_event == XIAOTAI_TOUCH_DOWN) {
         xiaotai_ui_action_t action = xiaotai_ui_room_action(
             event->x, event->y, true);
         if (action == XIAOTAI_UI_ACTION_BACK &&
             xiaotai_ui_action_triggers_on_down(action)) {
-            int rc = xiaotai_room_action(&s_room,
-                                         XIAOTAI_ROOM_ACTION_END, NULL);
-            BK_LOGI(TAG, "room back to home rc=%d\n", rc);
-            s_ui_page = UI_PAGE_HOME;
-            s_home_last_refresh_ms = 0U;
+            return_home_from_room();
             s_touch_action_consumed = true;
-            xiaotai_ui_show_status("READY");
             return;
         }
         if (action == XIAOTAI_UI_ACTION_ROOM_LEAVE &&
             xiaotai_ui_action_triggers_on_down(action)) {
-            int rc = xiaotai_room_action(&s_room,
-                                         XIAOTAI_ROOM_ACTION_LEAVE, NULL);
-            BK_LOGI(TAG, "room leave requested rc=%d\n", rc);
-            if (rc == BK_OK) {
-                s_ui_page = UI_PAGE_HOME;
-                s_home_last_refresh_ms = 0U;
-                s_touch_action_consumed = true;
-                xiaotai_ui_show_status("READY");
-            }
+            navigate_to(UI_PAGE_ROOM_LEAVE_CONFIRM);
+            s_touch_action_consumed = true;
+            xiaotai_ui_show_room_leave_confirm();
             return;
         }
     }
@@ -1046,8 +1156,8 @@ static void handle_touch(const control_event_t *event)
         return;
     }
     if (event->y < 40U && s_ui_page != UI_PAGE_HOME) {
-        s_ui_page = s_ui_page == UI_PAGE_LAUNCHER ? UI_PAGE_HOME :
-                                                       UI_PAGE_LAUNCHER;
+        navigate_to(s_ui_page == UI_PAGE_LAUNCHER ? UI_PAGE_HOME :
+                                                    UI_PAGE_LAUNCHER);
         if (s_ui_page == UI_PAGE_HOME) s_home_last_refresh_ms = 0U;
         else xiaotai_ui_show_launcher(s_launcher_selected);
         return;
@@ -1057,7 +1167,7 @@ static void handle_touch(const control_event_t *event)
         xiaotai_ui_action_t action =
             xiaotai_ui_home_action(event->x, event->y);
         if (action == XIAOTAI_UI_ACTION_HOME_MENU) {
-            s_ui_page = UI_PAGE_LAUNCHER;
+            navigate_to(UI_PAGE_LAUNCHER);
             s_launcher_selected = 6U;
             xiaotai_ui_show_launcher(s_launcher_selected);
         } else if (action == XIAOTAI_UI_ACTION_HOME_QUICK_CALL) {
@@ -1313,9 +1423,13 @@ static void room_render(void)
         rtos_unlock_mutex(&s_room_snapshot_mutex);
     }
     if (s_ui_page == UI_PAGE_ROOM) {
-        s_room_participant_page = xiaotai_ui_room_page_clamp(
-            s_room_participant_page, snapshot.participant_count);
-        xiaotai_ui_show_room(&snapshot, s_room_participant_page);
+        if (!snapshot.assigned) {
+            xiaotai_ui_show_room_entry(snapshot.request_pending);
+        } else {
+            s_room_participant_page = xiaotai_ui_room_page_clamp(
+                s_room_participant_page, snapshot.participant_count);
+            xiaotai_ui_show_room(&snapshot, s_room_participant_page);
+        }
     }
 }
 
@@ -1332,11 +1446,94 @@ static void room_post_response(xiaotai_room_response_t type,
     queue_text_event(event_type, generation, text, length);
 }
 
+typedef struct {
+    char *path;
+    char *body;
+    xiaotai_room_service_response_fn callback;
+    void *callback_context;
+} room_service_work_t;
+
+static bool wait_for_room_transport_release(void)
+{
+    uint32_t deadline = rtos_get_time() + ROOM_TRANSPORT_RELEASE_TIMEOUT_MS;
+    while (xiaotai_tirtc_connected() &&
+           (int32_t)(rtos_get_time() - deadline) < 0) {
+        rtos_delay_milliseconds(20U);
+    }
+    return !xiaotai_tirtc_connected();
+}
+
+static void room_service_task(beken_thread_arg_t argument)
+{
+    static const char failed_response[] = "{\"code\":-1}";
+    room_service_work_t *work = (room_service_work_t *)argument;
+    bool released = wait_for_room_transport_release();
+    int rc = released ?
+        xiaotai_platform_service_request(work->path, work->body,
+                                         work->callback,
+                                         work->callback_context) : BK_FAIL;
+    if (rc != BK_OK) {
+        BK_LOGW(TAG, "deferred room service failed path=%s released=%d rc=%d\n",
+                work->path, released ? 1 : 0, rc);
+        work->callback(failed_response, work->callback_context);
+    }
+    psram_free(work->body);
+    psram_free(work->path);
+    psram_free(work);
+    rtos_delete_thread(NULL);
+}
+
+static char *room_service_copy(const char *value)
+{
+    if (value == NULL) return NULL;
+    size_t size = strlen(value) + 1U;
+    char *copy = psram_malloc(size);
+    if (copy != NULL) memcpy(copy, value, size);
+    return copy;
+}
+
+static bool room_service_defer_until_transport_closed(const char *path,
+                                                       const char *body)
+{
+    if (strcmp(path, "/v1/call/group/device/leave") == 0) return true;
+    if (strcmp(path, "/v1/call/group/device/presence") != 0 || body == NULL) {
+        return false;
+    }
+    return strstr(body, "\"state\":\"suspended\"") != NULL ||
+           strstr(body, "\"state\":\"ended\"") != NULL ||
+           strstr(body, "\"state\":\"left\"") != NULL;
+}
+
 static int room_service_request(const char *path, const char *body,
                                 xiaotai_room_service_response_fn callback,
                                 void *callback_context, void *context)
 {
     (void)context;
+    if (path == NULL || callback == NULL) return BK_ERR_PARAM;
+    if (room_service_defer_until_transport_closed(path, body)) {
+        room_service_work_t *work = psram_malloc(sizeof(*work));
+        if (work == NULL) return BK_ERR_NO_MEM;
+        memset(work, 0, sizeof(*work));
+        work->path = room_service_copy(path);
+        work->body = room_service_copy(body);
+        work->callback = callback;
+        work->callback_context = callback_context;
+        if (work->path == NULL || (body != NULL && work->body == NULL)) {
+            psram_free(work->body);
+            psram_free(work->path);
+            psram_free(work);
+            return BK_ERR_NO_MEM;
+        }
+        int rc = rtos_create_psram_thread(NULL, 4, "xiaotai_room_http",
+                                          room_service_task,
+                                          ROOM_SERVICE_TASK_STACK_SIZE, work);
+        if (rc != BK_OK) {
+            psram_free(work->body);
+            psram_free(work->path);
+            psram_free(work);
+        }
+        return rc;
+    }
     return xiaotai_platform_service_request(path, body, callback,
                                              callback_context);
 }
@@ -1448,7 +1645,7 @@ static bool room_media_available(void *context)
 static void room_state_changed(void *context)
 {
     (void)context;
-    room_render();
+    if (room_menu_page(s_ui_page)) room_render();
 }
 
 static void room_transport_closed(void *context)
@@ -1474,6 +1671,12 @@ static void room_diagnostic(xiaotai_room_diagnostic_t event,
     if (event == XIAOTAI_ROOM_DIAG_DISCONNECTED) {
         BK_LOGI(TAG, "room transport closed generation=%u error=%d\n",
                 (unsigned)generation, detail);
+    } else if (event == XIAOTAI_ROOM_DIAG_LEAVE_FAILED) {
+        BK_LOGW(TAG, "room leave failed; assignment retained\n");
+        if (s_ui_page == UI_PAGE_HOME) {
+            s_home_defer_until_ms = rtos_get_time() + 5000U;
+            xiaotai_ui_show_status("ROOM LEAVE FAILED");
+        }
     } else {
         BK_LOGW(TAG, "room diagnostic event=%d generation=%u detail=%d\n",
                 (int)event, (unsigned)generation, detail);

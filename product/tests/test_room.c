@@ -10,6 +10,7 @@ static uint32_t clock_ms;
 static bool connected;
 static bool uplink = true;
 static unsigned assignment_requests;
+static unsigned create_requests;
 static unsigned diagnostic_events;
 static xiaotai_room_diagnostic_t last_diagnostic;
 static xiaotai_room_t *active_room;
@@ -64,9 +65,14 @@ static int request(const char *path, const char *body,
                    xiaotai_room_service_response_fn callback,
                    void *callback_context, void *context)
 {
-    (void)body;
     (void)context;
-    if (strstr(path, "assignment") != NULL) {
+    if (strstr(path, "/create") != NULL) {
+        assert(strcmp(body, "{\"password\":\"\"}") == 0);
+        ++create_requests;
+        callback("{\"code\":0,\"data\":{\"desired_state\":\"joined\","
+                 "\"assignment_version\":1,\"room_id\":\"room-new\","
+                 "\"room_code\":\"654321\"}}", callback_context);
+    } else if (strstr(path, "assignment") != NULL) {
         ++assignment_requests;
         callback("{\"code\":0,\"data\":{\"desired_state\":\"joined\","
                  "\"assignment_version\":1,\"room_id\":\"room-1\","
@@ -123,6 +129,13 @@ int main(void)
     };
     xiaotai_room_t room;
     active_room = &room;
+    xiaotai_room_init(&room, "device-1", &port);
+    assert(xiaotai_room_action(&room, XIAOTAI_ROOM_ACTION_CREATE,
+                               "{\"password\":\"\"}") == 0);
+    assert(create_requests == 1U);
+    assert(room.assigned && room.connecting);
+
+    connected = false;
     xiaotai_room_init(&room, "device-1", &port);
     xiaotai_room_tick(&room);
     assert(assignment_requests == 0U);

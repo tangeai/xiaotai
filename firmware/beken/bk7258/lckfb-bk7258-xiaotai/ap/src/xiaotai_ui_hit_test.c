@@ -72,6 +72,45 @@ xiaotai_ui_action_t xiaotai_ui_room_action(uint16_t x, uint16_t y,
     return XIAOTAI_UI_ACTION_NONE;
 }
 
+xiaotai_ui_action_t xiaotai_ui_room_entry_action(uint16_t x, uint16_t y)
+{
+    if (x < XIAOTAI_UI_BACK_HIT_X && y < XIAOTAI_UI_BACK_HIT_Y) {
+        return XIAOTAI_UI_ACTION_BACK;
+    }
+    if (y < XIAOTAI_UI_ROOM_BUTTON_Y ||
+        y >= XIAOTAI_UI_ROOM_BUTTON_Y + XIAOTAI_UI_ROOM_BUTTON_HEIGHT) {
+        return XIAOTAI_UI_ACTION_NONE;
+    }
+    return x < 160U ? XIAOTAI_UI_ACTION_ROOM_CREATE :
+                      XIAOTAI_UI_ACTION_ROOM_JOIN;
+}
+
+int xiaotai_ui_room_keypad_key(uint16_t x, uint16_t y)
+{
+    if (y >= 190U && y < 232U) return XIAOTAI_UI_ROOM_KEY_SUBMIT;
+    if (y < 64U || y >= 180U) return -1;
+    unsigned row = (unsigned)(y - 64U) / 29U;
+    unsigned column = (unsigned)x / 107U;
+    if (column > 2U) column = 2U;
+    if (row < 3U) return (int)(row * 3U + column + 1U);
+    if (column == 0U) return XIAOTAI_UI_ROOM_KEY_DELETE;
+    return column == 1U ? 0 : -1;
+}
+
+xiaotai_ui_action_t xiaotai_ui_room_leave_confirm_action(uint16_t x,
+                                                          uint16_t y)
+{
+    if (x < XIAOTAI_UI_BACK_HIT_X && y < XIAOTAI_UI_BACK_HIT_Y) {
+        return XIAOTAI_UI_ACTION_ROOM_LEAVE_CANCEL;
+    }
+    if (y < XIAOTAI_UI_ROOM_BUTTON_Y ||
+        y >= XIAOTAI_UI_ROOM_BUTTON_Y + XIAOTAI_UI_ROOM_BUTTON_HEIGHT) {
+        return XIAOTAI_UI_ACTION_NONE;
+    }
+    return x < 160U ? XIAOTAI_UI_ACTION_ROOM_LEAVE_CANCEL :
+                      XIAOTAI_UI_ACTION_ROOM_LEAVE_CONFIRM;
+}
+
 size_t xiaotai_ui_room_page_count(size_t participant_count)
 {
     if (participant_count == 0U) return 1U;

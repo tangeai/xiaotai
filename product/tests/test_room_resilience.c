@@ -21,6 +21,7 @@ typedef struct {
     unsigned state_changes;
     bool uplink_enabled;
     bool media_acquire_ok;
+    bool media_available;
     int service_result;
     int connect_result;
     int transport_send_result;
@@ -41,8 +42,7 @@ static bool ready(void *context)
 
 static bool available(void *context)
 {
-    (void)context;
-    return true;
+    return ((fixture_t *)context)->media_available;
 }
 
 static bool not_busy(void *context)
@@ -153,6 +153,7 @@ static void diagnostic(xiaotai_room_diagnostic_t event,
 
 static xiaotai_room_t active_room(fixture_t *fixture)
 {
+    fixture->media_available = true;
     xiaotai_room_port_t port = {
         .service_request = service_request,
         .now_ms = now_ms,
@@ -175,12 +176,51 @@ static xiaotai_room_t active_room(fixture_t *fixture)
     xiaotai_room_t room;
     xiaotai_room_init(&room, "device-1", &port);
     room.assigned = true;
+    room.foreground = true;
     room.joined = true;
     room.generation = 9U;
     room.runtime_generation = 77U;
     strcpy(room.room_id, "room-1");
     strcpy(room.room_code, "123456");
     return room;
+}
+
+static void late_token_does_not_reacquire_media_after_menu_exit(void)
+{
+    fixture_t fixture = {.media_acquire_ok = true};
+    xiaotai_room_t room = active_room(&fixture);
+    room.joined = false;
+    room.connecting = false;
+    room.request_pending = true;
+    assert(xiaotai_room_action(&room, XIAOTAI_ROOM_ACTION_END, NULL) == 0);
+
+    xiaotai_room_handle_response(&room, XIAOTAI_ROOM_RESPONSE_TOKEN, 9U,
+        "{\"code\":0,\"data\":{\"peer_id\":\"peer\","
+        "\"token\":\"token\",\"heartbeat_seconds\":15,"
+        "\"lease_seconds\":45}}");
+
+    assert(!room.request_pending);
+    assert(!room.connecting);
+    assert(fixture.media_acquires == 0U);
+    assert(fixture.transport_connects == 0U);
+    assert(fixture.diagnostics == 0U);
+}
+
+static void transport_close_does_not_complete_pending_leave(void)
+{
+    fixture_t fixture = {0};
+    xiaotai_room_t room = active_room(&fixture);
+
+    assert(xiaotai_room_action(&room, XIAOTAI_ROOM_ACTION_LEAVE, NULL) == 0);
+    assert(room.request_pending);
+    xiaotai_room_handle_disconnected(&room, 9U, 0);
+    assert(room.request_pending);
+
+    xiaotai_room_handle_response(&room, XIAOTAI_ROOM_RESPONSE_ASSIGNMENT, 0U,
+                                 "{\"code\":-1}");
+    assert(!room.request_pending);
+    assert(room.assigned);
+    assert(fixture.last_diagnostic == XIAOTAI_ROOM_DIAG_LEAVE_FAILED);
 }
 
 static void stale_disconnect_does_not_close_new_session(void)
@@ -421,6 +461,8 @@ int main(void)
     invalid_token_failure_response_does_not_block_recovery();
     assignment_request_failure_is_retryable();
     duplicate_notification_coalesces_and_recovers_disconnected_room();
+    late_token_does_not_reacquire_media_after_menu_exit();
+    transport_close_does_not_complete_pending_leave();
     join_send_failure_disconnects_transport();
     rejected_join_reports_failure_and_disconnects();
     media_start_failure_disconnects_join();
