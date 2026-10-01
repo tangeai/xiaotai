@@ -6,10 +6,22 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from package_validation_firmware import beken_build_root
+from package_validation_firmware import beken_build_root, verification_readme_status
 
 
 class ValidationPackagingTests(unittest.TestCase):
+    def test_verification_status_has_matching_human_readable_text(self) -> None:
+        self.assertEqual(
+            verification_readme_status("BUILD_VERIFIED_HIL_PENDING"),
+            "build verified; this exact artifact still requires HIL.",
+        )
+        self.assertEqual(
+            verification_readme_status("HIL_VERIFIED"),
+            "build and hardware-in-the-loop verification passed.",
+        )
+        with self.assertRaisesRegex(ValueError, "unsupported verification status"):
+            verification_readme_status("VERIFIED")
+
     def test_beken_packaging_selects_the_requested_build_profile(self) -> None:
         project = Path("/workspace/firmware/beken/demo")
         self.assertEqual(

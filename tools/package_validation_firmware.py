@@ -15,6 +15,25 @@ from firmware_version import FirmwareVersion
 from package_esp_validation import add_file, git_output, package_board, sha256
 
 
+VERIFICATION_STATUSES = (
+    "BUILD_VERIFIED_HIL_PENDING",
+    "HIL_VERIFIED",
+)
+
+
+def verification_readme_status(status: str) -> str:
+    descriptions = {
+        "BUILD_VERIFIED_HIL_PENDING":
+            "build verified; this exact artifact still requires HIL.",
+        "HIL_VERIFIED":
+            "build and hardware-in-the-loop verification passed.",
+    }
+    try:
+        return descriptions[status]
+    except KeyError as exc:
+        raise ValueError(f"unsupported verification status: {status}") from exc
+
+
 def beken_build_root(project_dir: Path, target: str, profile: str) -> Path:
     """Resolve a Beken output tree without silently mixing build profiles."""
     if profile == "release":
@@ -27,7 +46,8 @@ def beken_build_root(project_dir: Path, target: str, profile: str) -> Path:
 
 
 def package_beken(root: Path, board: Board, output_dir: Path,
-                  build_profile: str = "release") -> Path:
+                  build_profile: str = "release",
+                  verification_status: str = "BUILD_VERIFIED_HIL_PENDING") -> Path:
     project_dir = board.project_path(root)
     target = board.data["target"]
     build_root = beken_build_root(project_dir, target, build_profile)
@@ -76,7 +96,7 @@ def package_beken(root: Path, board: Board, output_dir: Path,
             "project_version": version,
             "platform": "beken",
             "target": target,
-            "verification_status": "BUILD_VERIFIED_HIL_PENDING",
+            "verification_status": verification_status,
             "source_commit": source_commit,
             "source_worktree_dirty": source_dirty,
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -106,7 +126,7 @@ def package_beken(root: Path, board: Board, output_dir: Path,
             "XiaoTai BK7258 validation firmware\n"
             f"Board: {board.data['vendor']} {board.data['model']}\n"
             f"Version: {version}\n"
-            "Status: build verified; this exact artifact still requires HIL.\n\n"
+            f"Status: {verification_readme_status(verification_status)}\n\n"
             "Flash the complete all-app.bin at offset 0x00000000 with the "
             f"board vendor's {target.upper()} downloader. Preserve RF calibration and "
             "factory-data partitions. app_pack.rbl is the OTA image, not the "
@@ -129,6 +149,12 @@ def main() -> int:
         default="release",
         help="Beken artifact tree to package (default: release)",
     )
+    parser.add_argument(
+        "--verification-status",
+        choices=VERIFICATION_STATUSES,
+        default="BUILD_VERIFIED_HIL_PENDING",
+        help="artifact verification evidence recorded in the package manifest",
+    )
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
@@ -144,7 +170,13 @@ def main() -> int:
             )
         elif board.data["platform"] == "beken":
             archives.append(
-                package_beken(root, board, output_dir, args.beken_build_profile)
+                package_beken(
+                    root,
+                    board,
+                    output_dir,
+                    args.beken_build_profile,
+                    args.verification_status,
+                )
             )
     sums = "".join(f"{sha256(path)}  {path.name}\n" for path in archives)
     (output_dir / "SHA256SUMS").write_text(sums, encoding="utf-8")
