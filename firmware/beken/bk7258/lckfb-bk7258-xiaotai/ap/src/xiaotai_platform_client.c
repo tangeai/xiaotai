@@ -95,7 +95,7 @@ static char s_service_token[MQTT_TOKEN_MAX];
 static const char s_device_profile[] =
     "{\"hardware\":{\"chip_model\":\"BK7258\","
     "\"board_model\":\"lckfb-bk7258\"},"
-    "\"firmware_version\":\"1.0.0+build.2\","
+    "\"firmware_version\":\"1.0.0+build.3\","
     "\"profiles\":{\"stream\":{\"up_audio_streamid\":10,"
     "\"up_video_streamid\":11,\"down_audio_streamid\":14,"
     "\"down_video_streamid\":15,\"up_audio_mt\":[\"alaw\"],"
