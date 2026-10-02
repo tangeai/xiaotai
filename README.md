@@ -10,16 +10,29 @@
 
 优先从 [GitHub Releases](https://github.com/tangeai/xiaotai/releases) 下载已经打包的验证固件。压缩包名称以板卡 ID（开发板在本仓库中的唯一名称，用于选择编译目标和核对固件包）开头，不要只按芯片名称选择固件。
 
-首页提供两款立创·实战派开发板的快速入口：
+首页优先提供立创·实战派 BK7258 的固件下载入口：
+
+| 对外型号 | 板卡 ID | 下载固件 | 烧录说明 |
+|---|---|---|---|
+| 立创·实战派 BK7258 | `lckfb-bk7258` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.0/lckfb-bk7258-1.0.0%2Bbuild.3-validation.zip) · [仅下载完整烧录镜像](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.0/xiaotai-bk7258-v1.0.0-all-app.bin) | [开发板指南](docs/boards/lckfb-bk7258/README.md) |
+
+推荐下载固件包，其中包含完整烧录镜像、OTA（无线升级）镜像、分区表、构建摘要和
+SHA-256 校验清单。只需要首次完整烧录时，也可以直接下载 `all-app.bin`。
+
+<details>
+<summary>更多开发板</summary>
 
 | 对外型号 | 板卡 ID | 发布包名称前缀 | 烧录说明 |
 |---|---|---|---|
-| 立创·实战派 BK7258 | `lckfb-bk7258` | `lckfb-bk7258-` | [开发板指南](docs/boards/lckfb-bk7258/README.md) |
 | 立创·实战派 ESP32-S3 | `lckfb-esp32s3` | `lckfb-esp32s3-` | [开发板指南](docs/boards/lckfb-esp32s3/README.md) |
 
 其他已经适配的开发板及其型号、固件名称和使用说明统一收录在
-[更多开发板](docs/boards/README.md)。发布包内的 `MANIFEST.json` 记录板卡、源码版本、
-文件校验值和烧录信息；解压后先核对清单，再连接设备。
+[完整开发板目录](docs/boards/README.md)。
+
+</details>
+
+发布包内的 `MANIFEST.json` 记录板卡、源码版本、文件校验值和烧录信息；解压后先核对
+清单，再连接设备。
 
 没有对应发布包时，可以从源码编译。不要使用其他板卡的固件，也不要把“芯片相同”理解为 GPIO（通用输入输出引脚）、屏幕、音频和烧录布局相同。
 
