@@ -46,8 +46,8 @@
 #define APP_CONFIG_WECHAT_VOIP_SCREEN_HEIGHT 480
 
 #ifndef APP_CONFIG_WECHAT_VOIP_CAMERA_ROTATION
-/* Protocol UI metadata only: WeChat rotates the published camera view.
- * Keep the local YUV420 -> H264 frame path byte-for-byte unchanged. */
+/* Protocol UI metadata only: WeChat rotates the sensor-oriented camera view.
+ * The local YUV420 -> H264 path never rotates pixels. */
 #define APP_CONFIG_WECHAT_VOIP_CAMERA_ROTATION 270
 #endif
 

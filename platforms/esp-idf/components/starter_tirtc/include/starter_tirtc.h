@@ -26,6 +26,11 @@ typedef enum {
     STARTER_TIRTC_ROOM,    /**< 多人对讲 WHIP 音频连接。 */
 } starter_tirtc_mode_t;
 
+/* Stable SDK condition surfaced through on_connection().  Keeping the raw
+ * value behind this adapter prevents product state machines from including
+ * the vendor SDK header. */
+#define STARTER_TIRTC_ERROR_REMOTE_CLOSE (-40008)
+
 /** SDK 帧元数据的稳定副本；payload 不包含在该结构中。 */
 typedef struct {
     uint8_t stream_id;     /**< 协议流编号。 */
@@ -142,6 +147,10 @@ int starter_tirtc_service_request(const char *path, const char *json_body);
  * H5 自动使用 stream 10，AI 自动使用 stream 1。
  */
 int starter_tirtc_send_alaw(uint32_t timestamp_ms,
+                            const void *data,
+                            uint32_t length);
+/** AI-only 16 kHz mono Opus uplink. */
+int starter_tirtc_send_opus(uint32_t timestamp_ms,
                             const void *data,
                             uint32_t length);
 

@@ -29,19 +29,19 @@
   "ai": {
     "audio_up": {
       "stream_id": 1,
-      "codec": "alaw",
-      "sample_rate_hz": 8000,
+      "codec": "opus",
+      "sample_rate_hz": 16000,
       "channels": 1,
-      "media": "TIRTC_AUDIO_ALAW",
-      "flags": "TIRTC_AUDIOSAMPLE_8K16B1C"
+      "media": "TIRTC_AUDIO_OPUS",
+      "flags": "TIRTC_AUDIOSAMPLE_16K16B1C"
     },
     "audio_down": {
       "stream_id": 1,
-      "codec": "alaw",
-      "sample_rate_hz": 8000,
+      "codec": "opus",
+      "sample_rate_hz": 16000,
       "channels": 1,
-      "media": "TIRTC_AUDIO_ALAW",
-      "flags": "TIRTC_AUDIOSAMPLE_8K16B1C"
+      "media": "TIRTC_AUDIO_OPUS",
+      "flags": "TIRTC_AUDIOSAMPLE_16K16B1C"
     },
     "start_session_response": {
       "required_fields": ["id", "result.session_id", "result.input_audio", "result.output_audio"],

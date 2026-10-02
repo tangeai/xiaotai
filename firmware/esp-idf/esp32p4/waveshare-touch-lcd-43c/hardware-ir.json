@@ -34,7 +34,7 @@
     {
       "id": "product-docs",
       "kind": "product-contract",
-      "location": "docs/product/PRODUCT_REQUIREMENTS.md",
+      "location": "../../../../docs/product/PRODUCT_REQUIREMENTS.md",
       "revision": "小钛桌面 AI 机器人 V2.2（docs/product/README.md / PRODUCT_REQUIREMENTS.md / ROOM_REQUIREMENTS.md）"
     },
     {
@@ -60,6 +60,12 @@
       "kind": "user-input",
       "location": "user-input://2026-09-22/board-facts",
       "revision": "用户确认：该型号实物带 OV5647 模组；PCB V1.0；产品界面采用横屏 800×480（原生 480×800 旋转 90°）"
+    },
+    {
+      "id": "user-input-20261002",
+      "kind": "user-input",
+      "location": "user-input://2026-10-02/ai-stack-validation",
+      "revision": "用户确认 1.0.0+build.5 的 AI 对讲不再发生 Opus SILK 编码栈保护崩溃"
     }
   ],
   "soc": {
@@ -138,6 +144,14 @@
           8000
         ],
         "verification": "build_verified"
+      },
+      {
+        "name": "Opus",
+        "model": "software-opus-voip",
+        "role": "AI 16 kHz 单声道上行；AEC、NS、AGC 后编码",
+        "channels": 1,
+        "sample_rates_hz": [16000],
+        "verification": "build_verified"
       }
     ],
     "verification": "corroborated",
@@ -169,6 +183,14 @@
         "sample_rates_hz": [
           8000
         ],
+        "verification": "build_verified"
+      },
+      {
+        "name": "Opus",
+        "model": "software-opus-voip",
+        "role": "AI 16 kHz 单声道下行解码播放",
+        "channels": 1,
+        "sample_rates_hz": [16000],
         "verification": "build_verified"
       }
     ],
@@ -268,15 +290,15 @@
     "artifacts": [
       {
         "path": "build/xiaotai_esp32p4.bin",
-        "label": "43c-port.20 application BIN",
-        "size_bytes": 4415680,
-        "sha256": "d27c480ad088af13c9372a8a005b516907d578ccf8b57d1c595471d553755643"
+        "label": "1.0.0+build.11 application BIN",
+        "size_bytes": 4650592,
+        "sha256": "71f218bc7ec60aea180f353fd9e27afd1702a817034f59dc3e4090b92077bc2c"
       },
       {
         "path": "build/xiaotai_esp32p4.elf",
-        "label": "43c-port.20 full ELF",
-        "size_bytes": 35710204,
-        "sha256": "0fcb72b320abf8fe16e5be5ce51a3df93d4e40146b23f4e805e55b29d1af5a57"
+        "label": "1.0.0+build.11 full ELF",
+        "size_bytes": 36444080,
+        "sha256": "9ed4c413c1ee19102b60220c763d6a2b309d890fd93d811c429d4124160d149f"
       }
     ]
   },
@@ -294,6 +316,20 @@
       "notes": "P4 rev v1.3 正常启动无 panic；32MB PSRAM 自检通过；ST7701 DSI 初始化成功（480x800，UI 800x480 ROT_90）；GT911 0x5D 触摸就绪；OV5647 PID=0x5647 检出；H264 编码器/scaler/转换器就绪；C6 SDIO 建链（CLK18/CMD19/D0-3=14-17/RST54）；XiaoTai-A5A5 配网成功；STA 连接测试 AP 成功；绑定验证码屏幕+播报正常。注：该版本音频采集仍为 3.5 拓扑（ES8311 双工），43c-port.2 已切换 ES7210。",
       "source_refs": [
         "user-input-20260922"
+      ]
+    },
+    {
+      "artifact_sha256": "f971913c53ac34fca54b82d7234d6d4815b9f8d21222fbbad0e51428e23ef06d",
+      "label": "1.0.0+build.5 AI 对讲 Opus 栈修复实机确认（用户反馈，2026-10-02）",
+      "acceptance_levels": [
+        "L6"
+      ],
+      "features": [
+        "ai_talk"
+      ],
+      "notes": "用户确认 AI 对讲不再发生 silk_encode_frame_FIX 栈保护崩溃。该证据只绑定 build.5；build.6 保留相同 40 KiB Opus 编解码任务栈，但新增音量与 UI 修改后仍需复测。",
+      "source_refs": [
+        "user-input-20261002"
       ]
     }
   ],

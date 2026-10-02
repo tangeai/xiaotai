@@ -35,6 +35,8 @@ typedef struct {
     uint32_t audio_decode_failed; /**< A-law 解码失败或空输出的帧数。 */
     uint32_t audio_playback_blocked; /**< 静音、功放或会话门禁拒绝的帧数。 */
     uint32_t audio_write_failed; /**< I2S 写入失败或部分写入的帧数。 */
+    uint32_t audio_playback_pending; /**< 已入队但尚未完成播放的帧数。 */
+    bool audio_playback_active;  /**< 播放任务当前正在写 I2S/DMA。 */
     uint32_t aec_processed;      /**< 已完成的 16 kHz ESP-SR AEC 帧数。 */
     uint32_t aec_errors;         /**< AEC 输入帧不完整或处理边界错误数。 */
     uint32_t aec_mic_clipped;    /**< MIC1 接近满量程的累计采样数。 */
@@ -48,6 +50,7 @@ typedef struct {
     uint8_t speaker_volume;     /**< 产品音量档位，0..10。 */
     bool speaker_muted;         /**< 全局扬声器静音。 */
     bool microphone_muted;      /**< 全局麦克风静音；AEC/活动检测仍继续运行。 */
+    uint8_t microphone_sensitivity; /**< 麦克风模拟灵敏度，1..5，默认 4。 */
     bool uplink_enabled;        /**< 业务上行门禁；多人对讲只在 PTT 按下时开启。 */
 } starter_media_status_t;
 
@@ -69,6 +72,7 @@ esp_err_t starter_media_select_lcd(bool selected);
 esp_err_t starter_media_set_speaker_volume(uint8_t volume);
 esp_err_t starter_media_set_speaker_muted(bool muted);
 void starter_media_set_microphone_muted(bool muted);
+esp_err_t starter_media_set_microphone_sensitivity(uint8_t sensitivity);
 void starter_media_set_uplink_enabled(bool enabled);
 /** Runtime publishes foreground admission; microphone mute is also enforced. */
 void starter_media_set_wake_allowed(bool allowed);

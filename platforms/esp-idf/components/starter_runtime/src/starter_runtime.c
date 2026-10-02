@@ -37,6 +37,8 @@
 #include "runtime_config.h"
 #include "starter_media.h"
 #include "starter_tirtc.h"
+#include "xiaotai_ai_protocol.h"
+#include "xiaotai_ai_view.h"
 
 #define RUNTIME_QUEUE_DEPTH 12U
 #define RUNTIME_TEXT_MAX 4096U
@@ -56,6 +58,9 @@
 #define AI_CONNECT_TIMEOUT_MS 12000
 #define AI_RESPONSE_TIMEOUT_MS 10000
 #define AI_START_SETTLE_MS 300
+#define AI_END_FINAL_AUDIO_ARRIVAL_MS 1500U
+#define AI_END_DRAIN_TIMEOUT_MS 5000U
+#define AI_REMOTE_CLOSE_DRAIN_TIMEOUT_MS 3000U
 #define ROOM_START_SETTLE_MS 300
 #define CALL_PENDING_TIMEOUT_MS 45000
 #define CALL_CONNECT_TIMEOUT_MS 30000
@@ -63,6 +68,7 @@
 #define VOIP_PROFILE_RETRY_MS 15000
 #define CALL_COMMAND_CONNECT 0x2000U
 #define CALL_COMMAND_HANGUP 0x2001U
+#define CALL_HANGUP_FLUSH_MS 120U
 #define ROOM_COMMAND 0x2200U
 #define ROOM_CONNECT_TIMEOUT_MS 12000
 #define CONTACTS_RETRY_MS 500
@@ -158,6 +164,9 @@ static char s_device_id[65];
 static char s_ai_role_id[65];
 static char s_ai_request_id[24];
 static int64_t s_ai_start_at_ms;
+static xiaotai_ai_end_drain_t s_ai_end_drain;
+static xiaotai_ai_view_t s_ai_view;
+static bool s_ai_transport_closed;
 static int64_t s_room_start_at_ms;
 static xiaotai_runtime_t s_session;
 static uint32_t s_connection_generation;
@@ -390,6 +399,16 @@ static void product_set_phase(starter_ai_ui_phase_t phase)
     }
 }
 
+static bool supported_emotion(const char *emotion);
+static void product_set_emotion(const char *emotion)
+{
+    if (!supported_emotion(emotion) || s_product_mutex == NULL ||
+        xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(50)) != pdTRUE) return;
+    (void)snprintf(s_product_snapshot.emotion,
+                   sizeof(s_product_snapshot.emotion), "%s", emotion);
+    xSemaphoreGive(s_product_mutex);
+}
+
 static bool supported_emotion(const char *emotion)
 {
     static const char *const allowed[] = {
@@ -408,6 +427,13 @@ static bool supported_emotion(const char *emotion)
         }
     }
     return false;
+}
+
+static starter_ai_ui_phase_t product_phase_from_ai_view(xiaotai_ai_ui_phase_t phase)
+{
+    return phase == XIAOTAI_AI_UI_SPEAKING ? STARTER_AI_UI_SPEAKING
+           : phase == XIAOTAI_AI_UI_THINKING ? STARTER_AI_UI_THINKING
+                                             : STARTER_AI_UI_LISTENING;
 }
 
 static void product_set_caption(bool is_ai,
@@ -442,16 +468,6 @@ static void product_set_caption(bool is_ai,
                        sizeof(s_product_snapshot.emotion),
                        "%s",
                        emotion);
-    } else if (is_ai && final) {
-        /* 无显式标签时只在正向表情中轮换，不用声音强度猜情绪。 */
-        static const char *const fallback[] = {
-            "happy", "surprised", "winking", "silly", "cool",
-        };
-        (void)snprintf(s_product_snapshot.emotion,
-                       sizeof(s_product_snapshot.emotion),
-                       "%s",
-                       fallback[esp_random() %
-                                (sizeof(fallback) / sizeof(fallback[0]))]);
     }
     xSemaphoreGive(s_product_mutex);
 }
@@ -624,6 +640,8 @@ static void finish_session(int error)
     bool keep_pending_call = session_incoming_pending();
     uint32_t generation = session_generation();
     diagnostic_event("session end/error", error);
+    xiaotai_ai_end_drain_cancel(&s_ai_end_drain);
+    s_ai_transport_closed = false;
     /* 所有退出路径汇聚到这里，确保媒体、连接、超时和 H5 门禁一起复位。 */
     starter_media_stop();
     /* Also invalidates pending external requests / inbound call expectations.
@@ -665,6 +683,63 @@ static void finish_session(int error)
                      keep_pending_call ? s_call_peer_name : "", false);
     publish_state();
     resume_mqtt_after_external_connect();
+}
+
+static void begin_ai_end_drain(uint32_t arrival_grace_ms,
+                               uint32_t timeout_ms,
+                               bool transport_closed)
+{
+    uint32_t generation = session_generation();
+    xiaotai_ai_end_drain_begin(&s_ai_end_drain,
+                               generation,
+                               (uint32_t)now_ms(),
+                               arrival_grace_ms,
+                               timeout_ms);
+    s_ai_transport_closed = transport_closed;
+    starter_media_set_uplink_enabled(false);
+    ESP_LOGI(TAG,
+             "AI end_session waiting for final playback generation=%lu arrival-grace=%lu timeout=%lu transport-closed=%d",
+             (unsigned long)generation,
+             (unsigned long)arrival_grace_ms,
+             (unsigned long)timeout_ms,
+             transport_closed ? 1 : 0);
+}
+
+static void service_ai_end_drain(void)
+{
+    if (!s_ai_end_drain.pending) {
+        return;
+    }
+    if (session_state() != STARTER_RUNTIME_AI_ACTIVE) {
+        xiaotai_ai_end_drain_cancel(&s_ai_end_drain);
+        s_ai_transport_closed = false;
+        return;
+    }
+
+    starter_media_status_t media = starter_media_status();
+    bool drained = media.audio_playback_pending == 0U &&
+                   !media.audio_playback_active;
+    uint32_t current_ms = (uint32_t)now_ms();
+    bool timed_out = (int32_t)(current_ms - s_ai_end_drain.deadline_ms) >= 0;
+    xiaotai_ai_end_drain_result_t result = xiaotai_ai_end_drain_step(
+        &s_ai_end_drain, session_generation(), current_ms, drained);
+    if (result == XIAOTAI_AI_END_DRAIN_STALE) {
+        xiaotai_ai_end_drain_cancel(&s_ai_end_drain);
+        s_ai_transport_closed = false;
+        return;
+    }
+    if (result != XIAOTAI_AI_END_DRAIN_DISCONNECT) {
+        return;
+    }
+
+    ESP_LOGI(TAG,
+             "AI final playback %s generation=%lu pending=%lu active=%d transport-closed=%d",
+             drained ? "drained" : (timed_out ? "timeout" : "complete"),
+             (unsigned long)session_generation(),
+             (unsigned long)media.audio_playback_pending,
+             media.audio_playback_active ? 1 : 0,
+             s_ai_transport_closed ? 1 : 0);
+    finish_session(0);
 }
 
 static void finish_call_session(int error, const char *result)
@@ -983,16 +1058,14 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.0.0+build.1\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.11\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":10,\"down_video_streamid\":11,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
         "\"down_audio_mt\":[\"alaw\"],\"down_video_mt\":[\"h264\"],"
-        /* H5 uses the phone profile, whose camera pipeline already rotates
-         * the mounted sensor CCW90 before H.264 encoding. The stream pixels
-         * are therefore upright relative to the current product UI. Asking
-         * the browser to rotate them again would turn the view by 180°. */
-        "\"audio_rate\":8000,\"audio_channels\":1,\"camera_rotation\":0,"
+        /* Every uplink preserves sensor orientation. Scene receivers apply
+         * this clockwise angle instead of spending a PPA pass on the device. */
+        "\"audio_rate\":8000,\"audio_channels\":1,\"camera_rotation\":270,"
         "\"aspect_ratio\":0.75,\"hor_mirror\":false,\"vert_mirror\":false,"
         "\"object_fit\":\"contain\",\"no_video\":false},"
         "\"call\":{\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
@@ -1031,7 +1104,7 @@ static void request_device_profile(void)
         s_voip_profile_inflight = true;
         ESP_LOGI(TAG, "device capability submission queued (stream/call/voip)");
 #if CONFIG_IDF_TARGET_ESP32P4
-        ESP_LOGI(TAG, "video presentation capability: stream_rotation=0 "
+        ESP_LOGI(TAG, "video presentation capability: stream_rotation=270 "
                       "call_rotation=270 voip_rotation=270 down_rotation=1");
 #endif
     } else {
@@ -1479,7 +1552,14 @@ static void reject_or_hangup_call(bool reject)
         return;
     }
     if (starter_tirtc_connected()) {
-        (void)starter_tirtc_send_command(CALL_COMMAND_HANGUP, NULL, 0);
+        /* A non-empty reason is part of the peer-call contract.  Keep the
+         * transport alive briefly so the reliable data-channel command can
+         * leave the SDK before local teardown closes the connection. */
+        static const char hangup_command[] = "{\"reason\":0}";
+        (void)starter_tirtc_send_command(CALL_COMMAND_HANGUP,
+                                         hangup_command,
+                                         sizeof(hangup_command) - 1U);
+        vTaskDelay(pdMS_TO_TICKS(CALL_HANGUP_FLUSH_MS));
     }
     char body[1200];
     if (s_call_wechat) {
@@ -1745,11 +1825,11 @@ static void send_ai_start(void)
               cJSON_AddStringToObject(root, "method", "start_session") &&
               cJSON_AddStringToObject(params, "device_id", s_device_id) &&
               cJSON_AddStringToObject(params, "role_id", s_ai_role_id) &&
-              cJSON_AddStringToObject(input, "codec", "alaw") &&
-              cJSON_AddNumberToObject(input, "sample_rate", 8000) &&
+              cJSON_AddStringToObject(input, "codec", "opus") &&
+              cJSON_AddNumberToObject(input, "sample_rate", 16000) &&
               cJSON_AddNumberToObject(input, "channels", 1) &&
-              cJSON_AddStringToObject(output, "codec", "alaw") &&
-              cJSON_AddNumberToObject(output, "sample_rate", 8000) &&
+              cJSON_AddStringToObject(output, "codec", "opus") &&
+              cJSON_AddNumberToObject(output, "sample_rate", 16000) &&
               cJSON_AddNumberToObject(output, "channels", 1);
     if (ok) {
         cJSON_AddItemToObject(params, "input_audio", input);
@@ -1816,9 +1896,8 @@ static bool ai_audio_profile_valid(const cJSON *profile)
                                 ? cJSON_GetObjectItemCaseSensitive(profile, "channels")
                                 : NULL;
     bool codec_ok = cJSON_IsString(codec) && codec->valuestring != NULL &&
-                    (strcmp(codec->valuestring, "alaw") == 0 ||
-                     strcmp(codec->valuestring, "g711a") == 0);
-    return codec_ok && cJSON_IsNumber(rate) && rate->valueint == 8000 &&
+                    strcmp(codec->valuestring, "opus") == 0;
+    return codec_ok && cJSON_IsNumber(rate) && rate->valueint == 16000 &&
            cJSON_IsNumber(channels) && channels->valueint == 1;
 }
 
@@ -1911,6 +1990,33 @@ static void handle_connection(const runtime_event_t *event)
         if (event->generation != 0U && s_connection_generation != 0U &&
             event->generation != s_connection_generation) {
             return;
+        }
+        if (event->mode == STARTER_TIRTC_AI &&
+            state == STARTER_RUNTIME_AI_ACTIVE) {
+            bool expected = xiaotai_ai_end_drain_accepts_remote_close(
+                                &s_ai_end_drain, session_generation()) ||
+                            ((event->error == 0 ||
+                              event->error == STARTER_TIRTC_ERROR_REMOTE_CLOSE) &&
+                             xiaotai_ai_remote_close_is_normal(
+                                 &s_ai_end_drain,
+                                 session_generation(),
+                                 true));
+            if (expected) {
+                ESP_LOGI(TAG,
+                         "AI transport closed normally; draining playback error=%d generation=%lu",
+                         event->error,
+                         (unsigned long)event->generation);
+                if (!s_ai_end_drain.pending) {
+                    begin_ai_end_drain(0U,
+                                       AI_REMOTE_CLOSE_DRAIN_TIMEOUT_MS,
+                                       true);
+                } else {
+                    s_ai_transport_closed = true;
+                    starter_media_set_uplink_enabled(false);
+                }
+                service_ai_end_drain();
+                return;
+            }
         }
         ESP_LOGW(TAG, "connection ended mode=%d error=%d", (int)event->mode, event->error);
         if (state == STARTER_RUNTIME_ROOM_CONNECTING ||
@@ -2342,6 +2448,7 @@ static void handle_ai_command(const runtime_event_t *event)
     } else if (state == STARTER_RUNTIME_AI_CONNECTING && accepted) {
         /* 服务端明确接受后才开放麦克风，避免把音频发到未建立的 AI 会话。 */
         cJSON_Delete(root);
+        xiaotai_ai_view_init(&s_ai_view);
         if (starter_media_start(STARTER_TIRTC_AI,
                                 s_connection_generation) != ESP_OK) {
             finish_session(ESP_ERR_INVALID_STATE);
@@ -2352,6 +2459,11 @@ static void handle_ai_command(const runtime_event_t *event)
         publish_state();
         diagnostic_event("AI ready ms", (int)(now_ms() - s_diagnostic_ai_started_ms));
     } else if (state == STARTER_RUNTIME_AI_ACTIVE) {
+        if (xiaotai_ai_view_apply(&s_ai_view, event->text,
+                                  (uint32_t)now_ms())) {
+            product_set_emotion(s_ai_view.emotion);
+            product_set_phase(product_phase_from_ai_view(s_ai_view.phase));
+        }
         const cJSON *method = cJSON_GetObjectItemCaseSensitive(root, "method");
         const cJSON *params = cJSON_GetObjectItemCaseSensitive(root, "params");
         if (cJSON_IsString(method) && method->valuestring != NULL) {
@@ -2447,7 +2559,9 @@ static void handle_ai_command(const runtime_event_t *event)
                          "AI session ended by remote end_session/idle policy generation=%lu",
                          (unsigned long)s_connection_generation);
                 cJSON_Delete(root);
-                finish_session(0);
+                begin_ai_end_drain(AI_END_FINAL_AUDIO_ARRIVAL_MS,
+                                   AI_END_DRAIN_TIMEOUT_MS,
+                                   false);
                 return;
             } else {
                 diagnostic_event("AI unknown method/params", 0);
@@ -3272,6 +3386,7 @@ static void runtime_task(void *argument)
         if (recover_voip_profile_delivery_failure(now_ms())) {
             ESP_LOGW(TAG, "VoIP profile response was not delivered; retrying");
         }
+        service_ai_end_drain();
         if (s_mqtt_suspended_for_connect && s_mqtt_resume_due_ms != 0 &&
             now_ms() >= s_mqtt_resume_due_ms) {
             resume_mqtt_after_external_connect();

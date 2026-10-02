@@ -22,55 +22,52 @@
 /*
  * Stable full-duplex device-call profile.
  *
- * The encoder bitrate is a rate-control target, not a hard ceiling. Use the
- * 4:3 landscape surface with 384 macroblocks per frame keeps the P4 software
- * decoder inside the frame budget under full-frame motion. The receiver scales
- * once to the panel-native 480x320 surface through PPA. Keep the same per-frame
- * bit budget as the validated 320 kbit/s at 15 fps profile while reserving CPU
- * time for full-duplex audio, UI, and transport. Let rate control
- * use the full legal H.264 QP range when full-frame motion would otherwise
- * exceed the peer's software-decode budget. Weak-network adaptation remains
- * opt-in and starts from this normal profile.
+ * The encoder bitrate is a rate-control target, not a hard ceiling. Device
+ * calls use a VGA 4:3 surface independently from the portrait WeChat profile.
+ * The receiver converts it once to the panel viewport through PPA. Reserve
+ * 1.2 Mbit/s so the higher pixel count does not regress into the soft output
+ * observed with the former 384x256 / 512 kbit/s profile. Weak-network
+ * adaptation may lower this target only after transport feedback.
  */
-#define APP_MEDIA_CALL_VIDEO_WIDTH                      384U
-#define APP_MEDIA_CALL_VIDEO_HEIGHT                     256U
+#define APP_MEDIA_CALL_VIDEO_WIDTH                      640U
+#define APP_MEDIA_CALL_VIDEO_HEIGHT                     480U
 #define APP_MEDIA_CALL_VIDEO_FPS                        12U
-#define APP_MEDIA_CALL_VIDEO_BITRATE_BPS                256000U
-#define APP_MEDIA_CALL_VIDEO_MIN_QP                     34U
-#define APP_MEDIA_CALL_VIDEO_MAX_QP                     51U
+#define APP_MEDIA_CALL_VIDEO_BITRATE_BPS                1200000U
+#define APP_MEDIA_CALL_VIDEO_MIN_QP                     28U
+#define APP_MEDIA_CALL_VIDEO_MAX_QP                     44U
 
-/* XiaoTai phone/browser uplink: balanced full-duplex portrait profile.
- * Keep the full 4:3 sensor field of view, scale it to 75%, then correct the
- * physical camera mounting counterclockwise by 90 degrees. The reduced pixel
- * load leaves PPA and encoder time for simultaneous MJPEG downlink rendering. */
-#define APP_MEDIA_WECHAT_VIDEO_WIDTH                    720U
-#define APP_MEDIA_WECHAT_VIDEO_HEIGHT                   960U
+/* XiaoTai phone/browser uplink: balanced full-duplex sensor-orientation
+ * profile. Keep the full 4:3 field of view and scale it to 75%, but leave the
+ * pixels unrotated. The receiver applies the reported clockwise 270-degree
+ * camera rotation. */
+#define APP_MEDIA_WECHAT_VIDEO_WIDTH                    960U
+#define APP_MEDIA_WECHAT_VIDEO_HEIGHT                   720U
 #define APP_MEDIA_WECHAT_VIDEO_FPS                      12U
 #define APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS              1500000U
 #define APP_MEDIA_WECHAT_VIDEO_MIN_QP                   30U
 #define APP_MEDIA_WECHAT_VIDEO_MAX_QP                   46U
 
-/* H5 remote view keeps every native 1280x960 sensor pixel. Correcting the
- * physical camera mounting swaps the encoded axes to 960x1280, without crop
- * or scale. H5 has no simultaneous video downlink, so it can retain the
- * normal RTC quality target independently of the balanced WeChat profile. */
-#define APP_MEDIA_H5_VIDEO_WIDTH                        APP_MEDIA_RTC_VIDEO_HEIGHT
-#define APP_MEDIA_H5_VIDEO_HEIGHT                       APP_MEDIA_RTC_VIDEO_WIDTH
+/* H5 remote view encodes the native 1280x960 sensor surface directly. The
+ * receiver applies the reported clockwise 270-degree camera rotation, which
+ * avoids a blocking full-frame PPA pass on every frame. Keep the 20 fps cadence
+ * while limiting the target to 3 Mbit/s so transport pressure does not turn
+ * into non-key-frame suppression. */
+#define APP_MEDIA_H5_VIDEO_WIDTH                        APP_MEDIA_RTC_VIDEO_WIDTH
+#define APP_MEDIA_H5_VIDEO_HEIGHT                       APP_MEDIA_RTC_VIDEO_HEIGHT
 #define APP_MEDIA_H5_VIDEO_FPS                          APP_MEDIA_RTC_H264_FPS
-#define APP_MEDIA_H5_VIDEO_BITRATE_BPS                  APP_MEDIA_RTC_H264_BITRATE_BPS
+#define APP_MEDIA_H5_VIDEO_BITRATE_BPS                  3000000U
 #define APP_MEDIA_H5_VIDEO_MIN_QP                       APP_MEDIA_RTC_H264_MIN_QP
 #define APP_MEDIA_H5_VIDEO_MAX_QP                       APP_MEDIA_RTC_H264_MAX_QP
 /* H264 encoder and transport protection. */
 /*
- * IPC keeps a two-second recovery interval. Full-duplex calls use a longer
- * sixteen-second interval because moving 480x320 IDR frames take the software
- * P4 decoder roughly two frame budgets while delta frames remain near budget.
- * Stream start, subscription, transport recovery, and peer requests still
- * force an immediate IDR, so the longer nominal GOP does not replace explicit
- * recovery signaling.
+ * IPC and full-duplex calls both keep a two-second recovery interval. A short
+ * call GOP bounds decoder recovery after transport loss and prevents a long
+ * run of unusable delta frames from filling the shared audio/video send queue.
+ * Stream start, subscription, transport recovery, and peer requests can still
+ * force an earlier IDR.
  */
 #define APP_MEDIA_H264_GOP_DURATION_MS                  2000U
-#define APP_MEDIA_CALL_H264_GOP_DURATION_MS             16000U
+#define APP_MEDIA_CALL_H264_GOP_DURATION_MS             2000U
 #define APP_MEDIA_H264_OUTPUT_BUFFER_BYTES              (1024U * 1024U)
 #define APP_MEDIA_H264_MAX_DELTA_PAYLOAD_BYTES          (256U * 1024U)
 #define APP_MEDIA_H264_STARTUP_GUARD_MS                 2500U
@@ -91,11 +88,9 @@
 /* TGMP bitrate controller hysteresis. */
 #define APP_MEDIA_TGMP_EVENT_MIN_INTERVAL_US            500000ULL
 #define APP_MEDIA_TGMP_EVENT_FAST_STEP_BPS              64000U
-/* Keep the normal device-call profile at 256 kbit/s. The lower bound is only
- * exposed to TGMP after transport feedback reports congestion. At 160 kbit/s
- * the measured 300 ms / 5% loss path still accumulated retransmission bursts
- * large enough to overflow the P4 decoder ingress queue; 96 kbit/s leaves the
- * controller one real protection step without degrading a healthy call. */
+/* The lower bound is exposed only after transport feedback reports congestion.
+ * VGA calls derive a 300 kbit/s floor from the normal 1.2 Mbit/s target; the
+ * compact 96 kbit/s floor remains available to smaller profiles. */
 #define APP_MEDIA_TGMP_COMPACT_MIN_BITRATE_BPS           (96U * 1000U)
 #define APP_MEDIA_TGMP_LARGE_MIN_BITRATE_BPS            (750U * 1000U)
 #define APP_MEDIA_TGMP_MIN_RATIO_DIVISOR                4U

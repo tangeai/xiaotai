@@ -173,6 +173,16 @@ config APP_TIRTC_QUERY_SEND_BUFFER_USED
         some SDK builds can invalidate a connection handle during remote close.
         Disable this only when isolating SDK send-buffer internals.
 
+config XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES
+    int "TiRTC maximum send-buffer bytes"
+    range 262144 4194304
+    default 2097152
+    help
+        Reserve enough TiRTC transport buffering for one complete P4 H264
+        access unit plus simultaneous audio and retransmission traffic. The
+        P4 board media contract requires 2 MiB; smaller ESP32 products may
+        select a lower value in their own project configuration.
+
 endmenu
 
 menu "Debug utilities"

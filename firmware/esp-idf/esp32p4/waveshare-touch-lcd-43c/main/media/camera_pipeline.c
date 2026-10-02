@@ -2293,18 +2293,13 @@ static void camera_pipeline_task(void *arg)
 
         uint16_t target_width = camera_pipeline_even_dimension(policy.rtc_width);
         uint16_t target_height = camera_pipeline_even_dimension(policy.rtc_height);
-        /* Phone/H5 portrait output corrects the physical camera mounting.
-         * H5 keeps all native pixels; WeChat uses its balanced scaled profile.
-         * Device-call's separate decoder-limited profile remains unchanged. */
-        const bool rotate_ccw90 =
-            (target_width == APP_MEDIA_WECHAT_VIDEO_WIDTH &&
-             target_height == APP_MEDIA_WECHAT_VIDEO_HEIGHT) ||
-            (target_width == APP_MEDIA_H5_VIDEO_WIDTH &&
-             target_height == APP_MEDIA_H5_VIDEO_HEIGHT);
-        if (!rotate_ccw90 && (target_width == 0U || target_width > source_width)) {
+        /* All uplink modes preserve sensor orientation. H5, device call and
+         * WeChat receivers apply the scene-specific camera_rotation metadata. */
+        const bool rotate_ccw90 = false;
+        if (target_width == 0U || target_width > source_width) {
             target_width = camera_pipeline_even_dimension(source_width);
         }
-        if (!rotate_ccw90 && (target_height == 0U || target_height > source_height)) {
+        if (target_height == 0U || target_height > source_height) {
             target_height = camera_pipeline_even_dimension(source_height);
         }
         if (camera_pipeline_h264_is_open(&h264) &&
@@ -2335,7 +2330,7 @@ static void camera_pipeline_task(void *arg)
         const char *h264_input_path = "unknown";
         bool h264_direct_input = false;
 
-        if (!rotate_ccw90 && source_format == CAMERA_DRIVER_PIXEL_FORMAT_YUV420_OUYY_EVYY &&
+        if (source_format == CAMERA_DRIVER_PIXEL_FORMAT_YUV420_OUYY_EVYY &&
             frame.data != NULL &&
             source_width == target_width &&
             source_height == target_height &&
@@ -2432,7 +2427,7 @@ static void camera_pipeline_task(void *arg)
             if (convert_us > CAMERA_PIPELINE_FRAME_TRACE_SLOW_STAGE_US) {
                 slow_convert_count++;
             }
-            h264_input_path = rotate_ccw90 ? "yuv420-ppa-ccw90" : "yuv420-ppa-scale";
+            h264_input_path = "yuv420-ppa-scale";
             h264_direct_input = false;
         } else {
             camera_driver_release(&frame);

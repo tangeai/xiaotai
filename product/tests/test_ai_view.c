@@ -66,9 +66,13 @@ int main(void)
         "\"data\":{\"emotion\":\"crying\"}}}", 104U));
     assert(strcmp(view.emotion, "crying") == 0);
     assert(xiaotai_ai_view_apply(&view,
+        "{\"method\":\"event\",\"params\":{\"data\":{\"tag\":\"confused\"}}}",
+        105U));
+    assert(strcmp(view.emotion, "confused") == 0);
+    assert(xiaotai_ai_view_apply(&view,
         "{\"method\":\"caption\",\"params\":{\"caption_type\":1,"
         "\"utterance_id\":\"u3\",\"text\":\"让我想想\",\"mode\":0,"
-        "\"is_final\":true,\"emotion\":\"thinking\"}}", 105U));
+        "\"is_final\":true,\"emotion\":\"thinking\"}}", 106U));
     assert(strcmp(view.emotion, "thinking") == 0);
 
     assert(!xiaotai_ai_view_apply(&view,

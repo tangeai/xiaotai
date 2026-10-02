@@ -4,6 +4,8 @@ idf_component_register(
     SRCS
         "${xiaotai_starter_runtime_dir}/src/starter_runtime.c"
         "${xiaotai_starter_runtime_dir}/../../../../product/src/xiaotai_runtime.c"
+        "${xiaotai_starter_runtime_dir}/../../../../product/src/xiaotai_ai_protocol.c"
+        "${xiaotai_starter_runtime_dir}/../../../../product/src/xiaotai_ai_view.c"
     INCLUDE_DIRS
         "${xiaotai_starter_runtime_dir}/include"
         "${xiaotai_starter_runtime_dir}/../../../../product/include"

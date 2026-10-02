@@ -12,7 +12,6 @@ issues: https://github.com/espressif/esp-video-components/issues
 repository: git://github.com/espressif/esp-video-components.git
 repository_info:
   commit_sha: 2c218e66eede0b8edc12c09b69f1281c655e52e7
-  path: esp_video
 targets:
 - esp32p4
 url: https://github.com/espressif/esp-video-components/tree/master/esp_video

@@ -47,6 +47,12 @@
 #define VERIFICATION_PROMPT_GAP_MS 350U
 #define TIRTC_INTERNAL_RESERVE_BYTES (20U * 1024U)
 
+/* Existing constrained boards keep the reference-size transport queue unless
+ * their project Kconfig opts into a larger board media contract. */
+#ifndef CONFIG_XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES
+#define CONFIG_XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES (256U * 1024U)
+#endif
+
 static const char *TAG = "starter_main";
 static runtime_tirtc_config_t s_tirtc_config;
 static void *s_tirtc_internal_reserve;
@@ -293,14 +299,17 @@ static void starter_start_task(void *argument)
                 .device_id = s_tirtc_config.device_id,
                 .device_secret = s_tirtc_config.device_secret,
                 .client_id = s_tirtc_config.client_id,
-                /* 与 TiRTC ESP32 参考工程一致。1 MiB 会在 HTTPS、MQTT、
-                 * camera/I2S 已就绪后放大启动期内存压力。 */
-                .max_send_buffer_bytes = 256U * 1024U,
+                /* 由板级媒体合同配置：P4 的 H264 访问单元可达 256 KiB，
+                 * 全双工音视频需要更大余量，避免一个峰值帧堵住音频。 */
+                .max_send_buffer_bytes = CONFIG_XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES,
                 .log_level = 3,
             };
             int rc = starter_tirtc_start(&tirtc);
             if (rc == 0) {
                 tirtc_submitted = true;
+                ESP_LOGI(TAG,
+                         "TiRTC send buffer configured=%u bytes",
+                         (unsigned)tirtc.max_send_buffer_bytes);
                 log_heap_snapshot("post-tirtc-submit");
             } else {
                 ESP_LOGE(TAG, "TiRTC start failed rc=%d", rc);

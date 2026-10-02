@@ -103,12 +103,14 @@ value 复制到控制内存后，由 internal-RAM task 串行执行 `open -> set
 - pipeline 只按 RTC 目标节拍取帧。12fps 使用向上取整的 `84ms` 间隔，15fps 使用 `67ms`，
   20fps 使用 `50ms`；
   超过一个周期时按错过的周期数推进原相位，不从当前时刻重新起算。
-- GOP 按媒体档位计算：IPC 为 `40` 帧 / `2s`；设备呼叫名义值为 `192` 帧 / `16s`；
+- GOP 按媒体档位计算：IPC 为 `40` 帧 / `2s`；设备呼叫为 `24` 帧 / `2s`，以缩短丢包后的图像恢复时间；
   微信上行为 `24` 帧 / `2s`。流开始、订阅恢复、传输恢复和对端请求仍会强制关键帧。
 
-设备间呼叫从 P4 发送 `384x256@12fps`、`256kbps` H264；微信 VoIP 使用独立的
-`720x960@12fps`、目标 `1.5Mbps` H264 档位。微信档从 1280×960 传感器完整画面
-等比缩小到 75% 后逆时针旋转，不裁切。退出通话后恢复 IPC 正常档位。
+设备间呼叫从 P4 发送 `640x480@12fps`、`1.2Mbps`、QP `28-44` H264；微信 VoIP 使用独立的
+`960x720@12fps`、目标 `1.5Mbps` H264 档位。微信档从 1280×960 传感器完整画面
+等比缩小到 75%，不裁切、不旋转。H5 直接编码原生 `1280x960`。H5、设备呼叫和微信
+VoIP 均保持传感器像素方向，由对应接收端按能力中的 `camera_rotation=270` 旋转。
+退出通话后恢复 IPC 正常档位。
 
 ## 视频下行
 
@@ -118,7 +120,7 @@ value 复制到控制内存后，由 internal-RAM task 串行执行 `open -> set
 
 - 接收 constrained-baseline H264。
 - 软件 H264 decoder 输出 YUV420。
-- PPA 优先完成缩放、裁剪和 RGB565 转换，软件路径作为回退。
+- PPA 优先完成等比例缩放、居中留边和 RGB565 转换，软件路径作为回退。
 - H264 依赖帧丢失时进入 key-frame resync，不继续显示错误参考帧。
 - 压缩输入使用 24 个 `256KB` PSRAM slot；输入溢出后标记延迟恢复，在下一次 IDR 到达时
   清空旧依赖链并切换到新一代解码状态。
@@ -126,8 +128,9 @@ value 复制到控制内存后，由 internal-RAM task 串行执行 `open -> set
   上限为 `16`，队列只传递 slot index。
 - 当前产品路径关闭 TinyH264 双任务 helper，由单一 decoder owner 在 SMP 上调度，避免第三方
   slice/deblock helper 竞态；双任务参数仅保留给受控实验。
-- 解码目标上限为 `384x256`。转换任务通过 PPA 一次缩放到 `480x320`，每帧后主动让出调度窗口，
-  避免持续占满 CPU。
+- 解码目标上限为 `640x480`。decoded pool 保留每帧的实际宽高，兼容 `384x256` 等较小档位；
+  转换任务通过 PPA 以 `contain` 一次映射到 `640x384` 显示区，完整画面等比例缩放并居中留边，
+  每帧后主动让出调度窗口，避免持续占满 CPU。
 - access unit decode 超过 `2s` 时标记 decoder fault 并隔离后续输入，同时记录 caller、helper、
   音频采集和播放 task 状态。只有原 decode 最终返回后才能安全销毁 decoder 并等待新 IDR 重建。
 
@@ -260,9 +263,9 @@ SDIO 读取全 `0xff` 寄存器快照时最多重试 3 次，间隔 `200us`；�
 
 | 项目 | 默认值 |
 | --- | --- |
-| P4 设备 -> 服务端（IPC） | `1280x960@20fps`, `4Mbps`，GOP `40` 帧 / `2s` |
-| P4 设备 -> 服务端（设备呼叫） | `384x256@12fps`, `256kbps`，TGMP `96-256kbps`，名义 GOP `192` 帧 / `16s` |
-| P4 设备 -> 服务端（微信 VoIP） | `720x960@12fps`，目标 `1.5Mbps`，GOP `24` 帧 / `2s` |
+| P4 设备 -> 服务端（IPC） | `1280x960@20fps`, `3Mbps`，GOP `40` 帧 / `2s`，接收端旋转 270° |
+| P4 设备 -> 服务端（设备呼叫） | `640x480@12fps`, `1.2Mbps`，TGMP `300-1200kbps`，QP `28-44`，GOP `24` 帧 / `2s`，TiRTC 发送缓冲 `2 MiB` |
+| P4 设备 -> 服务端（微信 VoIP） | `960x720@12fps`，目标 `1.5Mbps`，GOP `24` 帧 / `2s`，接收端旋转 270° |
 | 服务端 -> P4 设备（微信 VoIP） | 请求 `640x480` MJPEG，实际帧可以更小，`cover` 到 `480x320` |
 | H264 downlink input | `24 x 256KB` PSRAM slot |
 | H264 decoded/output | decoded `4` 个、output `20` 个 RGB565 slot；playout 深度上限 `16` |
@@ -298,10 +301,10 @@ SDIO 读取全 `0xff` 寄存器快照时最多重试 3 次，间隔 `200us`；�
 4. 快速切换 AI Chat、设备呼叫和微信呼叫，确认同一时刻只有一个 WHIP attempt，过期回调
    不会再次销毁 closing connection，重复 disconnect 保持幂等。
 5. 分别检查 IPC、设备呼叫、微信 VoIP 和 AI Chat。
-6. 对微信正式版 VoIP 分别确认 P4 设备发送的 `720x960` H264 和服务端下发的 MJPEG 均有
+6. 对微信正式版 VoIP 分别确认 P4 设备发送的 `960x720` H264、微信端按 270° 显示和服务端下发的 MJPEG 均有
    首帧证据，并记录服务端实际下发分辨率。
 7. 保持每个主要场景至少 5 分钟，观察 fps、bitrate、queue、DMA largest block、持久 PSRAM
-   pool 和 AEC；单独确认设备呼叫 `384x256@12fps` 弱网恢复。
+   pool 和 AEC；单独确认设备呼叫 `640x480@12fps` 弱网恢复。
 8. 每个场景连续进入和退出至少 10 次，确认无残留资源和连接句柄。
 9. 对 H264 下行做连续呼叫和故障注入，确认 persistent reference/deblocking pool 没有跨会话
    残留，记录 decode 超过 `2s` 时原调用是否返回、decoder 是否能从新 IDR 重建。

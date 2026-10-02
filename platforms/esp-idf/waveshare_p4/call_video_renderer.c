@@ -32,7 +32,7 @@
 static const char *TAG = "call_video";
 
 #define CALL_VIDEO_DECODED_SLOT_CAPACITY  \
-    (CALL_VIDEO_SOURCE_CROP_WIDTH * CALL_VIDEO_SOURCE_CROP_HEIGHT * 3U / 2U)
+    (CALL_VIDEO_DECODE_MAX_WIDTH * CALL_VIDEO_DECODE_MAX_HEIGHT * 3U / 2U)
 #define CALL_VIDEO_OUTPUT_SLOT_INVALID    UINT8_MAX
 #define CALL_VIDEO_H264_BASELINE_PROFILE_IDC 66U
 #define CALL_VIDEO_H264_CONSTRAINT_SET1_FLAG 0x40U
@@ -1603,59 +1603,20 @@ static esp_err_t call_video_copy_display_i420(const uint8_t *source,
                                               uint16_t source_height,
                                               uint8_t *output)
 {
-    uint16_t crop_x = CALL_VIDEO_SOURCE_CROP_X;
-    uint16_t crop_y = CALL_VIDEO_SOURCE_CROP_Y;
-    const uint16_t crop_width = CALL_VIDEO_SOURCE_CROP_WIDTH;
-    const uint16_t crop_height = CALL_VIDEO_SOURCE_CROP_HEIGHT;
-
     ESP_RETURN_ON_FALSE(source != NULL && output != NULL,
                         ESP_ERR_INVALID_ARG,
                         TAG,
-                        "invalid I420 crop buffer");
-    if (source_width >= crop_width && source_height >= crop_height) {
-        crop_x = (uint16_t)(((source_width - crop_width) / 2U) & ~1U);
-        crop_y = (uint16_t)(((source_height - crop_height) / 2U) & ~1U);
-    }
-    ESP_RETURN_ON_FALSE(((crop_x | crop_y | crop_width | crop_height) & 1U) == 0U &&
-                            (uint32_t)crop_x + crop_width <= source_width &&
-                            (uint32_t)crop_y + crop_height <= source_height,
+                        "invalid I420 copy buffer");
+    ESP_RETURN_ON_FALSE(source_width >= 16U && source_height >= 16U &&
+                            (source_width & 1U) == 0U &&
+                            (source_height & 1U) == 0U &&
+                            source_width <= CALL_VIDEO_DECODE_MAX_WIDTH &&
+                            source_height <= CALL_VIDEO_DECODE_MAX_HEIGHT,
                         ESP_ERR_NOT_SUPPORTED,
                         TAG,
-                        "decoded resolution does not contain display crop");
+                        "decoded resolution exceeds display decoder pool");
 
-    const size_t source_luma_size = (size_t)source_width * source_height;
-    const size_t source_chroma_stride = source_width / 2U;
-    const uint8_t *source_y = source;
-    const uint8_t *source_u = source_y + source_luma_size;
-    const uint8_t *source_v = source_u + (source_luma_size / 4U);
-    const size_t output_luma_size = (size_t)crop_width * crop_height;
-    uint8_t *output_y = output;
-    uint8_t *output_u = output_y + output_luma_size;
-    uint8_t *output_v = output_u + (output_luma_size / 4U);
-
-    if (crop_x == 0U && crop_width == source_width) {
-        size_t chroma_copy_size = output_luma_size / 4U;
-        size_t source_chroma_offset = (size_t)(crop_y / 2U) * source_chroma_stride;
-        memcpy(output_y,
-               source_y + ((size_t)crop_y * source_width),
-               output_luma_size);
-        memcpy(output_u, source_u + source_chroma_offset, chroma_copy_size);
-        memcpy(output_v, source_v + source_chroma_offset, chroma_copy_size);
-        return ESP_OK;
-    }
-
-    for (uint16_t row = 0; row < crop_height; ++row) {
-        memcpy(output_y + ((size_t)row * crop_width),
-               source_y + ((size_t)(crop_y + row) * source_width) + crop_x,
-               crop_width);
-    }
-    for (uint16_t row = 0; row < crop_height / 2U; ++row) {
-        size_t source_offset =
-            ((size_t)((crop_y / 2U) + row) * source_chroma_stride) + (crop_x / 2U);
-        size_t output_offset = (size_t)row * (crop_width / 2U);
-        memcpy(output_u + output_offset, source_u + source_offset, crop_width / 2U);
-        memcpy(output_v + output_offset, source_v + source_offset, crop_width / 2U);
-    }
+    memcpy(output, source, (size_t)source_width * source_height * 3U / 2U);
     return ESP_OK;
 }
 
@@ -1721,9 +1682,9 @@ static esp_err_t call_video_queue_decoded_frame(const esp_h264_dec_out_frame_t *
         call_video_return_decoded_slot(index);
         return copy_ret;
     }
-    slot->data_len = CALL_VIDEO_DECODED_SLOT_CAPACITY;
-    slot->width = CALL_VIDEO_SOURCE_CROP_WIDTH;
-    slot->height = CALL_VIDEO_SOURCE_CROP_HEIGHT;
+    slot->data_len = required;
+    slot->width = resolution.width;
+    slot->height = resolution.height;
     slot->pts = frame->pts;
     slot->generation = input_slot->generation;
     memset(&slot->trace, 0, sizeof(slot->trace));
@@ -2099,8 +2060,8 @@ static void call_video_renderer_task(void *arg)
          * landscape picture unrotated and let PPA scale it to the viewport. */
         .source_crop_x = 0,
         .source_crop_y = 0,
-        .source_crop_width = CALL_VIDEO_SOURCE_CROP_WIDTH,
-        .source_crop_height = CALL_VIDEO_SOURCE_CROP_HEIGHT,
+        .source_crop_width = 0,
+        .source_crop_height = 0,
         .fit_mode = CALL_VIDEO_H264_FIT_COVER ?
                         VIDEO_FRAME_FIT_COVER : VIDEO_FRAME_FIT_CONTAIN,
         .prevent_upscale = false,
@@ -2158,17 +2119,16 @@ static void call_video_renderer_task(void *arg)
 
     ESP_LOGI(TAG,
              "H264 downlink renderer ready: decoder=%s conversion=pipelined-%s output=%ux%u "
-             "source_crop=%ux%u+%u+%u orientation=panel-owned input_slots=%u input_cap=%u decoded_slots=%u "
+             "source=dynamic<=%ux%u fit=%s orientation=panel-owned input_slots=%u input_cap=%u decoded_slots=%u "
              "decoded_cap=%u presentation=latest-%u priorities=decode:%u ingress:%u helper:%u convert:%u "
              "cores=decode:%d helper:%d convert:%d ui:%d camera:%d",
              CALL_VIDEO_H264_DECODER_MODE,
              video_frame_converter_mode_name(video_frame_converter_get_mode(converter)),
              CALL_VIDEO_RENDER_WIDTH,
              CALL_VIDEO_RENDER_HEIGHT,
-             CALL_VIDEO_SOURCE_CROP_WIDTH,
-             CALL_VIDEO_SOURCE_CROP_HEIGHT,
-             CALL_VIDEO_SOURCE_CROP_X,
-             CALL_VIDEO_SOURCE_CROP_Y,
+             CALL_VIDEO_DECODE_MAX_WIDTH,
+             CALL_VIDEO_DECODE_MAX_HEIGHT,
+             video_frame_fit_mode_name(converter_config.fit_mode),
              CALL_VIDEO_INPUT_SLOT_COUNT,
              CALL_VIDEO_INPUT_SLOT_CAPACITY,
              CALL_VIDEO_DECODED_SLOT_COUNT,

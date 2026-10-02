@@ -666,6 +666,7 @@ def test_connection_lifecycle():
 #define AI_RESPONSE_TIMEOUT_MS 1000
 #define ROOM_CONNECT_TIMEOUT_MS 1200
 #define VOIP_CONNECTED_WAIT_TIMEOUT_MS 1000
+#define AI_REMOTE_CLOSE_DRAIN_TIMEOUT_MS 3000
 #define CALL_COMMAND_CONNECT 0x2000
 #define ROOM_COMMAND 0x2200
 typedef struct {
@@ -680,6 +681,9 @@ static uint32_t s_connection_generation;
 static int64_t s_ai_start_at_ms, s_room_start_at_ms;
 static bool s_call_waiting_confirm, s_call_outgoing=true;
 static bool s_call_p2p_connected, s_call_wechat;
+typedef struct { bool pending; } xiaotai_ai_end_drain_t;
+static xiaotai_ai_end_drain_t s_ai_end_drain;
+static bool s_ai_transport_closed;
 static char s_call_room_id[32];
 static unsigned finished, resumed, media_started;
 static int64_t now_ms(void) { return 100; }
@@ -689,6 +693,24 @@ static void arm_session_timeout(uint32_t timeout) {
     assert(xiaotai_runtime_arm_timeout(&s_session, s_session.generation, 100, timeout));
 }
 static void finish_session(int error) { (void)error; ++finished; }
+static bool xiaotai_ai_end_drain_accepts_remote_close(
+    const xiaotai_ai_end_drain_t *drain, uint32_t generation) {
+    (void)generation; return drain->pending;
+}
+static bool xiaotai_ai_remote_close_is_normal(
+    const xiaotai_ai_end_drain_t *drain, uint32_t generation,
+    bool media_was_active) {
+    (void)drain; (void)generation; return media_was_active;
+}
+static void begin_ai_end_drain(uint32_t grace, uint32_t timeout, bool closed) {
+    (void)grace; (void)timeout; s_ai_end_drain.pending = true;
+    s_ai_transport_closed = closed;
+}
+static void starter_media_set_uplink_enabled(bool enabled) { (void)enabled; }
+static void service_ai_end_drain(void) {
+    assert(s_ai_end_drain.pending && s_ai_transport_closed);
+    finish_session(0);
+}
 static void room_stop_connection(const char *presence,int error) {
     (void)presence; finish_session(error);
 }
@@ -805,8 +827,14 @@ static bool s_call_wechat, s_call_outgoing, s_call_waiting_confirm;
 static bool s_voip_connect_inflight;
 static bool s_call_peer_answered, s_call_p2p_connected;
 static atomic_int s_last_error;
+typedef struct { bool pending; } xiaotai_ai_end_drain_t;
+static xiaotai_ai_end_drain_t s_ai_end_drain;
+static bool s_ai_transport_closed;
 static bool pending=true, connected=false;
 static unsigned disconnects;
+static void xiaotai_ai_end_drain_cancel(xiaotai_ai_end_drain_t *drain) {
+    drain->pending = false;
+}
 static bool session_incoming_pending(void) { return xiaotai_runtime_has_incoming(&s_session); }
 static uint32_t session_generation(void) { return s_session.generation; }
 static void diagnostic_event(const char *s,int e) {(void)s;(void)e;}

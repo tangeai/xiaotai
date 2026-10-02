@@ -60,6 +60,7 @@ with tempfile.TemporaryDirectory(prefix="uplink-rotation-") as directory:
     subprocess.run(["cc", "-Wall", "-Wextra", "-Werror", str(path / "test.c"), "-o", str(path / "test")], check=True)
     subprocess.run([str(path / "test")], check=True)
 pipeline = (root / "main/media/camera_pipeline.c").read_text()
+assert "const bool rotate_ccw90 = false;" in pipeline
 assert ".rotate_ccw90 = rotate_ccw90" in pipeline
-assert '"yuv420-ppa-ccw90"' in pipeline
-print("PASS: actual PPA submission uses CCW90, full crop, 0.75x scale and exchanged axes; zero rotation preserved")
+assert '"yuv420-ppa-ccw90"' not in pipeline
+print("PASS: PPA rotation primitive remains covered while production uplink preserves sensor orientation")

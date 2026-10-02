@@ -35,25 +35,21 @@ code+=r'''
 int main(void) {
     media_governor_video_config_t config;
     media_governor_build_wechat_video_config(&config);
-    assert(config.width==720 && config.height==960 && config.fps==12 && config.bitrate_bps==1500000);
+    assert(config.width==960 && config.height==720 && config.fps==12 && config.bitrate_bps==1500000);
     uint16_t w=APP_MEDIA_CAMERA_CAPTURE_WIDTH,h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
     media_governor_select_native_capture_size(&config,&w,&h);
     assert(w==1280 && h==960);
-    video_yuv420_scaler_config_t scale={w,h,config.width,config.height,true};
+    video_yuv420_scaler_config_t scale={w,h,config.width,config.height,false};
     assert(video_yuv420_config_valid(&scale));
     uint16_t cw,ch,x,y; uint8_t step;
     assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&step));
     assert(cw==1280 && ch==960 && x==0 && y==0 && step==12);
-    scale.rotate_ccw90=false;
-    assert(video_yuv420_config_valid(&scale));
-    assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&step));
-    assert(cw==720 && ch==960 && x==280 && y==0 && step==16);
     media_governor_build_h5_video_config(&config);
-    assert(config.width==960 && config.height==1280 && config.fps==20 && config.bitrate_bps==4000000);
+    assert(config.width==1280 && config.height==960 && config.fps==20 && config.bitrate_bps==3000000);
     w=APP_MEDIA_CAMERA_CAPTURE_WIDTH; h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
     media_governor_select_native_capture_size(&config,&w,&h);
     assert(w==1280 && h==960);
-    scale=(video_yuv420_scaler_config_t){w,h,config.width,config.height,true};
+    scale=(video_yuv420_scaler_config_t){w,h,config.width,config.height,false};
     assert(video_yuv420_config_valid(&scale));
     assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&step));
     assert(cw==1280 && ch==960 && x==0 && y==0 && step==16);
@@ -70,5 +66,10 @@ video=(root/"components/p4_hardware/p4_video.c").read_text()
 assert "mode == STARTER_TIRTC_H5" in video
 assert "media_governor_build_h5_video_config(&config);" in video
 for config in ("sdkconfig.defaults", "sdkconfig"):
-    assert "CONFIG_APP_RTC_H264_RESOURCE_FALLBACK_ENABLE=y" not in (root/config).read_text()
-print("PASS: H5 keeps native 1280x960 pixels as CCW90 960x1280; WeChat remains 720x960")
+    config_path = root / config
+    if config_path.exists():
+        assert "CONFIG_APP_RTC_H264_RESOURCE_FALLBACK_ENABLE=y" not in config_path.read_text()
+pipeline=(root/"main/media/camera_pipeline.c").read_text()
+assert "const bool rotate_ccw90 = false;" in pipeline
+assert '"yuv420-ppa-ccw90"' not in pipeline
+print("PASS: H5, WeChat VoIP and device calls keep sensor orientation for receiver-side rotation")

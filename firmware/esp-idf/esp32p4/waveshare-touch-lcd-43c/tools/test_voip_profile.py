@@ -33,10 +33,11 @@ assert (stream["up_audio_streamid"], stream["up_video_streamid"]) == (10, 11)
 assert (stream["down_audio_streamid"], stream["down_video_streamid"]) == (10, 11)
 assert (stream["up_audio_mt"], stream["up_video_mt"]) == (["alaw"], ["h264"])
 assert (stream["down_audio_mt"], stream["down_video_mt"]) == (["alaw"], ["h264"])
-assert stream["camera_rotation"] == 0  # H5 pixels are already corrected by PPA CCW90.
+assert stream["camera_rotation"] == 270
 assert stream["aspect_ratio"] == 720 / 960
 assert (call["up_audio_mt"], call["up_video_mt"]) == (["alaw"], ["h264"])
 assert (call["down_audio_mt"], call["down_video_mt"]) == (["alaw"], ["h264"])
+assert call["camera_rotation"] == 270
 assert voip["no_video"] is False
 assert (voip["up_video_mt"], voip["down_video_mt"]) == ("h264", "mjpeg")
 assert (voip["screen_width"], voip["screen_height"]) == (640, 480)
@@ -57,7 +58,7 @@ assert s3["profiles"]["voip"]["down_video_mt"] == "none"
 profile_function = source[start:source.index("static void handle_voip_profile", start)]
 assert 'PLATFORM_SERVICE_DEVICE, "/v1/device/profile"' in profile_function
 assert "/v1/voip/device/profile" not in profile_function
-assert "stream_rotation=0" in profile_function
+assert "stream_rotation=270" in profile_function
 renderer = (Path(__file__).resolve().parents[5] / "platforms/esp-idf/waveshare_p4/call_video_renderer.c").read_text()
 renderer_config = (root / "main/services/call_video_renderer_config.h").read_text()
 assert re.search(r"video_frame_rotation_t display_rotation\s*=\s*VIDEO_FRAME_ROTATION_CLOCKWISE_90;", renderer)

@@ -132,19 +132,19 @@ dependencies:
   espressif/esp_codec_dev:
     dependencies: []
     source:
-      path: $PWD/components/espressif__esp_codec_dev
+      path: /home/workspace/xiaotai/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/espressif__esp_codec_dev
       type: local
     version: 1.5.10
   espressif/esp_h264:
     dependencies: []
     source:
-      path: $PWD/components/espressif__esp_h264
+      path: /home/workspace/xiaotai/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/espressif__esp_h264
       type: local
     version: 1.3.8
   espressif/esp_hosted:
     dependencies: []
     source:
-      path: $PWD/components/espressif__esp_hosted
+      path: /home/workspace/xiaotai/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/espressif__esp_hosted
       type: local
     version: 1.4.7
   espressif/esp_ipa:
@@ -231,7 +231,7 @@ dependencies:
   espressif/esp_lvgl_port:
     dependencies: []
     source:
-      path: $PWD/components/espressif__esp_lvgl_port
+      path: /home/workspace/xiaotai/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/espressif__esp_lvgl_port
       type: local
     version: 2.7.2
   espressif/esp_sccb_intf:
@@ -257,7 +257,7 @@ dependencies:
   espressif/esp_video:
     dependencies: []
     source:
-      path: $PWD/components/espressif__esp_video
+      path: /home/workspace/xiaotai/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/espressif__esp_video
       type: local
     version: 0.8.0~3
   espressif/esp_wifi_remote:
@@ -324,6 +324,6 @@ direct_dependencies:
 - espressif/quirc
 - idf
 - lvgl/lvgl
-manifest_hash: 75dcf5d79f48272d032cd4407bea5ed4ad1921d01189f1a35cd5a936d1231e83
+manifest_hash: d54c43c29d2bd981ec9d6d45f29c683c5dfb05633e0edf7d2cd8418a69a4e00e
 target: esp32p4
 version: 2.0.0

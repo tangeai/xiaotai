@@ -128,6 +128,8 @@ typedef enum {
     ACTION_VOLUME_UP,
     ACTION_SPEAKER_MUTE,
     ACTION_MIC_MUTE,
+    ACTION_MIC_SENSITIVITY_DOWN,
+    ACTION_MIC_SENSITIVITY_UP,
     ACTION_SLEEP,
     ACTION_ACK_VOICE,
     ACTION_EMOJI_APPLY,
@@ -164,6 +166,7 @@ typedef struct {
     uint8_t volume;
     bool speaker_muted;
     bool microphone_muted;
+    uint8_t microphone_sensitivity;
     bool acknowledgement_male;
     uint8_t sleep_index;
     uint8_t emoji_index;
@@ -180,7 +183,9 @@ static esp_lcd_touch_handle_t s_touch;
 static lv_disp_t *s_display;
 static product_page_t s_page = PAGE_HOME_FACE;
 static product_page_t s_call_return_page = PAGE_HOME_FACE;
-static product_preferences_t s_preferences = {.volume = 7, .sleep_index = 1};
+static product_preferences_t s_preferences = {
+    .volume = 7, .microphone_sensitivity = 4, .sleep_index = 1,
+};
 static int64_t s_last_interaction_ms;
 static int64_t s_hint_due_ms;
 static int64_t s_hint_hide_ms;
@@ -290,6 +295,7 @@ static lv_obj_t *s_call_hangup_button;
 static lv_obj_t *s_settings_volume;
 static lv_obj_t *s_settings_speaker;
 static lv_obj_t *s_settings_microphone;
+static lv_obj_t *s_settings_microphone_sensitivity;
 static lv_obj_t *s_settings_sleep;
 static lv_obj_t *s_settings_acknowledgement;
 
@@ -343,6 +349,7 @@ static void preferences_save_task(void *argument)
     (void)nvs_set_u8(nvs, "volume", s_preferences.volume);
     (void)nvs_set_u8(nvs, "spk_mute", s_preferences.speaker_muted ? 1U : 0U);
     (void)nvs_set_u8(nvs, "mic_mute", s_preferences.microphone_muted ? 1U : 0U);
+    (void)nvs_set_u8(nvs, "mic_sens", s_preferences.microphone_sensitivity);
     (void)nvs_set_u8(nvs, "ack_voice", s_preferences.acknowledgement_male ? 1U : 0U);
     (void)nvs_set_u8(nvs, "sleep", s_preferences.sleep_index);
     (void)nvs_set_u8(nvs, "emoji", s_preferences.emoji_index);
@@ -378,6 +385,10 @@ static void preferences_load(void)
         if (nvs_get_u8(nvs, "mic_mute", &value) == ESP_OK) {
             s_preferences.microphone_muted = value != 0U;
         }
+        if (nvs_get_u8(nvs, "mic_sens", &value) == ESP_OK &&
+            value >= 1U && value <= 5U) {
+            s_preferences.microphone_sensitivity = value;
+        }
         if (nvs_get_u8(nvs, "ack_voice", &value) == ESP_OK) {
             s_preferences.acknowledgement_male = value != 0U;
         }
@@ -394,6 +405,8 @@ static void preferences_load(void)
     (void)starter_media_set_speaker_volume(s_preferences.volume);
     (void)starter_media_set_speaker_muted(s_preferences.speaker_muted);
     starter_media_set_microphone_muted(s_preferences.microphone_muted);
+    (void)starter_media_set_microphone_sensitivity(
+        s_preferences.microphone_sensitivity);
 }
 
 /* All product pages use a 320x240 logical layout, including nested controls
@@ -525,6 +538,14 @@ static lv_obj_t *product_create_content(lv_obj_t *screen)
     return screen;
 }
 #endif
+
+/* Button captions use the complete CJK font on every display. The larger P4
+ * UI font is intentionally a compact subset; allowing it to fall back to the
+ * 16 px font made missing glyphs and dynamic contact names look mismatched. */
+static const lv_font_t *product_button_font(void)
+{
+    return &ui_font_cn_16;
+}
 
 static void set_bg(lv_obj_t *object, lv_color_t color)
 {
@@ -946,6 +967,18 @@ static void on_action(lv_event_t *event)
         s_preferences.microphone_muted = !s_preferences.microphone_muted;
         starter_media_set_microphone_muted(s_preferences.microphone_muted);
         preferences_save();
+    } else if (action == ACTION_MIC_SENSITIVITY_DOWN &&
+               s_preferences.microphone_sensitivity > 1U) {
+        s_preferences.microphone_sensitivity--;
+        (void)starter_media_set_microphone_sensitivity(
+            s_preferences.microphone_sensitivity);
+        preferences_save();
+    } else if (action == ACTION_MIC_SENSITIVITY_UP &&
+               s_preferences.microphone_sensitivity < 5U) {
+        s_preferences.microphone_sensitivity++;
+        (void)starter_media_set_microphone_sensitivity(
+            s_preferences.microphone_sensitivity);
+        preferences_save();
     } else if (action == ACTION_SLEEP) {
         s_preferences.sleep_index = (uint8_t)((s_preferences.sleep_index + 1U) %
             (sizeof(s_sleep_minutes) / sizeof(s_sleep_minutes[0])));
@@ -1037,9 +1070,23 @@ static lv_obj_t *make_button(lv_obj_t *parent,
     lv_obj_add_event_cb(button, on_action, LV_EVENT_CLICKED, (void *)(uintptr_t)action);
     lv_obj_t *label = lv_label_create(button);
     lv_label_set_text(label, text);
-    lv_obj_set_style_text_font(label, product_ui_font(), 0);
+    lv_obj_set_style_text_font(label, product_button_font(), 0);
     lv_obj_center(label);
     return button;
+}
+
+static lv_obj_t *make_settings_stepper(lv_obj_t *parent,
+                                       const char *text,
+                                       lv_coord_t y,
+                                       product_action_t down,
+                                       product_action_t up)
+{
+    (void)make_button(parent, "-", 18, y, 42, 38, down);
+    lv_obj_t *label = make_label(parent, text, 72, y + 5, 176,
+                                 lv_color_hex(0xFFFFFF));
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+    (void)make_button(parent, "+", 260, y, 42, 38, up);
+    return label;
 }
 
 static void set_button_text(lv_obj_t *button, const char *text)
@@ -1079,6 +1126,9 @@ static void refresh_settings_controls(void)
     (void)snprintf(text, sizeof(text), "麦克风  %s",
                    s_preferences.microphone_muted ? "已静音" : "开启");
     set_button_text(s_settings_microphone, text);
+    (void)snprintf(text, sizeof(text), "灵敏度  %u / 5",
+                   s_preferences.microphone_sensitivity);
+    lv_label_set_text(s_settings_microphone_sensitivity, text);
     (void)snprintf(text, sizeof(text), "休眠  %s",
                    s_sleep_names[s_preferences.sleep_index]);
     set_button_text(s_settings_sleep, text);
@@ -1448,6 +1498,9 @@ static void render_home(lv_obj_t *screen)
                          lv_color_hex(0xBFE9F3));
     lv_obj_set_style_text_align(s_state, LV_TEXT_ALIGN_CENTER, 0);
     s_subtitle = make_label(screen, "", 16, 177, 236, lv_color_hex(0xEDFAFF));
+    /* Dynamic AI text uses the complete 16 px CJK font.  The curated 24 px
+     * face font falls back glyph-by-glyph and otherwise produces mixed sizes. */
+    lv_obj_set_style_text_font(s_subtitle, &ui_font_cn_16, 0);
     lv_obj_set_height(s_subtitle, 45);
     lv_label_set_long_mode(s_subtitle, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(s_subtitle, LV_TEXT_ALIGN_CENTER, 0);
@@ -1514,6 +1567,7 @@ static void render_ai_chat(lv_obj_t *screen)
                                     s_ai_history[0] == '\0'
                                         ? "请说，我在听。" : s_ai_history,
                                     4, 4, 266, lv_color_hex(0xFFFFFF));
+    lv_obj_set_style_text_font(s_ai_history_label, &ui_font_cn_16, 0);
 }
 
 static const uint64_t s_wechat_qr_rows[37] = {
@@ -1721,14 +1775,14 @@ static void render_contacts(lv_obj_t *screen)
         }
         lv_obj_t *name = lv_label_create(row);
         lv_label_set_text(name, contact->name);
-        lv_obj_set_style_text_font(name, product_ui_font(), 0);
+        lv_obj_set_style_text_font(name, product_button_font(), 0);
         lv_obj_set_style_text_color(name, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_pos(name, 42, 7);
         lv_obj_set_width(name, 130);
         if (contact->source == STARTER_CONTACT_WECHAT) {
             lv_obj_t *wx_hint = make_label(row, "微信", 42, 22, 40,
                                            lv_color_hex(0x9CC0C9));
-            lv_obj_set_style_text_font(wx_hint, product_ui_font(), 0);
+            lv_obj_set_style_text_font(wx_hint, product_button_font(), 0);
         } else {
             lv_obj_t *status = lv_obj_create(row);
             lv_obj_set_pos(status, 188, 14);
@@ -1958,26 +2012,30 @@ static void render_settings(lv_obj_t *screen)
     (void)snprintf(microphone, sizeof(microphone), "麦克风  %s",
                    s_preferences.microphone_muted ? "已静音" : "开启");
     render_header(screen, "设置");
-    s_settings_volume = make_label(screen, volume, 72, 47, 176,
-                                   lv_color_hex(0xFFFFFF));
-    (void)make_button(screen, "-", 18, 42, 42, 38, ACTION_VOLUME_DOWN);
-    (void)make_button(screen, "+", 260, 42, 42, 38, ACTION_VOLUME_UP);
-    s_settings_speaker = make_button(screen, speaker, 18, 82, 132, 36,
+    s_settings_volume = make_settings_stepper(
+        screen, volume, 38, ACTION_VOLUME_DOWN, ACTION_VOLUME_UP);
+    s_settings_speaker = make_button(screen, speaker, 18, 80, 132, 34,
                                      ACTION_SPEAKER_MUTE);
-    s_settings_microphone = make_button(screen, microphone, 170, 82, 132, 36,
+    s_settings_microphone = make_button(screen, microphone, 170, 80, 132, 34,
                                         ACTION_MIC_MUTE);
     char sleep_text[48];
     (void)snprintf(sleep_text, sizeof(sleep_text), "休眠  %s",
                    s_sleep_names[s_preferences.sleep_index]);
-    s_settings_sleep = make_button(screen, sleep_text, 18, 126, 132, 34,
+    char sensitivity[48];
+    (void)snprintf(sensitivity, sizeof(sensitivity), "灵敏度  %u / 5",
+                   s_preferences.microphone_sensitivity);
+    s_settings_microphone_sensitivity = make_settings_stepper(
+        screen, sensitivity, 118,
+        ACTION_MIC_SENSITIVITY_DOWN, ACTION_MIC_SENSITIVITY_UP);
+    s_settings_sleep = make_button(screen, sleep_text, 18, 160, 132, 30,
                                    ACTION_SLEEP);
-    (void)make_button(screen, "网络信息", 170, 126, 132, 34, ACTION_NETWORK);
+    (void)make_button(screen, "网络信息", 18, 194, 90, 28, ACTION_NETWORK);
     char acknowledgement[48];
     (void)snprintf(acknowledgement, sizeof(acknowledgement), "回应声  %s",
                    s_preferences.acknowledgement_male ? "男声" : "女声");
-    s_settings_acknowledgement = make_button(screen, acknowledgement, 78, 166, 164, 30,
-                                               ACTION_ACK_VOICE);
-    (void)make_button(screen, "返回", 110, 204, 100, 28, ACTION_MENU);
+    s_settings_acknowledgement = make_button(screen, acknowledgement, 170, 160, 132, 30,
+                                              ACTION_ACK_VOICE);
+    (void)make_button(screen, "返回", 212, 194, 90, 28, ACTION_MENU);
 }
 
 static void refresh_diagnostics(int64_t now)
@@ -2190,16 +2248,19 @@ static void render_binding(lv_obj_t *screen)
 #endif
 
     lv_obj_t *instruction = make_label(screen,
-                                       "请在体验平台输入此验证码",
+                                       "请用浏览器打开",
                                        48,
-                                       157,
+                                       151,
                                        224,
                                        lv_color_hex(0xBFE9F3));
     lv_obj_set_style_text_align(instruction, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_t *website = make_label(screen, "https://xiaotai.chat", 44, 174,
+                                   232, lv_color_hex(0xFFFFFF));
+    lv_obj_set_style_text_align(website, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_t *waiting = make_label(screen,
                                    "正在等待绑定，验证码将播报 3 次…",
                                    30,
-                                   190,
+                                   202,
                                    260,
                                    lv_color_hex(0x8DA5B1));
     lv_obj_set_style_text_align(waiting, LV_TEXT_ALIGN_CENTER, 0);
@@ -2242,6 +2303,7 @@ static void render_page(void)
     s_settings_volume = NULL;
     s_settings_speaker = NULL;
     s_settings_microphone = NULL;
+    s_settings_microphone_sensitivity = NULL;
     s_settings_sleep = NULL;
     s_settings_acknowledgement = NULL;
     s_diagnostics_label = NULL;
@@ -2337,6 +2399,7 @@ static void apply_expression(const char *emotion,
                              starter_ai_ui_phase_t phase,
                              uint8_t activity_level)
 {
+    (void)phase;
     static expression_geometry_t previous_geometry;
     static bool previous_geometry_valid;
     if (s_face == NULL || s_face_canvas_buffer == NULL) {
@@ -2344,11 +2407,8 @@ static void apply_expression(const char *emotion,
     }
     const char *effective = emotion == NULL || emotion[0] == '\0'
                                 ? "neutral" : emotion;
-    if (phase == STARTER_AI_UI_LISTENING) {
-        effective = "listening";
-    } else if (phase == STARTER_AI_UI_THINKING) {
-        effective = "thinking";
-    }
+    /* An explicit server emotion wins.  Phase is status text, not a reason to
+     * overwrite the expression tag returned by AI. */
     if (strcmp(effective, "calm") == 0) {
         effective = "neutral";
     } else if (strcmp(effective, "excited") == 0) {

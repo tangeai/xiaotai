@@ -37,9 +37,10 @@
   ],
   "implementation_assertions": [
     {
-      "file": "main/protocols/tirtc/tirtc_session_options.h",
+      "file": "main/Kconfig.projbuild",
       "contains": [
-        "TIRTC_SESSION_MAX_SEND_BUFFER"
+        "config XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES",
+        "default 2097152"
       ],
       "absent": []
     },
@@ -55,7 +56,8 @@
       "file": "sdkconfig.defaults",
       "contains": [
         "CONFIG_CAMERA_OV5647=y",
-        "CONFIG_CAMERA_OV5647_MIPI_RAW10_1280x960_BINNING_45FPS=y"
+        "CONFIG_CAMERA_OV5647_MIPI_RAW10_1280x960_BINNING_45FPS=y",
+        "CONFIG_XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES=2097152"
       ],
       "absent": []
     }

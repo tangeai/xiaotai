@@ -254,8 +254,11 @@ static void on_audio(tirtc_conn_t connection,
      * 对端下行流号。设备呼叫和 VoIP 均可能从服务端收到不同的流号。
      * 连接句柄已经完成会话隔离；这里仅验证本产品的可播放编码格式。
      */
-    bool expected = frame->media == TIRTC_AUDIO_ALAW &&
-                    frame->flags == TIRTC_AUDIOSAMPLE_8K16B1C;
+    bool expected = mode == STARTER_TIRTC_AI
+                        ? frame->media == TIRTC_AUDIO_OPUS &&
+                              frame->flags == TIRTC_AUDIOSAMPLE_16K16B1C
+                        : frame->media == TIRTC_AUDIO_ALAW &&
+                              frame->flags == TIRTC_AUDIOSAMPLE_8K16B1C;
     if (!expected) {
         uint32_t rejected = (uint32_t)atomic_fetch_add_explicit(
                                 &s_downlink_audio_rejected, 1,
@@ -700,16 +703,36 @@ int starter_tirtc_send_alaw(uint32_t timestamp_ms,
         &s_connection, memory_order_acquire);
     starter_tirtc_mode_t mode = starter_tirtc_mode();
     if (connection == NULL || data == NULL || length == 0U ||
-        (mode != STARTER_TIRTC_H5 && mode != STARTER_TIRTC_AI &&
-         mode != STARTER_TIRTC_VOIP && mode != STARTER_TIRTC_CALL &&
+        (mode != STARTER_TIRTC_H5 && mode != STARTER_TIRTC_VOIP &&
+         mode != STARTER_TIRTC_CALL &&
          mode != STARTER_TIRTC_ROOM)) {
         return TIRTC_E_INVALID_PARAMETER;
     }
     /* 调用者只提交编码数据；协议 stream/media/flags 在此集中固定。 */
     TIRTCFRAMEINFO frame = {
-        .stream_id = mode == STARTER_TIRTC_AI ? AI_AUDIO_STREAM : CALL_AUDIO_STREAM,
+        .stream_id = CALL_AUDIO_STREAM,
         .media = TIRTC_AUDIO_ALAW,
         .flags = TIRTC_AUDIOSAMPLE_8K16B1C,
+        .ts = timestamp_ms,
+        .length = length,
+    };
+    return TiRtcSendAudioStream(connection, &frame, data);
+}
+
+int starter_tirtc_send_opus(uint32_t timestamp_ms,
+                            const void *data,
+                            uint32_t length)
+{
+    tirtc_conn_t connection = (tirtc_conn_t)atomic_load_explicit(
+        &s_connection, memory_order_acquire);
+    if (connection == NULL || starter_tirtc_mode() != STARTER_TIRTC_AI ||
+        data == NULL || length == 0U) {
+        return TIRTC_E_INVALID_PARAMETER;
+    }
+    TIRTCFRAMEINFO frame = {
+        .stream_id = AI_AUDIO_STREAM,
+        .media = TIRTC_AUDIO_OPUS,
+        .flags = TIRTC_AUDIOSAMPLE_16K16B1C,
         .ts = timestamp_ms,
         .length = length,
     };
