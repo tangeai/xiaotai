@@ -94,6 +94,7 @@ typedef struct {
 /** 面向屏幕的有界快照；字幕最多两行显示，完整历史由上层自行持久化。 */
 typedef struct {
     starter_ai_ui_phase_t ai_phase;
+    bool ai_start_pending; /**< 用户已请求 AI，正在等待平台和 TiRTC 就绪。 */
     bool caption_is_ai;
     bool caption_final;
     char subtitle[193];

@@ -24,7 +24,7 @@ idf_component_register(
     PRIV_INCLUDE_DIRS ${XIAOTAI_STARTER_PRODUCT_EXTRA_PRIV_INCLUDE_DIRS}
     REQUIRES
         esp_driver_gpio esp_driver_i2c esp_driver_spi esp_lcd nvs_flash
-        platform_client starter_media starter_runtime starter_voice wifi_manager
+        platform_client runtime_config starter_media starter_runtime starter_voice wifi_manager
         esp_lvgl_port esp_lcd_touch_ft5x06 lvgl esp_app_format
         ${XIAOTAI_STARTER_PRODUCT_EXTRA_REQUIRES}
 )

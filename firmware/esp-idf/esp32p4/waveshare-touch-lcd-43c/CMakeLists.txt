@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/xiaotai_repository.cmake")
 xiaotai_find_repository_root(XIAOTAI_REPO_ROOT)
 
-set(PROJECT_VER "1.0.0+build.11")
+set(PROJECT_VER "1.0.0+build.17")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(xiaotai_esp32p4)
 

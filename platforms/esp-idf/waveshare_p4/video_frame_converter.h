@@ -34,10 +34,17 @@ typedef struct {
     uint16_t source_crop_y;
     uint16_t source_crop_width;
     uint16_t source_crop_height;
+    /* Maximum dynamic source dimensions used only to reserve the fixed PPA
+     * staging pool. Zero falls back to the configured crop/output size. */
+    uint16_t source_max_width;
+    uint16_t source_max_height;
     video_frame_fit_mode_t fit_mode;
     /* Keep sources smaller than the viewport at native size and center them
      * instead of manufacturing detail through upscaling. */
     bool prevent_upscale;
+    /* Realtime receive paths may drop a frame instead of running an
+     * unbounded software conversion that can starve the idle/LVGL tasks. */
+    bool require_ppa;
     bool output_rgb565_byte_swap;
 } video_frame_converter_config_t;
 
@@ -71,6 +78,7 @@ esp_err_t video_frame_converter_i420_to_rgb565(video_frame_converter_handle_t ha
                                                const uint8_t *i420,
                                                uint16_t source_width,
                                                uint16_t source_height,
+                                               video_frame_rotation_t rotation,
                                                uint16_t *output,
                                                video_frame_converter_mode_t *mode_used);
 

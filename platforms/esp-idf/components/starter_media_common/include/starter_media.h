@@ -149,6 +149,8 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
 starter_media_status_t starter_media_status(void);
 #if CONFIG_IDF_TARGET_ESP32P4
 void starter_media_set_call_video(bool video);
+void starter_media_set_remote_video_presentation(uint16_t rotation,
+                                                 bool remote_profile);
 esp_err_t starter_media_set_camera_enabled(uint32_t generation, bool enabled);
 void starter_media_submit_video(starter_tirtc_mode_t mode, uint32_t generation,
                                  const starter_tirtc_frame_t *frame, const void *data);

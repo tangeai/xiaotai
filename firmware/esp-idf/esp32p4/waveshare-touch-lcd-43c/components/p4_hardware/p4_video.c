@@ -17,6 +17,7 @@ static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static uint32_t s_desired_generation;
 static starter_tirtc_mode_t s_desired_mode;
 static bool s_desired_video;
+static call_video_presentation_t s_desired_presentation;
 static atomic_uint s_live_generation;
 static uint32_t s_worker_generation;
 static starter_tirtc_mode_t s_worker_mode;
@@ -74,6 +75,24 @@ esp_err_t p4_video_set_camera_enabled(uint32_t generation, bool enabled)
     }
     taskEXIT_CRITICAL(&s_lock);
     return valid ? ESP_OK : ESP_ERR_INVALID_STATE;
+}
+
+void p4_video_set_remote_presentation(uint16_t rotation, bool remote_profile)
+{
+    if (rotation != 0U && rotation != 90U && rotation != 180U &&
+        rotation != 270U) {
+        rotation = 0U;
+        remote_profile = false;
+    }
+    taskENTER_CRITICAL(&s_lock);
+    s_desired_presentation.rotation = rotation;
+    s_desired_presentation.remote_profile = remote_profile;
+    taskEXIT_CRITICAL(&s_lock);
+}
+
+esp_err_t p4_video_rotate_remote_clockwise(uint16_t *rotation)
+{
+    return call_video_renderer_rotate_clockwise(rotation);
 }
 
 /* Only the media owner changes camera hardware. Camera privacy is independent
@@ -246,9 +265,17 @@ void p4_video_poll(void)
              * before the new worker attempts to acquire that workspace. */
             camera_pipeline_on_rtc_video_config_changed();
         }
-        if (ret == ESP_OK && mode != STARTER_TIRTC_H5)
-            ret = call_video_renderer_start_for_codec(mode == STARTER_TIRTC_VOIP
-                ? CALL_VIDEO_CODEC_MJPEG : CALL_VIDEO_CODEC_H264);
+        if (ret == ESP_OK && mode != STARTER_TIRTC_H5) {
+            call_video_presentation_t presentation;
+            taskENTER_CRITICAL(&s_lock);
+            presentation = s_desired_presentation;
+            taskEXIT_CRITICAL(&s_lock);
+            ret = call_video_renderer_set_presentation(&presentation);
+            if (ret == ESP_OK) {
+                ret = call_video_renderer_start_for_codec(mode == STARTER_TIRTC_VOIP
+                    ? CALL_VIDEO_CODEC_MJPEG : CALL_VIDEO_CODEC_H264);
+            }
+        }
         if (ret == ESP_OK) {
             taskENTER_CRITICAL(&s_lock);
             bool current = s_desired_generation == generation && s_desired_mode == mode && s_desired_video;

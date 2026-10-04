@@ -58,6 +58,7 @@
 #define AI_CONNECT_TIMEOUT_MS 12000
 #define AI_RESPONSE_TIMEOUT_MS 10000
 #define AI_START_SETTLE_MS 300
+#define AI_READY_WAIT_TIMEOUT_MS 15000
 #define AI_END_FINAL_AUDIO_ARRIVAL_MS 1500U
 #define AI_END_DRAIN_TIMEOUT_MS 5000U
 #define AI_REMOTE_CLOSE_DRAIN_TIMEOUT_MS 3000U
@@ -164,6 +165,8 @@ static char s_device_id[65];
 static char s_ai_role_id[65];
 static char s_ai_request_id[24];
 static int64_t s_ai_start_at_ms;
+static bool s_ai_start_pending;
+static int64_t s_ai_ready_deadline_ms;
 static xiaotai_ai_end_drain_t s_ai_end_drain;
 static xiaotai_ai_view_t s_ai_view;
 static bool s_ai_transport_closed;
@@ -186,6 +189,8 @@ static bool s_call_wechat;
 #if CONFIG_IDF_TARGET_ESP32P4
 static bool s_call_video;
 static bool s_call_camera_enabled;
+static uint16_t s_call_remote_rotation;
+static bool s_call_remote_rotation_reported;
 #endif
 static bool s_call_outgoing;
 static bool s_call_waiting_confirm;
@@ -207,6 +212,8 @@ static void reset_call_media_state(bool keep_pending_call)
     if (!keep_pending_call) {
         s_call_video = false;
         s_call_camera_enabled = false;
+        s_call_remote_rotation = 0U;
+        s_call_remote_rotation_reported = false;
     }
 }
 #endif
@@ -310,11 +317,13 @@ static void product_snapshot_reset(void)
     char room_code[7];
     char room_message[49];
     char call_peer[65];
+    char emotion[16];
     memcpy(contacts, s_product_snapshot.contacts, sizeof(contacts));
     memcpy(room_members, s_product_snapshot.room_members, sizeof(room_members));
     memcpy(room_code, s_product_snapshot.room_code, sizeof(room_code));
     memcpy(room_message, s_product_snapshot.room_message, sizeof(room_message));
     memcpy(call_peer, s_product_snapshot.call_peer, sizeof(call_peer));
+    memcpy(emotion, s_product_snapshot.emotion, sizeof(emotion));
     s_product_snapshot = (starter_runtime_product_snapshot_t) {
         .ai_phase = STARTER_AI_UI_IDLE,
         .contact_count = contact_count,
@@ -337,9 +346,7 @@ static void product_snapshot_reset(void)
     if (call_incoming) {
         memcpy(s_product_snapshot.call_peer, call_peer, sizeof(call_peer));
     }
-    (void)snprintf(s_product_snapshot.emotion,
-                   sizeof(s_product_snapshot.emotion),
-                   "calm");
+    memcpy(s_product_snapshot.emotion, emotion, sizeof(emotion));
     xSemaphoreGive(s_product_mutex);
 }
 
@@ -395,6 +402,20 @@ static void product_set_phase(starter_ai_ui_phase_t phase)
     if (s_product_mutex != NULL &&
         xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
         s_product_snapshot.ai_phase = phase;
+        xSemaphoreGive(s_product_mutex);
+    }
+}
+
+static void product_set_ai_start_pending(bool pending, const char *message)
+{
+    if (s_product_mutex != NULL &&
+        xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        s_product_snapshot.ai_start_pending = pending;
+        s_product_snapshot.caption_is_ai = false;
+        s_product_snapshot.caption_final = false;
+        (void)snprintf(s_product_snapshot.subtitle,
+                       sizeof(s_product_snapshot.subtitle), "%s",
+                       message == NULL ? "" : message);
         xSemaphoreGive(s_product_mutex);
     }
 }
@@ -777,6 +798,26 @@ static bool copy_json_string(const cJSON *object,
     return true;
 }
 
+#if CONFIG_IDF_TARGET_ESP32P4
+static void configure_remote_video_presentation(const cJSON *metadata,
+                                                bool wechat)
+{
+    /* These are two independent local presentation contracts. Device calls
+     * deliberately ignore remote rotation metadata and start at the local
+     * default; the on-screen control changes only this receiver. WeChat uses
+     * its fixed downlink angle and never inherits the device-call setting. */
+    (void)metadata;
+    uint16_t rotation = 90U;
+    bool reported = wechat;
+    const char *source = wechat ? "wechat-contract" : "local-default";
+    s_call_remote_rotation = rotation;
+    s_call_remote_rotation_reported = reported;
+    starter_media_set_remote_video_presentation(rotation, reported);
+    ESP_LOGI(TAG, "remote video presentation rotation=%u source=%s",
+             (unsigned)rotation, source);
+}
+#endif
+
 static void request_ai_token_response(const char *body, void *user_data)
 {
     /* HTTP 回调运行在 platform_client 请求任务中，只复制响应后立即返回。 */
@@ -1058,7 +1099,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.0.0+build.11\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.17\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":10,\"down_video_streamid\":11,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
@@ -1074,7 +1115,7 @@ static void request_device_profile(void)
         "\"aspect_ratio\":0.75,\"hor_mirror\":false,\"vert_mirror\":false,"
         "\"object_fit\":\"contain\",\"no_video\":false},"
         "\"voip\":{\"screen_width\":640,\"screen_height\":480,"
-        "\"camera_rotation\":270,\"down_video_rotation\":1,"
+        "\"camera_rotation\":0,\"down_video_rotation\":1,"
         "\"aspect_ratio\":0.75,\"hor_mirror\":false,\"vert_mirror\":false,"
         "\"object_fit\":\"contain\",\"video_res_mode\":\"fit_screen\","
         "\"audio_rate\":8000,\"audio_channels\":1,"
@@ -1105,7 +1146,8 @@ static void request_device_profile(void)
         ESP_LOGI(TAG, "device capability submission queued (stream/call/voip)");
 #if CONFIG_IDF_TARGET_ESP32P4
         ESP_LOGI(TAG, "video presentation capability: stream_rotation=270 "
-                      "call_rotation=270 voip_rotation=270 down_rotation=1");
+                      "call_rotation=270 voip_up_rotation=0 "
+                      "voip_down_rotation=90 down_rotation_mode=1");
 #endif
     } else {
         s_voip_profile_retry_at_ms = now_ms() + VOIP_PROFILE_RETRY_MS;
@@ -1315,6 +1357,7 @@ static void dial_contact(uint8_t index, bool video)
     starter_media_set_call_video(video);
     s_call_video = video;
     s_call_camera_enabled = video;
+    if (video) configure_remote_video_presentation(NULL, s_call_wechat);
     product_set_call(false, s_call_wechat, s_call_peer_name, false);
 #endif
 
@@ -1336,7 +1379,8 @@ static void dial_contact(uint8_t index, bool video)
         /* 主叫的 P2P 是入站 SDK 连接；先设门禁，避免 HTTP 响应与接听竞态。 */
         starter_tirtc_expect_call(session_generation());
         (void)snprintf(body, sizeof(body),
-                       "{\"targets\":[\"%s\"],\"call_type\":\"%s\"}",
+                       "{\"targets\":[\"%s\"],\"call_type\":\"%s\","
+                       "\"camera_rotation\":270}",
                        s_call_peer_id, video ? "video" : "audio");
         service = PLATFORM_SERVICE_CALL;
         path = "/v1/call/request";
@@ -1379,7 +1423,7 @@ static void accept_call(void)
     char body[384];
     (void)snprintf(body, sizeof(body),
                    "{\"device_id\":\"%s\",\"room_id\":\"%s\","
-                   "\"purpose\":\"call\"}",
+                   "\"purpose\":\"call\",\"camera_rotation\":270}",
                    s_call_peer_id, s_call_room_id);
     esp_err_t err = platform_client_request_timeout(
         PLATFORM_SERVICE_CALL, "/v1/call/device/info", body,
@@ -1594,16 +1638,44 @@ static void begin_ai_session(uint32_t wake_token)
      * HTTP 响应携带该代次，迟到响应不能推动后续新会话。
      */
     starter_runtime_state_t state = session_state();
+    bool platform_ready = platform_client_ready();
+    bool tirtc_ready = starter_tirtc_started();
+    bool microphone_muted = starter_media_status().microphone_muted;
     if ((state != STARTER_RUNTIME_WAITING &&
          state != STARTER_RUNTIME_H5_ACTIVE &&
          state != STARTER_RUNTIME_ROOM_CONNECTING &&
-         state != STARTER_RUNTIME_ROOM_ACTIVE) ||
-        !platform_client_ready() || !starter_tirtc_started() ||
-        starter_media_status().microphone_muted) {
-        ESP_LOGW(TAG, "AI start ignored: platform or TiRTC is not ready");
+         state != STARTER_RUNTIME_ROOM_ACTIVE) || microphone_muted) {
+        ESP_LOGW(TAG,
+                 "AI start rejected: state=%s platform_ready=%d tirtc_ready=%d microphone_muted=%d",
+                 starter_runtime_state_name(state), platform_ready ? 1 : 0,
+                 tirtc_ready ? 1 : 0, microphone_muted ? 1 : 0);
         starter_media_cancel_ai_preroll(wake_token);
+        s_ai_start_pending = false;
+        s_ai_ready_deadline_ms = 0;
+        product_set_ai_start_pending(false, "现在暂时不能开始对话");
         return;
     }
+    if (!platform_ready || !tirtc_ready) {
+        ESP_LOGI(TAG,
+                 "AI start waiting: platform_ready=%d tirtc_ready=%d microphone_muted=%d",
+                 platform_ready ? 1 : 0, tirtc_ready ? 1 : 0,
+                 microphone_muted ? 1 : 0);
+        if (wake_token != 0U) {
+            /* Acoustic preroll is time-bounded; never replay stale speech. */
+            starter_media_cancel_ai_preroll(wake_token);
+            product_set_ai_start_pending(false, "AI 服务启动中，请稍候…");
+            return;
+        }
+        if (!s_ai_start_pending) {
+            s_ai_ready_deadline_ms = now_ms() + AI_READY_WAIT_TIMEOUT_MS;
+        }
+        s_ai_start_pending = true;
+        product_set_ai_start_pending(true, "AI 服务启动中，请稍候…");
+        return;
+    }
+
+    s_ai_start_pending = false;
+    s_ai_ready_deadline_ms = 0;
 
     if (state == STARTER_RUNTIME_ROOM_CONNECTING ||
         state == STARTER_RUNTIME_ROOM_ACTIVE) {
@@ -1647,6 +1719,32 @@ static void begin_ai_session(uint32_t wake_token)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "AI token request submission failed: %s", esp_err_to_name(err));
         finish_session(err);
+    }
+}
+
+static void retry_pending_ai_start(int64_t current_ms)
+{
+    if (!s_ai_start_pending) return;
+    starter_runtime_state_t state = session_state();
+    if (state != STARTER_RUNTIME_WAITING && state != STARTER_RUNTIME_H5_ACTIVE &&
+        state != STARTER_RUNTIME_ROOM_CONNECTING &&
+        state != STARTER_RUNTIME_ROOM_ACTIVE) {
+        s_ai_start_pending = false;
+        s_ai_ready_deadline_ms = 0;
+        product_set_ai_start_pending(false, "现在暂时不能开始对话");
+        return;
+    }
+    if (current_ms >= s_ai_ready_deadline_ms) {
+        ESP_LOGW(TAG, "AI readiness wait timed out");
+        s_ai_start_pending = false;
+        s_ai_ready_deadline_ms = 0;
+        product_set_ai_start_pending(false, "AI 服务暂不可用，请稍后重试");
+        return;
+    }
+    if (platform_client_ready() && starter_tirtc_started()) {
+        ESP_LOGI(TAG, "AI readiness reached; starting pending manual request");
+        s_ai_start_pending = false;
+        begin_ai_session(0U);
     }
 }
 
@@ -1777,6 +1875,9 @@ static void handle_call_http(const runtime_event_t *event)
         bool ok = copy_json_string(data, "token", token, sizeof(token), true) &&
                   copy_json_string(data, "device_id", remote_id,
                                    sizeof(remote_id), true);
+#if CONFIG_IDF_TARGET_ESP32P4
+        if (s_call_video) configure_remote_video_presentation(data, false);
+#endif
         cJSON_Delete(root);
         if (!ok) {
             finish_call_session(ESP_ERR_INVALID_RESPONSE, "呼叫失败");
@@ -2681,6 +2782,9 @@ static void handle_platform_signal(const runtime_event_t *event)
         char callee[65] = "";
         (void)copy_json_string(payload, "room_id", room, sizeof(room), false);
         (void)copy_json_string(payload, "callee_id", callee, sizeof(callee), false);
+#if CONFIG_IDF_TARGET_ESP32P4
+        if (s_call_video) configure_remote_video_presentation(payload, false);
+#endif
         cJSON_Delete(root);
         starter_runtime_state_t state = session_state();
         bool matched = state == STARTER_RUNTIME_CALL_CONNECTING &&
@@ -2860,6 +2964,7 @@ static void handle_platform_signal(const runtime_event_t *event)
         s_call_video = strcmp(room_type, "video") == 0 ||
                        (wechat && room_type[0] == '\0');
         s_call_camera_enabled = s_call_video;
+        if (s_call_video) configure_remote_video_presentation(payload, wechat);
     }
 #endif
     (void)snprintf(s_call_room_id, sizeof(s_call_room_id), "%s", room);
@@ -3417,6 +3522,8 @@ static void runtime_task(void *argument)
                 begin_ai_session(event.generation);
                 break;
             case EVENT_AI_STOP:
+                s_ai_start_pending = false;
+                s_ai_ready_deadline_ms = 0;
                 end_ai_session();
                 break;
             case EVENT_AI_TOKEN:
@@ -3499,6 +3606,7 @@ static void runtime_task(void *argument)
             release_event(&event);
         }
         int64_t current_ms = now_ms();
+        retry_pending_ai_start(current_ms);
         if (s_wechat_quick_pending && s_contacts_check_deadline_ms != 0 &&
             current_ms >= s_contacts_check_deadline_ms) {
             ESP_LOGW(TAG, "微信联系人检查超时; showing QR fallback");

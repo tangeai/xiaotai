@@ -109,6 +109,8 @@ static void media_governor_select_native_capture_size(const media_governor_video
     *width = MEDIA_GOVERNOR_CAPTURE_WIDTH;
     *height = MEDIA_GOVERNOR_CAPTURE_HEIGHT;
 
+    /* Compact calls use the inexpensive 800x640 sensor mode. The P4 scaler
+     * preserves its complete 5:4 field of view inside the 4:3 encode canvas. */
     if (config != NULL &&
         config->width <= MEDIA_GOVERNOR_COMPACT_CAPTURE_WIDTH &&
         config->height <= MEDIA_GOVERNOR_COMPACT_CAPTURE_HEIGHT) {

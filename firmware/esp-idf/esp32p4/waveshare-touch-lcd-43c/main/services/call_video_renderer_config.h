@@ -81,7 +81,7 @@
 #define CALL_VIDEO_INPUT_GAP_US                (CALL_VIDEO_TARGET_FRAME_INTERVAL_US * 3U)
 /*
  * High-motion streams and TGTRP retransmission bursts can briefly lift the
- * compressed queue even though the following windows catch up to the 12 fps
+ * compressed queue even though the following windows catch up to the source
  * source. Rebuilding TinyH264 for that recoverable burst creates the periodic
  * freeze it was meant to cure. Recover only after a backlog stays above twelve
  * frames for about half a second. The 24-slot input pool covers the measured
@@ -110,10 +110,8 @@ _Static_assert(CALL_VIDEO_INPUT_SLOT_COUNT >=
 #define CALL_VIDEO_ADAPTIVE_PLAYOUT_INTERVAL_US CALL_VIDEO_TARGET_FRAME_INTERVAL_US
 /* A weak-network reservoir can only refill when presentation is slower than
  * the active source. These rates used to be fixed at 14/12 fps for a 15 fps
- * stream; after the call profile moved to 12 fps that made the low-watermark
- * path drain at 14 fps and left the critical path unable to refill. Derive the
- * recovery cadence from the source so normal playout stays unchanged while a
- * confirmed retransmission burst temporarily uses 11/9 fps at 12 fps input. */
+ * stream. Derive the recovery cadence from the source so normal playout stays
+ * unchanged while a confirmed retransmission burst temporarily refills. */
 #define CALL_VIDEO_ADAPTIVE_REFILL_FPS            \
     ((APP_MEDIA_CALL_VIDEO_FPS > 1U) ? (APP_MEDIA_CALL_VIDEO_FPS - 1U) : 1U)
 #define CALL_VIDEO_ADAPTIVE_CRITICAL_FPS          \

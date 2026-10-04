@@ -2,7 +2,7 @@
  * Wi-Fi STA 与 SoftAP 配网 adapter。
  *
  * 启动时优先读取 NVS 并连接 STA；没有配置或连续连接失败时开启 APSTA，提供
- * 一个最小配置页。网页只保存配置并重启，连接状态仍由同一事件处理路径建立。
+ * 产品化的扫描/选择配置页。网页只保存配置并重启，连接状态仍由同一事件处理路径建立。
  * 实时媒体要求关闭 Wi-Fi power save，避免 KCP 音视频排队和抖动。
  */
 #include "wifi_manager.h"
@@ -83,18 +83,55 @@ static esp_netif_t *s_ap_netif;
 /* 页面内嵌在固件中，避免模板依赖额外文件系统分区。 */
 static const char s_setup_page[] =
     "<!doctype html><html lang=zh-CN><meta charset=utf-8>"
-    "<meta name=viewport content='width=device-width,initial-scale=1'>"
-    "<title>TiRTC Wi-Fi 配置</title><style>body{font-family:sans-serif;max-width:420px;"
-    "margin:40px auto;padding:0 18px}input,button{box-sizing:border-box;width:100%;"
-    "padding:12px;margin:7px 0;font-size:16px}#msg{white-space:pre-wrap}</style>"
-    "<h2>TiRTC 设备配网</h2><p>填写设备需要连接的 Wi-Fi。</p>"
-    "<input id=s placeholder='Wi-Fi 名称' maxlength=32>"
-    "<input id=p type=password placeholder='Wi-Fi 密码（开放网络可留空）' maxlength=64>"
-    "<button onclick=save()>保存并重启</button><p id=msg></p>"
-    "<script>async function save(){let m=document.getElementById('msg');m.textContent='保存中…';"
-    "try{let r=await fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},"
-    "body:JSON.stringify({ssid:s.value,password:p.value})});m.textContent=await r.text()}"
-    "catch(e){m.textContent='请求失败：'+e}}</script></html>";
+    "<meta name=viewport content='width=device-width,initial-scale=1,viewport-fit=cover'>"
+    "<title>小钛联网助手</title><style>*{box-sizing:border-box}body{margin:0;background:#f4f7f8;"
+    "color:#16313b;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif}"
+    ".hero{padding:34px 22px 54px;color:#fff;background:linear-gradient(145deg,#103742,#17606c)}"
+    ".brand{font-size:25px;font-weight:800}.sub{margin-top:8px;color:#c9e4e7}.card{margin:-28px 16px 94px;"
+    "padding:20px;border-radius:20px;background:#fff;box-shadow:0 12px 34px #173b4930}h1{font-size:21px;margin:0 0 6px}"
+    ".hint{margin:0 0 17px;color:#72848b;font-size:14px}.wifi{display:flex;width:100%;align-items:center;"
+    "gap:12px;padding:14px 4px;border:0;border-bottom:1px solid #e7edef;background:#fff;text-align:left;font-size:16px}"
+    ".wifi b{flex:1;overflow:hidden;text-overflow:ellipsis}.lock{color:#759097}.notice{margin:18px 0 8px;"
+    "padding:13px;border-radius:12px;background:#edf7f6;color:#537078;font-size:13px;line-height:1.55}"
+    ".link{width:100%;padding:12px;border:0;background:transparent;color:#178271;font-size:15px}"
+    ".back{padding:0;border:0;background:transparent;color:#178271;font-size:15px}.chosen{margin:18px 0;"
+    "padding:14px;border-radius:12px;background:#f1f7f7;font-weight:700}label{display:block;color:#536b74;font-size:14px}"
+    ".password{display:flex;margin-top:7px;border:1px solid #d6e0e3;border-radius:12px;overflow:hidden}"
+    "input{min-width:0;flex:1;padding:14px;border:0;outline:0;font-size:17px}.show{width:72px;border:0;background:#fff;color:#178271}"
+    ".footer{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));"
+    "background:#fff;border-top:1px solid #e1e8ea}.primary{width:100%;padding:15px;border:0;border-radius:13px;"
+    "background:#168b74;color:#fff;font-size:17px;font-weight:700}.primary:disabled{background:#b7c7c7}"
+    ".empty{padding:28px 0;text-align:center;color:#7b8c92}.spin{display:inline-block;width:18px;height:18px;"
+    "border:2px solid #bdd2d2;border-top-color:#178271;border-radius:50%;animation:r .8s linear infinite}"
+    "@keyframes r{to{transform:rotate(360deg)}}[hidden]{display:none!important}</style><body>"
+    "<header class=hero><div class=brand>小钛联网助手</div><div class=sub>让设备连接家里的 Wi-Fi</div></header>"
+    "<main class=card><section id=list><h1>选择家庭 Wi-Fi</h1><p class=hint>请选择设备要连接的 2.4 GHz 网络</p>"
+    "<div id=networks class=empty><span class=spin></span><p>正在搜索附近网络…</p></div>"
+    "<div class=notice>手机当前连接的是小钛热点，显示“无互联网连接”属于正常现象。配网完成后设备会自动重启。</div>"
+    "<button class=link onclick=scan()>重新扫描</button><button class=link onclick=manualWifi()>手动输入网络名称</button></section>"
+    "<section id=detail hidden><button class=back onclick=chooseAgain()>‹ 重新选择 Wi-Fi</button>"
+    "<h1 style='margin-top:18px'>输入 Wi-Fi 密码</h1><p class=hint>确认网络名称后输入密码</p>"
+    "<div class=chosen id=chosen></div><label>Wi-Fi 密码<div class=password>"
+    "<input id=p type=password maxlength=64 autocomplete=current-password placeholder='开放网络可留空'>"
+    "<button class=show type=button onclick=togglePassword(this)>显示</button></div></label>"
+    "<p class=hint style='margin-top:10px'>密码只保存在小钛设备中。</p></section></main>"
+    "<footer id=footer class=footer hidden><button id=connect class=primary onclick=save()>连接此 Wi-Fi</button></footer>"
+    "<script>let selected='',secured=false;function esc(v){let d=document.createElement('div');d.textContent=v;return d.innerHTML}"
+    "async function scan(){let n=document.getElementById('networks');n.className='empty';n.innerHTML='<span class=spin></span><p>正在搜索附近网络…</p>';"
+    "try{let r=await fetch('/api/wifi/scan',{cache:'no-store'}),a=await r.json();if(!r.ok)throw Error('扫描失败');"
+    "if(!a.length){n.innerHTML='<p>未找到网络，请靠近路由器后重试</p>';return}n.className='';let seen={};"
+    "n.innerHTML=a.filter(x=>x.ssid&&!seen[x.ssid]&&(seen[x.ssid]=1)).map(x=>'<button class=wifi data-ssid=\"'+encodeURIComponent(x.ssid)+'\" data-secure=\"'+x.secure+'\"><span>⌁</span><b>'+esc(x.ssid)+'</b><span class=lock>'+(x.secure?'锁':'开放')+'</span></button>').join('');"
+    "n.querySelectorAll('.wifi').forEach(b=>b.onclick=()=>selectWifi(decodeURIComponent(b.dataset.ssid),b.dataset.secure==='true'))}"
+    "catch(e){n.innerHTML='<p>扫描失败，请点击重新扫描</p>'}}"
+    "function selectWifi(ssid,secure){selected=ssid;secured=secure;chosen.textContent=ssid;list.hidden=true;detail.hidden=false;footer.hidden=false;"
+    "p.value='';p.placeholder=secure?'请输入 Wi-Fi 密码':'开放网络可留空';connect.disabled=secure;p.oninput=()=>connect.disabled=secured&&p.value.length<8}"
+    "function chooseAgain(){detail.hidden=true;footer.hidden=true;list.hidden=false}"
+    "function manualWifi(){let ssid=prompt('请输入家庭 Wi-Fi 名称');if(ssid&&ssid.trim())selectWifi(ssid.trim(),true)}"
+    "function togglePassword(button){p.type=p.type==='password'?'text':'password';button.textContent=p.type==='password'?'显示':'隐藏'}"
+    "async function save(){connect.disabled=true;connect.textContent='正在保存…';try{let r=await fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},"
+    "body:JSON.stringify({ssid:selected,password:p.value})}),m=await r.text();if(!r.ok)throw Error(m);"
+    "document.querySelector('main').innerHTML='<section style=\"text-align:center;padding:34px 4px\"><h1>配置已保存</h1><p class=hint>设备正在重启并连接 '+esc(selected)+'，手机可以关闭此页面。</p></section>';footer.hidden=true}"
+    "catch(e){connect.disabled=false;connect.textContent='连接此 Wi-Fi';alert('保存失败：'+e.message)}}scan()</script></body></html>";
 
 static void set_error(char *error, size_t error_size, const char *message)
 {
@@ -207,8 +244,79 @@ static void restart_task(void *argument)
 
 static esp_err_t setup_page_get(httpd_req_t *request)
 {
+    httpd_resp_set_hdr(request, "Cache-Control", "no-store");
     httpd_resp_set_type(request, "text/html; charset=utf-8");
     return httpd_resp_send(request, s_setup_page, HTTPD_RESP_USE_STRLEN);
+}
+
+static esp_err_t wifi_scan_get(httpd_req_t *request)
+{
+    wifi_scan_config_t scan_config = {
+        .show_hidden = false,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+    };
+    esp_err_t err = esp_wifi_scan_start(&scan_config, true);
+    if (err != ESP_OK) {
+        return httpd_resp_send_err(request,
+                                   HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Wi-Fi scan failed");
+    }
+
+    uint16_t count = 0;
+    err = esp_wifi_scan_get_ap_num(&count);
+    if (err != ESP_OK) {
+        return httpd_resp_send_err(request,
+                                   HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "cannot read Wi-Fi scan");
+    }
+    if (count > 24U) count = 24U;
+    wifi_ap_record_t *records = count == 0U ? NULL :
+        calloc(count, sizeof(*records));
+    if (count > 0U && records == NULL) {
+        return httpd_resp_send_err(request,
+                                   HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "scan memory unavailable");
+    }
+    if (count > 0U) {
+        err = esp_wifi_scan_get_ap_records(&count, records);
+    }
+
+    cJSON *array = err == ESP_OK ? cJSON_CreateArray() : NULL;
+    for (uint16_t index = 0; array != NULL && index < count; ++index) {
+        cJSON *network = cJSON_CreateObject();
+        if (network == NULL ||
+            !cJSON_AddStringToObject(network,
+                                    "ssid",
+                                    (const char *)records[index].ssid) ||
+            !cJSON_AddBoolToObject(network,
+                                  "secure",
+                                  records[index].authmode != WIFI_AUTH_OPEN) ||
+            !cJSON_AddNumberToObject(network, "rssi", records[index].rssi)) {
+            cJSON_Delete(network);
+            cJSON_Delete(array);
+            array = NULL;
+            break;
+        }
+        cJSON_AddItemToArray(array, network);
+    }
+    free(records);
+    if (array == NULL) {
+        return httpd_resp_send_err(request,
+                                   HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "cannot encode Wi-Fi scan");
+    }
+    char *json = cJSON_PrintUnformatted(array);
+    cJSON_Delete(array);
+    if (json == NULL) {
+        return httpd_resp_send_err(request,
+                                   HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "cannot encode Wi-Fi scan");
+    }
+    httpd_resp_set_hdr(request, "Cache-Control", "no-store");
+    httpd_resp_set_type(request, "application/json; charset=utf-8");
+    esp_err_t response = httpd_resp_sendstr(request, json);
+    cJSON_free(json);
+    return response;
 }
 
 static esp_err_t captive_portal_404(httpd_req_t *request,
@@ -294,7 +402,7 @@ static esp_err_t start_http_server(void)
         return ESP_OK;
     }
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 4;
+    config.max_uri_handlers = 5;
     config.lru_purge_enable = true;
     esp_err_t err = httpd_start(&s_http_server, &config);
     if (err != ESP_OK) {
@@ -313,9 +421,25 @@ static esp_err_t start_http_server(void)
         .method = HTTP_POST,
         .handler = wifi_config_post,
     };
+    const httpd_uri_t scan = {
+        .uri = "/api/wifi/scan",
+        .method = HTTP_GET,
+        .handler = wifi_scan_get,
+    };
+    const httpd_uri_t apple_probe = {
+        .uri = "/hotspot-detect.html",
+        .method = HTTP_GET,
+        .handler = setup_page_get,
+    };
     err = httpd_register_uri_handler(s_http_server, &page);
     if (err == ESP_OK) {
         err = httpd_register_uri_handler(s_http_server, &api);
+    }
+    if (err == ESP_OK) {
+        err = httpd_register_uri_handler(s_http_server, &scan);
+    }
+    if (err == ESP_OK) {
+        err = httpd_register_uri_handler(s_http_server, &apple_probe);
     }
     if (err == ESP_OK) {
         err = httpd_register_err_handler(s_http_server,
@@ -336,8 +460,13 @@ static void start_provisioning(void)
     if (s_provisioning) {
         return;
     }
-    uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    uint8_t mac[6] = {0};
+    esp_err_t mac_err = esp_wifi_get_mac(WIFI_IF_STA, mac);
+    if (mac_err != ESP_OK) {
+        /* ESP32-P4 has no native Wi-Fi MAC. Its base MAC is nevertheless a
+         * stable last-resort suffix if the hosted C6 MAC is not ready yet. */
+        (void)esp_read_mac(mac, ESP_MAC_BASE);
+    }
     (void)snprintf(s_provisioning_ssid,
                    sizeof(s_provisioning_ssid),
                    "XiaoTai-%02X%02X",

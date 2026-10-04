@@ -298,13 +298,28 @@ typedef struct {
     bool resources_ready;
     bool mjpeg_decoder_preparing;
     call_video_codec_t codec;
+    call_video_presentation_t presentation;
 } call_video_renderer_t;
 
 static call_video_renderer_t s_renderer = {
     .lock = portMUX_INITIALIZER_UNLOCKED,
     .presented_output_slot = CALL_VIDEO_OUTPUT_SLOT_INVALID,
     .codec = CALL_VIDEO_CODEC_H264,
+    .presentation = {
+        .rotation = VIDEO_FRAME_ROTATION_CLOCKWISE_0,
+        .remote_profile = false,
+    },
 };
+
+static call_video_presentation_t call_video_renderer_presentation_snapshot(void)
+{
+    call_video_presentation_t presentation;
+
+    taskENTER_CRITICAL(&s_renderer.lock);
+    presentation = s_renderer.presentation;
+    taskEXIT_CRITICAL(&s_renderer.lock);
+    return presentation;
+}
 
 static uint32_t call_video_elapsed_us(int64_t started_at_us, int64_t finished_at_us)
 {
@@ -1954,10 +1969,13 @@ static void call_video_converter_task(void *arg)
         if (slot->trace.frame_index > 0U) {
             slot->trace.decoded_wait_us = decoded_wait_us;
         }
+        call_video_presentation_t presentation =
+            call_video_renderer_presentation_snapshot();
         esp_err_t convert_ret = video_frame_converter_i420_to_rgb565(converter,
                                                                      slot->data,
                                                                      slot->width,
                                                                      slot->height,
+                                                                     (video_frame_rotation_t)presentation.rotation,
                                                                      output_pixels,
                                                                      NULL);
         uint32_t convert_elapsed_us =
@@ -2041,6 +2059,8 @@ static void call_video_converter_task(void *arg)
 
 static void call_video_renderer_task(void *arg)
 {
+    call_video_presentation_t presentation =
+        call_video_renderer_presentation_snapshot();
     (void)arg;
     esp_h264_dec_handle_t decoder = NULL;
     esp_h264_dec_param_sw_handle_t parameters = NULL;
@@ -2062,9 +2082,12 @@ static void call_video_renderer_task(void *arg)
         .source_crop_y = 0,
         .source_crop_width = 0,
         .source_crop_height = 0,
+        .source_max_width = CALL_VIDEO_DECODE_MAX_WIDTH,
+        .source_max_height = CALL_VIDEO_DECODE_MAX_HEIGHT,
         .fit_mode = CALL_VIDEO_H264_FIT_COVER ?
                         VIDEO_FRAME_FIT_COVER : VIDEO_FRAME_FIT_CONTAIN,
         .prevent_upscale = false,
+        .require_ppa = true,
         .output_rgb565_byte_swap = true,
     };
 
@@ -2119,7 +2142,7 @@ static void call_video_renderer_task(void *arg)
 
     ESP_LOGI(TAG,
              "H264 downlink renderer ready: decoder=%s conversion=pipelined-%s output=%ux%u "
-             "source=dynamic<=%ux%u fit=%s orientation=panel-owned input_slots=%u input_cap=%u decoded_slots=%u "
+             "source=dynamic<=%ux%u fit=%s rotation=%s source=%s input_slots=%u input_cap=%u decoded_slots=%u "
              "decoded_cap=%u presentation=latest-%u priorities=decode:%u ingress:%u helper:%u convert:%u "
              "cores=decode:%d helper:%d convert:%d ui:%d camera:%d",
              CALL_VIDEO_H264_DECODER_MODE,
@@ -2129,6 +2152,8 @@ static void call_video_renderer_task(void *arg)
              CALL_VIDEO_DECODE_MAX_WIDTH,
              CALL_VIDEO_DECODE_MAX_HEIGHT,
              video_frame_fit_mode_name(converter_config.fit_mode),
+             video_frame_rotation_name((video_frame_rotation_t)presentation.rotation),
+             presentation.remote_profile ? "remote-profile" : "compat-default",
              CALL_VIDEO_INPUT_SLOT_COUNT,
              CALL_VIDEO_INPUT_SLOT_CAPACITY,
              CALL_VIDEO_DECODED_SLOT_COUNT,
@@ -2529,6 +2554,8 @@ static void call_video_log_mjpeg_stats_if_due(call_video_mjpeg_log_window_t *win
 
 static void call_video_mjpeg_renderer_task(void *arg)
 {
+    call_video_presentation_t presentation =
+        call_video_renderer_presentation_snapshot();
     (void)arg;
     jpeg_decoder_handle_t decoder = NULL;
     video_frame_converter_handle_t converter = NULL;
@@ -2585,10 +2612,13 @@ static void call_video_mjpeg_renderer_task(void *arg)
 
     ESP_LOGI(TAG,
              "MJPEG downlink renderer ready: decoder=hardware-jpeg-rgb565 "
-             "rotation=cw90 source_rotation=not-signaled "
+             "rotation=%s source_rotation=%s "
              "scale=%s fit=%s upscale=%s output=RGB565-%ux%u "
              "source_cap=%upx/%u-edge "
              "input_slots=%u input_cap=%u presentation=latest-%u core=%d",
+             video_frame_rotation_name(
+                 (video_frame_rotation_t)presentation.rotation),
+             presentation.remote_profile ? "profile-contract" : "compat-default",
              video_frame_converter_mode_name(
                  video_frame_converter_get_mode(converter)),
              video_frame_fit_mode_name(CALL_VIDEO_MJPEG_FIT_MODE),
@@ -2662,7 +2692,7 @@ static void call_video_mjpeg_renderer_task(void *arg)
         uint32_t aligned_height = 0U;
         size_t expected_output_size = 0U;
         video_frame_rotation_t display_rotation =
-            VIDEO_FRAME_ROTATION_CLOCKWISE_90;
+            (video_frame_rotation_t)call_video_renderer_presentation_snapshot().rotation;
         if (decode_ret == ESP_OK) {
             if (picture.width == 0U || picture.height == 0U ||
                 picture.width > CALL_VIDEO_MJPEG_MAX_EDGE ||
@@ -3188,6 +3218,50 @@ esp_err_t call_video_renderer_prewarm(void)
                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
     }
     return ret;
+}
+
+esp_err_t call_video_renderer_set_presentation(
+    const call_video_presentation_t *presentation)
+{
+    ESP_RETURN_ON_FALSE(presentation != NULL &&
+                            (presentation->rotation == 0U ||
+                             presentation->rotation == 90U ||
+                             presentation->rotation == 180U ||
+                             presentation->rotation == 270U),
+                        ESP_ERR_INVALID_ARG,
+                        TAG,
+                        "invalid call video presentation");
+    taskENTER_CRITICAL(&s_renderer.lock);
+    if (s_renderer.running || s_renderer.start_pending) {
+        taskEXIT_CRITICAL(&s_renderer.lock);
+        return ESP_ERR_INVALID_STATE;
+    }
+    s_renderer.presentation = *presentation;
+    taskEXIT_CRITICAL(&s_renderer.lock);
+    return ESP_OK;
+}
+
+esp_err_t call_video_renderer_rotate_clockwise(uint16_t *rotation)
+{
+    ESP_RETURN_ON_FALSE(rotation != NULL,
+                        ESP_ERR_INVALID_ARG,
+                        TAG,
+                        "rotation output is null");
+
+    uint16_t next_rotation = 0U;
+    taskENTER_CRITICAL(&s_renderer.lock);
+    if (!s_renderer.running || s_renderer.stop_requested) {
+        taskEXIT_CRITICAL(&s_renderer.lock);
+        return ESP_ERR_INVALID_STATE;
+    }
+    next_rotation = (uint16_t)((s_renderer.presentation.rotation + 90U) % 360U);
+    s_renderer.presentation.rotation = next_rotation;
+    s_renderer.presentation.remote_profile = false;
+    taskEXIT_CRITICAL(&s_renderer.lock);
+
+    *rotation = next_rotation;
+    ESP_LOGI(TAG, "local remote-video rotation=%u", (unsigned)next_rotation);
+    return ESP_OK;
 }
 
 esp_err_t call_video_renderer_start_for_codec(call_video_codec_t codec)

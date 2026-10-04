@@ -113,6 +113,11 @@ static const char *TAG = "starter_media";
 static atomic_bool s_ready;
 static atomic_bool s_call_video;
 void starter_media_set_call_video(bool video) { atomic_store(&s_call_video, video); }
+void starter_media_set_remote_video_presentation(uint16_t rotation,
+                                                 bool remote_profile)
+{
+    p4_video_set_remote_presentation(rotation, remote_profile);
+}
 esp_err_t starter_media_set_camera_enabled(uint32_t generation, bool enabled)
 {
     return p4_video_set_camera_enabled(generation, enabled);
@@ -1001,7 +1006,17 @@ static bool play_audio_item(const audio_rx_item_t *item)
         : esp_g711a_dec_decode(s_g711_decoder, &input, &output, &info);
     if (decode_result != ESP_AUDIO_ERR_OK ||
         output.decoded_size == 0U) {
-        atomic_fetch_add_explicit(&s_audio_decode_failed, 1, memory_order_relaxed);
+        uint32_t failures = (uint32_t)atomic_fetch_add_explicit(
+                                &s_audio_decode_failed, 1,
+                                memory_order_relaxed) + 1U;
+        if (failures <= 3U || failures % 100U == 0U) {
+            ESP_LOGW(TAG,
+                     "downlink audio decode failed mode=%d generation=%lu result=%d encoded=%lu decoded=%lu count=%lu",
+                     (int)item->mode, (unsigned long)item->generation,
+                     (int)decode_result, (unsigned long)item->frame.length,
+                     (unsigned long)output.decoded_size,
+                     (unsigned long)failures);
+        }
         return false;
     }
     atomic_fetch_add_explicit(&s_audio_decoded, 1, memory_order_relaxed);
@@ -1046,14 +1061,40 @@ static bool play_audio_item(const audio_rx_item_t *item)
                                             &bytes_written) == ESP_OK &&
                  bytes_written == bytes;
         if (played) {
-            atomic_fetch_add_explicit(&s_audio_played, 1, memory_order_relaxed);
+            uint32_t count = (uint32_t)atomic_fetch_add_explicit(
+                                 &s_audio_played, 1,
+                                 memory_order_relaxed) + 1U;
+            if (count == 1U || count % 100U == 0U) {
+                ESP_LOGI(TAG,
+                         "downlink audio played mode=%d generation=%lu frames=%lu pcm-bytes=%lu",
+                         (int)item->mode, (unsigned long)item->generation,
+                         (unsigned long)count, (unsigned long)bytes_written);
+            }
         } else {
-            atomic_fetch_add_explicit(&s_audio_write_failed, 1,
-                                      memory_order_relaxed);
+            uint32_t failures = (uint32_t)atomic_fetch_add_explicit(
+                                    &s_audio_write_failed, 1,
+                                    memory_order_relaxed) + 1U;
+            if (failures <= 3U || failures % 100U == 0U) {
+                ESP_LOGW(TAG,
+                         "downlink audio write failed mode=%d generation=%lu expected=%lu written=%lu count=%lu",
+                         (int)item->mode, (unsigned long)item->generation,
+                         (unsigned long)bytes, (unsigned long)bytes_written,
+                         (unsigned long)failures);
+            }
         }
     } else {
-        atomic_fetch_add_explicit(&s_audio_playback_blocked, 1,
-                                  memory_order_relaxed);
+        uint32_t blocked = (uint32_t)atomic_fetch_add_explicit(
+                               &s_audio_playback_blocked, 1,
+                               memory_order_relaxed) + 1U;
+        if (blocked <= 3U || blocked % 100U == 0U) {
+            ESP_LOGW(TAG,
+                     "downlink audio playback blocked mode=%d generation=%lu amp=%d speaker-muted=%d count=%lu",
+                     (int)item->mode, (unsigned long)item->generation,
+                     s_amp_enabled ? 1 : 0,
+                     atomic_load_explicit(&s_speaker_muted,
+                                          memory_order_acquire) ? 1 : 0,
+                     (unsigned long)blocked);
+        }
     }
     xSemaphoreGive(s_audio_output_mutex);
     return played;

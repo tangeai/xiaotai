@@ -29,6 +29,13 @@ static void *s_product_mutex = (void *)1;
 static int xSemaphoreTake(void *m, int ms) { (void)m; (void)ms; return 1; }
 static void xSemaphoreGive(void *m) { (void)m; }
 static bool s_call_wechat, s_call_outgoing, s_call_video, s_call_camera_enabled;
+static unsigned short s_call_remote_rotation;
+static bool s_call_remote_rotation_reported;
+typedef struct cJSON cJSON;
+static const cJSON *payload __attribute__((unused));
+static void __attribute__((unused))
+configure_remote_video_presentation(const cJSON *metadata, bool wechat)
+{ (void)metadata; (void)wechat; }
 static bool media_video;
 static struct {
     bool call_incoming, call_wechat, call_microphone_muted;

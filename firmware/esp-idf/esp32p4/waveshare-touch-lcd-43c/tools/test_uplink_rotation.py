@@ -22,8 +22,8 @@ code = r'''
 #define PPA_SRM_ROTATION_ANGLE_90 1
 #define PPA_TRANS_MODE_BLOCKING 0
 typedef int esp_err_t;
-typedef struct {uint16_t input_width,input_height,output_width,output_height; bool rotate_ccw90;} config_t;
-typedef struct {config_t config; uint16_t crop_width,crop_height,crop_x,crop_y; unsigned scale_step;
+typedef struct {uint16_t input_width,input_height,output_width,output_height; bool rotate_ccw90,fit_contain;} config_t;
+typedef struct {config_t config; uint16_t crop_width,crop_height,crop_x,crop_y,output_x,output_y,render_width,render_height; unsigned scale_step;
  uint8_t *output_buffer; size_t output_buffer_size,output_data_len; int ppa_client;} scaler_t;
 typedef scaler_t *video_yuv420_scaler_handle_t;
 typedef struct {const void *buffer; size_t buffer_size; unsigned pic_w,pic_h,block_w,block_h,block_offset_x,block_offset_y,srm_cm;} picture_t;
@@ -35,6 +35,7 @@ static int ppa_do_scale_rotate_mirror(int client,const ppa_srm_oper_config_t *op
  assert(op->scale_x==(rotated?0.75f:1.0f) && op->scale_y==(rotated?0.75f:1.0f));
  assert(op->in.block_w==1280 && op->in.block_h==960);
  assert(!op->in.block_offset_x && !op->in.block_offset_y);
+ assert(!op->out.block_offset_x && !op->out.block_offset_y);
  assert(op->out.pic_w==(rotated?720:1280) && op->out.pic_h==(rotated?960:960));
  return 0;
 }
@@ -48,7 +49,7 @@ int main(void) {
  .scale_step=12,.output_buffer=&buf,.output_buffer_size=1036800,.output_data_len=1036800};
  assert(video_yuv420_scaler_process(&scaler,&input,1843200,&output,&length)==0);
  assert(output==&buf && length==1036800);
- rotated=false; scaler.config=(config_t){1280,960,1280,960,false}; scaler.scale_step=16;
+ rotated=false; scaler.config=(config_t){1280,960,1280,960,false,false}; scaler.scale_step=16;
  assert(video_yuv420_scaler_process(&scaler,&input,1843200,&output,&length)==0);
  assert(video_yuv420_scaler_process(&scaler,&input,10,&output,&length)==ESP_ERR_INVALID_SIZE);
  return 0;

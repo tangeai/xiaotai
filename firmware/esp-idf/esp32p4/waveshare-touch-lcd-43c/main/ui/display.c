@@ -11849,7 +11849,7 @@ static void display_style_call_video_overlay(lv_obj_t *overlay)
     if (overlay == NULL) {
         return;
     }
-    /* The video surface has an 83 ms frame budget at 12 fps. A translucent
+    /* A translucent
      * full-width panel forces per-pixel RGB565 blending on every frame and,
      * together with the LCD transfer, exhausts that budget. Keep the status
      * surfaces opaque so their body is copied directly; only anti-aliased

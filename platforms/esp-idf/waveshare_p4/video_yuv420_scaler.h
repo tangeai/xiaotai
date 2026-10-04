@@ -18,6 +18,8 @@ typedef struct {
     uint16_t output_width;
     uint16_t output_height;
     bool rotate_ccw90;
+    /* Preserve the complete input image and letterbox instead of cropping. */
+    bool fit_contain;
 } video_yuv420_scaler_config_t;
 
 esp_err_t video_yuv420_scaler_create(const video_yuv420_scaler_config_t *config,

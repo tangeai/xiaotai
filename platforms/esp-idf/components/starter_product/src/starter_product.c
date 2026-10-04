@@ -22,6 +22,7 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
@@ -31,6 +32,7 @@
 #include "lvgl.h"
 #include "nvs.h"
 #include "platform_client.h"
+#include "runtime_config.h"
 #include "starter_media.h"
 #include "starter_runtime.h"
 #include "wifi_manager.h"
@@ -73,10 +75,15 @@ LV_FONT_DECLARE(ui_font_cn_24);
 #define PRODUCT_VIDEO_TICK_MS 30U
 #define PRODUCT_UI_REFRESH_SLOW_US (20LL * 1000LL)
 #define PRODUCT_UI_REFRESH_LOG_INTERVAL_US (5LL * 1000LL * 1000LL)
+#define PRODUCT_CALL_ROTATE_SIZE_PX 48
+#define PRODUCT_CALL_ROTATE_RIGHT_PX 16
+#define PRODUCT_CALL_ROTATE_TOP_PX 64
+#define PRODUCT_CALL_ROTATION_HINT_MS 1200
 #define FACE_CANVAS_W 220
 #define FACE_CANVAS_H 108
 #define QR_CANVAS_SIZE 136
 #define HOME_BACKGROUND_COLOR 0x07151C
+#define CONTACTS_PER_PAGE 3U
 
 extern const uint8_t kids_watch_outgoing_tiny_wav_start[]
     asm("_binary_kids_watch_outgoing_tiny_wav_start");
@@ -105,6 +112,7 @@ typedef enum {
     PAGE_EMOJIS,
     PAGE_EMOJI_PREVIEW,
     PAGE_SETTINGS,
+    PAGE_RESET_CONFIRM,
     PAGE_NETWORK,
     PAGE_BINDING,
     PAGE_CALL,
@@ -132,6 +140,9 @@ typedef enum {
     ACTION_MIC_SENSITIVITY_UP,
     ACTION_SLEEP,
     ACTION_ACK_VOICE,
+    ACTION_FACTORY_RESET,
+    ACTION_FACTORY_RESET_CANCEL,
+    ACTION_FACTORY_RESET_CONFIRM,
     ACTION_EMOJI_APPLY,
     ACTION_NETWORK_BACK,
     ACTION_CALL_ACCEPT,
@@ -139,8 +150,11 @@ typedef enum {
     ACTION_CALL_HANGUP,
     ACTION_CALL_MUTE,
     ACTION_CALL_CAMERA,
+    ACTION_CALL_ROTATE,
     ACTION_AI_BACK,
     ACTION_CONTACTS_BACK,
+    ACTION_CONTACTS_PREVIOUS,
+    ACTION_CONTACTS_NEXT,
     ACTION_VOICE_CALL,
     ACTION_VIDEO_CALL,
     ACTION_DIAGNOSTICS,
@@ -218,6 +232,10 @@ static uint32_t s_wake_debug_session;
 static uint32_t s_previous_ai_generation;
 static TaskHandle_t s_call_ring_task;
 static int64_t s_call_result_hide_ms;
+#if CONFIG_IDF_TARGET_ESP32P4
+static int64_t s_call_rotation_hint_hide_ms;
+static uint16_t s_call_rotation_hint;
+#endif
 static uint32_t s_wifi_signal_revision = UINT32_MAX;
 static int s_wifi_signal_style = -1;
 static bool s_previous_wifi_connected;
@@ -231,6 +249,7 @@ static bool s_hint_visible;
 static bool s_ambient_visible;
 static uint8_t s_previous_audio_level;
 static uint8_t s_expression_audio_level;
+static bool s_prefer_local_expression = true;
 static uint8_t s_idle_persona_stage = UINT8_MAX;
 static starter_runtime_state_t s_previous_runtime_state = STARTER_RUNTIME_WAITING;
 static bool s_previous_call_incoming;
@@ -244,6 +263,7 @@ static char s_call_result[33];
 static char s_previous_verification_code[17];
 static char s_voice_feedback[65];
 static uint8_t s_selected_contact;
+static uint8_t s_contacts_page;
 static uint8_t s_preview_emoji;
 static product_page_t s_network_back_page = PAGE_MENU;
 static uint8_t s_previous_contact_count;
@@ -258,10 +278,19 @@ static int64_t s_ui_refresh_slow_last_us;
 static char s_room_input[7];
 static bool s_room_input_create;
 static char s_room_join_code[7];
+typedef enum {
+    FACTORY_RESET_IDLE = 0,
+    FACTORY_RESET_RUNNING,
+    FACTORY_RESET_FAILED,
+} factory_reset_status_t;
+static atomic_int s_factory_reset_status;
+static atomic_bool s_factory_reset_requested;
+static factory_reset_status_t s_rendered_factory_reset_status = FACTORY_RESET_IDLE;
 
 /* 当前页面对象只在 LVGL 任务内创建和访问。 */
 static lv_obj_t *s_clock;
 static lv_obj_t *s_wifi_signal;
+static bool s_header_has_back;
 static lv_obj_t *s_wifi_signal_bars[4];
 #if !defined(CONFIG_TIRTC_NETWORK_4G)
 #define CONFIG_TIRTC_NETWORK_4G 0
@@ -288,6 +317,8 @@ static lv_obj_t *s_call_reject_button;
 static lv_obj_t *s_call_mute_button;
 #if CONFIG_IDF_TARGET_ESP32P4
 static lv_obj_t *s_call_camera_button;
+static lv_obj_t *s_call_rotate_button;
+static lv_obj_t *s_call_rotation_hint_label;
 #endif
 static lv_obj_t *s_call_hangup_button;
 /* Settings owns a small persistent set of labels.  These pointers are only
@@ -298,6 +329,7 @@ static lv_obj_t *s_settings_microphone;
 static lv_obj_t *s_settings_microphone_sensitivity;
 static lv_obj_t *s_settings_sleep;
 static lv_obj_t *s_settings_acknowledgement;
+static lv_obj_t *s_factory_reset_status_label;
 
 static const uint16_t s_sleep_minutes[] = {1, 5, 10, 30, 0};
 static const char *const s_sleep_names[] = {
@@ -341,6 +373,10 @@ static void note_interaction(void)
 static void preferences_save_task(void *argument)
 {
     (void)argument;
+    if (atomic_load(&s_factory_reset_requested)) {
+        vTaskDelete(NULL);
+        return;
+    }
     nvs_handle_t nvs = 0;
     if (nvs_open(PRODUCT_NVS, NVS_READWRITE, &nvs) != ESP_OK) {
         vTaskDelete(NULL);
@@ -353,7 +389,9 @@ static void preferences_save_task(void *argument)
     (void)nvs_set_u8(nvs, "ack_voice", s_preferences.acknowledgement_male ? 1U : 0U);
     (void)nvs_set_u8(nvs, "sleep", s_preferences.sleep_index);
     (void)nvs_set_u8(nvs, "emoji", s_preferences.emoji_index);
-    (void)nvs_commit(nvs);
+    if (!atomic_load(&s_factory_reset_requested)) {
+        (void)nvs_commit(nvs);
+    }
     nvs_close(nvs);
     vTaskDelete(NULL);
 }
@@ -445,6 +483,16 @@ static void product_set_height(lv_obj_t *object, lv_coord_t h)
 static bool product_uses_centered_layout(void)
 {
     return display_driver_width() == 800 && display_driver_height() == 480;
+}
+/* Video overlays use exact physical pixels so the touch target remains 48x48
+ * on both supported P4 panels instead of inheriting the page scale. */
+static void product_set_physical_pos(lv_obj_t *object, lv_coord_t x, lv_coord_t y)
+{
+    lv_obj_set_pos(object, x, y);
+}
+static void product_set_physical_size(lv_obj_t *object, lv_coord_t w, lv_coord_t h)
+{
+    lv_obj_set_size(object, w, h);
 }
 static lv_coord_t product_style_size(lv_coord_t value)
 {
@@ -539,12 +587,11 @@ static lv_obj_t *product_create_content(lv_obj_t *screen)
 }
 #endif
 
-/* Button captions use the complete CJK font on every display. The larger P4
- * UI font is intentionally a compact subset; allowing it to fall back to the
- * 16 px font made missing glyphs and dynamic contact names look mismatched. */
+/* Static controls use the same visual scale as fields on the current layout.
+ * Dynamic platform text is assigned the complete 16 px CJK font explicitly. */
 static const lv_font_t *product_button_font(void)
 {
-    return &ui_font_cn_16;
+    return product_ui_font();
 }
 
 static void set_bg(lv_obj_t *object, lv_color_t color)
@@ -592,6 +639,7 @@ static lv_obj_t *make_button(lv_obj_t *parent,
                              lv_coord_t width,
                              lv_coord_t height,
                              product_action_t action);
+static void set_object_visible(lv_obj_t *object, bool visible);
 static void render_page(void);
 static void refresh_settings_controls(void);
 static void refresh_call_controls(starter_runtime_status_t runtime,
@@ -802,7 +850,7 @@ static void handle_voice_result(const starter_voice_result_t *result,
         starter_media_set_microphone_muted(true);
         (void)starter_runtime_call_set_microphone_muted(true);
         preferences_save();
-        set_voice_feedback("已闭麦 · 本地唤醒暂停", now);
+        set_voice_feedback("已闭麦  |  本地唤醒暂停", now);
         s_page = PAGE_HOME_FACE;
         render_page();
         break;
@@ -868,6 +916,41 @@ static void handle_voice_result(const starter_voice_result_t *result,
              starter_voice_intent_name(result->intent));
 }
 
+static esp_err_t clear_product_preferences(void)
+{
+    nvs_handle_t nvs = 0;
+    esp_err_t err = nvs_open(PRODUCT_NVS, NVS_READWRITE, &nvs);
+    if (err == ESP_OK) err = nvs_erase_all(nvs);
+    if (err == ESP_OK) err = nvs_commit(nvs);
+    if (nvs != 0) nvs_close(nvs);
+    return err;
+}
+
+static void factory_reset_task(void *argument)
+{
+    (void)argument;
+    esp_err_t config_err = runtime_config_clear_tirtc();
+    esp_err_t wifi_err = wifi_manager_forget_credentials();
+    /* Product preferences are cleared last so an already-queued async save
+     * cannot repopulate them while the identity stores are being erased. */
+    esp_err_t product_err = clear_product_preferences();
+
+    if (product_err != ESP_OK || config_err != ESP_OK || wifi_err != ESP_OK) {
+        ESP_LOGE(TAG,
+                 "device reset failed: product=%s config=%s wifi=%s",
+                 esp_err_to_name(product_err),
+                 esp_err_to_name(config_err),
+                 esp_err_to_name(wifi_err));
+        atomic_store(&s_factory_reset_status, FACTORY_RESET_FAILED);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    ESP_LOGW(TAG, "device user configuration cleared; restarting");
+    vTaskDelay(pdMS_TO_TICKS(300));
+    esp_restart();
+}
+
 static void on_action(lv_event_t *event)
 {
     product_action_t action = (product_action_t)(uintptr_t)lv_event_get_user_data(event);
@@ -887,11 +970,32 @@ static void on_action(lv_event_t *event)
     } else if (action == ACTION_HOME) {
         s_page = PAGE_HOME_FACE;
     } else if (action == ACTION_CONTACTS) {
+        s_contacts_page = 0U;
         if (enter_page(PAGE_CONTACTS)) (void)starter_runtime_contacts_refresh();
     } else if (action == ACTION_EMOJIS) {
         (void)enter_page(PAGE_EMOJIS);
     } else if (action == ACTION_SETTINGS) {
         enter_settings_page();
+    } else if (action == ACTION_FACTORY_RESET) {
+        atomic_store(&s_factory_reset_requested, false);
+        atomic_store(&s_factory_reset_status, FACTORY_RESET_IDLE);
+        s_page = PAGE_RESET_CONFIRM;
+    } else if (action == ACTION_FACTORY_RESET_CANCEL) {
+        atomic_store(&s_factory_reset_requested, false);
+        enter_settings_page();
+    } else if (action == ACTION_FACTORY_RESET_CONFIRM &&
+               atomic_load(&s_factory_reset_status) != FACTORY_RESET_RUNNING) {
+        atomic_store(&s_factory_reset_requested, true);
+        atomic_store(&s_factory_reset_status, FACTORY_RESET_RUNNING);
+        if (xTaskCreatePinnedToCore(factory_reset_task,
+                                    "factory_reset",
+                                    3072,
+                                    NULL,
+                                    3,
+                                    NULL,
+                                    0) != pdPASS) {
+            atomic_store(&s_factory_reset_status, FACTORY_RESET_FAILED);
+        }
     } else if (action == ACTION_NETWORK) {
         s_network_back_page = s_page == PAGE_SETTINGS ? PAGE_SETTINGS : PAGE_MENU;
         (void)enter_page(PAGE_NETWORK);
@@ -988,6 +1092,7 @@ static void on_action(lv_event_t *event)
         preferences_save();
     } else if (action == ACTION_EMOJI_APPLY) {
         s_preferences.emoji_index = s_preview_emoji;
+        s_prefer_local_expression = true;
         preferences_save();
         s_page = PAGE_HOME_FACE;
     } else if (action == ACTION_NETWORK_BACK) {
@@ -1013,9 +1118,40 @@ static void on_action(lv_event_t *event)
         if (starter_runtime_call_set_camera_enabled(runtime.session_generation,
                 !product.call_camera_enabled) != ESP_OK)
             ESP_LOGW(TAG, "camera control queue busy; state unchanged");
+    } else if (action == ACTION_CALL_ROTATE) {
+        starter_runtime_status_t runtime = starter_runtime_status();
+        starter_runtime_product_snapshot_t product =
+            starter_runtime_product_snapshot();
+        if (runtime.state == STARTER_RUNTIME_CALL_ACTIVE &&
+            product.call_video && !product.call_wechat) {
+            uint16_t rotation = 0U;
+            esp_err_t ret = p4_video_rotate_remote_clockwise(&rotation);
+            if (ret == ESP_OK) {
+                char hint[24];
+                s_call_rotation_hint = rotation;
+                s_call_rotation_hint_hide_ms =
+                    monotonic_ms() + PRODUCT_CALL_ROTATION_HINT_MS;
+                (void)snprintf(hint, sizeof(hint), "已旋转 %u°",
+                               (unsigned)rotation);
+                label_set_text_if_changed(s_call_rotation_hint_label, hint);
+                set_object_visible(s_call_rotation_hint_label, true);
+            } else {
+                ESP_LOGW(TAG, "local video rotation ignored: %s",
+                         esp_err_to_name(ret));
+            }
+        }
 #endif
     } else if (action == ACTION_CONTACTS_BACK) {
         (void)enter_page(PAGE_CONTACTS);
+    } else if (action == ACTION_CONTACTS_PREVIOUS) {
+        if (s_contacts_page > 0U) s_contacts_page--;
+    } else if (action == ACTION_CONTACTS_NEXT) {
+        starter_runtime_product_snapshot_t product =
+            starter_runtime_product_snapshot();
+        uint8_t page_count = product.contact_count == 0U ? 1U :
+            (uint8_t)((product.contact_count + CONTACTS_PER_PAGE - 1U) /
+                      CONTACTS_PER_PAGE);
+        if (s_contacts_page + 1U < page_count) s_contacts_page++;
     } else if (action == ACTION_VOICE_CALL) {
         (void)starter_runtime_call_contact(s_selected_contact);
 #if CONFIG_IDF_TARGET_ESP32P4
@@ -1042,7 +1178,10 @@ static void on_action(lv_event_t *event)
      * existing conservative renderer until the remaining pages are migrated. */
     if (s_page != previous_page ||
         (action >= ACTION_ROOM_DIGIT_BASE && action < ACTION_ROOM_DIGIT_BASE + 10) ||
-        action == ACTION_ROOM_INPUT_DELETE) {
+        action == ACTION_ROOM_INPUT_DELETE ||
+        action == ACTION_CONTACTS_PREVIOUS ||
+        action == ACTION_CONTACTS_NEXT ||
+        action == ACTION_FACTORY_RESET_CONFIRM) {
         render_page();
     } else if (s_page == PAGE_SETTINGS) {
         refresh_settings_controls();
@@ -1072,6 +1211,22 @@ static lv_obj_t *make_button(lv_obj_t *parent,
     lv_label_set_text(label, text);
     lv_obj_set_style_text_font(label, product_button_font(), 0);
     lv_obj_center(label);
+    return button;
+}
+
+static lv_obj_t *make_menu_button(lv_obj_t *parent,
+                                  const char *text,
+                                  lv_coord_t x,
+                                  lv_coord_t y,
+                                  lv_coord_t width,
+                                  lv_coord_t height,
+                                  product_action_t action)
+{
+    lv_obj_t *button = make_button(parent, text, x, y, width, height, action);
+    lv_obj_t *label = lv_obj_get_child(button, 0);
+    if (label != NULL) {
+        lv_obj_set_style_text_font(label, product_ui_font(), 0);
+    }
     return button;
 }
 
@@ -1235,6 +1390,7 @@ static lv_obj_t *make_header_back_button(lv_obj_t *parent,
                                          product_action_t action)
 {
     /* HEADER_BACK_NATIVE_CHEVRON: built-in LVGL symbol, never a CJK tofu box. */
+    s_header_has_back = true;
     lv_obj_t *button = lv_btn_create(parent);
     lv_obj_set_pos(button, 4, 2);
     lv_obj_set_size(button, 40, 34);
@@ -1417,8 +1573,8 @@ static void render_header_status(lv_obj_t *screen)
 
 static void render_header(lv_obj_t *screen, const char *title)
 {
-    lv_coord_t title_x = 14;
-    lv_coord_t title_width = 190;
+    lv_coord_t title_x = s_header_has_back ? 50 : 14;
+    lv_coord_t title_width = s_header_has_back ? 154 : 190;
     if (strcmp(title, "小钛") == 0) {
         /* HOME_BRAND_ROBOT_MARK: code-native product mark, no bitmap asset. */
         lv_obj_t *mark = lv_obj_create(screen);
@@ -1550,7 +1706,9 @@ static void render_ai_chat(lv_obj_t *screen)
         starter_runtime_product_snapshot();
     (void)make_header_back_button(screen, ACTION_AI_BACK);
     s_state = make_label(screen,
-                         runtime.state == STARTER_RUNTIME_AI_CONNECTING
+                         product.ai_start_pending
+                             ? "AI 服务启动中"
+                             : runtime.state == STARTER_RUNTIME_AI_CONNECTING
                              ? "正在连接 AI" : phase_text(product.ai_phase),
                          52, 10, 154, lv_color_hex(0x72DEF8));
     lv_label_set_long_mode(s_state, LV_LABEL_LONG_DOT);
@@ -1650,14 +1808,13 @@ static void render_room(lv_obj_t *screen)
         (void)make_button(screen, "加密创建", 170, 86, 132, 40,
                           ACTION_ROOM_CREATE_PASSWORD);
         (void)make_button(screen, "加入房间", 84, 140, 152, 42, ACTION_ROOM_JOIN);
-        (void)make_button(screen, "返回", 110, 194, 100, 34, ACTION_MENU);
         return;
     }
     char line[96];
     (void)snprintf(line, sizeof(line), "房间号  %s%s", room.room_code,
-                   room.room_password_set ? "  · 有密码" : "");
+                   room.room_password_set ? "  |  有密码" : "");
     (void)make_label(screen, line, 40, 42, 240, lv_color_hex(0xFFFFFF));
-    (void)snprintf(line, sizeof(line), "在线 %u 人  ·  %s",
+    (void)snprintf(line, sizeof(line), "在线 %u 人  |  %s",
                    room.room_online_count, room.room_message);
     (void)make_label(screen, line, 40, 69, 240, lv_color_hex(0xBFE9F3));
     char members[96] = "";
@@ -1679,8 +1836,7 @@ static void render_room(lv_obj_t *screen)
         (void)make_label(screen, "正在连接房间…", 70, 118, 180,
                          lv_color_hex(0x72DEF8));
     }
-    (void)make_button(screen, "退出房间", 40, 188, 112, 36, ACTION_ROOM_LEAVE);
-    (void)make_button(screen, "返回", 168, 188, 112, 36, ACTION_HOME);
+    (void)make_button(screen, "退出房间", 104, 188, 112, 36, ACTION_ROOM_LEAVE);
 }
 
 static void render_room_input(lv_obj_t *screen)
@@ -1711,36 +1867,44 @@ static void render_room_input(lv_obj_t *screen)
 
 static void render_menu(lv_obj_t *screen)
 {
+    (void)make_header_back_button(screen, ACTION_HOME);
     render_header(screen, "功能菜单");
-    (void)make_button(screen, "AI 聊天", 18, 36, 132, 36, ACTION_AI);
-    (void)make_button(screen, "通讯录", 170, 36, 132, 36, ACTION_CONTACTS);
-    (void)make_button(screen, "多人对讲", 18, 78, 132, 36, ACTION_ROOM);
-    (void)make_button(screen, "表情包", 170, 78, 132, 36, ACTION_EMOJIS);
-    (void)make_button(screen, "设备设置", 18, 120, 132, 36, ACTION_SETTINGS);
-    (void)make_button(screen, "网络状态", 170, 120, 132, 36, ACTION_NETWORK);
-    (void)make_button(screen, "运行状态", 18, 162, 132, 36, ACTION_DIAGNOSTICS);
-    (void)make_button(screen, "返回", 170, 162, 132, 36, ACTION_HOME);
+    (void)make_menu_button(screen, "AI 聊天", 18, 42, 132, 42, ACTION_AI);
+    (void)make_menu_button(screen, "通讯录", 170, 42, 132, 42, ACTION_CONTACTS);
+    (void)make_menu_button(screen, "多人对讲", 18, 94, 132, 42, ACTION_ROOM);
+    (void)make_menu_button(screen, "表情包", 170, 94, 132, 42, ACTION_EMOJIS);
+    (void)make_menu_button(screen, "设备设置", 18, 146, 132, 42, ACTION_SETTINGS);
+    (void)make_menu_button(screen, "运行状态", 170, 146, 132, 42, ACTION_DIAGNOSTICS);
 }
 
 static void render_contacts(lv_obj_t *screen)
 {
     starter_runtime_product_snapshot_t product =
         starter_runtime_product_snapshot();
+    (void)make_header_back_button(screen, ACTION_MENU);
     render_header(screen, "联系人 | 仅语音");
+    uint8_t page_count = product.contact_count == 0U ? 1U :
+        (uint8_t)((product.contact_count + CONTACTS_PER_PAGE - 1U) /
+                  CONTACTS_PER_PAGE);
+    if (s_contacts_page >= page_count) s_contacts_page = page_count - 1U;
+    uint8_t first = (uint8_t)(s_contacts_page * CONTACTS_PER_PAGE);
+    uint8_t last = (uint8_t)(first + CONTACTS_PER_PAGE);
+    if (last > product.contact_count) last = product.contact_count;
     lv_obj_t *list = lv_obj_create(screen);
     lv_obj_set_pos(list, 12, 36);
-    lv_obj_set_size(list, 296, 150);
+    lv_obj_set_size(list, 296, 134);
     set_bg(list, lv_color_hex(0x102832));
     lv_obj_set_style_radius(list, 10, 0);
-    lv_obj_set_scroll_dir(list, LV_DIR_VER);
-    lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_clear_flag(list, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_OFF);
     if (product.contact_count == 0U) {
         (void)make_label(list, "暂无联系人\n绑定设备或完成微信授权后下拉同步",
                          12, 30, 252, lv_color_hex(0xABC0C9));
     }
-    for (uint8_t i = 0; i < product.contact_count; ++i) {
+    for (uint8_t i = first; i < last; ++i) {
         const starter_product_contact_t *contact = &product.contacts[i];
-        lv_obj_t *row = make_button(list, "", 4, (lv_coord_t)(4 + i * 43),
+        lv_obj_t *row = make_button(list, "", 4,
+                                    (lv_coord_t)(4 + (i - first) * 43),
                                     270, 37,
                                     (product_action_t)(ACTION_CONTACT_BASE + i));
         lv_obj_t *source_icon = lv_obj_create(row);
@@ -1775,15 +1939,13 @@ static void render_contacts(lv_obj_t *screen)
         }
         lv_obj_t *name = lv_label_create(row);
         lv_label_set_text(name, contact->name);
-        lv_obj_set_style_text_font(name, product_button_font(), 0);
+        lv_obj_set_style_text_font(name, &ui_font_cn_16, 0);
         lv_obj_set_style_text_color(name, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_pos(name, 42, 7);
         lv_obj_set_width(name, 130);
-        if (contact->source == STARTER_CONTACT_WECHAT) {
-            lv_obj_t *wx_hint = make_label(row, "微信", 42, 22, 40,
-                                           lv_color_hex(0x9CC0C9));
-            lv_obj_set_style_text_font(wx_hint, product_button_font(), 0);
-        } else {
+        lv_obj_set_height(name, 18);
+        lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
+        if (contact->source != STARTER_CONTACT_WECHAT) {
             lv_obj_t *status = lv_obj_create(row);
             lv_obj_set_pos(status, 188, 14);
             lv_obj_set_size(status, 8, 8);
@@ -1802,19 +1964,31 @@ static void render_contacts(lv_obj_t *screen)
         lv_obj_set_style_text_color(call_icon, lv_color_hex(0x72DEF8), 0);
         lv_obj_center(call_icon);
     }
-    (void)make_button(screen, "返回", 110, 194, 100, 36, ACTION_MENU);
+    char page[12];
+    (void)snprintf(page, sizeof(page), "%u/%u",
+                   (unsigned)s_contacts_page + 1U, (unsigned)page_count);
+    lv_obj_t *previous = make_button(screen, "上一页", 34, 180, 82, 36,
+                                     ACTION_CONTACTS_PREVIOUS);
+    if (s_contacts_page == 0U) lv_obj_add_state(previous, LV_STATE_DISABLED);
+    lv_obj_t *page_label = make_label(screen, page, 130, 187, 60,
+                                      lv_color_hex(0xBFE9F3));
+    lv_obj_set_style_text_align(page_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_t *next = make_button(screen, "下一页", 204, 180, 82, 36,
+                                 ACTION_CONTACTS_NEXT);
+    if ((uint8_t)(s_contacts_page + 1U) >= page_count) {
+        lv_obj_add_state(next, LV_STATE_DISABLED);
+    }
 }
 
 static void render_contact_detail(lv_obj_t *screen)
 {
     starter_runtime_product_snapshot_t product =
         starter_runtime_product_snapshot();
+    (void)make_header_back_button(screen, ACTION_CONTACTS_BACK);
     render_header(screen, "联系人详情");
     if (s_selected_contact >= product.contact_count) {
         (void)make_label(screen, "联系人已更新，请返回重试", 48, 88, 224,
                          lv_color_hex(0xABC0C9));
-        (void)make_button(screen, "返回", 110, 194, 100, 36,
-                          ACTION_CONTACTS_BACK);
         return;
     }
     const starter_product_contact_t *contact =
@@ -1834,8 +2008,6 @@ static void render_contact_detail(lv_obj_t *screen)
     (void)make_button(screen, "语音通话", 50, 125, 220, 48,
                       ACTION_VOICE_CALL);
 #endif
-    (void)make_button(screen, "返回", 110, 194, 100, 36,
-                      ACTION_CONTACTS_BACK);
 }
 
 static void render_call(lv_obj_t *screen)
@@ -1873,6 +2045,41 @@ static void render_call(lv_obj_t *screen)
 #if CONFIG_IDF_TARGET_ESP32P4
     s_call_camera_button = make_button(screen, "关摄像头", 116, 184, 88, 42,
                                        ACTION_CALL_CAMERA);
+    s_call_rotate_button = lv_btn_create(screen);
+    product_set_physical_pos(
+        s_call_rotate_button,
+        product_x(320) - PRODUCT_CALL_ROTATE_RIGHT_PX -
+            PRODUCT_CALL_ROTATE_SIZE_PX,
+        PRODUCT_CALL_ROTATE_TOP_PX);
+    product_set_physical_size(s_call_rotate_button,
+                              PRODUCT_CALL_ROTATE_SIZE_PX,
+                              PRODUCT_CALL_ROTATE_SIZE_PX);
+    lv_obj_set_style_radius(s_call_rotate_button, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_pad_all(s_call_rotate_button, 0, 0);
+    lv_obj_set_style_bg_color(s_call_rotate_button, lv_color_hex(0x17313D), 0);
+    lv_obj_set_style_bg_opa(s_call_rotate_button, LV_OPA_80, 0);
+    lv_obj_set_style_border_width(s_call_rotate_button, 1, 0);
+    lv_obj_set_style_border_color(s_call_rotate_button,
+                                  lv_color_hex(0x72DEF8), 0);
+    lv_obj_set_style_border_opa(s_call_rotate_button, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(s_call_rotate_button, lv_color_hex(0x205064),
+                              LV_STATE_PRESSED);
+    lv_obj_add_event_cb(s_call_rotate_button, on_action, LV_EVENT_CLICKED,
+                        (void *)(uintptr_t)ACTION_CALL_ROTATE);
+    lv_obj_t *rotate_icon = lv_label_create(s_call_rotate_button);
+    lv_label_set_text(rotate_icon, LV_SYMBOL_REFRESH);
+    lv_obj_set_style_text_font(rotate_icon, product_symbol_font(), 0);
+    lv_obj_set_style_text_color(rotate_icon, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_center(rotate_icon);
+    lv_obj_clear_flag(rotate_icon, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+
+    s_call_rotation_hint_label = make_label(screen, "", 75, 40, 170,
+                                             lv_color_hex(0xFFFFFF));
+    lv_obj_set_style_text_align(s_call_rotation_hint_label,
+                                LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_add_flag(s_call_rotation_hint_label, LV_OBJ_FLAG_HIDDEN);
+    s_call_rotation_hint = 0U;
+    s_call_rotation_hint_hide_ms = 0;
 #endif
     refresh_call_controls(runtime, &product);
 }
@@ -1924,6 +2131,14 @@ static void refresh_call_controls(starter_runtime_status_t runtime,
     set_object_visible(s_call_hangup_button, !incoming);
 #if CONFIG_IDF_TARGET_ESP32P4
     set_object_visible(s_call_camera_button, active && product->call_video);
+    bool rotate_visible = active && product->call_video && !product->call_wechat;
+    set_object_visible(s_call_rotate_button, rotate_visible);
+    ESP_LOGI(TAG,
+             "device-call rotate control visible=%d active=%d video=%d wechat=%d",
+             rotate_visible ? 1 : 0,
+             active ? 1 : 0,
+             product->call_video ? 1 : 0,
+             product->call_wechat ? 1 : 0);
     if (active && product->call_video)
         set_button_text(s_call_camera_button,
                         product->call_camera_enabled ? "关摄像头" : "开摄像头");
@@ -1965,10 +2180,11 @@ static void render_call_result(lv_obj_t *screen)
 
 static void render_emojis(lv_obj_t *screen)
 {
+    (void)make_header_back_button(screen, ACTION_MENU);
     render_header(screen, "表情包 21");
     lv_obj_t *grid = lv_obj_create(screen);
     lv_obj_set_pos(grid, 10, 38);
-    lv_obj_set_size(grid, 300, 150);
+    lv_obj_set_size(grid, 300, 190);
     set_bg(grid, lv_color_hex(0x102832));
     lv_obj_set_style_radius(grid, 10, 0);
     lv_obj_set_style_pad_all(grid, 4, 0);
@@ -1988,17 +2204,16 @@ static void render_emojis(lv_obj_t *screen)
             lv_obj_set_style_border_color(button, lv_color_hex(0x72DEF8), 0);
         }
     }
-    (void)make_button(screen, "返回", 110, 196, 100, 34, ACTION_MENU);
 }
 
 static void render_emoji_preview(lv_obj_t *screen)
 {
+    (void)make_header_back_button(screen, ACTION_EMOJIS);
     render_header(screen, s_emoji_names[s_preview_emoji]);
     create_expression_face(screen, 50, 46);
     apply_expression(s_emoji_keys[s_preview_emoji], STARTER_AI_UI_IDLE, 1U);
-    (void)make_button(screen, "应用到主页", 42, 174, 142, 44,
+    (void)make_button(screen, "应用到主页", 89, 174, 142, 44,
                       ACTION_EMOJI_APPLY);
-    (void)make_button(screen, "返回", 198, 174, 80, 44, ACTION_EMOJIS);
 }
 
 static void render_settings(lv_obj_t *screen)
@@ -2011,7 +2226,8 @@ static void render_settings(lv_obj_t *screen)
                    s_preferences.speaker_muted ? "已静音" : "开启");
     (void)snprintf(microphone, sizeof(microphone), "麦克风  %s",
                    s_preferences.microphone_muted ? "已静音" : "开启");
-    render_header(screen, "设置");
+    (void)make_header_back_button(screen, ACTION_MENU);
+    render_header(screen, "设备设置");
     s_settings_volume = make_settings_stepper(
         screen, volume, 38, ACTION_VOLUME_DOWN, ACTION_VOLUME_UP);
     s_settings_speaker = make_button(screen, speaker, 18, 80, 132, 34,
@@ -2035,7 +2251,40 @@ static void render_settings(lv_obj_t *screen)
                    s_preferences.acknowledgement_male ? "男声" : "女声");
     s_settings_acknowledgement = make_button(screen, acknowledgement, 170, 160, 132, 30,
                                               ACTION_ACK_VOICE);
-    (void)make_button(screen, "返回", 212, 194, 90, 28, ACTION_MENU);
+    (void)make_button(screen, "重置设备", 212, 194, 90, 28,
+                      ACTION_FACTORY_RESET);
+}
+
+static void render_factory_reset_confirmation(lv_obj_t *screen)
+{
+    factory_reset_status_t status =
+        (factory_reset_status_t)atomic_load(&s_factory_reset_status);
+    s_rendered_factory_reset_status = status;
+    (void)make_header_back_button(screen, ACTION_FACTORY_RESET_CANCEL);
+    render_header(screen, "重置设备");
+
+    s_factory_reset_status_label = make_label(
+        screen,
+        status == FACTORY_RESET_RUNNING
+            ? "正在清除用户数据，完成后设备将重启…"
+            : status == FACTORY_RESET_FAILED
+                  ? "重置失败，数据未能完整清除，请重试。"
+                  : "将清除 Wi-Fi、设备 ID、设备密钥和本机设置。\n固件、OTA 与硬件校准不会被清除。",
+        28,
+        62,
+        264,
+        status == FACTORY_RESET_FAILED ? lv_color_hex(0xFF9D9D)
+                                       : lv_color_hex(0xFFFFFF));
+    lv_obj_set_style_text_align(s_factory_reset_status_label,
+                                LV_TEXT_ALIGN_CENTER,
+                                0);
+
+    if (status != FACTORY_RESET_RUNNING) {
+        (void)make_button(screen, "取消", 38, 174, 108, 42,
+                          ACTION_FACTORY_RESET_CANCEL);
+        (void)make_button(screen, "确认重置", 174, 174, 108, 42,
+                          ACTION_FACTORY_RESET_CONFIRM);
+    }
 }
 
 static void refresh_diagnostics(int64_t now)
@@ -2147,6 +2396,7 @@ static void refresh_diagnostics(int64_t now)
 
 static void render_diagnostics(lv_obj_t *screen)
 {
+    (void)make_header_back_button(screen, ACTION_MENU);
     render_header(screen, "运行状态");
     (void)make_button(screen, "资源", 14, 36, 90, 32, ACTION_DIAG_SYSTEM);
     (void)make_button(screen, "音频", 115, 36, 90, 32, ACTION_DIAG_AUDIO);
@@ -2154,18 +2404,18 @@ static void render_diagnostics(lv_obj_t *screen)
     lv_obj_t *panel = lv_obj_create(screen);
     s_diagnostics_panel = panel;
     lv_obj_set_pos(panel, 8, 74);
-    lv_obj_set_size(panel, 304, 122);
+    lv_obj_set_size(panel, 304, 154);
     lv_obj_set_style_pad_all(panel, 4, 0);
     lv_obj_set_scroll_dir(panel, LV_DIR_VER);
     set_bg(panel, lv_color_hex(HOME_BACKGROUND_COLOR));
     s_diagnostics_label = make_label(panel, "", 0, 0, 280, lv_color_hex(0xFFFFFF));
-    (void)make_button(screen, "返回", 110, 202, 100, 30, ACTION_MENU);
     refresh_diagnostics(esp_timer_get_time() / 1000);
 }
 
 static void render_network(lv_obj_t *screen)
 {
-    render_header(screen, "网络信息");
+    (void)make_header_back_button(screen, ACTION_NETWORK_BACK);
+    render_header(screen, wifi_manager_provisioning() ? "配置网络" : "网络信息");
     if (wifi_manager_connected()) {
         wifi_config_t config = {0};
         uint8_t mac[6] = {0};
@@ -2192,33 +2442,36 @@ static void render_network(lv_obj_t *screen)
     } else if (wifi_manager_provisioning()) {
         char details[384];
         (void)snprintf(details, sizeof(details),
-                       "需要连接网络\n请连接热点：%s\n无需密码，系统通常会提示打开配网页\n%s\n未弹出时打开：%s",
+                       "让设备连接家庭 Wi-Fi\n"
+                       "1. 连接设备热点\n"
+                       "打开手机“设置 > Wi-Fi”，连接：\n%s（无需密码）\n"
+                       "提示“无互联网”是正常现象\n"
+                       "2. 配置家庭网络\n"
+                       "在弹出的页面选择家庭 Wi-Fi，并输入密码\n"
+                       "未自动打开时，请在浏览器访问 %s",
                        wifi_manager_provisioning_ssid(),
-                       wifi_manager_provisioning_status(),
                        wifi_manager_provisioning_url());
-        (void)make_label(screen, details, 22, 42, 276, lv_color_hex(0xFFFFFF));
+        (void)make_label(screen, details, 18, 36, 284, lv_color_hex(0xFFFFFF));
     } else {
         (void)make_label(screen, "正在连接网络…", 70, 88, 180,
                          lv_color_hex(0xABC0C9));
     }
-    (void)make_button(screen, "返回", 110, 198, 100, 34,
-                      ACTION_NETWORK_BACK);
 }
 
 static void render_binding(lv_obj_t *screen)
 {
     render_header(screen, "绑定设备");
-    lv_obj_t *status = make_label(screen,
-                                  "网络已连接 · 请输入验证码",
-                                  48,
-                                  38,
-                                  224,
-                                  lv_color_hex(0x72DEF8));
-    lv_obj_set_style_text_align(status, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_t *purpose = make_label(screen, "将设备添加到你的小钛账号",
+                                   34, 34, 252, lv_color_hex(0x72DEF8));
+    lv_obj_set_style_text_align(purpose, LV_TEXT_ALIGN_CENTER, 0);
+    (void)make_label(screen,
+                     "1. 浏览器打开 https://xiaotai.chat\n   注册或登录账号\n"
+                     "2. 选择“添加设备”\n   输入下面的验证码",
+                     38, 55, 244, lv_color_hex(0xFFFFFF));
 
     lv_obj_t *code_panel = lv_obj_create(screen);
-    lv_obj_set_pos(code_panel, 20, 62);
-    lv_obj_set_size(code_panel, 280, 82);
+    lv_obj_set_pos(code_panel, 20, 112);
+    lv_obj_set_size(code_panel, 280, 58);
     set_bg(code_panel, lv_color_hex(0x173B49));
     lv_obj_set_style_radius(code_panel, 18, 0);
     lv_obj_clear_flag(code_panel, LV_OBJ_FLAG_SCROLLABLE);
@@ -2238,7 +2491,7 @@ static void render_binding(lv_obj_t *screen)
     lv_obj_t *code = make_label(screen,
                                 spaced_code,
                                 20,
-                                75,
+                                111,
                                 280,
                                 lv_color_hex(0xFFFFFF));
     lv_obj_set_height(code, 58);
@@ -2247,21 +2500,13 @@ static void render_binding(lv_obj_t *screen)
     lv_obj_set_style_text_font(code, &lv_font_montserrat_48, 0);
 #endif
 
-    lv_obj_t *instruction = make_label(screen,
-                                       "请用浏览器打开",
-                                       48,
-                                       151,
-                                       224,
-                                       lv_color_hex(0xBFE9F3));
-    lv_obj_set_style_text_align(instruction, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_t *website = make_label(screen, "https://xiaotai.chat", 44, 174,
-                                   232, lv_color_hex(0xFFFFFF));
-    lv_obj_set_style_text_align(website, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_t *waiting = make_label(screen,
-                                   "正在等待绑定，验证码将播报 3 次…",
-                                   30,
-                                   202,
-                                   260,
+                                   platform_client_provisioning()
+                                       ? "正在等待绑定，验证码将语音播报 3 次"
+                                       : "正在刷新验证码，请稍候…",
+                                   22,
+                                   190,
+                                   276,
                                    lv_color_hex(0x8DA5B1));
     lv_obj_set_style_text_align(waiting, LV_TEXT_ALIGN_CENTER, 0);
 }
@@ -2273,6 +2518,7 @@ static void render_page(void)
 #endif
     lv_obj_t *screen = lv_scr_act();
     lv_obj_clean(screen);
+    s_header_has_back = false;
     set_bg(screen, lv_color_hex(HOME_BACKGROUND_COLOR));
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_t *content = product_create_content(screen);
@@ -2298,6 +2544,8 @@ static void render_page(void)
     s_call_mute_button = NULL;
 #if CONFIG_IDF_TARGET_ESP32P4
     s_call_camera_button = NULL;
+    s_call_rotate_button = NULL;
+    s_call_rotation_hint_label = NULL;
 #endif
     s_call_hangup_button = NULL;
     s_settings_volume = NULL;
@@ -2306,6 +2554,7 @@ static void render_page(void)
     s_settings_microphone_sensitivity = NULL;
     s_settings_sleep = NULL;
     s_settings_acknowledgement = NULL;
+    s_factory_reset_status_label = NULL;
     s_diagnostics_label = NULL;
     s_diagnostics_panel = NULL;
     s_diagnostics_due_ms = 0;
@@ -2323,6 +2572,7 @@ static void render_page(void)
     case PAGE_EMOJIS: render_emojis(content); break;
     case PAGE_EMOJI_PREVIEW: render_emoji_preview(content); break;
     case PAGE_SETTINGS: render_settings(content); break;
+    case PAGE_RESET_CONFIRM: render_factory_reset_confirmation(content); break;
     case PAGE_NETWORK: render_network(content); break;
     case PAGE_DIAGNOSTICS: render_diagnostics(content); break;
     case PAGE_BINDING: render_binding(content); break;
@@ -2737,6 +2987,10 @@ static void product_tick(lv_timer_t *timer)
     bool home = s_page == PAGE_HOME_FACE || s_page == PAGE_HOME_CLOCK;
     bool wifi_connected = wifi_manager_connected();
     bool wifi_failed = wifi_manager_connection_failed();
+    if (s_page == PAGE_RESET_CONFIRM &&
+        atomic_load(&s_factory_reset_status) != s_rendered_factory_reset_status) {
+        render_page();
+    }
     if (wifi_connected && !s_previous_wifi_connected) {
         s_pending_wifi_notice = WIFI_NOTICE_CONNECTED;
     }
@@ -2768,6 +3022,7 @@ static void product_tick(lv_timer_t *timer)
         /* BOOT, screen and console bypass the acoustic-result queue. */
         if (runtime.session_generation != s_wake_debug_session) show_wake_debug(NULL, now);
         s_previous_ai_generation = runtime.session_generation;
+        s_prefer_local_expression = false;
     }
     if (s_wake_debug_label != NULL && (now >= s_wake_debug_hide_ms || call_now)) {
         lv_obj_add_flag(s_wake_debug_label, LV_OBJ_FLAG_HIDDEN);
@@ -2819,6 +3074,10 @@ static void product_tick(lv_timer_t *timer)
         }
         note_interaction();
         if (s_page != PAGE_CALL) {
+#if CONFIG_IDF_TARGET_ESP32P4
+            s_call_rotation_hint = 0U;
+            s_call_rotation_hint_hide_ms = 0;
+#endif
             s_call_return_page = s_page;
             s_page = PAGE_CALL;
             starter_media_set_microphone_muted(s_preferences.microphone_muted);
@@ -2842,6 +3101,10 @@ static void product_tick(lv_timer_t *timer)
             s_call_ring_kind = CALL_RING_NONE;
         }
     } else if (call_before && s_page == PAGE_CALL) {
+#if CONFIG_IDF_TARGET_ESP32P4
+        s_call_rotation_hint = 0U;
+        s_call_rotation_hint_hide_ms = 0;
+#endif
         if (product.call_result[0] != '\0') {
             (void)snprintf(s_call_result, sizeof(s_call_result), "%s",
                            product.call_result);
@@ -2857,17 +3120,23 @@ static void product_tick(lv_timer_t *timer)
     if (!call_now) {
         s_call_ring_kind = CALL_RING_NONE;
     }
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (s_call_rotation_hint_hide_ms != 0 &&
+        now >= s_call_rotation_hint_hide_ms) {
+        s_call_rotation_hint_hide_ms = 0;
+        set_object_visible(s_call_rotation_hint_label, false);
+    }
+#endif
     if (s_page == PAGE_CALL_RESULT && now >= s_call_result_hide_ms) {
         s_page = PAGE_HOME_FACE;
         render_page();
     }
 
     /* Wi-Fi 已连但尚未绑定时，验证码页优先于所有空闲产品页。 */
-    bool binding_now = platform_client_provisioning();
+    bool binding_required = platform_client_binding_required();
     const char *verification_code = platform_client_verification_code();
-    if (!call_now && session_idle && wifi_connected && binding_now &&
-        !wifi_notice_visible &&
-        verification_code != NULL && verification_code[0] != '\0') {
+    if (!call_now && session_idle && wifi_connected && binding_required &&
+        !wifi_notice_visible) {
         bool code_changed = strcmp(verification_code,
                                    s_previous_verification_code) != 0;
         if (code_changed) {
@@ -2882,7 +3151,7 @@ static void product_tick(lv_timer_t *timer)
             render_page();
             ESP_LOGI(TAG, "binding code is visible on the product screen");
         }
-    } else if (!binding_now && s_page == PAGE_BINDING) {
+    } else if (!binding_required && s_page == PAGE_BINDING) {
         memset(s_previous_verification_code,
                0,
                sizeof(s_previous_verification_code));
@@ -2925,7 +3194,9 @@ static void product_tick(lv_timer_t *timer)
          strcmp(product.subtitle, s_previous_subtitle) != 0)) {
         if (s_state != NULL) {
             lv_label_set_text(s_state,
-                              runtime.state == STARTER_RUNTIME_AI_CONNECTING
+                              product.ai_start_pending
+                                  ? "AI 服务启动中"
+                                  : runtime.state == STARTER_RUNTIME_AI_CONNECTING
                                   ? "正在连接 AI"
                                   : (runtime.state == STARTER_RUNTIME_AI_ACTIVE
                                          ? phase_text(product.ai_phase)
@@ -3104,15 +3375,15 @@ static void product_tick(lv_timer_t *timer)
         }
     }
     const char *emotion = product.emotion;
-    if (session_idle) {
+    if (emotion[0] == '\0' || s_prefer_local_expression) {
         emotion = s_emoji_keys[s_preferences.emoji_index];
-        if (s_ambient_visible) {
-            emotion = media.voice_active ? "speech" : "ambient";
-        } else if (idle_stage >= 2U) {
-            emotion = "sleepy";
-        } else if (idle_stage == 1U) {
-            emotion = "relaxed";
-        }
+    }
+    if (session_idle && s_ambient_visible) {
+        emotion = media.voice_active ? "speech" : "ambient";
+    } else if (session_idle && idle_stage >= 2U) {
+        emotion = "sleepy";
+    } else if (session_idle && idle_stage == 1U) {
+        emotion = "relaxed";
     }
     if (home && s_page == PAGE_HOME_FACE &&
         (strcmp(emotion, s_rendered_expression) != 0 ||
@@ -3291,7 +3562,9 @@ esp_err_t starter_product_start(void)
     backlight_set(true);
     s_started = true;
 #if CONFIG_IDF_TARGET_ESP32P4
-    ESP_LOGI(TAG, "XiaoTai P4 UI ready: 480x320 touch, audio/video contacts, sleep=%s",
+    ESP_LOGI(TAG, "XiaoTai P4 UI ready: %ux%u touch, audio/video contacts, sleep=%s",
+             (unsigned)display_driver_width(),
+             (unsigned)display_driver_height(),
              s_sleep_names[s_preferences.sleep_index]);
 #else
     ESP_LOGI(TAG,

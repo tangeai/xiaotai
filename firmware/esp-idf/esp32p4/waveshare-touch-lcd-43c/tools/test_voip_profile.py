@@ -41,7 +41,7 @@ assert call["camera_rotation"] == 270
 assert voip["no_video"] is False
 assert (voip["up_video_mt"], voip["down_video_mt"]) == ("h264", "mjpeg")
 assert (voip["screen_width"], voip["screen_height"]) == (640, 480)
-assert voip["camera_rotation"] == 270
+assert voip["camera_rotation"] == 0
 assert voip["down_video_rotation"] == 1
 assert voip["aspect_ratio"] == 960 / 1280
 assert voip["hor_mirror"] is False and voip["vert_mirror"] is False
@@ -61,9 +61,21 @@ assert "/v1/voip/device/profile" not in profile_function
 assert "stream_rotation=270" in profile_function
 renderer = (Path(__file__).resolve().parents[5] / "platforms/esp-idf/waveshare_p4/call_video_renderer.c").read_text()
 renderer_config = (root / "main/services/call_video_renderer_config.h").read_text()
-assert re.search(r"video_frame_rotation_t display_rotation\s*=\s*VIDEO_FRAME_ROTATION_CLOCKWISE_90;", renderer)
-assert "rotation=cw90 source_rotation=not-signaled" in renderer
+wechat_config = (root / "main/services/wechat_voip/wechat_voip_config.h").read_text()
+assert "call_video_renderer_set_presentation" in renderer
+assert "s_renderer.presentation.rotation" in renderer
+assert not re.search(r"video_frame_rotation_t display_rotation\s*=\s*VIDEO_FRAME_ROTATION_CLOCKWISE_90;", renderer)
+assert "starter_media_set_remote_video_presentation" in source
+presentation_start = source.index("static void configure_remote_video_presentation")
+presentation = source[presentation_start:
+                      source.index("static void request_ai_token_response",
+                                   presentation_start)]
+assert "uint16_t rotation = 90U;" in presentation
+assert "call_read_rotation" not in presentation
+assert 'wechat ? "wechat-contract" : "local-default"' in presentation
+assert "#define APP_CONFIG_WECHAT_VOIP_CAMERA_ROTATION 0" in wechat_config
+assert '"rotation=%s source_rotation=%s "' in renderer
 assert "CALL_VIDEO_RENDER_WIDTH             640U" in renderer_config
 assert "CALL_VIDEO_RENDER_HEIGHT            384U" in renderer_config
 assert "CALL_VIDEO_MJPEG_MAX_PIXELS        (640U * 480U)" in renderer
-print("PASS: unified stream/call/voip capabilities and centered 640x384 MJPEG presentation contract")
+print("PASS: scene-specific uplink/downlink rotation and centered 640x384 presentation contract")

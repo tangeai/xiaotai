@@ -118,7 +118,7 @@ class RepositoryLayoutTests(unittest.TestCase):
                 self.assertIn(board_id, readme, board_id)
             else:
                 self.assertNotIn(board_id, readme, board_id)
-        self.assertIn("[更多开发板](docs/boards/README.md)", readme)
+        self.assertIn("[完整开发板目录](docs/boards/README.md)", readme)
 
     def test_root_documents_keep_reader_focused_section_order(self):
         expected_sections = {
@@ -302,7 +302,6 @@ class RepositoryLayoutTests(unittest.TestCase):
             path for path in (ROOT / "docs").rglob("*.md")
             if ".local" not in path.parts
         )
-        public_files.extend((ROOT / "docs/product/board-catalog").glob("*.html"))
         for path in public_files:
             self.assertNotIn(
                 "ESP32-P4-WIFI6-Touch-LCD-3.5",

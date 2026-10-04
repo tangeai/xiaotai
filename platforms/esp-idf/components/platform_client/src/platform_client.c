@@ -122,6 +122,7 @@ static atomic_bool s_mqtt_connected;
 static platform_online_callback_t s_online_callback;
 static void *s_online_user_data;
 static volatile bool s_provisioning;
+static volatile bool s_binding_required;
 static bool s_services_ready;
 static char s_verification_code[17];
 static platform_signal_callback_t s_signal_callback;
@@ -1188,6 +1189,7 @@ esp_err_t platform_client_provision(const platform_provision_config_t *config,
         return ESP_ERR_INVALID_ARG;
     }
     memset(result, 0, sizeof(*result));
+    s_binding_required = true;
     esp_err_t err = sync_clock();
     if (err != ESP_OK) {
         return err;
@@ -1221,6 +1223,7 @@ esp_err_t platform_client_provision(const platform_provision_config_t *config,
                              sizeof(s_verification_code));
     mbedtls_platform_zeroize(&report, sizeof(report));
     if (err == ESP_OK) {
+        s_binding_required = false;
         ESP_LOGI(TAG, "verification binding completed; credentials ready for NVS");
     }
     return err;
@@ -1406,6 +1409,11 @@ esp_err_t platform_client_resume_mqtt_after_realtime(void)
 bool platform_client_provisioning(void)
 {
     return s_provisioning;
+}
+
+bool platform_client_binding_required(void)
+{
+    return s_binding_required;
 }
 
 const char *platform_client_verification_code(void)

@@ -44,6 +44,20 @@ RICH_PLATFORM_CLIENT_PROJECTS = tuple(
 
 
 class EspPlatformComponentsTest(unittest.TestCase):
+    def test_captive_portal_matches_the_product_two_step_flow(self) -> None:
+        source = (
+            ROOT / "platforms/esp-idf/components/wifi_manager/src/wifi_manager.c"
+        ).read_text()
+        self.assertIn("小钛联网助手", source)
+        self.assertIn("选择家庭 Wi-Fi", source)
+        self.assertIn("重新选择 Wi-Fi", source)
+        self.assertIn("连接此 Wi-Fi", source)
+        self.assertIn('uri = "/api/wifi/scan"', source)
+        self.assertIn("esp_wifi_scan_start", source)
+        self.assertIn('uri = "/hotspot-detect.html"', source)
+        self.assertNotIn("TiRTC 设备配网", source)
+        self.assertNotIn("保存并重启", source)
+
     def test_runtime_config_has_one_platform_implementation(self) -> None:
         canonical = ROOT / "platforms/esp-idf/components/runtime_config"
         self.assertTrue((canonical / "src/runtime_config.c").is_file())

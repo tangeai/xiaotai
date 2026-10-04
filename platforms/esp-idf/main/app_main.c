@@ -228,13 +228,19 @@ static void starter_start_task(void *argument)
                        "%s",
                        default_client_id);
         ESP_LOGW(TAG, "device is not bound; starting verification-code binding");
-        err = provision_and_save(mac_address, false);
-        if (err != ESP_OK) {
+        for (;;) {
+            while (!wifi_manager_connected()) {
+                vTaskDelay(pdMS_TO_TICKS(250));
+            }
+            err = provision_and_save(mac_address, false);
+            if (err == ESP_OK) {
+                break;
+            }
             ESP_LOGE(TAG,
-                     "binding did not complete: %s; restart to retry",
+                     "binding incomplete; retrying in %u ms: %s",
+                     START_RETRY_DELAY_MS,
                      esp_err_to_name(err));
-            vTaskDelete(NULL);
-            return;
+            vTaskDelay(pdMS_TO_TICKS(START_RETRY_DELAY_MS));
         }
     } else {
         ESP_LOGI(TAG,
@@ -270,9 +276,8 @@ static void starter_start_task(void *argument)
     };
     /*
      * 平台信令和 SDK 独立重试。platform_client_start() 返回 NOT_FOUND 表示
-     * 本地凭证对应的设备已解绑，只在本次启动中尝试一次签名重绑。
+     * 本地凭证对应的设备已解绑，保持在验证码页并持续尝试签名重绑。
      */
-    bool rebind_attempted = false;
     bool tirtc_submitted = false;
     bool controls_started = false;
     bool wake_submitted = false;
@@ -348,12 +353,13 @@ static void starter_start_task(void *argument)
 
         if (!platform_client_ready()) {
             esp_err_t platform_err = platform_client_start(&platform);
-            if (platform_err == ESP_ERR_NOT_FOUND && !rebind_attempted) {
-                rebind_attempted = true;
+            if (platform_err == ESP_ERR_NOT_FOUND) {
                 ESP_LOGW(TAG, "stored device was unbound; starting signed rebind");
                 platform_err = provision_and_save(mac_address, true);
                 if (platform_err == ESP_OK) {
-                    platform_err = platform_client_start(&platform);
+                    ESP_LOGI(TAG, "signed rebind saved; restarting with new credentials");
+                    vTaskDelay(pdMS_TO_TICKS(300));
+                    esp_restart();
                 }
             }
             if (platform_err != ESP_OK) {

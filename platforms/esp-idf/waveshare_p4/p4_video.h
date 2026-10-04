@@ -4,6 +4,8 @@
 #include "lvgl.h"
 esp_err_t p4_video_init(void);
 void p4_video_set_session(starter_tirtc_mode_t mode, uint32_t generation, bool video);
+void p4_video_set_remote_presentation(uint16_t rotation, bool remote_profile);
+esp_err_t p4_video_rotate_remote_clockwise(uint16_t *rotation);
 void p4_video_poll(void);
 esp_err_t p4_video_set_camera_enabled(uint32_t generation, bool enabled);
 void p4_video_key_frame(void);

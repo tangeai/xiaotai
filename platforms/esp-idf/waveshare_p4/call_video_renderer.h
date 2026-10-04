@@ -15,6 +15,11 @@ typedef enum {
 } call_video_codec_t;
 
 typedef struct {
+    uint16_t rotation;       /* Additional clockwise receive-side rotation. */
+    bool remote_profile;     /* True when supplied by peer/platform metadata. */
+} call_video_presentation_t;
+
+typedef struct {
     uint32_t frame_index;
     uint32_t pts;
     uint32_t payload_bytes;
@@ -68,6 +73,11 @@ esp_err_t call_video_renderer_prewarm(void);
 /* Reserves the P4 hardware JPEG driver's small internal DMA working set before
  * networking and RTC fragment internal RAM. The decoder is reused by calls. */
 esp_err_t call_video_renderer_prewarm_mjpeg_decoder(void);
+esp_err_t call_video_renderer_set_presentation(
+    const call_video_presentation_t *presentation);
+/* Applies a local, receive-only 90-degree clockwise adjustment while a call is
+ * running. The next session's set_presentation() call replaces this override. */
+esp_err_t call_video_renderer_rotate_clockwise(uint16_t *rotation);
 esp_err_t call_video_renderer_start_for_codec(call_video_codec_t codec);
 esp_err_t call_video_renderer_start(void);
 esp_err_t call_video_renderer_stop(void);

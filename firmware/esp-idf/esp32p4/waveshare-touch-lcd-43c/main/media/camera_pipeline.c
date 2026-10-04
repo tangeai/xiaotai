@@ -1708,6 +1708,7 @@ static bool camera_pipeline_build_call_scaler_config(video_yuv420_scaler_config_
         .input_height = camera_pipeline_even_dimension(policy.capture_height),
         .output_width = camera_pipeline_even_dimension(policy.rtc_width),
         .output_height = camera_pipeline_even_dimension(policy.rtc_height),
+        .fit_contain = true,
     };
 
     return config->input_width > 0U && config->input_height > 0U &&
@@ -2361,6 +2362,8 @@ static void camera_pipeline_task(void *arg)
                 .output_width = target_width,
                 .output_height = target_height,
                 .rotate_ccw90 = rotate_ccw90,
+                .fit_contain = target_width == APP_MEDIA_CALL_VIDEO_WIDTH &&
+                               target_height == APP_MEDIA_CALL_VIDEO_HEIGHT,
             };
             if (!video_yuv420_scaler_matches(yuv420_scaler, &scaler_config)) {
                 camera_pipeline_scaler_release(&yuv420_scaler, "profile-change");

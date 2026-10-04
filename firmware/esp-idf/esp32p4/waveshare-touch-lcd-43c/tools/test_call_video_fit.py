@@ -71,6 +71,19 @@ with tempfile.TemporaryDirectory(prefix="call-video-fit-") as directory:
 assert "#define CALL_VIDEO_H264_FIT_COVER            0U" in config
 assert ".source_crop_width = 0" in renderer
 assert ".source_crop_height = 0" in renderer
+assert ".source_max_width = CALL_VIDEO_DECODE_MAX_WIDTH" in renderer
+assert ".source_max_height = CALL_VIDEO_DECODE_MAX_HEIGHT" in renderer
+assert ".require_ppa = true" in renderer
+assert "config->source_max_width" in converter
+assert "config->source_max_height" in converter
+assert "PPA I420 staging buffer is too small" in converter
+assert "if (handle->config.require_ppa) return ppa_ret;" in converter
+assert "video_frame_converter_i420_to_rgb565(converter" in renderer
+assert "s_renderer.presentation.rotation" in renderer
+assert "VIDEO_FRAME_ROTATION_CLOCKWISE_0" not in renderer[
+    renderer.index("video_frame_converter_i420_to_rgb565(converter"):
+    renderer.index("video_frame_converter_i420_to_rgb565(converter") + 500
+]
 assert "slot->width = resolution.width;" in renderer
 assert "slot->height = resolution.height;" in renderer
 print("PASS: device-call H264 preserves source pixels and contains each resolution centrally")

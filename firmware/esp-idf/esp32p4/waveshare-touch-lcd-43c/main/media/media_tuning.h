@@ -24,17 +24,18 @@
  *
  * The encoder bitrate is a rate-control target, not a hard ceiling. Device
  * calls use a VGA 4:3 surface independently from the portrait WeChat profile.
- * The receiver converts it once to the panel viewport through PPA. Reserve
- * 1.2 Mbit/s so the higher pixel count does not regress into the soft output
- * observed with the former 384x256 / 512 kbit/s profile. Weak-network
- * adaptation may lower this target only after transport feedback.
+ * The receiver converts it once to the panel viewport through PPA. The P4
+ * must encode and decode concurrently. Field logs show that 12 fps can
+ * outrun its software H264 decoder and force repeated reference-chain resets.
+ * Five fps stays within the measured sustained decode rate; 600 kbit/s keeps
+ * per-frame complexity bounded while retaining the VGA canvas.
  */
 #define APP_MEDIA_CALL_VIDEO_WIDTH                      640U
 #define APP_MEDIA_CALL_VIDEO_HEIGHT                     480U
-#define APP_MEDIA_CALL_VIDEO_FPS                        12U
-#define APP_MEDIA_CALL_VIDEO_BITRATE_BPS                1200000U
-#define APP_MEDIA_CALL_VIDEO_MIN_QP                     28U
-#define APP_MEDIA_CALL_VIDEO_MAX_QP                     44U
+#define APP_MEDIA_CALL_VIDEO_FPS                        5U
+#define APP_MEDIA_CALL_VIDEO_BITRATE_BPS                600000U
+#define APP_MEDIA_CALL_VIDEO_MIN_QP                     30U
+#define APP_MEDIA_CALL_VIDEO_MAX_QP                     46U
 
 /* XiaoTai phone/browser uplink: balanced full-duplex sensor-orientation
  * profile. Keep the full 4:3 field of view and scale it to 75%, but leave the
@@ -89,8 +90,7 @@
 #define APP_MEDIA_TGMP_EVENT_MIN_INTERVAL_US            500000ULL
 #define APP_MEDIA_TGMP_EVENT_FAST_STEP_BPS              64000U
 /* The lower bound is exposed only after transport feedback reports congestion.
- * VGA calls derive a 300 kbit/s floor from the normal 1.2 Mbit/s target; the
- * compact 96 kbit/s floor remains available to smaller profiles. */
+ * Compact VGA calls retain a 96 kbit/s recovery floor. */
 #define APP_MEDIA_TGMP_COMPACT_MIN_BITRATE_BPS           (96U * 1000U)
 #define APP_MEDIA_TGMP_LARGE_MIN_BITRATE_BPS            (750U * 1000U)
 #define APP_MEDIA_TGMP_MIN_RATIO_DIVISOR                4U

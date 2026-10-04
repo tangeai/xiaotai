@@ -103,6 +103,9 @@ esp_err_t platform_client_provision(const platform_provision_config_t *config,
 bool platform_client_ready(void);
 bool platform_client_mqtt_connected(void);
 bool platform_client_provisioning(void);
+/* True from the first unbound provisioning attempt until credentials have
+ * been delivered. Unlike provisioning(), this remains true between retries. */
+bool platform_client_binding_required(void);
 
 /**
  * TiRTC 外连在 ESP32-S3 上需要一块较大的连续内部堆。外连提交前可短暂停止

@@ -13,6 +13,7 @@ code=r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <stddef.h>
 #include "media_tuning.h"
 #define CONFIG_APP_RTC_VIDEO_AUTO_ADAPT_ENABLE 0
@@ -24,38 +25,60 @@ code=r'''
 #define MEDIA_GOVERNOR_CAPTURE_HEIGHT APP_MEDIA_CAMERA_CAPTURE_HEIGHT
 #define VIDEO_YUV420_SCALE_DENOMINATOR 16U
 typedef struct {uint16_t width,height; uint8_t fps; uint32_t bitrate_bps; int weak_network_mode,weak_network_level,h264_min_qp,h264_max_qp;} media_governor_video_config_t;
-typedef struct {uint16_t input_width,input_height,output_width,output_height; bool rotate_ccw90;} video_yuv420_scaler_config_t;
+typedef struct {uint16_t input_width,input_height,output_width,output_height; bool rotate_ccw90,fit_contain;} video_yuv420_scaler_config_t;
 '''
+code+=function(governor,"void media_governor_build_device_call_video_config(")
 code+=function(governor,"void media_governor_build_wechat_video_config(")
 code+=function(governor,"void media_governor_build_h5_video_config(")
 code+=function(governor,"static void media_governor_select_native_capture_size(")
 code+=function(scaler,"static bool video_yuv420_select_geometry(")
 code+=function(scaler,"static bool video_yuv420_config_valid(")
+code+=function(scaler,"static size_t video_yuv420_data_size(")
+code+=function(scaler,"static void video_yuv420_fill_black_ouyy_evyy(")
 code+=r'''
 int main(void) {
+    uint8_t black[24];
+    memset(black, 0xa5, sizeof(black));
+    video_yuv420_fill_black_ouyy_evyy(black, 4, 4);
+    const uint8_t expected_black[24] = {
+        128, 16, 16, 128, 16, 16,
+        128, 16, 16, 128, 16, 16,
+        128, 16, 16, 128, 16, 16,
+        128, 16, 16, 128, 16, 16,
+    };
+    assert(memcmp(black, expected_black, sizeof(black)) == 0);
     media_governor_video_config_t config;
-    media_governor_build_wechat_video_config(&config);
-    assert(config.width==960 && config.height==720 && config.fps==12 && config.bitrate_bps==1500000);
+    media_governor_build_device_call_video_config(&config);
+    assert(config.width==640 && config.height==480 && config.fps==5 && config.bitrate_bps==600000);
     uint16_t w=APP_MEDIA_CAMERA_CAPTURE_WIDTH,h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
     media_governor_select_native_capture_size(&config,&w,&h);
-    assert(w==1280 && h==960);
-    video_yuv420_scaler_config_t scale={w,h,config.width,config.height,false};
+    assert(w==800 && h==640);
+    video_yuv420_scaler_config_t scale={w,h,config.width,config.height,false,true};
     assert(video_yuv420_config_valid(&scale));
-    uint16_t cw,ch,x,y; uint8_t step;
-    assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&step));
+    uint16_t cw,ch,x,y,ox,oy; uint8_t step;
+    assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
+    assert(cw==800 && ch==640 && x==0 && y==0 && ox==20 && oy==0 && step==12);
+    media_governor_build_wechat_video_config(&config);
+    assert(config.width==960 && config.height==720 && config.fps==12 && config.bitrate_bps==1500000);
+    w=APP_MEDIA_CAMERA_CAPTURE_WIDTH; h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
+    media_governor_select_native_capture_size(&config,&w,&h);
+    assert(w==1280 && h==960);
+    scale=(video_yuv420_scaler_config_t){w,h,config.width,config.height,false,false};
+    assert(video_yuv420_config_valid(&scale));
+    assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
     assert(cw==1280 && ch==960 && x==0 && y==0 && step==12);
     media_governor_build_h5_video_config(&config);
     assert(config.width==1280 && config.height==960 && config.fps==20 && config.bitrate_bps==3000000);
     w=APP_MEDIA_CAMERA_CAPTURE_WIDTH; h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
     media_governor_select_native_capture_size(&config,&w,&h);
     assert(w==1280 && h==960);
-    scale=(video_yuv420_scaler_config_t){w,h,config.width,config.height,false};
+    scale=(video_yuv420_scaler_config_t){w,h,config.width,config.height,false,false};
     assert(video_yuv420_config_valid(&scale));
-    assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&step));
+    assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
     assert(cw==1280 && ch==960 && x==0 && y==0 && step==16);
-    scale=(video_yuv420_scaler_config_t){800,640,384,256,false};
+    scale=(video_yuv420_scaler_config_t){800,640,384,256,false,false};
     assert(video_yuv420_config_valid(&scale));
-    assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&step));
+    assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
 }
 '''
 with tempfile.TemporaryDirectory(prefix="full-frame-uplink-") as tmp:
