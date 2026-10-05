@@ -13,6 +13,7 @@
 #include "camera_pipeline.h"
 
 #define CAPTURE_CAP (512U * 1024U)
+#define DOWNLINK_CAPTURE_CAP (256U * 1024U)
 static SemaphoreHandle_t s_mutex;
 static atomic_bool s_active, s_missed;
 static uint8_t *s_data;
@@ -23,6 +24,11 @@ static int s_mode;
 static int64_t s_deadline;
 static bool s_started;
 static const char *s_reason = "empty";
+static atomic_bool s_down_active;
+static uint8_t *s_down_data;
+static size_t s_down_size;
+static uint32_t s_down_generation;
+static const char *s_down_reason = "empty";
 
 /* Annex B validation: do not export a clip starting without SPS/PPS/IDR. */
 static bool has_headers_and_idr(const uint8_t *data, size_t len)
@@ -69,6 +75,33 @@ void p4_video_capture_offer(const uint8_t *data, size_t len, uint16_t w,
     goto done;
 stop:
     atomic_store(&s_active, false);
+done:
+    xSemaphoreGive(s_mutex);
+}
+
+void p4_video_capture_offer_downlink(const uint8_t *data, size_t len,
+                                     uint32_t generation)
+{
+    if (!atomic_load(&s_down_active) || !data) return;
+    /* One complete JPEG before the renderer; no waiting or console I/O here. */
+    if (xSemaphoreTake(s_mutex, 0) != pdTRUE) return;
+    if (!atomic_load(&s_down_active)) goto done;
+    if (generation != s_down_generation) {
+        s_down_reason = "session-changed";
+        atomic_store(&s_down_active, false);
+        goto done;
+    }
+    if (len < 4 || data[0] != 0xff || data[1] != 0xd8 ||
+        data[len - 2] != 0xff || data[len - 1] != 0xd9) goto done;
+    if (len > DOWNLINK_CAPTURE_CAP) {
+        s_down_reason = "capacity";
+        atomic_store(&s_down_active, false);
+        goto done;
+    }
+    memcpy(s_down_data, data, len);
+    s_down_size = len;
+    s_down_reason = "captured";
+    atomic_store(&s_down_active, false);
 done:
     xSemaphoreGive(s_mutex);
 }
@@ -143,6 +176,69 @@ static int capture_command(int argc, char **argv)
     return rc;
 }
 
+static int downlink_capture_command(int argc, char **argv)
+{
+    if (argc != 2) {
+        puts("usage: downlink-capture start|stop|status|dump|clear");
+        return 1;
+    }
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    int rc = 0;
+    if (!strcmp(argv[1], "start")) {
+        if (!starter_tirtc_connected() || starter_tirtc_mode() != STARTER_TIRTC_VOIP ||
+            atomic_load(&s_down_active) || s_down_data) {
+            puts("DCAP ERROR require active WeChat video and clear previous capture"); rc = 1;
+        } else {
+            s_down_data = heap_caps_malloc(DOWNLINK_CAPTURE_CAP,
+                                           MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+            if (!s_down_data) {
+                puts("DCAP ERROR PSRAM allocation failed"); rc = 1;
+            } else {
+                s_down_size = 0;
+                s_down_generation = starter_tirtc_generation();
+                s_down_reason = "armed";
+                atomic_store(&s_down_active, true);
+                puts("DCAP ARMED");
+            }
+        }
+    } else if (!strcmp(argv[1], "stop")) {
+        if (atomic_exchange(&s_down_active, false)) s_down_reason = "manual-stop";
+    } else if (!strcmp(argv[1], "clear")) {
+        atomic_store(&s_down_active, false);
+        free(s_down_data); s_down_data = NULL; s_down_size = 0;
+        s_down_generation = 0; s_down_reason = "empty";
+    } else if (!strcmp(argv[1], "dump")) {
+        if (atomic_load(&s_down_active) || starter_tirtc_connected() || !s_down_size) {
+            puts("DCAP ERROR end call before dump; captured JPEG required"); rc = 1;
+        } else {
+            printf("\nDCAP BEGIN bytes=%u fnv=%08lx generation=%lu\n",
+                   (unsigned)s_down_size,
+                   (unsigned long)checksum(s_down_data, s_down_size),
+                   (unsigned long)s_down_generation);
+            for (size_t i = 0; i < s_down_size; i += 64) {
+                char line[160];
+                int n = snprintf(line, sizeof(line), "DCAP DATA %08x ", (unsigned)i);
+                size_t count = s_down_size - i < 64 ? s_down_size - i : 64;
+                static const char hex[] = "0123456789abcdef";
+                for (size_t j = 0; j < count; ++j) {
+                    line[n++] = hex[s_down_data[i + j] >> 4];
+                    line[n++] = hex[s_down_data[i + j] & 15];
+                }
+                line[n++] = '\n'; line[n] = 0;
+                fputs(line, stdout);
+            }
+            puts("DCAP END");
+        }
+    } else if (strcmp(argv[1], "status")) {
+        puts("DCAP ERROR unknown command"); rc = 1;
+    }
+    printf("DCAP STATUS active=%d bytes=%u generation=%lu reason=%s\n",
+           atomic_load(&s_down_active), (unsigned)s_down_size,
+           (unsigned long)s_down_generation, s_down_reason);
+    xSemaphoreGive(s_mutex);
+    return rc;
+}
+
 esp_err_t p4_video_capture_init(void)
 {
     if (s_mutex) return ESP_OK;
@@ -152,5 +248,11 @@ esp_err_t p4_video_capture_init(void)
         .help = "Temporary pre-SDK H264: start|stop|status|dump|clear", .func = capture_command};
     esp_err_t ret = esp_console_cmd_register(&cmd);
     if (ret != ESP_OK) { vSemaphoreDelete(s_mutex); s_mutex = NULL; }
+    if (ret == ESP_OK) {
+        const esp_console_cmd_t downlink_cmd = {.command = "downlink-capture",
+            .help = "Temporary pre-render JPEG: start|stop|status|dump|clear",
+            .func = downlink_capture_command};
+        ret = esp_console_cmd_register(&downlink_cmd);
+    }
     return ret;
 }

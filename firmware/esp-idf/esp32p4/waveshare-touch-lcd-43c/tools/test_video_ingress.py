@@ -12,6 +12,7 @@ def function(signature):
 code = r'''
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdatomic.h>
 #include <string.h>
@@ -32,7 +33,7 @@ static atomic_uint s_live_generation=1, s_rx_seen, s_rx_last_media, s_rx_last_st
 static atomic_bool s_need_idr;
 static int64_t s_last_idr_us;
 static struct { uint32_t generation; starter_tirtc_frame_t frame; uint8_t data[64]; } s_ingress[4];
-static int s_free=1, s_pending=2, pending, mode=STARTER_TIRTC_VOIP, jpeg, h264;
+static int s_free=1, s_pending=2, pending, mode=STARTER_TIRTC_VOIP, jpeg, h264, captured;
 static int starter_tirtc_mode(void) { return mode; }
 static int xQueueReceive(int q, uint8_t *slot, int timeout) {
     assert(timeout==0); *slot=0;
@@ -44,6 +45,9 @@ static int xQueueSend(int q, const uint8_t *slot, int timeout) {
 }
 static int call_video_renderer_submit_mjpeg(const void *data, unsigned len, unsigned ts) {
     assert(len==4 && ts==123 && memcmp(data,"JPEG",4)==0); ++jpeg; return 0;
+}
+static void p4_video_capture_offer_downlink(const uint8_t *data, size_t len, uint32_t generation) {
+    assert(len==4 && generation==1 && memcmp(data,"JPEG",4)==0); ++captured;
 }
 static int call_video_renderer_submit_h264(const void *data, unsigned len, bool key, unsigned ts) {
     (void)data; (void)len; (void)key; (void)ts; ++h264; return 0;
@@ -57,14 +61,14 @@ code += r'''
 int main(void) {
     starter_tirtc_frame_t f={.stream_id=1,.media=65,.length=4,.timestamp_ms=123};
     p4_video_submit(1,&f,"JPEG"); drain_video();
-    assert(jpeg==1); /* Exact captured stream=1 media=65 must reach MJPEG. */
+    assert(jpeg==1 && captured==1); /* Exact stream=1 JPEG is captured before render. */
     p4_video_submit(2,&f,"JPEG"); drain_video(); assert(jpeg==1);
     f.media=TIRTC_VIDEO_H264;
     p4_video_submit(1,&f,"JPEG"); drain_video(); assert(jpeg==1 && h264==0);
     mode=STARTER_TIRTC_CALL; f.stream_id=11;
     p4_video_submit(1,&f,"JPEG"); drain_video(); assert(h264==1);
     f.media=TIRTC_VIDEO_JPEG;
-    p4_video_submit(1,&f,"JPEG"); drain_video(); assert(jpeg==1);
+    p4_video_submit(1,&f,"JPEG"); drain_video(); assert(jpeg==1 && captured==1);
     return 0;
 }
 '''

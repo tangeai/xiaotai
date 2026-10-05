@@ -26,9 +26,6 @@ enum {
     VOIP_HTTP_URL_MAX_LEN = 256,
     VOIP_HTTP_RESPONSE_MAX_LEN = 2048,
     VOIP_HTTP_BODY_MAX_LEN = 768,
-    VOIP_PROFILE_MAX_LEN = 512,
-    DEVICE_AUDIO_RATE = 8000,
-    DEVICE_AUDIO_CHANNELS = 1,
     DEVICE_CALLING_TIMEOUT_SEC = 30,
 };
 
@@ -135,103 +132,6 @@ static esp_err_t parse_and_check_reply(const char *response, const char *operati
     }
     cJSON_Delete(root);
     return ESP_OK;
-}
-
-esp_err_t wechat_voip_api_report_profile(const char *api_base, const char *mqtt_token)
-{
-    char response[VOIP_HTTP_RESPONSE_MAX_LEN] = {0};
-    int status = 0;
-    char body[VOIP_PROFILE_MAX_LEN + 1] = {0};
-    const char *object_fit = WECHAT_VOIP_OBJECT_FIT;
-    const bool local_video = WECHAT_VOIP_LOCAL_VIDEO_ENABLE != 0;
-    const bool remote_video = WECHAT_VOIP_REMOTE_VIDEO_ENABLE != 0;
-    const bool any_video = local_video || remote_video;
-    cJSON *profile = cJSON_CreateObject();
-    ESP_RETURN_ON_FALSE(profile != NULL, ESP_ERR_NO_MEM, TAG, "create voip profile failed");
-
-    if (strcmp(object_fit, "fill") != 0 && strcmp(object_fit, "contain") != 0) {
-        ESP_LOGW(TAG,
-                 "invalid profile object_fit=%s; fallback=contain",
-                 object_fit);
-        object_fit = "contain";
-    }
-
-    /*
-     * Request the standard 640x480 landscape rendition. The physical 480x320
-     * panel contract remains inside the renderer, and adaptive service output
-     * may still temporarily arrive at a smaller size.
-     * Rotation, mirror, aspect_ratio, and object_fit are extension hints.
-     * P4 publishes hardware-encoded H264, while the service converts WeChat
-     * downlink to independent MJPEG frames for the hardware JPEG decoder.
-     */
-    cJSON_AddNumberToObject(profile,
-                           "screen_width",
-                           WECHAT_VOIP_SCREEN_WIDTH);
-    cJSON_AddNumberToObject(profile,
-                           "screen_height",
-                           WECHAT_VOIP_SCREEN_HEIGHT);
-    cJSON_AddNumberToObject(profile, "camera_rotation", WECHAT_VOIP_CAMERA_ROTATION);
-    cJSON_AddNumberToObject(profile,
-                           "aspect_ratio",
-                           (double)WECHAT_VOIP_VIDEO_WIDTH /
-                               (double)WECHAT_VOIP_VIDEO_HEIGHT);
-    cJSON_AddBoolToObject(profile, "hor_mirror", false);
-    cJSON_AddBoolToObject(profile, "vert_mirror", false);
-    cJSON_AddStringToObject(profile, "object_fit", object_fit);
-    cJSON_AddNumberToObject(profile, "audio_rate", DEVICE_AUDIO_RATE);
-    cJSON_AddNumberToObject(profile, "audio_channels", DEVICE_AUDIO_CHANNELS);
-    cJSON_AddStringToObject(profile,
-                           "up_video_mt",
-                           local_video ? WECHAT_VOIP_UP_VIDEO_MEDIA : "none");
-    cJSON_AddStringToObject(profile,
-                           "down_video_mt",
-                           remote_video ? WECHAT_VOIP_DOWN_VIDEO_MEDIA : "none");
-    cJSON_AddStringToObject(profile, "down_audio_mt", "alaw");
-    cJSON_AddBoolToObject(profile, "no_video", !any_video);
-    cJSON_AddNumberToObject(profile, "calling_timeout_sec", DEVICE_CALLING_TIMEOUT_SEC);
-
-    bool printed = cJSON_PrintPreallocated(profile, body, sizeof(body), false);
-    cJSON_Delete(profile);
-    ESP_RETURN_ON_FALSE(printed && strlen(body) <= VOIP_PROFILE_MAX_LEN,
-                        ESP_ERR_INVALID_SIZE,
-                        TAG,
-                        "voip profile exceeds %u bytes",
-                        (unsigned)VOIP_PROFILE_MAX_LEN);
-
-    ESP_LOGI(TAG,
-             "report voip profile: request_down=%s-%ux%u "
-             "server_fit=%s "
-             "camera_rotation=%u request_up=%s-%ux%u "
-             "audio=%uHz/%uch bytes=%u",
-             remote_video ? WECHAT_VOIP_DOWN_VIDEO_MEDIA : "none",
-             (unsigned)WECHAT_VOIP_SCREEN_WIDTH,
-             (unsigned)WECHAT_VOIP_SCREEN_HEIGHT,
-             object_fit,
-             (unsigned)WECHAT_VOIP_CAMERA_ROTATION,
-             local_video ? WECHAT_VOIP_UP_VIDEO_MEDIA : "none",
-             (unsigned)WECHAT_VOIP_VIDEO_WIDTH,
-             (unsigned)WECHAT_VOIP_VIDEO_HEIGHT,
-             (unsigned)DEVICE_AUDIO_RATE,
-             (unsigned)DEVICE_AUDIO_CHANNELS,
-             (unsigned)strlen(body));
-    esp_err_t ret = voip_http_request(api_base,
-                                      "/v1/voip/device/profile",
-                                      "POST",
-                                      body,
-                                      mqtt_token,
-                                      response,
-                                      sizeof(response),
-                                      &status);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-    if (status != 200) {
-        ESP_LOGW(TAG, "report profile HTTP status=%d body_len=%u",
-                 status,
-                 (unsigned)strlen(response));
-        return ESP_FAIL;
-    }
-    return parse_and_check_reply(response, "report profile");
 }
 
 esp_err_t wechat_voip_api_fetch_callers(const char *api_base,

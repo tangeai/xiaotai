@@ -40,7 +40,6 @@
       {
         "file": "main/services/wechat_voip/wechat_voip_api.c",
         "contains": [
-          "/v1/voip/device/profile",
           "/v1/voip/device/contacts",
           "/v1/voip/device/call"
         ]

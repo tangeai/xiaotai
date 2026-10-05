@@ -799,29 +799,22 @@ static bool copy_json_string(const cJSON *object,
 }
 
 #if CONFIG_IDF_TARGET_ESP32P4
-static uint16_t remote_video_initial_rotation(bool wechat, bool outgoing)
+static uint16_t remote_video_initial_rotation(bool wechat)
 {
-    if (!wechat) {
-        return 0U;
-    }
-    return outgoing ? 90U : 270U;
+    return wechat ? 90U : 0U;
 }
 
 static void configure_remote_video_presentation(const cJSON *metadata,
                                                 bool wechat)
 {
     /* Device calls start upright and expose the session-local rotate control.
-     * WeChat uses different downlink pixel orientations depending on which
-     * endpoint initiated the call: device-originated calls need cw90, while
-     * mini-program-originated calls need cw270 (ccw90). These receiver angles
-     * remain independent from the uplink camera_rotation profile field. */
+     * Both WeChat call directions use the same down_video_rotation contract,
+     * so their P4-local downlink correction is cw90 regardless of initiator.
+     * This receiver angle remains independent from uplink camera_rotation. */
     (void)metadata;
-    uint16_t rotation =
-        remote_video_initial_rotation(wechat, s_call_outgoing);
+    uint16_t rotation = remote_video_initial_rotation(wechat);
     bool reported = wechat;
-    const char *source =
-        wechat ? (s_call_outgoing ? "wechat-outgoing" : "wechat-incoming")
-               : "device-call-default";
+    const char *source = wechat ? "wechat-contract" : "device-call-default";
     s_call_remote_rotation = rotation;
     s_call_remote_rotation_reported = reported;
     starter_media_set_remote_video_presentation(rotation, reported);
@@ -1127,7 +1120,7 @@ static void request_device_profile(void)
         "\"aspect_ratio\":0.75,\"hor_mirror\":false,\"vert_mirror\":false,"
         "\"object_fit\":\"contain\",\"no_video\":false},"
         "\"voip\":{\"screen_width\":640,\"screen_height\":480,"
-        "\"camera_rotation\":180,\"down_video_rotation\":1,"
+        "\"camera_rotation\":180,\"down_video_rotation\":0,"
         "\"aspect_ratio\":0.75,\"hor_mirror\":false,\"vert_mirror\":false,"
         "\"object_fit\":\"contain\",\"video_res_mode\":\"fit_screen\","
         "\"audio_rate\":8000,\"audio_channels\":1,"
@@ -1159,8 +1152,7 @@ static void request_device_profile(void)
 #if CONFIG_IDF_TARGET_ESP32P4
         ESP_LOGI(TAG, "video presentation capability: stream_rotation=270 "
                       "call_rotation=270 voip_up_rotation=0 "
-                      "voip_device_out_down_rotation=90 "
-                      "voip_mini_out_down_rotation=270 down_rotation_mode=1");
+                      "voip_down_rotation=90 down_rotation_mode=0");
 #endif
     } else {
         s_voip_profile_retry_at_ms = now_ms() + VOIP_PROFILE_RETRY_MS;

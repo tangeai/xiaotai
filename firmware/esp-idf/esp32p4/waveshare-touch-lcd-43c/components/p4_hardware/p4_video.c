@@ -147,7 +147,11 @@ static void drain_video(void)
                 ret = call_video_renderer_submit_h264(s_ingress[slot].data, f->length,
                     (f->flags & TIRTC_FRAME_FLAG_KEY_FRAME) != 0, f->timestamp_ms);
             else if (starter_tirtc_mode() == STARTER_TIRTC_VOIP && f->media == TIRTC_VIDEO_JPEG)
+            {
+                p4_video_capture_offer_downlink(s_ingress[slot].data, f->length,
+                                                s_ingress[slot].generation);
                 ret = call_video_renderer_submit_mjpeg(s_ingress[slot].data, f->length, f->timestamp_ms);
+            }
             if (ret != ESP_OK && f->media == TIRTC_VIDEO_H264) atomic_store(&s_need_idr, true);
         }
         (void)xQueueSend(s_free, &slot, 0);

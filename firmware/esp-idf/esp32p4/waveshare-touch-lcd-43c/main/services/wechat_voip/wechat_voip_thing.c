@@ -89,7 +89,6 @@ typedef struct {
     TaskHandle_t refresh_task;
     TaskHandle_t call_task;
     bool started;
-    bool profile_ready;
     uint32_t channel_generation;
     int64_t start_retry_after_us;
     thing_mqtt_listener_handle_t mqtt_listener;
@@ -425,16 +424,6 @@ static void caller_refresh_cb(const wechat_voip_auth_user_t *caller, void *ctx)
     }
 }
 
-static esp_err_t report_profile(void)
-{
-    char token[DEVICE_AUTH_MQTT_TOKEN_MAX_LEN] = {0};
-    get_runtime_mqtt_token(token, sizeof(token));
-    if (token[0] == '\0') {
-        return ESP_ERR_INVALID_STATE;
-    }
-    return wechat_voip_api_report_profile(thing_service_registry_voip_api_base(), token);
-}
-
 static esp_err_t refresh_callers(void)
 {
     char token[DEVICE_AUTH_MQTT_TOKEN_MAX_LEN] = {0};
@@ -669,7 +658,7 @@ esp_err_t wechat_voip_thing_update_contact_remark_async(const char *open_id,
     mqtt_connected = thing_mqtt_client_is_connected();
 
     xSemaphoreTake(s_voip.lock, portMAX_DELAY);
-    ready = s_voip.started && s_voip.profile_ready && s_voip.refresh_task != NULL &&
+    ready = s_voip.started && s_voip.refresh_task != NULL &&
             !s_voip.remark_update_pending && !s_voip.remark_update_running &&
             mqtt_connected;
     refresh_task = s_voip.refresh_task;
@@ -1239,7 +1228,6 @@ static void start_task(void *arg)
                     strcmp(s_voip.device_id, credentials.device_id) == 0;
     if (current_start) {
         s_voip.started = true;
-        s_voip.profile_ready = false;
         s_voip.mqtt_listener = listener;
     }
     xSemaphoreGive(s_voip.lock);
@@ -1249,36 +1237,9 @@ static void start_task(void *arg)
         goto done;
     }
 
-    ret = report_profile();
-    if (ret != ESP_OK) {
-        bool remove_listener = false;
-
-        xSemaphoreTake(s_voip.lock, portMAX_DELAY);
-        current_start = s_voip.started &&
-                        s_voip.channel_generation == start_generation &&
-                        s_voip.mqtt_listener == listener;
-        if (current_start) {
-            s_voip.started = false;
-            s_voip.profile_ready = false;
-            s_voip.mqtt_listener = -1;
-            s_voip.start_retry_after_us =
-                esp_timer_get_time() + (int64_t)VOIP_CHANNEL_START_RETRY_MS * 1000;
-            remove_listener = true;
-        }
-        xSemaphoreGive(s_voip.lock);
-        if (remove_listener) {
-            thing_mqtt_client_remove_listener(listener);
-        }
-        ESP_LOGW(TAG,
-                 "profile report failed; retry channel after %ums: %s",
-                 (unsigned)VOIP_CHANNEL_START_RETRY_MS,
-                 esp_err_to_name(ret));
-        goto done;
-    }
     bool channel_ready = false;
     xSemaphoreTake(s_voip.lock, portMAX_DELAY);
     if (s_voip.started && s_voip.channel_generation == start_generation) {
-        s_voip.profile_ready = true;
         s_voip.start_retry_after_us = 0;
         channel_ready = true;
     }
@@ -1353,7 +1314,6 @@ esp_err_t wechat_voip_thing_start(void)
     copy_str(s_voip.device_id, sizeof(s_voip.device_id), credentials.device_id);
     copy_str(s_voip.device_key, sizeof(s_voip.device_key), credentials.device_key);
     s_voip.mqtt_token[0] = '\0';
-    s_voip.profile_ready = false;
     s_voip.remark_update_pending = false;
     s_voip.remark_update_running = false;
     memset(&s_voip.remark_update, 0, sizeof(s_voip.remark_update));
@@ -1409,7 +1369,6 @@ void wechat_voip_thing_stop(void)
     xSemaphoreTake(s_voip.dispatch_lock, portMAX_DELAY);
     xSemaphoreTake(s_voip.lock, portMAX_DELAY);
     s_voip.started = false;
-    s_voip.profile_ready = false;
     (void)advance_channel_generation_locked();
     listener = s_voip.mqtt_listener;
     s_voip.mqtt_listener = -1;
@@ -1437,7 +1396,7 @@ bool wechat_voip_thing_is_connected(void)
 
     if (s_voip.lock != NULL) {
         xSemaphoreTake(s_voip.lock, portMAX_DELAY);
-        ready = s_voip.started && s_voip.profile_ready;
+        ready = s_voip.started;
         xSemaphoreGive(s_voip.lock);
     }
     return ready && thing_mqtt_client_is_connected();

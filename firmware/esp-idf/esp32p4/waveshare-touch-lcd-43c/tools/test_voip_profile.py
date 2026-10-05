@@ -44,7 +44,7 @@ assert voip["no_video"] is False
 assert (voip["up_video_mt"], voip["down_video_mt"]) == ("h264", "mjpeg")
 assert (voip["screen_width"], voip["screen_height"]) == (640, 480)
 assert voip["camera_rotation"] == 180
-assert voip["down_video_rotation"] == 1
+assert voip["down_video_rotation"] == 0
 assert voip["aspect_ratio"] == 960 / 1280
 assert voip["hor_mirror"] is False and voip["vert_mirror"] is False
 assert voip["object_fit"] == "contain" and voip["video_res_mode"] == "fit_screen"
@@ -61,6 +61,22 @@ profile_function = source[start:source.index("static void handle_voip_profile", 
 assert 'PLATFORM_SERVICE_DEVICE, "/v1/device/profile"' in profile_function
 assert "/v1/voip/device/profile" not in profile_function
 assert "stream_rotation=270" in profile_function
+assert "voip_down_rotation=90 down_rotation_mode=0" in profile_function
+legacy_api_source = (root / "main/services/wechat_voip/wechat_voip_api.c").read_text()
+legacy_api_header = (root / "main/services/wechat_voip/wechat_voip_api.h").read_text()
+legacy_thing_source = (root / "main/services/wechat_voip/wechat_voip_thing.c").read_text()
+runtime_contract = (root / "tirtc-runtime-contract.json").read_text()
+for legacy_source in (
+    legacy_api_source,
+    legacy_api_header,
+    legacy_thing_source,
+    runtime_contract,
+):
+    assert "/v1/voip/device/profile" not in legacy_source
+assert "wechat_voip_api_report_profile" not in legacy_api_source
+assert "wechat_voip_api_report_profile" not in legacy_api_header
+assert "report_profile()" not in legacy_thing_source
+assert "profile_ready" not in legacy_thing_source
 renderer = (Path(__file__).resolve().parents[5] / "platforms/esp-idf/waveshare_p4/call_video_renderer.c").read_text()
 renderer_config = (root / "main/services/call_video_renderer_config.h").read_text()
 wechat_config = (root / "main/services/wechat_voip/wechat_voip_config.h").read_text()
@@ -77,10 +93,8 @@ rotation_test = f'''\
 #include <stdint.h>
 {rotation_function}
 int main(void) {{
-    assert(remote_video_initial_rotation(false, false) == 0U);
-    assert(remote_video_initial_rotation(false, true) == 0U);
-    assert(remote_video_initial_rotation(true, true) == 90U);
-    assert(remote_video_initial_rotation(true, false) == 270U);
+    assert(remote_video_initial_rotation(false) == 0U);
+    assert(remote_video_initial_rotation(true) == 90U);
     return 0;
 }}
 '''
@@ -94,9 +108,9 @@ presentation_start = source.index("static void configure_remote_video_presentati
 presentation = source[presentation_start:
                       source.index("static void request_ai_token_response",
                                    presentation_start)]
-assert "remote_video_initial_rotation(wechat, s_call_outgoing)" in presentation
+assert "remote_video_initial_rotation(wechat)" in presentation
 assert "call_read_rotation" not in presentation
-assert 'wechat ? (s_call_outgoing ? "wechat-outgoing" : "wechat-incoming")' in presentation
+assert 'wechat ? "wechat-contract" : "device-call-default"' in presentation
 assert "#define APP_CONFIG_WECHAT_VOIP_CAMERA_ROTATION 180" in wechat_config
 assert '"rotation=%s source_rotation=%s "' in renderer
 assert "CALL_VIDEO_RENDER_WIDTH             640U" in renderer_config
