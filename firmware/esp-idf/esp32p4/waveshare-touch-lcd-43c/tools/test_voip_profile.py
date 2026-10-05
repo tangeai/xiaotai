@@ -41,7 +41,7 @@ assert call["camera_rotation"] == 270
 assert voip["no_video"] is False
 assert (voip["up_video_mt"], voip["down_video_mt"]) == ("h264", "mjpeg")
 assert (voip["screen_width"], voip["screen_height"]) == (640, 480)
-assert voip["camera_rotation"] == 0
+assert voip["camera_rotation"] == 180
 assert voip["down_video_rotation"] == 1
 assert voip["aspect_ratio"] == 960 / 1280
 assert voip["hor_mirror"] is False and voip["vert_mirror"] is False
@@ -73,7 +73,7 @@ presentation = source[presentation_start:
 assert "uint16_t rotation = 90U;" in presentation
 assert "call_read_rotation" not in presentation
 assert 'wechat ? "wechat-contract" : "local-default"' in presentation
-assert "#define APP_CONFIG_WECHAT_VOIP_CAMERA_ROTATION 0" in wechat_config
+assert "#define APP_CONFIG_WECHAT_VOIP_CAMERA_ROTATION 180" in wechat_config
 assert '"rotation=%s source_rotation=%s "' in renderer
 assert "CALL_VIDEO_RENDER_WIDTH             640U" in renderer_config
 assert "CALL_VIDEO_RENDER_HEIGHT            384U" in renderer_config

@@ -110,7 +110,8 @@ value 复制到控制内存后，由 internal-RAM task 串行执行 `open -> set
 传感器画面等比缩到 600×480，并在编码画布左右各留 20 像素，不裁切。微信 VoIP 使用独立的
 `960x720@12fps`、目标 `1.5Mbps` H264 档位。微信档从 1280×960 传感器完整画面
 等比缩小到 75%，不裁切、不旋转。H5 直接编码原生 `1280x960`。H5、设备呼叫和微信
-VoIP 均保持传感器像素方向，由对应接收端按能力中的 `camera_rotation=270` 旋转。
+VoIP 均保持传感器像素方向。H5 和设备呼叫按各自契约处理方向；微信接收端按 VoIP
+能力中的 `camera_rotation=180` 顺时针旋转。
 退出通话后恢复 IPC 正常档位。
 
 ## 视频下行
@@ -145,8 +146,8 @@ VoIP 均保持传感器像素方向，由对应接收端按能力中的 `camera_
 - P4 hardware JPEG decoder 输出 RGB565。
 - 解码入口支持不超过 `640x480` 解码预算的服务端实际帧；服务端可根据链路临时下发
   较小档位。
-- TiRTC JPEG 帧头不携带旋转元数据。本机按服务端实际下发方向显示，MJPEG 渲染固定使用
-  `cw0`；PPA 只执行裁切和缩放，不承担方向修正。
+- TiRTC JPEG 帧头不携带旋转元数据。微信 MJPEG 下行在 P4 本地固定使用 `cw90`；PPA
+  同时执行该方向修正、裁切和缩放。该值与设备上行的 `camera_rotation=180` 相互独立。
 - PPA 基于服务端实际帧执行一次居中 `cover`：大于显示视口的帧对称裁切并等比缩小到
   `480x320`，较小档位等比放大后居中裁切，不做非等比拉伸或第二次显示缩放。
 - ThingConnect 协议字段独立上报 `object_fit=contain`；设备上行另行上报摄像头方向提示，
@@ -266,8 +267,8 @@ SDIO 读取全 `0xff` 寄存器快照时最多重试 3 次，间隔 `200us`；�
 | --- | --- |
 | P4 设备 -> 服务端（IPC） | `1280x960@20fps`, `3Mbps`，GOP `40` 帧 / `2s`，接收端旋转 270° |
 | P4 设备 -> 服务端（设备呼叫） | `640x480@5fps`, `600kbps`，QP `30-46`，GOP `10` 帧 / `2s`；800×640 完整取景缩到 600×480 后左右留边；TiRTC 发送缓冲 `2 MiB` |
-| P4 设备 -> 服务端（微信 VoIP） | `960x720@12fps`，目标 `1.5Mbps`，GOP `24` 帧 / `2s`，接收端旋转 270° |
-| 服务端 -> P4 设备（微信 VoIP） | 请求 `640x480` MJPEG，实际帧可以更小，`cover` 到 `480x320` |
+| P4 设备 -> 服务端（微信 VoIP） | `960x720@12fps`，目标 `1.5Mbps`，GOP `24` 帧 / `2s`，小程序按 `camera_rotation=180` 旋转 |
+| 服务端 -> P4 设备（微信 VoIP） | `down_video_rotation=1`，请求 `640x480` MJPEG，P4 本地 `cw90` 后 `cover` 到 `480x320`；实际帧可以更小 |
 | H264 downlink input | `24 x 256KB` PSRAM slot |
 | H264 decoded/output | decoded `4` 个、output `20` 个 RGB565 slot；playout 深度上限 `16` |
 | H264 output buffer | `1MB` |
@@ -302,7 +303,7 @@ SDIO 读取全 `0xff` 寄存器快照时最多重试 3 次，间隔 `200us`；�
 4. 快速切换 AI Chat、设备呼叫和微信呼叫，确认同一时刻只有一个 WHIP attempt，过期回调
    不会再次销毁 closing connection，重复 disconnect 保持幂等。
 5. 分别检查 IPC、设备呼叫、微信 VoIP 和 AI Chat。
-6. 对微信正式版 VoIP 分别确认 P4 设备发送的 `960x720` H264、微信端按 270° 显示和服务端下发的 MJPEG 均有
+6. 对微信正式版 VoIP 分别确认 P4 设备发送的 `960x720` H264、微信端按 180° 显示和服务端下发的 MJPEG 均有
    首帧证据，并记录服务端实际下发分辨率。
 7. 保持每个主要场景至少 5 分钟，观察 fps、bitrate、queue、DMA largest block、持久 PSRAM
    pool 和 AEC；单独确认设备呼叫 `640x480@5fps` 长时间无解码重建循环并能从弱网恢复。

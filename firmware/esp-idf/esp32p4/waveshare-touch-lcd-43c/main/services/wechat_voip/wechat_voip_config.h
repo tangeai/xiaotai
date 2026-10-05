@@ -48,7 +48,7 @@
 #ifndef APP_CONFIG_WECHAT_VOIP_CAMERA_ROTATION
 /* Protocol UI metadata only: WeChat rotates the sensor-oriented camera view.
  * The local YUV420 -> H264 path never rotates pixels. */
-#define APP_CONFIG_WECHAT_VOIP_CAMERA_ROTATION 0
+#define APP_CONFIG_WECHAT_VOIP_CAMERA_ROTATION 180
 #endif
 
 #ifndef APP_CONFIG_WECHAT_VOIP_OBJECT_FIT

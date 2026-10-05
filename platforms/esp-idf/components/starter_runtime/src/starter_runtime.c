@@ -804,8 +804,9 @@ static void configure_remote_video_presentation(const cJSON *metadata,
 {
     /* These are two independent local presentation contracts. Device calls
      * deliberately ignore remote rotation metadata and start at the local
-     * default; the on-screen control changes only this receiver. WeChat uses
-     * its fixed downlink angle and never inherits the device-call setting. */
+     * default; the on-screen control changes only this receiver. The WeChat
+     * downlink needs a P4-local clockwise 90-degree presentation correction;
+     * do not derive it from the independent uplink camera_rotation value. */
     (void)metadata;
     uint16_t rotation = 90U;
     bool reported = wechat;
@@ -1115,7 +1116,7 @@ static void request_device_profile(void)
         "\"aspect_ratio\":0.75,\"hor_mirror\":false,\"vert_mirror\":false,"
         "\"object_fit\":\"contain\",\"no_video\":false},"
         "\"voip\":{\"screen_width\":640,\"screen_height\":480,"
-        "\"camera_rotation\":0,\"down_video_rotation\":1,"
+        "\"camera_rotation\":180,\"down_video_rotation\":1,"
         "\"aspect_ratio\":0.75,\"hor_mirror\":false,\"vert_mirror\":false,"
         "\"object_fit\":\"contain\",\"video_res_mode\":\"fit_screen\","
         "\"audio_rate\":8000,\"audio_channels\":1,"
