@@ -146,8 +146,9 @@ VoIP 均保持传感器像素方向。H5 和设备呼叫按各自契约处理方
 - P4 hardware JPEG decoder 输出 RGB565。
 - 解码入口支持不超过 `640x480` 解码预算的服务端实际帧；服务端可根据链路临时下发
   较小档位。
-- TiRTC JPEG 帧头不携带旋转元数据。微信 MJPEG 下行在 P4 本地固定使用 `cw90`；PPA
-  同时执行该方向修正、裁切和缩放。该值与设备上行的 `camera_rotation=180` 相互独立。
+- TiRTC JPEG 帧头不携带旋转元数据。微信 MJPEG 下行按发起方选择 P4 本地角度：设备
+  发起使用 `cw90`，小程序发起使用 `cw270`（即逆时针 90 度）；PPA 同时执行该方向
+  修正、裁切和缩放。这些值与设备上行的 `camera_rotation=180` 相互独立。
 - PPA 基于服务端实际帧执行一次居中 `cover`：大于显示视口的帧对称裁切并等比缩小到
   `480x320`，较小档位等比放大后居中裁切，不做非等比拉伸或第二次显示缩放。
 - ThingConnect 协议字段独立上报 `object_fit=contain`；设备上行另行上报摄像头方向提示，
@@ -268,7 +269,7 @@ SDIO 读取全 `0xff` 寄存器快照时最多重试 3 次，间隔 `200us`；�
 | P4 设备 -> 服务端（IPC） | `1280x960@20fps`, `3Mbps`，GOP `40` 帧 / `2s`，接收端旋转 270° |
 | P4 设备 -> 服务端（设备呼叫） | `640x480@5fps`, `600kbps`，QP `30-46`，GOP `10` 帧 / `2s`；800×640 完整取景缩到 600×480 后左右留边；TiRTC 发送缓冲 `2 MiB` |
 | P4 设备 -> 服务端（微信 VoIP） | `960x720@12fps`，目标 `1.5Mbps`，GOP `24` 帧 / `2s`，小程序按 `camera_rotation=180` 旋转 |
-| 服务端 -> P4 设备（微信 VoIP） | `down_video_rotation=1`，请求 `640x480` MJPEG，P4 本地 `cw90` 后 `cover` 到 `480x320`；实际帧可以更小 |
+| 服务端 -> P4 设备（微信 VoIP） | `down_video_rotation=1`，请求 `640x480` MJPEG；设备发起时 P4 本地 `cw90`，小程序发起时 `cw270`，之后 `cover` 到 `480x320`；实际帧可以更小 |
 | H264 downlink input | `24 x 256KB` PSRAM slot |
 | H264 decoded/output | decoded `4` 个、output `20` 个 RGB565 slot；playout 深度上限 `16` |
 | H264 output buffer | `1MB` |

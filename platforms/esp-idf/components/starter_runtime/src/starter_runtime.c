@@ -799,18 +799,29 @@ static bool copy_json_string(const cJSON *object,
 }
 
 #if CONFIG_IDF_TARGET_ESP32P4
+static uint16_t remote_video_initial_rotation(bool wechat, bool outgoing)
+{
+    if (!wechat) {
+        return 0U;
+    }
+    return outgoing ? 90U : 270U;
+}
+
 static void configure_remote_video_presentation(const cJSON *metadata,
                                                 bool wechat)
 {
-    /* These are two independent local presentation contracts. Device calls
-     * deliberately ignore remote rotation metadata and start at the local
-     * default; the on-screen control changes only this receiver. The WeChat
-     * downlink needs a P4-local clockwise 90-degree presentation correction;
-     * do not derive it from the independent uplink camera_rotation value. */
+    /* Device calls start upright and expose the session-local rotate control.
+     * WeChat uses different downlink pixel orientations depending on which
+     * endpoint initiated the call: device-originated calls need cw90, while
+     * mini-program-originated calls need cw270 (ccw90). These receiver angles
+     * remain independent from the uplink camera_rotation profile field. */
     (void)metadata;
-    uint16_t rotation = 90U;
+    uint16_t rotation =
+        remote_video_initial_rotation(wechat, s_call_outgoing);
     bool reported = wechat;
-    const char *source = wechat ? "wechat-contract" : "local-default";
+    const char *source =
+        wechat ? (s_call_outgoing ? "wechat-outgoing" : "wechat-incoming")
+               : "device-call-default";
     s_call_remote_rotation = rotation;
     s_call_remote_rotation_reported = reported;
     starter_media_set_remote_video_presentation(rotation, reported);
@@ -1148,7 +1159,8 @@ static void request_device_profile(void)
 #if CONFIG_IDF_TARGET_ESP32P4
         ESP_LOGI(TAG, "video presentation capability: stream_rotation=270 "
                       "call_rotation=270 voip_up_rotation=0 "
-                      "voip_down_rotation=90 down_rotation_mode=1");
+                      "voip_device_out_down_rotation=90 "
+                      "voip_mini_out_down_rotation=270 down_rotation_mode=1");
 #endif
     } else {
         s_voip_profile_retry_at_ms = now_ms() + VOIP_PROFILE_RETRY_MS;

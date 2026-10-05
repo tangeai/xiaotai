@@ -3,6 +3,8 @@
 import ast
 import json
 import re
+import subprocess
+import tempfile
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -66,13 +68,35 @@ assert "call_video_renderer_set_presentation" in renderer
 assert "s_renderer.presentation.rotation" in renderer
 assert not re.search(r"video_frame_rotation_t display_rotation\s*=\s*VIDEO_FRAME_ROTATION_CLOCKWISE_90;", renderer)
 assert "starter_media_set_remote_video_presentation" in source
+rotation_start = source.index("static uint16_t remote_video_initial_rotation(")
+rotation_function = source[rotation_start:
+                           source.index("\n}", rotation_start) + 2]
+rotation_test = f'''\
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+{rotation_function}
+int main(void) {{
+    assert(remote_video_initial_rotation(false, false) == 0U);
+    assert(remote_video_initial_rotation(false, true) == 0U);
+    assert(remote_video_initial_rotation(true, true) == 90U);
+    assert(remote_video_initial_rotation(true, false) == 270U);
+    return 0;
+}}
+'''
+with tempfile.TemporaryDirectory(prefix="remote-video-rotation-") as directory:
+    path = Path(directory)
+    (path / "test.c").write_text(rotation_test)
+    subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
+                    str(path / "test.c"), "-o", str(path / "test")], check=True)
+    subprocess.run([str(path / "test")], check=True)
 presentation_start = source.index("static void configure_remote_video_presentation")
 presentation = source[presentation_start:
                       source.index("static void request_ai_token_response",
                                    presentation_start)]
-assert "uint16_t rotation = 90U;" in presentation
+assert "remote_video_initial_rotation(wechat, s_call_outgoing)" in presentation
 assert "call_read_rotation" not in presentation
-assert 'wechat ? "wechat-contract" : "local-default"' in presentation
+assert 'wechat ? (s_call_outgoing ? "wechat-outgoing" : "wechat-incoming")' in presentation
 assert "#define APP_CONFIG_WECHAT_VOIP_CAMERA_ROTATION 180" in wechat_config
 assert '"rotation=%s source_rotation=%s "' in renderer
 assert "CALL_VIDEO_RENDER_WIDTH             640U" in renderer_config
