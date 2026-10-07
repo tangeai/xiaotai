@@ -115,7 +115,7 @@ H5 视频使用流 11，格式为 MJPEG（逐帧 JPEG 图像），分辨率 320�
 | 摄像头教程 | 无 | [在线文档](https://wiki.lckfb.com/zh-hans/szpi-esp32s3/beginner/camera.html) | 无 | 已提供 |
 | ES7210 教程 | 无 | [在线文档](https://wiki.lckfb.com/zh-hans/szpi-esp32s3/beginner/audio-input-es7210.html) | 无 | 已提供 |
 | ES8311 教程 | 无 | [在线文档](https://wiki.lckfb.com/zh-hans/szpi-esp32s3/beginner/audio-output-es8311.html) | 无 | 已提供 |
-| ES7210、ES8311、NS4150B、ZTS6216、PCA9557 数据手册 | 无 | 无 | 无 | 未提供 |
+| ES7210、ES8311、NS4150B、ZTS6216、PCA9557 数据手册 | 无 | | 无 | 未提供 |
 
 原理图版本和硬件结论的来源记录在工程 Hardware IR（硬件信息记录）中。
 

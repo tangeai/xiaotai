@@ -120,11 +120,11 @@ Beken 工程保持独立的 AP/CP（应用处理器/协处理器）、分区、T
 
 | 资料名称 | 版本或标识 | 链接 | SHA-256 | 资料状态 |
 | --- | --- | --- | --- | --- |
-| `ATK-DNT5M_V1.0+原理图.PDF` | 图纸标识 `ATK-DNT5M V1.0+` | 无 | `faf535aea976d599d1576f21ff07d38600486b01fc18925c8bdc7f024c5203ef` | 未提供 |
+| `ATK-DNT5M_V1.0+原理图.PDF` | 图纸标识 `ATK-DNT5M V1.0+` | | `faf535aea976d599d1576f21ff07d38600486b01fc18925c8bdc7f024c5203ef` | 未提供 |
 | BK7258 SMP 官方文档 | v3.1.1 | [在线文档](https://docs.bekencorp.com/arminodoc/bk_avdk_smp/smp_doc/bk7258/en/v3.1.1/index.html) | 无 | 已提供 |
 | BK7258 Datasheet | 无 | [PDF](https://docs.bekencorp.com/spec/BK7258/BK7258%C2%A0Datasheet.pdf) | 无 | 已提供 |
 | BK7258 官方硬件资料索引 | v3.1.1 | [在线文档](https://docs.bekencorp.com/arminodoc/bk_ai_smp/bk7258/en/v3.1.1/hw-reference/index.html) | 无 | 已提供 |
-| 立创·实战派 BK7258 官方板卡页 | 无 | 无 | 无 | 未提供 |
+| 立创·实战派 BK7258 官方板卡页 | 无 | | 无 | 未提供 |
 
 引脚和外设结论以工程 Hardware IR（硬件信息记录）及实板验证为准。
 

@@ -106,9 +106,9 @@ H5 视频使用流 11，格式为 MJPEG（逐帧 JPEG 图像），分辨率 320�
 | --- | --- | --- | --- | --- |
 | 正点原子官方板卡仓库 | 提交 `c7434a3da5b9e6feda05added5d6a686f1c95f13` | [GitHub](https://github.com/openedv/ATK-DNESP32S3-Board/tree/c7434a3da5b9e6feda05added5d6a686f1c95f13) | 无 | 已提供 |
 | ATK-DNESP32S3 原理图 | V1.2 | [PDF](https://github.com/openedv/ATK-DNESP32S3-Board/blob/c7434a3da5b9e6feda05added5d6a686f1c95f13/1_docs/1_sch/ATK_DNESP32S3%20V1.2.pdf) | `f5226bc6324db6b65fe90f29e49c4c66ae03873297ea936c5a39f081d3378abf` | 已提供 |
-| ATK-DNESP32S3 原理图 | V1.4 | 无 | `020350b116ab6e39e6a807744b8749154efcd81b22df4b5a0169a4c7f61d0a64` | 未提供 |
-| ATK-MC2640 摄像头原理图 | V2.2 | 无 | `f681cd8967c89a274b488a7345728cd4826b9c9abf5b62049bfb92b8a4384baf` | 未提供 |
-| ATK-MC5640 摄像头原理图 | V1.2 | 无 | `9a490b8a7fb9701a933ecf9aa78df8dece70a2b67c235263152778b743f87e96` | 未提供 |
+| ATK-DNESP32S3 原理图 | V1.4 | | `020350b116ab6e39e6a807744b8749154efcd81b22df4b5a0169a4c7f61d0a64` | 未提供 |
+| ATK-MC2640 摄像头原理图 | V2.2 | | `f681cd8967c89a274b488a7345728cd4826b9c9abf5b62049bfb92b8a4384baf` | 未提供 |
+| ATK-MC5640 摄像头原理图 | V1.2 | | `9a490b8a7fb9701a933ecf9aa78df8dece70a2b67c235263152778b743f87e96` | 未提供 |
 
 当前实板按 V1.4 适配。引脚和外设结论以工程 Hardware IR（硬件信息记录）及实板验证为准。
 
