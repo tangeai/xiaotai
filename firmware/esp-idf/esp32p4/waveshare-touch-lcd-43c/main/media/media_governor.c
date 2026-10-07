@@ -106,17 +106,13 @@ static void media_governor_select_native_capture_size(const media_governor_video
                                                        uint16_t *width,
                                                        uint16_t *height)
 {
+    /* Encoder resolution must not select the sensor's field of view. The
+     * OV5647 800x640 mode uses a narrower sensor window than 1280x960;
+     * containing that output cannot recover the missing scene. Keep the
+     * full-view capture mode and let PPA downscale for compact calls. */
+    (void)config;
     *width = MEDIA_GOVERNOR_CAPTURE_WIDTH;
     *height = MEDIA_GOVERNOR_CAPTURE_HEIGHT;
-
-    /* Compact calls use the inexpensive 800x640 sensor mode. The P4 scaler
-     * preserves its complete 5:4 field of view inside the 4:3 encode canvas. */
-    if (config != NULL &&
-        config->width <= MEDIA_GOVERNOR_COMPACT_CAPTURE_WIDTH &&
-        config->height <= MEDIA_GOVERNOR_COMPACT_CAPTURE_HEIGHT) {
-        *width = MEDIA_GOVERNOR_COMPACT_CAPTURE_WIDTH;
-        *height = MEDIA_GOVERNOR_COMPACT_CAPTURE_HEIGHT;
-    }
 }
 
 static media_governor_camera_policy_t media_governor_make_rtc_av_policy(const media_governor_video_config_t *config)

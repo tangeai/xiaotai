@@ -176,6 +176,11 @@ static uint32_t s_connection_generation;
 static bool s_mqtt_suspended_for_connect;
 static int64_t s_mqtt_resume_due_ms;
 static char s_call_room_id[129];
+/* Runtime owns room/due; HTTP callbacks only complete their atomic ticket. */
+static char s_call_cleanup_room[129];
+static int64_t s_call_cleanup_due_ms;
+static unsigned s_call_cleanup_sequence;
+static atomic_uint s_call_cleanup_result;
 static char s_call_peer_id[65];
 static char s_call_peer_name[65];
 static char s_call_wx_app_id[65];
@@ -763,6 +768,58 @@ static void service_ai_end_drain(void)
     finish_session(0);
 }
 
+static void call_cleanup_response(const char *body, void *user_data)
+{
+    unsigned ticket = (unsigned)(uintptr_t)user_data;
+    cJSON *root = body != NULL ? cJSON_Parse(body) : NULL;
+    const cJSON *code = cJSON_GetObjectItemCaseSensitive(root, "code");
+    bool done = cJSON_IsNumber(code) &&
+                (code->valueint == 0 || code->valueint == 200 || code->valueint == 40400);
+    cJSON_Delete(root);
+    unsigned expected = ticket;
+    (void)atomic_compare_exchange_strong(&s_call_cleanup_result, &expected,
+                                          ticket | (done ? 1U : 2U));
+}
+
+static void schedule_call_cleanup(const char *room)
+{
+    if (room == NULL || room[0] == '\0' || s_call_cleanup_room[0] != '\0') return;
+    (void)snprintf(s_call_cleanup_room, sizeof(s_call_cleanup_room), "%s", room);
+    s_call_cleanup_due_ms = now_ms();
+    atomic_store(&s_call_cleanup_result, 0U);
+}
+
+static void service_call_cleanup(void)
+{
+    if (s_call_cleanup_room[0] == '\0') return;
+    unsigned result = atomic_load(&s_call_cleanup_result);
+    if ((result & 3U) == 1U) {
+        ESP_LOGI(TAG, "call room cleanup confirmed");
+        s_call_cleanup_room[0] = '\0';
+        atomic_store(&s_call_cleanup_result, 0U);
+        return;
+    }
+    if ((result & 3U) == 2U) {
+        atomic_store(&s_call_cleanup_result, 0U);
+        s_call_cleanup_due_ms = now_ms() + 2000;
+    }
+    if (now_ms() < s_call_cleanup_due_ms || !platform_client_ready()) return;
+    s_call_cleanup_sequence = (s_call_cleanup_sequence + 1U) & 0x3fffffffU;
+    if (s_call_cleanup_sequence == 0U) s_call_cleanup_sequence = 1U;
+    unsigned ticket = s_call_cleanup_sequence << 2;
+    atomic_store(&s_call_cleanup_result, ticket);
+    char body[256];
+    (void)snprintf(body, sizeof(body),
+                   "{\"room_id\":\"%s\",\"reason\":\"session_ended\"}", s_call_cleanup_room);
+    s_call_cleanup_due_ms = now_ms() + 15000;
+    esp_err_t err = platform_client_request_timeout(PLATFORM_SERVICE_CALL,
+        "/v1/call/hangup", body, 10000U, call_cleanup_response, (void *)(uintptr_t)ticket);
+    if (err != ESP_OK) {
+        atomic_store(&s_call_cleanup_result, 0U);
+        s_call_cleanup_due_ms = now_ms() + 2000;
+    }
+}
+
 static void finish_call_session(int error, const char *result)
 {
     ESP_LOGW(TAG,
@@ -770,6 +827,7 @@ static void finish_call_session(int error, const char *result)
              (unsigned long)session_generation(),
              error,
              result == NULL ? "" : result);
+    if (!s_call_wechat) schedule_call_cleanup(s_call_room_id);
     finish_session(error);
     product_set_call_result(result);
 }
@@ -1310,6 +1368,10 @@ static bool begin_call_common(const starter_product_contact_t *contact)
 {
     if (contact == NULL ||
         !platform_client_ready() || !starter_tirtc_started()) return false;
+    if (contact->source != STARTER_CONTACT_WECHAT && s_call_cleanup_room[0] != '\0') {
+        product_set_call_result("正在结束上次通话，请等待");
+        return false;
+    }
     if (contact->source == STARTER_CONTACT_WECHAT && !s_voip_profile_ready) {
         ESP_LOGW(TAG, "WeChat call blocked until VoIP profile is reported");
         return false;
@@ -1836,6 +1898,7 @@ static void handle_call_http(const runtime_event_t *event)
     const cJSON *message = cJSON_IsObject(root)
                                ? cJSON_GetObjectItemCaseSensitive(root, "message")
                                : NULL;
+    if (!cJSON_IsString(message)) message = cJSON_GetObjectItemCaseSensitive(root, "msg");
     ESP_LOGI(TAG,
              "[DEBUG-call] HTTP result stage=%lu bytes=%u parse=%d code=%d message=%s",
              (unsigned long)event->command,
@@ -1844,6 +1907,18 @@ static void handle_call_http(const runtime_event_t *event)
              cJSON_IsNumber(code) ? code->valueint : -1,
              cJSON_IsString(message) && message->valuestring != NULL
                  ? message->valuestring : "");
+    if (event->command == CALL_HTTP_DEVICE_DIAL &&
+        cJSON_IsNumber(code) && code->valueint == 40202) {
+        char existing_room[129] = "";
+        const cJSON *busy_data = cJSON_GetObjectItemCaseSensitive(root, "data");
+        if (copy_json_string(busy_data, "room_id", existing_room,
+                             sizeof(existing_room), true)) {
+            schedule_call_cleanup(existing_room);
+        }
+        cJSON_Delete(root);
+        finish_call_session(ESP_ERR_INVALID_STATE, "正在结束上次通话，请等待");
+        return;
+    }
     const cJSON *data = response_ok(root)
                             ? cJSON_GetObjectItemCaseSensitive(root, "data")
                             : NULL;
@@ -2930,9 +3005,10 @@ static void handle_platform_signal(const runtime_event_t *event)
                                                   ? XIAOTAI_OWNER_WECHAT_VOIP
                                                   : XIAOTAI_OWNER_DEVICE_CALL;
     if (!outgoing_wechat &&
-        !xiaotai_runtime_offer_incoming(&s_session, incoming_owner,
+        ((!wechat && s_call_cleanup_room[0] != '\0') ||
+         !xiaotai_runtime_offer_incoming(&s_session, incoming_owner,
                                         (uint32_t)now_ms(),
-                                        CALL_PENDING_TIMEOUT_MS)) {
+                                        CALL_PENDING_TIMEOUT_MS))) {
         if (wechat) {
             char app_id[65] = "";
             char model_id[65] = "";
@@ -3496,6 +3572,7 @@ static void runtime_task(void *argument)
         if (recover_voip_profile_delivery_failure(now_ms())) {
             ESP_LOGW(TAG, "VoIP profile response was not delivered; retrying");
         }
+        service_call_cleanup();
         service_ai_end_drain();
         if (s_mqtt_suspended_for_connect && s_mqtt_resume_due_ms != 0 &&
             now_ms() >= s_mqtt_resume_due_ms) {

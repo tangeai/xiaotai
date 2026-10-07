@@ -72,29 +72,35 @@ static inline void video_frame_pack_ouev_row(const uint8_t *luma,
 {
     uint32_t x = 0;
 
-    /* OUEV stores one chroma byte for each two luma bytes. Pack eight
-     * pixels into three aligned words so PSRAM writes stay sequential. */
-    for (; x + 8U <= width; x += 8U) {
-        uint32_t y0 = 0;
-        uint32_t y1 = 0;
-        uint32_t c = 0;
-        memcpy(&y0, luma + x, sizeof(y0));
-        memcpy(&y1, luma + x + 4U, sizeof(y1));
-        memcpy(&c, chroma + (x / 2U), sizeof(c));
+    /* The normal full-frame rows are word-aligned. Tell the compiler only
+     * after checking: otherwise RISC-V lowers these memcpy loads to byte
+     * loads and stack stores. Cropped/short rows may be unaligned. */
+    if ((((uintptr_t)luma | (uintptr_t)chroma | (uintptr_t)output) & 3U) == 0U) {
+        luma = __builtin_assume_aligned(luma, 4);
+        chroma = __builtin_assume_aligned(chroma, 4);
+        output = __builtin_assume_aligned(output, 4);
+        for (; x + 8U <= width; x += 8U) {
+            uint32_t y0 = 0;
+            uint32_t y1 = 0;
+            uint32_t c = 0;
+            memcpy(&y0, luma + x, sizeof(y0));
+            memcpy(&y1, luma + x + 4U, sizeof(y1));
+            memcpy(&c, chroma + (x / 2U), sizeof(c));
 
-        uint32_t *words = (uint32_t *)(output + ((size_t)x * 3U / 2U));
-        words[0] = (c & 0x000000FFU) |
-                   ((y0 & 0x000000FFU) << 8) |
-                   ((y0 & 0x0000FF00U) << 8) |
-                   ((c & 0x0000FF00U) << 16);
-        words[1] = ((y0 >> 16) & 0x000000FFU) |
-                   ((y0 >> 16) & 0x0000FF00U) |
-                   ((c & 0x00FF0000U)) |
-                   ((y1 & 0x000000FFU) << 24);
-        words[2] = ((y1 >> 8) & 0x000000FFU) |
-                   ((c >> 16) & 0x0000FF00U) |
-                   (y1 & 0x00FF0000U) |
-                   (y1 & 0xFF000000U);
+            uint32_t *words = (uint32_t *)(output + ((size_t)x * 3U / 2U));
+            words[0] = (c & 0x000000FFU) |
+                       ((y0 & 0x000000FFU) << 8) |
+                       ((y0 & 0x0000FF00U) << 8) |
+                       ((c & 0x0000FF00U) << 16);
+            words[1] = ((y0 >> 16) & 0x000000FFU) |
+                       ((y0 >> 16) & 0x0000FF00U) |
+                       ((c & 0x00FF0000U)) |
+                       ((y1 & 0x000000FFU) << 24);
+            words[2] = ((y1 >> 8) & 0x000000FFU) |
+                       ((c >> 16) & 0x0000FF00U) |
+                       (y1 & 0x00FF0000U) |
+                       (y1 & 0xFF000000U);
+        }
     }
 
     for (; x < width; x += 2U) {
@@ -149,6 +155,37 @@ static void video_frame_swap_rgb565_bytes(uint16_t *pixels, size_t pixel_count)
     if ((pixel_count & 1U) != 0U) {
         uint16_t value = pixels[pixel_count - 1U];
         pixels[pixel_count - 1U] = (uint16_t)((value >> 8) | (value << 8));
+    }
+}
+
+/* PPA overwrites the active rectangle. Clear only pixels it will not touch;
+ * this remains correct when a recycled slot changes angle or source size. */
+static void video_frame_clear_margins(uint16_t *output, uint16_t width, uint16_t height,
+                                      uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+{
+    memset(output, 0, (size_t)y * width * sizeof(*output));
+    for (uint16_t row = y; row < y + h; ++row) {
+        uint16_t *line = output + (size_t)row * width;
+        memset(line, 0, (size_t)x * sizeof(*output));
+        memset(line + x + w, 0, (size_t)(width - x - w) * sizeof(*output));
+    }
+    memset(output + (size_t)(y + h) * width, 0,
+           (size_t)(height - y - h) * width * sizeof(*output));
+}
+
+static void video_frame_swap_region(uint16_t *output, uint16_t stride,
+                                     uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+{
+    for (uint16_t row = y; row < y + h; ++row) {
+        uint16_t *line = output + (size_t)row * stride + x;
+        size_t count = w;
+        /* Odd offsets/strides are legal after PPA scale quantization. */
+        if (count != 0U && ((uintptr_t)line & 3U) != 0U) {
+            *line = (uint16_t)((*line >> 8) | (*line << 8));
+            ++line;
+            --count;
+        }
+        video_frame_swap_rgb565_bytes(line, count);
     }
 }
 
@@ -309,7 +346,8 @@ static esp_err_t video_frame_convert_yuv420_ppa(video_frame_converter_handle_t h
         ppa_crop_y = 0U;
     }
     if (fit.render_width != output_width || fit.render_height != output_height) {
-        memset(output, 0, output_size);
+        video_frame_clear_margins(output, output_width, output_height,
+                                  fit.offset_x, fit.offset_y, fit.render_width, fit.render_height);
         ESP_RETURN_ON_ERROR(esp_cache_msync(output,
                                             output_size,
                                             ESP_CACHE_MSYNC_FLAG_DIR_C2M),
@@ -352,7 +390,8 @@ static esp_err_t video_frame_convert_yuv420_ppa(video_frame_converter_handle_t h
                         "PPA YUV420 conversion failed");
     int64_t ppa_done_us = esp_timer_get_time();
     if (handle->config.output_rgb565_byte_swap) {
-        video_frame_swap_rgb565_bytes(output, (size_t)output_width * output_height);
+        video_frame_swap_region(output, output_width, fit.offset_x, fit.offset_y,
+                                fit.render_width, fit.render_height);
     }
     int64_t done_us = esp_timer_get_time();
     uint32_t pack_us = (uint32_t)(packed_us - started_us);
@@ -1021,7 +1060,8 @@ static esp_err_t video_frame_convert_rgb565_ppa(video_frame_converter_handle_t h
                                      fit.offset_y);
     int64_t started_us = esp_timer_get_time();
     if (fit.render_width != output_width || fit.render_height != output_height) {
-        memset(output, 0, output_size);
+        video_frame_clear_margins(output, output_width, output_height,
+                                  fit.offset_x, fit.offset_y, fit.render_width, fit.render_height);
         ESP_RETURN_ON_ERROR(esp_cache_msync(output,
                                             output_size,
                                             ESP_CACHE_MSYNC_FLAG_DIR_C2M),
@@ -1065,7 +1105,8 @@ static esp_err_t video_frame_convert_rgb565_ppa(video_frame_converter_handle_t h
                         "PPA RGB565 conversion failed");
     int64_t ppa_done_us = esp_timer_get_time();
     if (handle->config.output_rgb565_byte_swap) {
-        video_frame_swap_rgb565_bytes(output, (size_t)output_width * output_height);
+        video_frame_swap_region(output, output_width, fit.offset_x, fit.offset_y,
+                                fit.render_width, fit.render_height);
     }
     int64_t done_us = esp_timer_get_time();
 

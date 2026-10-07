@@ -114,6 +114,6 @@ assert 'wechat ? "wechat-contract" : "device-call-default"' in presentation
 assert "#define APP_CONFIG_WECHAT_VOIP_CAMERA_ROTATION 180" in wechat_config
 assert '"rotation=%s source_rotation=%s "' in renderer
 assert "CALL_VIDEO_RENDER_WIDTH             640U" in renderer_config
-assert "CALL_VIDEO_RENDER_HEIGHT            384U" in renderer_config
+assert "CALL_VIDEO_RENDER_HEIGHT            480U" in renderer_config
 assert "CALL_VIDEO_MJPEG_MAX_PIXELS        (640U * 480U)" in renderer
-print("PASS: scene-specific uplink/downlink rotation and centered 640x384 presentation contract")
+print("PASS: scene-specific rotation and full-height 640x480 presentation contract")

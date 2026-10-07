@@ -13,13 +13,12 @@
 #define CALL_VIDEO_DECODE_MAX_WIDTH         APP_MEDIA_CALL_VIDEO_WIDTH
 #define CALL_VIDEO_DECODE_MAX_HEIGHT        APP_MEDIA_CALL_VIDEO_HEIGHT
 /*
- * Waveshare 4.3-inch balanced video viewport. Incoming WeChat frames are normally 320x240
- * or 480x352, so upscaling them to the complete 800x480 panel adds no detail
- * while increasing both PPA conversion and LVGL software-rotation work. Keep
- * the panel at 800x480, but render video into a centered 640x384 5:3 viewport.
+ * Fill the 480px panel height with a centered 4:3 video canvas. Device-call
+ * 640x480 frames fit without geometric scaling; rotated frames are contained.
+ * Controls remain in the foreground above the video image.
  */
 #define CALL_VIDEO_RENDER_WIDTH             640U
-#define CALL_VIDEO_RENDER_HEIGHT            384U
+#define CALL_VIDEO_RENDER_HEIGHT            480U
 #define CALL_VIDEO_REQUIRE_MATCHING_ASPECT   0U
 #define CALL_VIDEO_H264_FIT_COVER            0U
 #define CALL_VIDEO_MJPEG_ADAPTIVE_PLAYOUT    0U
@@ -33,7 +32,7 @@
 #define CALL_VIDEO_DECODED_SLOT_COUNT       4U
 /*
  * Ten retained RGB slots keep the weak-network burst reserve bounded. At the
- * 640x384 viewport each slot is 480 KiB, leaving additional PSRAM headroom.
+ * 640x480 viewport each slot is 600 KiB (6000 KiB total).
  */
 #define CALL_VIDEO_OUTPUT_SLOT_COUNT        10U
 

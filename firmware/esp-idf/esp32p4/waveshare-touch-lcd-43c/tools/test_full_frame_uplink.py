@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Actual profile, capture selection and scaler geometry for phone uplink."""
+"""Actual public camera policy and scaler geometry preserve call field of view."""
 from pathlib import Path
 import subprocess
 import tempfile
@@ -16,21 +16,23 @@ code=r'''
 #include <string.h>
 #include <stddef.h>
 #include "media_tuning.h"
+#include "media_governor.h"
 #define CONFIG_APP_RTC_VIDEO_AUTO_ADAPT_ENABLE 0
-#define MEDIA_GOVERNOR_WEAK_NETWORK_OFF 0
-#define MEDIA_GOVERNOR_WEAK_NETWORK_RESOLUTION_PRIORITY 1
-#define MEDIA_GOVERNOR_COMPACT_CAPTURE_WIDTH 800U
-#define MEDIA_GOVERNOR_COMPACT_CAPTURE_HEIGHT 640U
 #define MEDIA_GOVERNOR_CAPTURE_WIDTH APP_MEDIA_CAMERA_CAPTURE_WIDTH
 #define MEDIA_GOVERNOR_CAPTURE_HEIGHT APP_MEDIA_CAMERA_CAPTURE_HEIGHT
+#define MEDIA_GOVERNOR_FULL_WIDTH APP_MEDIA_RTC_VIDEO_WIDTH
+#define MEDIA_GOVERNOR_FULL_HEIGHT APP_MEDIA_RTC_VIDEO_HEIGHT
+#define MEDIA_GOVERNOR_FULL_FPS APP_MEDIA_RTC_H264_FPS
 #define VIDEO_YUV420_SCALE_DENOMINATOR 16U
-typedef struct {uint16_t width,height; uint8_t fps; uint32_t bitrate_bps; int weak_network_mode,weak_network_level,h264_min_qp,h264_max_qp;} media_governor_video_config_t;
+static media_governor_video_config_t s_rtc_video_config;
 typedef struct {uint16_t input_width,input_height,output_width,output_height; bool rotate_ccw90,fit_contain;} video_yuv420_scaler_config_t;
 '''
 code+=function(governor,"void media_governor_build_device_call_video_config(")
 code+=function(governor,"void media_governor_build_wechat_video_config(")
 code+=function(governor,"void media_governor_build_h5_video_config(")
 code+=function(governor,"static void media_governor_select_native_capture_size(")
+code+=function(governor,"static media_governor_camera_policy_t media_governor_make_rtc_av_policy(")
+code+=function(governor,"void media_governor_build_camera_policy(")
 code+=function(scaler,"static bool video_yuv420_select_geometry(")
 code+=function(scaler,"static bool video_yuv420_config_valid(")
 code+=function(scaler,"static size_t video_yuv420_data_size(")
@@ -51,13 +53,18 @@ int main(void) {
     media_governor_build_device_call_video_config(&config);
     assert(config.width==640 && config.height==480 && config.fps==5 && config.bitrate_bps==600000);
     uint16_t w=APP_MEDIA_CAMERA_CAPTURE_WIDTH,h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
-    media_governor_select_native_capture_size(&config,&w,&h);
-    assert(w==800 && h==640);
+    media_governor_camera_policy_t policy;
+    media_governor_build_camera_policy(&config,&policy);
+    w=policy.capture_width; h=policy.capture_height;
+    assert(w==1280 && h==960);
+    assert(policy.capture_fps==5 && policy.rtc_video_fps==5);
+    assert(policy.rtc_width==640 && policy.rtc_height==480);
+    assert(policy.h264_bitrate_bps==600000);
     video_yuv420_scaler_config_t scale={w,h,config.width,config.height,false,true};
     assert(video_yuv420_config_valid(&scale));
     uint16_t cw,ch,x,y,ox,oy; uint8_t step;
     assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
-    assert(cw==800 && ch==640 && x==0 && y==0 && ox==20 && oy==0 && step==12);
+    assert(cw==1280 && ch==960 && x==0 && y==0 && ox==0 && oy==0 && step==8);
     media_governor_build_wechat_video_config(&config);
     assert(config.width==960 && config.height==720 && config.fps==12 && config.bitrate_bps==1500000);
     w=APP_MEDIA_CAMERA_CAPTURE_WIDTH; h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
@@ -83,7 +90,8 @@ int main(void) {
 '''
 with tempfile.TemporaryDirectory(prefix="full-frame-uplink-") as tmp:
     p=Path(tmp); (p/"test.c").write_text(code)
-    subprocess.run(["cc","-Wall","-Wextra","-Werror","-I",str(root/"main/media"),str(p/"test.c"),"-o",str(p/"test")],check=True)
+    (p/"esp_err.h").write_text("typedef int esp_err_t;\n")
+    subprocess.run(["cc","-Wall","-Wextra","-Werror","-I",str(p),"-I",str(root/"main/media"),str(p/"test.c"),"-o",str(p/"test")],check=True)
     subprocess.run([str(p/"test")],check=True)
 video=(root/"components/p4_hardware/p4_video.c").read_text()
 assert "mode == STARTER_TIRTC_H5" in video
@@ -95,4 +103,4 @@ for config in ("sdkconfig.defaults", "sdkconfig"):
 pipeline=(root/"main/media/camera_pipeline.c").read_text()
 assert "const bool rotate_ccw90 = false;" in pipeline
 assert '"yuv420-ppa-ccw90"' not in pipeline
-print("PASS: H5, WeChat VoIP and device calls keep sensor orientation for receiver-side rotation")
+print("PASS: public call camera policy keeps full-view 1280x960 capture and uncropped 640x480 encoding")

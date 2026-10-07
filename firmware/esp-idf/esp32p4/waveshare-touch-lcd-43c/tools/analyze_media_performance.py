@@ -51,7 +51,7 @@ COMPACT_DOWNLINK_RE = re.compile(
     r"VRX (\d+)x(\d+) in=([0-9.]+)/(\d+)k "
     r"q/d/c/o=([0-9.]+)/([0-9.]+)/([0-9.]+)/([0-9.]+) "
     r"drop=(\d+)/(\d+) fail=(\d+)/(\d+) age=(\d+)/(\d+)ms "
-    r"depth=(\d+)/(\d+) buf=(\d+)/(\d+)@(\d+)ms "
+    r"depth=(\d+)/(\d+) buf=(\d+)/(\d+)@(\d+)ms (?:adapt=\d+ )?"
     r"ms=au/cvt/ppa:(\d+)/(\d+)/(\d+) "
     r"(?:kd=(\d+)/(\d+) )?gap=(\d+)/(\d+) "
     r"old=(\d+)/(\d+) reset=(\d+)/(\d+)(?: ovf=(\d+))?"
@@ -262,6 +262,7 @@ def parse_log(path: Path) -> SampleSet:
                         "display_drops": int(compact_downlink.group(10)),
                         "decode_failures": int(compact_downlink.group(11)),
                         "convert_failures": int(compact_downlink.group(12)),
+                        "queue_age_avg_ms": int(compact_downlink.group(13)),
                         "queue_age_max_ms": int(compact_downlink.group(14)),
                         "input_depth": int(compact_downlink.group(15)),
                         "decoded_depth": int(compact_downlink.group(16)),

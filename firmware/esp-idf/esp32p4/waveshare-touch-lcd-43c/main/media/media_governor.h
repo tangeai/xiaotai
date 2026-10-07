@@ -7,9 +7,9 @@
 #include "esp_err.h"
 
 /*
- * The OV5647 CSI driver exposes 800x640 as its smallest native landscape
- * sensor mode. RTC output sizes are scaler targets, so the P4 media layer must
- * crop/scale this native frame before encoding a 480x320 call.
+ * Optional resource fallback only: the OV5647 800x640 mode narrows the sensor
+ * window. Normal RTC capture keeps the full-view mode independently of the
+ * encoded resolution; compact device calls are downscaled by PPA.
  */
 #define MEDIA_GOVERNOR_COMPACT_CAPTURE_WIDTH  800U
 #define MEDIA_GOVERNOR_COMPACT_CAPTURE_HEIGHT 640U

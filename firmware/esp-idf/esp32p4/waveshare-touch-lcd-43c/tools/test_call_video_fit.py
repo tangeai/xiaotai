@@ -3,6 +3,7 @@
 from pathlib import Path
 import subprocess
 import tempfile
+import re
 
 repo = Path(__file__).resolve().parents[5]
 project = Path(__file__).resolve().parents[1]
@@ -38,6 +39,9 @@ typedef int esp_err_t;
 '''
 code += function(renderer, "static esp_err_t call_video_copy_display_i420(")
 code += function(converter, "static void video_frame_fit_inside(")
+for name in ("CALL_VIDEO_RENDER_WIDTH", "CALL_VIDEO_RENDER_HEIGHT"):
+    value = re.search(r"#define\s+" + name + r"\s+(\d+)U", config).group(1)
+    code += f"\n#define {name} {value}U\n"
 code += r'''
 static void verify_copy(uint16_t width, uint16_t height) {
     size_t bytes=(size_t)width*height*3U/2U;
@@ -53,6 +57,12 @@ int main(void) {
     verify_copy(384,256);
     verify_copy(640,480);
     uint16_t width,height,x,y;
+    video_frame_fit_inside(640,480,CALL_VIDEO_RENDER_WIDTH,CALL_VIDEO_RENDER_HEIGHT,
+                           false,&width,&height,&x,&y);
+    assert(width==640 && height==480 && x==0 && y==0);
+    video_frame_fit_inside(480,640,CALL_VIDEO_RENDER_WIDTH,CALL_VIDEO_RENDER_HEIGHT,
+                           false,&width,&height,&x,&y);
+    assert(width==360 && height==480 && x==140 && y==0);
     video_frame_fit_inside(640,480,640,384,false,&width,&height,&x,&y);
     assert(width==512 && height==384 && x==64 && y==0);
     video_frame_fit_inside(384,256,640,384,false,&width,&height,&x,&y);
