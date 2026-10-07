@@ -12,8 +12,8 @@
 bash tools/check.sh
 ```
 
-仓库根目录没有 `tools/run_host_tests.sh`。各 ESP-IDF 工程可能保留自己的
-`run_host_tests.sh`，但它们不是全仓检查入口，也不能代替 `tools/check.sh`。
+只需重复主机测试时，可执行根目录 `bash tools/run_host_tests.sh`。
+各 ESP-IDF 工程内的同名脚本只覆盖该工程，不能代替提交前的 `tools/check.sh`。
 
 需要缩短红绿循环时，可先运行受影响的公开测试。例如：
 

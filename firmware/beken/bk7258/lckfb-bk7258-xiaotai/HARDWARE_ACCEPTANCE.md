@@ -25,7 +25,7 @@ TODO：下一次发布候选固件验收后，补充固件 SHA-256、验证日�
 4. 等待设备完成 TiRTC 启动、MQTT 登录和能力上报。
    空闲首页应显示北京时间、日期、默认表情和当前 Wi-Fi 信号格数。
 5. 空闲状态按一次 KEY，确认进入 AI 对讲；再按一次，确认退出。
-   执行前至少等待两次 `/v1/call/group/device/assignment` 成功响应，随后连续完成
+   执行前确认平台和 TiRTC 就绪，不等待后台 assignment 轮询。需要验证房间分配时，通过打开多人对讲页或 MQTT 通知触发查询。随后连续完成
    10 次“按键进入、按键退出”，全程不得出现 `UsageFault`、`HardFault` 或自动重启。
 6. 在触摸首页点击右下角三个点，必须进入“功能菜单”，不得启动 AI；点击首页
    其他空白区域才启动 AI。再分别点击四角附近的控件，确认横屏方向没有旋转或镜像。
@@ -105,8 +105,9 @@ xiaotai_app: VoIP audio active generation=
 ```
 
 通话中再次按 KEY 时应发送 `0x2001` 并返回 `READY`。远端发送 `0x2001` 或
-MQTT `call_cancel` 时也应释放音频。其他会话正在占用媒体资源时，新来电应调用
-`/v1/wxvoip/reject`，日志出现 `VoIP rejected busy room=...`。
+MQTT `call_cancel` 时也应释放音频。已有待接听或一对一通话时，后到的微信来电应调用
+`/v1/wxvoip/reject`。AI、H5 或多人对讲占用媒体时，第一条来电只进入待接听槽；
+原业务继续，用户接听后才切换媒体。拒接或来电超时不能中断原业务。
 
 AI 联系人外呼：先确认平台通讯录中存在唯一备注名，再在 AI 会话中说“呼叫
 <备注名>”。设备联系人应依次出现：
@@ -149,7 +150,7 @@ xiaotai_app: session timeout owner=... state=... generation=...
 | 远程视频 | 小程序显示连续的 640×480 画面 | 摄像头创建失败、没有 H.264 首帧 |
 | 视频方向 | 以设备当前 UI 正方向观察，画面保持正向 | 上下颠倒时记录需要旋转 180°，左右错误单独记录镜像 |
 | 会话释放 | 关闭后出现三条停止日志，并可再次打开 | sender/audio stop timeout、第二次连接被误判为忙 |
-| 按键 AI | assignment 轮询后连续 10 次进入/退出，未崩溃；KEY 首次按下进入 AI，再按退出；未运行唤醒词任务 | `xiaotai_control` UsageFault、token/WHIP 失败、确认前麦克风已启动、退出后音频仍占用 |
+| 按键 AI | 平台就绪后连续 10 次进入/退出；KEY 首次按下进入 AI，再按退出；不依赖 assignment 轮询 | `xiaotai_control` UsageFault、token/WHIP 失败、确认前麦克风已启动、退出后音频仍占用 |
 | AI 状态显示 | ASR/TTS 事件驱动监听、思考、回答；依次注入平台十个中文 emotion 值时显示对应本地表情并出现 `AI emotion changed` 日志；本地表情页可浏览全部 21 个兼容 tag；快速 partial 字幕不耗尽显示缓冲 | 中文 emotion 被当成未知值、表情无变化、一直停在 LISTENING、连续出现 frame allocation failed |
 | AI 收音与降噪 | 在安静环境和持续风扇噪声下分别以 0.5 m、1 m、2 m 正常音量说话；出现 16 kHz AGC/NS ready 日志，`SDK NS` failures 保持 0，AGC 输出高于低电平输入且无持续限幅，服务端连续识别 | 无 NS、正常人声被过度抑制、远距离仍频繁识别不到、输出长期为零或持续限幅 |
 | 麦克风灵敏度 | 设置页 1–5 档可循环并重启保留；3 档日志为 `adc-gain=0x2d`，4 档为 `0x35`；分别复测 H5、AI、设备呼叫、微信 VoIP 和多人对讲，远讲改善且近讲无持续限幅/破音 | 设置不生效或重启丢失、只影响部分模式、VoIP 过响、近讲 ADC 削波或底噪明显上升 |

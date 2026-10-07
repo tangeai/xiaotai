@@ -1,4 +1,11 @@
-# ESP32-S3 内部 SRAM / PSRAM 优化方案
+# ESP32-S3 内存优化实验记录
+
+本文保留 2026 年 8 至 9 月的故障基线、候选方案和实板结果，不是当前配置操作指南。
+下文的“当前”均指对应实验阶段；不同阶段的 ELF、内存数值和功能不能混用。
+当前构建与功能请从[工程说明](../README.md)和[板卡指南](../../../../../docs/boards/lckfb-esp32s3/README.md)进入。
+
+已经否决的 direct camera PSRAM DMA 路径不得按本文重新开启；Wi-Fi 静态 RX 的 10、6、4
+分别属于旧基线、已实施配置和候选实验。MultiNet7 也是历史方案，不代表当前唤醒实现。
 
 ## 结论
 
@@ -8,7 +15,7 @@ ESP32-S3 芯片有 512 KB 片上 SRAM，另有 16 KB RTC SRAM，但缓存、静�
 
 本项目的 8 MB PSRAM 容量足够。历史故障的本质是：**TLS/TiRTC 启动时内部 SRAM 和 DMA-capable 连续块不足，而不是 PSRAM 总容量不足**。优先方案是把已审计且不执行 NVS/原始 Flash 操作的 UI、媒体、会话、识别栈及工作区放入 PSRAM，同时让 cache-disabled 启动栈、DMA 描述符和安全敏感的 TLS 控制数据保留在内部 SRAM。
 
-## 当前工程基线
+## 历史工程基线
 
 > 2026-08-30 更新：下文的 164,527-byte DIRAM、双 24 KiB worker 和按值队列是制定方案时的故障基线。方案已实施：当前全双工 AEC + WDT 公平性 ELF 静态 DIRAM 为 144,231 bytes（42.2%），`starter_start` 已复用为延迟 HTTP worker，媒体/平台队列已改为 PSRAM 固定池 + 1-byte 索引队列，Wi-Fi 静态 RX 为 6。direct camera PSRAM DMA 因精确实机花屏证据被回退到内部 staging DMA。
 
@@ -16,7 +23,7 @@ ESP32-S3 芯片有 512 KB 片上 SRAM，另有 16 KB RTC SRAM，但缓存、静�
 
 `.24` 真机曾把 24 KiB `starter_start` 栈一并外移，但该任务调用 NVS 和读取模型分区；Flash 操作关闭 cache 时 ESP-IDF 断言 `esp_task_stack_is_sane_cache_disabled()`，设备在联网读取绑定信息时重启。因此 `.33` 保留 cache-safe 内部启动栈，只外移已审计的长期任务。`.33` 真机启动 HIL 中，Wi-Fi 后内部空闲 48,063 bytes、最大连续块 45,056 bytes；释放 20 KiB TiRTC 预留后，TiRTC pre-init 内部空闲 41,403 bytes、最大连续块 32,768 bytes，并在约 6.9 秒收到 `SDK started`，采集窗口内无 alloc failure 或重启。长时 AI/H5/弱网压力仍按本文 HIL 门槛执行。
 
-以下结果基于当前源码、`sdkconfig`、启动日志和现有 ELF：
+以下是优化前源码、`sdkconfig`、启动日志和 ELF 的结果，不是上述更新后的内存水位：
 
 - `idf.py size`：DIRAM 使用 164,527 / 341,760 字节，其中 `.bss` 44,048 字节、`.data` 31,640 字节、DIRAM `.text` 88,839 字节。
 - 启动失败时：`internal-free` 约 35 KB，最大连续内部块仅 18,432 字节；随后硬件 AES 报分配失败。
@@ -215,7 +222,10 @@ ESP-IDF 官方说明 `CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY` 会把这些�
 6. `.33` 启动 HIL 基线：TiRTC pre-init 时 `DMA largest = 32 KB`、`DMA free ≈ 39.5 KB`，已成功进入 `SDK started`；压力测试要求这些数值不持续单向下降。这是本项目实测基线，不是 Espressif 的通用保证值。
 7. 所有应用任务在最重路径后保留实测安全余量，不再仅依靠静态调用链估算。
 
-## 推荐实施顺序
+## 原实验顺序
+
+以下仅记录当时的实验安排。阶段 1 已因花屏回退，不再推荐；各阶段预期收益不能直接
+相加作为当前固件的已实现收益。重新实验需绑定新的固件哈希并独立完成回归。
 
 1. 阶段 0：观测和失败分配 hook。
 2. 阶段 1：camera PSRAM DMA，单独 HIL。

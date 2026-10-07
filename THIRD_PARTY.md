@@ -9,7 +9,7 @@
 | `firmware/**/third_party/tirtc/` 和 `components/tirtc_sdk/` 内的 TiRTC 静态库及头文件 | **需单独授权** | 各 SDK 包的 README/manifest；当前板卡包版本并不完全相同，BK7258 包标记为 2.5.0 | 逐包取得二进制、头文件、商业使用及再分发许可；无法公开源码分发时改为授权用户自行下载 |
 | `platforms/esp-idf/components/starter_voice/vendor/` | **许可证待确认** | Voicute onnx-wakeword 的 ESP32 前处理/后处理子集，实际提交见下一段 | 核实固定提交的 LICENSE、NOTICE 和署名要求；无明确许可证则替换或取得权利人书面授权 |
 | `product/assets/models/nihaoxiaotai/` 及固件工程中的目标模型副本 | **需单独授权** | 用户提供的唤醒模型和配套 head 数据 | 确认模型、训练数据和导出产物权利人，并取得源码仓库及固件再分发许可 |
-| 两个 ESP32-P4 工程中的 `main/ui/font/lv_font_cn_14.c` | **当前不可公开分发** | 生成注释包含 Windows 字体（包括 `simhei.ttf`）等来源 | 换用 OFL 等许可明确字体并完成字形/UI 回归，或取得字体权利人的明确再分发授权 |
+| ESP32-P4 工程中保留的 `main/ui/font/lv_font_cn_14.c` | **当前不可公开分发** | 生成注释包含 Windows 字体（包括 `simhei.ttf`）等来源 | 换用 OFL 等许可明确字体并完成字形/UI 回归，或取得字体权利人的明确再分发授权；未参与当前构建的文件也需核对源码分发权利 |
 | `product/assets/audio/` 及固件工程中保留的提示音、铃声副本 | **需单独授权或自制证明** | 工程内嵌音频资源 | 记录原创工程或素材许可证；没有证据的资源替换为自制/许可明确素材 |
 | ESP32-P4 工程中的预编译 H.264 库及配套组件 | **许可证、专利条件待确认** | 板卡工程携带的二进制和头文件 | 核实固定版本、来源、LICENSE/NOTICE、专利及二进制再分发条件 |
 | IDF managed components | **遵循各组件许可证** | `dependencies.lock` 锁定的供应商组件 | 保留各组件 LICENSE/NOTICE，生成 Release 依赖清单；只有许可证要求满足时才可分发 |

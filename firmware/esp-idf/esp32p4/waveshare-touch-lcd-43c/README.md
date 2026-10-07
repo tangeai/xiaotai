@@ -13,12 +13,16 @@ GPIO（通用输入输出引脚）、总线、时钟、DMA（直接内存访问�
 
 主要入口如下：
 
-- `main/application/`：业务会话和媒体资源所有权；
-- `main/protocols/tirtc/`：TiRTC 连接、订阅和媒体收发；
-- `main/services/`：H5、AI、设备呼叫和微信 VoIP；
-- `main/media/`：摄像头、编码和显示媒体链路；
-- `main/drivers/`：显示、触摸、音频和摄像头驱动；
+- 仓库 `platforms/esp-idf/main/`：共享启动入口，由本工程 `main/CMakeLists.txt` 引入；
+- 仓库 `platforms/esp-idf/components/starter_runtime/`：业务会话和媒体所有权；
+- 同目录 `starter_tirtc/`、`platform_client/`：TiRTC 与平台信令；
+- 同目录 `starter_product/`：产品界面和交互；
+- 本工程 `components/starter_media/`、`components/p4_hardware/`：P4 媒体适配；
+- 本工程 `main/media/`、`main/drivers/display/`：摄像头编码与显示实现；
 - `hardware-ir.json`：硬件事实、来源和证据等级。
+
+源文件是否生效以组件的 `CMakeLists.txt` 为准。旧 `main/application/`、
+`main/protocols/`、`main/ui/` 不作为当前产品入口。详细路径见[媒体架构](docs/P4_MEDIA_ARCHITECTURE.md)。
 
 ## 媒体约定
 
@@ -40,8 +44,6 @@ bash tools/check.sh
 
 ## 证据与待办
 
-板卡现有产品功能已经由项目方在实板验证。源码中的构建合同和主机测试用于防止接口回退，
-不能替代每次固件改动后的实板回归。
-
-TODO：下一次实板验证时，补充微信 VoIP 流 0 修正后的主叫、被叫、上行首包和双向通话日志。
-该证据补充不阻塞当前源码提交。
+已有实板结论的适用范围见开发板指南及[视频性能记录](../../../../docs/product/P4_VIDEO_PERFORMANCE.md)。
+设备互呼当前以 5 fps 为基线，不声明 8 fps 已通过稳定性验收。主机测试防止接口回退，
+不能替代新固件的双向音视频、四向旋转、连续挂断重拨和弱网回归。

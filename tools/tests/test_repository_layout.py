@@ -191,7 +191,7 @@ class RepositoryLayoutTests(unittest.TestCase):
             "AEC",
             "640×480",
             "1280×960",
-            "wechat_voip_media.c",
+            "starter_tirtc",
         )
         for detail in required_details:
             self.assertIn(detail, contract, detail)

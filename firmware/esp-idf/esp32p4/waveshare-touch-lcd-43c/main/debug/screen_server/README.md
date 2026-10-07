@@ -1,5 +1,9 @@
 # Screen Debug Server
 
+This is a legacy module, not an entry point in the current shared XiaoTai
+startup. Its switch alone does not enable it in the current firmware. Check
+the selected component's CMake source registration before using these routes.
+
 This module is a Wi-Fi LAN debug helper for viewing and driving the device screen from a browser.
 
 Build switch:
@@ -12,8 +16,8 @@ When enabled, browse to:
 
 `http://<device-ip>:8080/`
 
-The browser view follows the active LVGL viewport. On the P4 landscape build
-the screen is exposed as `480 x 320`.
+The browser view follows the active LVGL viewport. The former 480 x 320 layout
+does not describe the current 800 x 480 product UI.
 
 Routes:
 

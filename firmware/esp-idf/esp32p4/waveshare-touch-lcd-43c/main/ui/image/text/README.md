@@ -1,5 +1,11 @@
 # Figma text image assets
 
+This workflow belongs to the legacy project-local UI. The current product UI
+is built from `platforms/esp-idf/components/starter_product/` at the repository
+root. Do not regenerate these assets to change current menus; inspect that
+component's source and font registration instead. The steps below are retained
+only for maintaining the old assets.
+
 Static Chinese UI text is rendered from Figma-exported PNG masks instead of the
 runtime Chinese font. The only remaining Chinese font is reserved for AI chat
 dynamic text.

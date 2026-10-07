@@ -1,8 +1,13 @@
 # 小钛多人对讲接口与协议
 
 文档版本：V1.1  
-文档状态：评审稿  
+文档状态：设备接入说明与服务端设计草案
+
 更新日期：2026-09-08
+
+设备开发以第 7 节的现行 API 路径和[交互规范](PRODUCT_INTERACTION_PROFILES.md#64-房间分配刷新)为准。
+本仓库不包含服务端部署工程。下文的 `room-server` 拆分、Web API、数据库、租约时长和
+容量设计是服务端方案，不能视为当前部署已实现的承诺；对接时应核对服务端版本。
 
 ## 1. 方案结论
 
@@ -327,7 +332,7 @@ POST /v1/room/web/device/{device_id}/leave
 ### 7.1 查询期望状态
 
 ```http
-GET /v1/room/device/assignment
+GET /v1/call/group/device/assignment
 ```
 
 ```json
@@ -347,7 +352,7 @@ GET /v1/room/device/assignment
 ### 7.2 获取连接 Token
 
 ```http
-POST /v1/room/device/connect-token
+POST /v1/call/group/device/connect-token
 ```
 
 ```json
@@ -359,7 +364,7 @@ POST /v1/room/device/connect-token
 ### 7.3 上报连接状态和续租
 
 ```http
-POST /v1/room/device/presence
+POST /v1/call/group/device/presence
 ```
 
 ```json
@@ -438,7 +443,10 @@ IDLE
   → IDLE
 ```
 
-设备当前关系为 `joined`，但 AI、CALL 或 VOIP 占用音频时，上报 `suspended`。业务结束后重新查询关系并获取新 Token 恢复房间。用户通过 Web 退出会把期望状态改为 `left`，因此不会自动恢复。
+房间分配与媒体连接分别管理。其他业务结束不能触发 assignment 查询。
+`touch-full` 接听一对一来电后结束本地房间媒体，通话结束回首页，不在后台恢复；
+用户再次打开多人对讲页时才刷新并连接。`display-key` 和 `headless-key` 按本地收听意图
+和会话仲裁规则处理恢复，未连接时可长按 PTT 刷新分配。Web 取消分配后不得恢复原房间。
 
 每次连接生成新的 `session_id` 和 `SessionArbiter generation`。SDK 回调、HTTP 结果、MQTT 和定时器事件都必须核对当前代次，避免旧连接关闭新房间。
 

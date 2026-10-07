@@ -16,8 +16,8 @@ in the project components.
 - `p4_video_capture.*` is an opt-in diagnostic at the encoded-video boundary.
   It is not part of camera ownership or normal media policy.
 
-The two P4 projects intentionally retain separate `p4_video.c` files because
-their display presentation and H5/VoIP media policies differ. Those orchestration
-differences must not be hidden behind a shallow hardware adapter. Their common
-component source set and public `p4_video.h` contract are declared once in this
-directory.
+The registered P4 target is the Waveshare 4.3-inch board. Its project retains
+`components/p4_hardware/p4_video.c` and the renderer configuration for product
+presentation and H5/VoIP policy. The reusable source set and public `p4_video.h`
+contract are declared here. A future board must be registered separately; the
+family directory does not imply that another display model is supported.

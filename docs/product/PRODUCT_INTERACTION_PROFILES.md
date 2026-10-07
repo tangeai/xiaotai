@@ -68,8 +68,8 @@
 - 一对一通话页的麦克风按钮显示当前状态“麦克风已开”或“麦克风已关”，点击后切换；状态文案不写成“静音/开麦”动作。
 - 本地表情目录使用 21 个稳定 tag：`neutral`、`happy`、`laughing`、`funny`、`sad`、`angry`、`crying`、`loving`、`embarrassed`、`surprised`、`shocked`、`thinking`、`winking`、`cool`、`relaxed`、`delicious`、`kissy`、`confident`、`sleepy`、`silly`、`confused`。AI 回复和本地表情浏览页共用这一目录。
 - 平台 `caption.params.emotion` 使用中文协议值。设备必须映射：`中性→neutral`、`开心→happy`、`兴奋→laughing`、`温和→relaxed`、`安慰→loving`、`思考→thinking`、`惊讶→surprised`、`严肃→confident`、`困倦→sleepy`、`困惑→confused`。为兼容旧消息，也接受英文 tag、`round_start.params.emotion`、独立 `emotion`/`ai_emotion`/`expression` 消息、`event.params.data.emotion` 以及旧版 `ai_reply.emotion`。设备日志必须记录最终表情切换，平台未下发 emotion 时不得伪造变化。
-- AI 的 16 kHz 麦克风上行按 `AEC → 独立 NS（-25 dB）→ 带限幅 AGC → Opus` 处理；8 kHz 通话上行继续使用已验证的 AGC，且在 8 kHz AEC/NS 完成实机验证前不擅自启用。实机验收需覆盖静音房、风扇噪声、0.5/1/2 m 拾音和双讲。
-- `touch-full` 设置页提供持久化的 1–5 档“麦克风灵敏度”，控制板级 ADC 前端增益并同时作用于 H5、AI、设备呼叫、微信 VoIP 和多人对讲。默认 4 档“增强”；3 档必须保持该板原 BSP `0x2d` 增益作为可回退基线。该设置不是按业务链路偷偷增加 PCM 音量，调高后须同时检查近讲削波和远讲识别。
+- AI 和通话的编码、采样率、AEC、NS、AGC 按各板卡的[音视频参数](MEDIA_CONTRACT.md)执行，不从交互形态推断音频处理能力。实机验收需覆盖静音房、风扇噪声、0.5/1/2 m 拾音和双讲。
+- `touch-full` 设置页提供持久化的 1–5 档“麦克风灵敏度”，控制板级 ADC 前端增益并同时作用于 H5、AI、设备呼叫、微信 VoIP 和多人对讲。默认 4 档“增强”；3 档保留各板卡的标准增益，具体寄存器值由板级适配定义。调高后须同时检查近讲削波和远讲识别。
 - 收到 AI `end_session` 时，必须先停止上行，并至少保留 1.5 秒的尾音包到达窗口；随后等待软件包队列和按已写 PCM 时长估算的 BK 播放 DMA 尾音排空，整个结束流程最多等待 5 秒。传输先被远端关闭时，仍须排空已经收到的尾音，最多等待 3 秒；不得仅以软件队列瞬时为空判断播完。
 
 ## 5. 第一个联系人与快捷呼叫

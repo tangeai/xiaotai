@@ -86,7 +86,7 @@ H5、设备呼叫、多人对讲和微信通话使用 8 kHz 单声道 A-law，�
 AI 使用 16 kHz 单声道 Opus，每包 20 毫秒，目标码率 16 kbit/s。
 
 H5 视频为 H.264 1280×960、20 fps（每秒 20 帧）、目标码率 3 Mbit/s；设备保持传感器方向，H5 接收端按上报的 270° 顺时针角度旋转。
-设备呼叫为 H.264 Annex-B 640×480、5 fps、600 kbit/s、QP 30–46；800×640 传感器完整画面等比缩放后左右留边；微信通话为
+设备呼叫为 H.264 Annex-B 640×480、5 fps、600 kbit/s、QP 30–46；1280×960 传感器完整画面等比缩到 640×480，不裁切；微信通话为
 960×720、12 fps、1.5 Mbit/s；设备端不旋转，微信接收端按 180° 顺时针角度旋转。
 
 音频先在 16 kHz PCM 域完成 AEC（声学回声消除）。AI 上行继续执行激进 NS（噪声抑制）
@@ -104,7 +104,7 @@ SILK/CELT 的深调用路径，不能退回通用音频任务的 6 KiB 栈配置
 微信通话的音频收发已经统一使用协议规定的流 0，主机测试会检查实现常量。
 
 TODO：下一次实板回归时，重新保存主叫、被叫、上行首包和双向通话证据。
-这是证据补充项，不阻塞当前源码提交。
+发布验证需把这些结果绑定到本次固件哈希。
 
 ## 环境与依赖
 
@@ -141,17 +141,14 @@ TODO：下一次实板回归时，重新保存主叫、被叫、上行首包和�
 xiaotai/
 ├── boards/waveshare/esp32p4-touch-lcd-43c/ # 板卡身份、硬件参数与媒体接入
 ├── product/                                # 跨芯片复用的业务状态、协议与测试
+├── platforms/esp-idf/main/                 # 共享启动入口
+├── platforms/esp-idf/components/           # runtime、TiRTC、媒体和产品界面
 ├── platforms/esp-idf/waveshare_p4/         # P4 摄像头、显示、内存和板级公共实现
 └── firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/
-    ├── main/app_main.c                     # 固件启动入口
-    ├── main/application/                   # 产品状态、配置、呼叫和微信业务装配
-    ├── main/connectivity/                  # P4 与 C6 的联网流程
-    ├── main/drivers/                       # 音频、显示和虚拟媒体驱动
+    ├── main/CMakeLists.txt                 # 引入共享启动入口
+    ├── main/drivers/display/              # DSI 显示适配
     ├── main/media/                         # 摄像头管线和媒体负载控制
-    ├── main/protocols/                     # HTTP 与 TiRTC 协议接入
-    ├── main/services/                      # AI、绑定、设备呼叫、微信、OTA 和媒体服务
-    ├── main/ui/                            # 页面、布局、字体和界面资源
-    ├── main/platform/                      # 存储、时间、日志和任务策略
+    ├── main/services/call_video_renderer_config.h # 下行渲染参数
     ├── components/                         # BSP、ESP-Hosted 和公共组件接入
     └── *-contract.json                     # 硬件、交互和媒体契约
 ```
@@ -164,14 +161,14 @@ xiaotai/
 | 要修改的内容 | 首先查看 | 边界说明 |
 | --- | --- | --- |
 | 板卡型号、引脚和媒体入口 | `boards/waveshare/esp32p4-touch-lcd-43c/` | 只放该 PCB 和外设组合特有的事实 |
-| 启动流程和产品装配 | 工程 `main/app_main.c`、`main/application/` | 业务状态与底层生命周期分开 |
-| H5、AI、设备呼叫和微信 VoIP 的状态与优先级 | `product/src/`、`main/application/` | 公共规则优先落在可测试的产品接口 |
-| C6 联网、配网和网络状态 | `main/connectivity/`、工程 `components/espressif__esp_hosted/` | P4 不直接假设 Wi-Fi 已就绪 |
-| 麦克风、扬声器、AEC 和播放控制 | `main/drivers/audio/`、`main/services/audio_playout_controller.c` | 同时核对音频契约和实际播放参考 |
+| 启动流程和产品装配 | `platforms/esp-idf/main/` | 由工程 `main/CMakeLists.txt` 注册 |
+| H5、AI、设备呼叫和微信 VoIP 的状态与优先级 | `product/src/`、`platforms/esp-idf/components/starter_runtime/` | 公共规则优先落在可测试的产品接口 |
+| C6 联网、配网和网络状态 | `platforms/esp-idf/components/wifi_manager/`、工程 `components/espressif__esp_hosted/` | P4 不直接假设 Wi-Fi 已就绪 |
+| 麦克风、扬声器、AEC 和播放控制 | 工程 `components/starter_media/`、`platforms/esp-idf/components/starter_media_common/` | 同时核对音频契约和实际播放参考 |
 | MIPI-CSI 摄像头、视频转换和负载控制 | `main/media/`、`platforms/esp-idf/waveshare_p4/` | 采集、转换和业务编码参数分层维护 |
-| TiRTC 连接、流编号和媒体桥接 | `main/protocols/tirtc/`、`main/services/rtc_media_bridge.c` | 不把 H5、设备呼叫和微信流配置混用 |
-| AI、设备绑定、设备呼叫、微信和 OTA | `main/services/` 下对应目录或文件 | 服务处理协议，业务所有权仍由应用层决定 |
-| 页面、触摸反馈和显示布局 | `main/ui/`、`platforms/esp-idf/waveshare_p4/` | 页面不直接接管会话状态 |
+| TiRTC 连接、流编号和媒体桥接 | `platforms/esp-idf/components/starter_tirtc/` | 不把 H5、设备呼叫和微信流配置混用 |
+| 平台 HTTP/MQTT 与绑定 | `platforms/esp-idf/components/platform_client/` | 信令结果交由 runtime 处理 |
+| 页面、触摸反馈和显示布局 | `platforms/esp-idf/components/starter_product/`、工程 `main/drivers/display/` | 页面不直接接管会话状态 |
 | 回归测试和构建约束 | `product/tests/`、`tools/tests/` | 修改行为时先补失败用例，再改实现 |
 
 ### 推荐修改顺序
@@ -212,8 +209,12 @@ VoIP。音视频分别记录实际帧率、码率、丢帧、首包、AEC 参考
 
 ## 验证状态与已知限制
 
-项目方确认当前固件已在该型号的 PCB V1.0 实板跑通。当前状态标记为“已验证”。重新
-测试后，验证人员需要同步记录测试状态和对应固件身份。
+项目方确认该型号的 PCB V1.0 实板已有跑通记录。“已验证”只适用于记录中的固件和
+测试范围，不代表从任意提交构建的固件已经验收。
+
+设备互呼当前以 640×480、5 fps 为基线；旋转后的实测帧率可能低于目标，8 fps 未作为
+稳定档位验收。双机日志、比较条件和限制见[视频性能记录](../../product/P4_VIDEO_PERFORMANCE.md)。
+发布新固件时应重新覆盖双向发起、四向旋转、挂断重拨、微信通话和弱网恢复。
 
 板级配置位于 `boards/waveshare/esp32p4-touch-lcd-43c/`；硬件事实和证据等级见工程
 `hardware-ir.json`。
