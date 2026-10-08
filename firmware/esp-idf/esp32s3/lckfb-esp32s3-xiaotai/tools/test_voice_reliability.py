@@ -493,8 +493,9 @@ static starter_runtime_state_t session_state(void) {
     return (starter_runtime_state_t)atomic_load(&s_public_state);
 }
 static void finish_session(int error) { assert(error==0); ++finishes; s_public_state=STARTER_RUNTIME_WAITING; }
-static void room_stop_connection(const char *presence, int error) {
-    assert(strcmp(presence,"suspended")==0); finish_session(error);
+static bool s_room_page_active;
+static void room_set_foreground(bool active) {
+    assert(!active); s_room_page_active=false; finish_session(0);
 }
 static void diagnostic_event(const char *label, int value) { assert(label); assert(value>0); ++events; }
 ''' + function(runtime_path, "preempt_for_call") + r'''

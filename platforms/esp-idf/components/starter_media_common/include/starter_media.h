@@ -30,9 +30,23 @@ typedef struct {
     uint32_t video_sent;         /**< 产品适配器成功发送的视频帧数。 */
     uint32_t audio_received;     /**< 成功复制到播放队列的音频帧数。 */
     uint32_t audio_dropped;      /**< 参数无效、队列满或代次过期的帧数。 */
-    uint32_t audio_decoded;      /**< 已成功从 A-law 解码的下行帧数。 */
+    uint32_t audio_rx_overflow;  /**< 下行队列容量不足的丢包数，独立于上行。 */
+    uint32_t audio_rx_prefill_waits; /**< 为吸收下行抖动进行预缓冲的次数。 */
+    uint32_t audio_rx_queue_capacity; /**< 接收缓冲容量；0 表示未提供该诊断。 */
+    uint32_t audio_rx_burst_max; /**< 单个 10 ms 时间桶内的最大有效到包数。 */
+    uint32_t audio_rx_queue_peak; /**< 下行待播队列峰值，不包含工作线程持有帧。 */
+    uint32_t audio_decode_max_us; /**< 单帧解码耗时峰值。 */
+    uint32_t audio_lock_max_us; /**< 输出锁等待耗时峰值。 */
+    uint32_t audio_write_max_us; /**< 单帧 I2S 写入耗时峰值。 */
+    uint32_t audio_pcm_last_samples; /**< 最近成功解码的单声道采样数。 */
+    uint32_t audio_encode_max_us; /**< 编码墙钟耗时峰值，不含 SDK 发送。 */
+    uint32_t audio_encode_avg_us; /**< 当前代次编码平均墙钟耗时。 */
+    uint32_t audio_decode_avg_us; /**< 当前代次解码平均墙钟耗时。 */
+    uint32_t audio_lock_avg_us; /**< 当前代次输出锁平均等待时间。 */
+    uint32_t audio_write_avg_us; /**< 当前代次 I2S 写入平均墙钟耗时。 */
+    uint32_t audio_decoded;      /**< 已成功解码的下行帧数。 */
     uint32_t audio_played;       /**< 已完整写入 I2S 播放 DMA 的下行帧数。 */
-    uint32_t audio_decode_failed; /**< A-law 解码失败或空输出的帧数。 */
+    uint32_t audio_decode_failed; /**< 解码失败或空输出的帧数。 */
     uint32_t audio_playback_blocked; /**< 静音、功放或会话门禁拒绝的帧数。 */
     uint32_t audio_write_failed; /**< I2S 写入失败或部分写入的帧数。 */
     uint32_t audio_playback_pending; /**< 已入队但尚未完成播放的帧数。 */
@@ -74,6 +88,8 @@ esp_err_t starter_media_set_speaker_muted(bool muted);
 void starter_media_set_microphone_muted(bool muted);
 esp_err_t starter_media_set_microphone_sensitivity(uint8_t sensitivity);
 void starter_media_set_uplink_enabled(bool enabled);
+/** Immediate PTT gate; affects only Room, including after an owner switch. */
+void starter_media_set_room_pressed(bool pressed);
 /** Runtime publishes foreground admission; microphone mute is also enforced. */
 void starter_media_set_wake_allowed(bool allowed);
 /** Prepare only for an acoustic wake; returns zero if stale, muted or busy. */

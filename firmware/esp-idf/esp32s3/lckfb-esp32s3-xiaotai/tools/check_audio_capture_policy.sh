@@ -44,8 +44,17 @@ if ! rg -q '^CONFIG_MBEDTLS_TLS_SERVER_AND_CLIENT=y$' "$sdkconfig_defaults" ||
     exit 1
 fi
 
-if [[ "$main_compact" != *'.max_send_buffer_bytes=256U*1024U'* ]]; then
-    echo "FAIL: TiRTC send buffer must match the ESP32 reference value of 256 KiB" >&2
+if [[ "$main_compact" != *'.max_send_buffer_bytes=CONFIG_XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES'* ]]; then
+    echo "FAIL: TiRTC bootstrap must use the configured send buffer" >&2
+    exit 1
+fi
+if rg -q '^CONFIG_XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES=' "$project_dir/sdkconfig"; then
+    rg -qx 'CONFIG_XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES=262144' "$project_dir/sdkconfig" || {
+        echo "FAIL: S3 TiRTC send buffer must remain 256 KiB" >&2
+        exit 1
+    }
+elif [[ "$main_compact" != *'#ifndefCONFIG_XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES#defineCONFIG_XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES(256U*1024U)#endif'* ]]; then
+    echo "FAIL: default TiRTC send buffer must remain 256 KiB" >&2
     exit 1
 fi
 

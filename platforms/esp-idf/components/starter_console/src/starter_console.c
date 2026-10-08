@@ -141,6 +141,27 @@ static int command_status(int argc, char **argv)
            (unsigned long)media.audio_decode_failed,
            (unsigned long)media.audio_playback_blocked,
            (unsigned long)media.audio_write_failed);
+    if (media.audio_rx_queue_capacity != 0U) {
+        printf("Audio RX buffer: slots=%lu overflow=%lu prefill-waits=%lu\n",
+               (unsigned long)media.audio_rx_queue_capacity,
+               (unsigned long)media.audio_rx_overflow,
+               (unsigned long)media.audio_rx_prefill_waits);
+        printf("Audio RX timing: burst10ms=%lu queue-peak=%lu pcm-last=%lu "
+               "decode/lock/write-max=%lu/%lu/%lu us\n",
+               (unsigned long)media.audio_rx_burst_max,
+               (unsigned long)media.audio_rx_queue_peak,
+               (unsigned long)media.audio_pcm_last_samples,
+               (unsigned long)media.audio_decode_max_us,
+               (unsigned long)media.audio_lock_max_us,
+               (unsigned long)media.audio_write_max_us);
+        printf("Audio timing avg: encode/decode/lock/write=%lu/%lu/%lu/%lu us "
+               "encode-max=%lu us\n",
+               (unsigned long)media.audio_encode_avg_us,
+               (unsigned long)media.audio_decode_avg_us,
+               (unsigned long)media.audio_lock_avg_us,
+               (unsigned long)media.audio_write_avg_us,
+               (unsigned long)media.audio_encode_max_us);
+    }
     printf("AEC: processed=%lu errors=%lu clipped-mic/ref=%lu/%lu\n",
            (unsigned long)media.aec_processed,
            (unsigned long)media.aec_errors,

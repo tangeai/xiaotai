@@ -2,6 +2,8 @@ import re
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 from pathlib import Path
 
 
@@ -9,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 from build import build_environment
+import build
 from firmware_version import FirmwareVersion, bump_board_build
 
 
@@ -42,11 +45,46 @@ class FirmwareVersionTests(unittest.TestCase):
         self.assertIsNotNone(match)
         self.assertRegex(match.group(1), rf"^{SEMVER.pattern}$")
 
-    def test_unified_build_only_bumps_explicit_release_builds(self) -> None:
-        source = (REPO_ROOT / "tools/build.py").read_text()
-        self.assertIn('"--release"', source)
-        self.assertIn("bump_board_build", source)
-        self.assertIn("if args.release", source)
+    def dispatch(self, *, release=False, dry_run=False, return_code=0):
+        args = SimpleNamespace(list_boards=False, validate=False, all=False,
+                               board="lckfb-esp32s3", variant=None,
+                               release=release, dry_run=dry_run, keep_going=False)
+        board = SimpleNamespace(id=args.board, data={"platform": "esp-idf"},
+                                default_variant=lambda: "default")
+        events = []
+        def command(*unused):
+            events.append("validate-selection")
+            return ["idf.py", "build"], REPO_ROOT
+        def bump(*unused):
+            events.append("bump")
+            return FirmwareVersion.parse("1.0.0+build.2")
+        def compile(*unused, **kwargs):
+            events.append("compile")
+            return SimpleNamespace(returncode=return_code)
+        with mock.patch.object(build, "parse_args", return_value=args), \
+             mock.patch.object(build, "load_boards", return_value=[board]), \
+             mock.patch.object(build, "find_board", return_value=board), \
+             mock.patch.object(build, "print_build", side_effect=command), \
+             mock.patch.object(build, "bump_board_build", side_effect=bump), \
+             mock.patch.object(build, "prepare_dependency_lock"), \
+             mock.patch.object(build, "normalize_dependency_lock", return_value=False), \
+             mock.patch.object(build.subprocess, "run", side_effect=compile), \
+             mock.patch("builtins.print"):
+            result = build.main()
+        return result, events
+
+    def test_every_real_build_bumps_once_before_compiling(self) -> None:
+        for release in (False, True):
+            with self.subTest(release=release):
+                self.assertEqual(self.dispatch(release=release),
+                                 (0, ["validate-selection", "bump", "compile"]))
+
+    def test_dry_run_does_not_change_version(self) -> None:
+        self.assertEqual(self.dispatch(dry_run=True), (0, ["validate-selection"]))
+
+    def test_failed_build_keeps_its_unique_attempt_number(self) -> None:
+        self.assertEqual(self.dispatch(return_code=1),
+                         (1, ["validate-selection", "bump", "compile"]))
 
     def test_release_build_exports_release_profile(self) -> None:
         self.assertEqual(

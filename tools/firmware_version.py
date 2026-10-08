@@ -77,7 +77,7 @@ def _replace_profile_version(path: Path, board_model: str,
 
 
 def bump_board_build(root: Path, board_id: str) -> FirmwareVersion:
-    """Increment one board's formal-build number without changing x.y.z."""
+    """Increment one board's build-attempt number without changing x.y.z."""
     projects = {
         "alientek-atk-dnesp32s3":
             "firmware/esp-idf/esp32s3/atk-dnesp32s3",

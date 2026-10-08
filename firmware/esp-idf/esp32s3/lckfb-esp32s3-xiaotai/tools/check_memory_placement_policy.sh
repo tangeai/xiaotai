@@ -73,9 +73,11 @@ if [[ "$platform_compact" == *'xTaskCreate(request_task'* ||
 fi
 
 if [[ "$media_compact" != *'heap_caps_calloc(AUDIO_RX_QUEUE_DEPTH,sizeof(*s_audio_rx_pool),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
+      "$media_compact" != *'#defineOPUS_WORKER_TASK_STACK_BYTES(40U*1024U)'* ||
+      "$media_compact" != *'xTaskCreateWithCaps(audio_uplink_task,"rtc_audio_tx",OPUS_WORKER_TASK_STACK_BYTES,NULL,7,NULL,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
       "$media_compact" != *'heap_caps_malloc(JPEG_BUFFER_BYTES,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
       "$media_compact" != *'xQueueCreate(AUDIO_RX_QUEUE_DEPTH,sizeof(uint8_t))'* ||
-      "$media_compact" != *'xTaskCreateWithCaps(audio_sink_task,"board_audio_rx",6144,NULL,8,NULL,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
+      "$media_compact" != *'xTaskCreateWithCaps(audio_sink_task,"board_audio_rx",OPUS_WORKER_TASK_STACK_BYTES,NULL,8,NULL,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
       "$media_compact" != *'xTaskCreatePinnedToCoreWithCaps(audio_capture_task,"board_audio_tx",6144,NULL,7,NULL,MEDIA_REALTIME_CORE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
       "$media_compact" != *'xTaskCreatePinnedToCoreWithCaps(camera_task,"board_mjpeg",8192,NULL,5,NULL,MEDIA_REALTIME_CORE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
       "$media_compact" != *'frame2jpg_cb('* ]]; then

@@ -168,6 +168,8 @@ bool starter_tirtc_audio_ready(void);
 bool starter_tirtc_video_ready(void);
 int starter_tirtc_send_h264(uint32_t timestamp_ms, const void *data, uint32_t length, bool key);
 int starter_tirtc_subscribe_call_video(void);
+/** Subscribe call/VoIP downlink audio after business acceptance. */
+int starter_tirtc_subscribe_call_audio(void);
 int starter_tirtc_request_remote_key_frame(void);
 
 /** 返回当前 SDK 发送缓冲占用字节数，无连接时为 0。 */

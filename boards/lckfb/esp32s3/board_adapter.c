@@ -527,6 +527,16 @@ static int audio_adapter_write(void *context, const int16_t *samples,
     return rc;
 }
 
+static int audio_adapter_set_capture_gain(void *context, unsigned gain)
+{
+    (void)context;
+    if (gain > 36U || s_microphone_dev == NULL) return ESP_ERR_INVALID_ARG;
+    /* MIC1 only: MIC3 is the calibrated physical playback reference. */
+    return esp_codec_dev_set_in_channel_gain(s_microphone_dev,
+        ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), (float)gain) == ESP_CODEC_DEV_OK
+        ? ESP_OK : ESP_FAIL;
+}
+
 static int audio_adapter_set_volume(void *context, unsigned percent)
 {
     (void)context;
@@ -547,6 +557,7 @@ const xiaotai_board_audio_adapter_t *szpi_board_audio_adapter(void)
         .format = audio_adapter_format,
         .read_pcm = audio_adapter_read,
         .write_pcm = audio_adapter_write,
+        .set_capture_gain = audio_adapter_set_capture_gain,
         .set_volume = audio_adapter_set_volume,
         .set_muted = audio_adapter_set_muted,
     };

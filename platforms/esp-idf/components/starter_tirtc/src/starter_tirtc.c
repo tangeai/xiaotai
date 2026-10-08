@@ -28,6 +28,18 @@ _Static_assert(sizeof(StaticSemaphore_t) == TIRTC_SDK_STATIC_SEMAPHORE_SIZE,
 #define H5_VIDEO_STREAM 11U
 #define AI_AUDIO_STREAM 1U
 #define CALL_AUDIO_STREAM 10U
+#define VOIP_AUDIO_STREAM 0U
+#define ROOM_AUDIO_STREAM 1U
+
+static uint8_t audio_stream_for_mode(starter_tirtc_mode_t mode)
+{
+    switch (mode) {
+    case STARTER_TIRTC_AI: return AI_AUDIO_STREAM;
+    case STARTER_TIRTC_VOIP: return VOIP_AUDIO_STREAM;
+    case STARTER_TIRTC_ROOM: return ROOM_AUDIO_STREAM;
+    default: return CALL_AUDIO_STREAM;
+    }
+}
 /* SDK permits 1–50 ms. 20 ms avoids idle-core starvation without perceptible
  * call-control latency on this Wi-Fi S3 product. */
 #define TIRTC_TGTRP_POLL_TIMEOUT_MS 20
@@ -354,11 +366,8 @@ static int on_subscribe_audio(tirtc_conn_t connection, uint8_t stream_id)
     }
     starter_tirtc_mode_t mode = (starter_tirtc_mode_t)atomic_load_explicit(
         &s_mode, memory_order_acquire);
-    bool accepted = (mode == STARTER_TIRTC_H5 && stream_id == H5_AUDIO_STREAM) ||
-                    (mode == STARTER_TIRTC_AI && stream_id == AI_AUDIO_STREAM) ||
-                    ((mode == STARTER_TIRTC_VOIP || mode == STARTER_TIRTC_CALL ||
-                      mode == STARTER_TIRTC_ROOM) &&
-                     stream_id == CALL_AUDIO_STREAM);
+    bool accepted = mode >= STARTER_TIRTC_H5 && mode <= STARTER_TIRTC_ROOM &&
+                    stream_id == audio_stream_for_mode(mode);
     if (accepted) {
         atomic_store_explicit(&s_audio_subscribed, true, memory_order_release);
     }
@@ -389,8 +398,8 @@ static int on_subscribe_video(tirtc_conn_t connection, uint8_t stream_id)
 
 static void on_unsubscribe_audio(tirtc_conn_t connection, uint8_t stream_id)
 {
-    (void)stream_id;
-    if (connection_matches(connection)) {
+    if (connection_matches(connection) &&
+        stream_id == audio_stream_for_mode(starter_tirtc_mode())) {
         atomic_store_explicit(&s_audio_subscribed, false, memory_order_release);
     }
 }
@@ -710,7 +719,7 @@ int starter_tirtc_send_alaw(uint32_t timestamp_ms,
     }
     /* 调用者只提交编码数据；协议 stream/media/flags 在此集中固定。 */
     TIRTCFRAMEINFO frame = {
-        .stream_id = CALL_AUDIO_STREAM,
+        .stream_id = audio_stream_for_mode(mode),
         .media = TIRTC_AUDIO_ALAW,
         .flags = TIRTC_AUDIOSAMPLE_8K16B1C,
         .ts = timestamp_ms,
@@ -796,6 +805,16 @@ int starter_tirtc_send_h264(uint32_t timestamp_ms, const void *data, uint32_t le
     TIRTCFRAMEINFO frame = {.stream_id = H5_VIDEO_STREAM, .media = TIRTC_VIDEO_H264,
         .flags = key ? TIRTC_FRAME_FLAG_KEY_FRAME : 0, .ts = timestamp_ms, .length = length};
     return TiRtcSendVideoStream(conn, &frame, data);
+}
+
+int starter_tirtc_subscribe_call_audio(void)
+{
+    tirtc_conn_t conn = (tirtc_conn_t)atomic_load(&s_connection);
+    starter_tirtc_mode_t mode = starter_tirtc_mode();
+    if (!conn || (mode != STARTER_TIRTC_CALL && mode != STARTER_TIRTC_VOIP)) {
+        return TIRTC_E_INVALID_PARAMETER;
+    }
+    return TiRtcSubscribeAudio(conn, audio_stream_for_mode(mode));
 }
 
 int starter_tirtc_subscribe_call_video(void)

@@ -55,6 +55,12 @@ assert s3["hardware"] == {
 }
 assert s3["firmware_version"] == project_version(repo_root / s3_manifest["project_dir"])
 assert set(s3["profiles"]) == {"stream", "call", "voip"}
+s3_stream = s3["profiles"]["stream"]
+assert s3_stream["no_video"] is False, "S3 H5 still produces camera MJPEG"
+assert s3_stream["up_video_mt"] == ["mjpeg"]
+assert (s3_stream["up_audio_streamid"], s3_stream["up_video_streamid"]) == (10, 11)
+assert s3_stream["audio_rate"] == 8000
+assert s3["profiles"]["call"]["no_video"] is True
 assert s3["profiles"]["voip"]["no_video"] is True
 assert s3["profiles"]["voip"]["down_video_mt"] == "none"
 profile_function = source[start:source.index("static void handle_voip_profile", start)]

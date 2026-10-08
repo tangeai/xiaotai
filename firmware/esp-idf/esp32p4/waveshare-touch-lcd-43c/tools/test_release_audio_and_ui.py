@@ -395,7 +395,9 @@ class P4ReleaseContractTest(unittest.TestCase):
         self.assertIn('"下一页"', contacts)
         self.assertIn('"%u/%u"', contacts)
         self.assertIn("LV_LABEL_LONG_DOT", contacts)
-        self.assertIn("LV_SCROLLBAR_MODE_OFF", contacts)
+        self.assertIn('make_button(screen, "", 16,', contacts)
+        self.assertNotIn("lv_obj_create(screen)", contacts)
+        self.assertNotIn("下拉同步", contacts)
 
     def test_manual_ai_start_waits_for_runtime_readiness(self) -> None:
         runtime = RUNTIME.read_text()

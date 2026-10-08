@@ -5,7 +5,7 @@ xiaotai_find_repository_root(XIAOTAI_REPO_ROOT)
 
 # Diagnostic firmware identity. Keep this explicit so ESP-IDF embeds the same
 # human-readable version in the app descriptor and bootloader startup output.
-set(PROJECT_VER "1.0.0+build.1")
+set(PROJECT_VER "1.0.0+build.14")
 
 # 生成器把 SDK 复制到 third_party/tirtc，使生成工程可以离开本仓库独立构建。
 # 高级用户仍可通过 -DTIRTC_SDK_DIR=<path> 指向另一份兼容 SDK。
@@ -14,6 +14,11 @@ set(TIRTC_SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/third_party/tirtc"
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(lckfb_esp32s3_xiaotai)
+
+# BEGIN JPEG PERFORMANCE
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/xiaotai_camera_performance.cmake")
+xiaotai_optimize_camera_jpeg()
+# END JPEG PERFORMANCE
 
 # This Kconfig symbol is hidden when trace support is off, so confgen omits its
 # explicit "not set" line even though the value is correct. Device Kit Doctor

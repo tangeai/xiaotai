@@ -3,6 +3,18 @@ set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+python3 "$repo_dir/tools/tests/test_contact_pagination_layout.py"
+python3 "$repo_dir/tools/tests/test_shared_ui_icons.py"
+python3 "$repo_dir/tools/tests/test_s3_product_regressions.py"
+python3 "$repo_dir/tools/tests/test_s3_room_refresh.py"
+python3 "$repo_dir/tools/tests/test_s3_async_regressions.py"
+python3 "$repo_dir/tools/tests/test_s3_opus_media.py"
+python3 "$repo_dir/tools/tests/test_s3_audio_cadence.py"
+python3 "$repo_dir/tools/tests/test_s3_jpeg_performance.py"
+python3 "$repo_dir/tools/tests/test_s3_h5_cadence.py"
+python3 "$repo_dir/tools/tests/test_s3_main_key.py"
+python3 "$repo_dir/tools/tests/test_s3_voip_audio.py"
+python3 "$repo_dir/tools/tests/test_firmware_versions.py"
 bash "$repo_dir/tools/run_host_tests.sh"
 python3 "$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools/test_video_regions.py"
 python3 "$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools/test_media_performance_log.py"

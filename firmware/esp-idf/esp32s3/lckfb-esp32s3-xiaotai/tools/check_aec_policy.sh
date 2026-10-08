@@ -77,9 +77,13 @@ fi
 for token in \
     '#defineAUDIO_TRANSPORT_SAMPLE_RATE_HZ8000U' \
     'starter_aec_process_capture(capture_bytes,&clean)' \
-    'packet_pcm[packet_samples++]=clean.pcm_8k[i]' \
+    'live_pcm=mode==STARTER_TIRTC_AI?clean.pcm_16k:clean.pcm_8k' \
+    'live_samples=mode==STARTER_TIRTC_AI?clean.samples_16k:clean.samples' \
+    'packet_pcm[packet_samples++]=live_pcm[i]' \
+    'esp_opus_enc_process(s_opus_encoder,&input,&output)' \
+    'esp_opus_dec_decode(s_opus_decoder,&input,&output,&info)' \
     'AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT(AUDIO_PLAYBACK_UPSAMPLE*2U)' \
-    's_play_stereo[output_index+2U]=midpoint'; do
+    's_play_stereo[output_index+2U]=current'; do
     if [[ "$media_compact" != *"$token"* ]]; then
         echo "FAIL: missing 16 kHz AEC / 8 kHz transport bridge: $token" >&2
         exit 1
@@ -107,4 +111,4 @@ if rg -q 's_playback_active|STARTER_AEC_REFERENCE_SLOT[[:space:]]*=[[:space:]]*0
     exit 1
 fi
 
-echo "PASS: ESP-SR 2.4.7 FD_LOW_COST uses MIC1/MIC3 and stateful anti-alias 16 kHz->8 kHz G.711 bridge"
+echo "PASS: MIC1/MIC3 full-duplex AEC, AI Opus/16 kHz and anti-alias 8 kHz G.711 bridge"

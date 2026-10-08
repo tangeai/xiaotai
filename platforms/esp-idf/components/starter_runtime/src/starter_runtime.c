@@ -82,6 +82,7 @@ typedef enum {
     EVENT_COMMAND,         /* TiRTC 控制命令，当前用于 AI JSON-RPC。 */
     EVENT_AI_START,        /* 产品控制意图。 */
     EVENT_AI_STOP,         /* 产品控制意图。 */
+    EVENT_MAIN_KEY,
     EVENT_AI_TOKEN,        /* /v1/ai/token 的异步响应。 */
     EVENT_PLATFORM_SIGNAL, /* MQTT 设备信令，例如 unbind。 */
     EVENT_PLATFORM_ONLINE, /* MQTT 已订阅且 HTTP worker 就绪。 */
@@ -114,6 +115,7 @@ typedef enum {
     ROOM_ACTION_JOIN,
     ROOM_ACTION_LEAVE,
     ROOM_ACTION_PTT,
+    ROOM_ACTION_FOREGROUND,
 } room_action_t;
 
 typedef enum {
@@ -235,6 +237,9 @@ static bool s_room_desired;
 static bool s_room_joined;
 static bool s_room_ptt;
 static bool s_room_resume_pending;
+static bool s_room_page_active;
+static uint32_t s_room_page_epoch;
+static uint32_t s_room_token_epoch;
 static int64_t s_room_assignment_version;
 static int64_t s_room_sync_due_ms;
 static int64_t s_room_next_heartbeat_ms;
@@ -248,6 +253,9 @@ static room_action_t s_room_pending_action;
 static char s_room_pending_body[320];
 static room_action_t s_room_mutation_action;
 static char s_room_pending_presence_body[320];
+static atomic_uint s_room_http_delivery_failed_stage;
+static atomic_bool s_contacts_delivery_failed;
+static atomic_bool s_room_key_pressed;
 
 /* 供其他任务读取的公开快照，只能由 publish_state() 更新。 */
 static atomic_int s_public_state;
@@ -294,6 +302,8 @@ static atomic_bool s_platform_restart_required;
 static atomic_bool s_room_release_required;
 
 static void room_stop_connection(const char *presence, int error);
+static void room_set_foreground(bool active);
+static bool room_token_is_current(void);
 static void room_request_presence(const char *state);
 static void room_request_token(void);
 
@@ -306,6 +316,7 @@ static void product_snapshot_reset(void)
     starter_product_contact_t contacts[STARTER_PRODUCT_CONTACTS_MAX];
     starter_room_member_t room_members[STARTER_ROOM_MEMBERS_MAX];
     uint8_t contact_count = s_product_snapshot.contact_count;
+    uint32_t contact_guide_sequence = s_product_snapshot.contact_guide_sequence;
     bool wechat_checked = s_product_snapshot.wechat_contacts_checked;
     uint8_t wechat_count = s_product_snapshot.wechat_contact_count;
     starter_room_ui_phase_t room_phase = s_product_snapshot.room_phase;
@@ -332,6 +343,7 @@ static void product_snapshot_reset(void)
     s_product_snapshot = (starter_runtime_product_snapshot_t) {
         .ai_phase = STARTER_AI_UI_IDLE,
         .contact_count = contact_count,
+        .contact_guide_sequence = contact_guide_sequence,
         .wechat_contacts_checked = wechat_checked,
         .wechat_contact_count = wechat_count,
         .room_phase = room_phase,
@@ -930,7 +942,10 @@ static bool queue_http_result(runtime_event_type_t type,
 static void contacts_response(const char *body, void *user_data)
 {
     (void)user_data;
-    queue_http_result(EVENT_CONTACTS_RESULT, 0, 0, body);
+    if (!queue_http_result(EVENT_CONTACTS_RESULT, 0, 0, body)) {
+        atomic_store_explicit(&s_contacts_delivery_failed, true,
+                              memory_order_release);
+    }
 }
 
 static void voip_profile_response(const char *body, void *user_data)
@@ -1162,7 +1177,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.0.0+build.17\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.24\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":10,\"down_video_streamid\":11,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
@@ -1189,10 +1204,11 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-S3\","
         "\"board_model\":\"lckfb-esp32s3\"},"
-        "\"firmware_version\":\"1.0.0+build.1\",\"profiles\":{"
-        "\"stream\":{\"up_audio_streamid\":10,\"down_audio_streamid\":10,"
+        "\"firmware_version\":\"1.0.0+build.14\",\"profiles\":{"
+        "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
+        "\"down_audio_streamid\":10,\"up_video_mt\":[\"mjpeg\"],"
         "\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"
-        "\"audio_rate\":8000,\"audio_channels\":1,\"no_video\":true},"
+        "\"audio_rate\":8000,\"audio_channels\":1,\"no_video\":false},"
         "\"call\":{\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"
         "\"audio_rate\":8000,\"audio_channels\":1,\"no_video\":true},"
         "\"voip\":{\"screen_width\":1,\"screen_height\":1,"
@@ -1343,6 +1359,8 @@ static void handle_contacts_result(const runtime_event_t *event)
 static bool preempt_for_call(bool incoming)
 {
     starter_runtime_state_t state = session_state();
+    if (s_room_page_active && state != STARTER_RUNTIME_ROOM_CONNECTING &&
+        state != STARTER_RUNTIME_ROOM_ACTIVE) room_set_foreground(false);
     /* A locally initiated call, or an incoming call after explicit answer,
      * becomes the foreground owner and may replace AI, Room or H5. Merely
      * receiving an incoming notification never calls this function. */
@@ -1356,7 +1374,7 @@ static bool preempt_for_call(bool incoming)
         diagnostic_event(incoming ? "incoming preempts" : "outgoing preempts", state);
         if (state == STARTER_RUNTIME_ROOM_CONNECTING ||
             state == STARTER_RUNTIME_ROOM_ACTIVE)
-            room_stop_connection("suspended", 0);
+            room_set_foreground(false);
         else
             finish_session(0);
         state = session_state();
@@ -1744,9 +1762,9 @@ static void begin_ai_session(uint32_t wake_token)
     s_ai_start_pending = false;
     s_ai_ready_deadline_ms = 0;
 
-    if (state == STARTER_RUNTIME_ROOM_CONNECTING ||
+    if (s_room_page_active || state == STARTER_RUNTIME_ROOM_CONNECTING ||
         state == STARTER_RUNTIME_ROOM_ACTIVE) {
-        room_stop_connection("suspended", 0);
+        room_set_foreground(false);
     }
     starter_tirtc_accept_h5(false);
     starter_media_set_wake_allowed(false);
@@ -2343,6 +2361,11 @@ static void handle_call_command(const runtime_event_t *event)
     }
     starter_tirtc_mode_t mode = s_call_wechat ? STARTER_TIRTC_VOIP
                                                : STARTER_TIRTC_CALL;
+    int subscribe_rc = starter_tirtc_subscribe_call_audio();
+    if (subscribe_rc < 0) {
+        finish_call_session(subscribe_rc, "网络中断");
+        return;
+    }
     if (starter_media_start(mode, s_connection_generation) != ESP_OK) {
         finish_session(ESP_ERR_INVALID_STATE);
         return;
@@ -3087,8 +3110,11 @@ static void handle_platform_signal(const runtime_event_t *event)
 
 static void room_http_response(const char *body, void *user_data)
 {
-    (void)queue_http_result(EVENT_ROOM_HTTP, 0,
-                            (uint32_t)(uintptr_t)user_data, body);
+    uint32_t stage = (uint32_t)(uintptr_t)user_data;
+    if (!queue_http_result(EVENT_ROOM_HTTP, 0, stage, body)) {
+        atomic_store_explicit(&s_room_http_delivery_failed_stage, stage,
+                              memory_order_release);
+    }
 }
 
 static bool room_request(room_http_stage_t stage, const char *path,
@@ -3175,9 +3201,28 @@ static void room_stop_connection(const char *presence, int error)
     s_room_resume_pending = resume_after_foreground;
 }
 
+static void room_set_foreground(bool active)
+{
+    if (s_room_page_active == active) return;
+    s_room_page_active = active;
+    ++s_room_page_epoch;
+    if (!active) {
+        s_room_ptt = false;
+        room_stop_connection("left", 0);
+        s_room_resume_pending = false;
+    }
+}
+
+static bool room_token_is_current(void)
+{
+    return s_room_page_active && s_room_token_epoch == s_room_page_epoch;
+}
+
 static void room_request_token(void)
 {
-    if (!s_room_desired || s_room_id[0] == '\0' ||
+    if (!s_room_page_active || !s_room_desired || s_room_id[0] == '\0' ||
+        s_room_pending_action == ROOM_ACTION_LEAVE ||
+        s_room_mutation_action == ROOM_ACTION_LEAVE ||
         s_room_assignment_version <= 0 ||
         s_room_pending_presence_body[0] != '\0') return;
     s_room_resume_pending = false;
@@ -3187,6 +3232,7 @@ static void room_request_token(void)
                    "{\"room_id\":\"%s\",\"assignment_version\":%lld,"
                    "\"session_id\":\"%s\"}", s_room_id,
                    (long long)s_room_assignment_version, s_room_session_id);
+    s_room_token_epoch = s_room_page_epoch;
     if (room_request(ROOM_HTTP_TOKEN,
                      "/v1/call/group/device/connect-token", body)) {
         product_set_room(STARTER_ROOM_CONNECTING, "正在连接");
@@ -3196,6 +3242,8 @@ static void room_request_token(void)
 static void handle_room_http(const runtime_event_t *event)
 {
     s_room_http_inflight = false;
+    /* Validate the scope before either success or failure changes the UI. */
+    if (event->command == ROOM_HTTP_TOKEN && !room_token_is_current()) return;
     if (event->command == ROOM_HTTP_MUTATION) s_room_mutation_action = 0;
     cJSON *root = event->text == NULL ? NULL :
         cJSON_ParseWithLength(event->text, event->length);
@@ -3277,7 +3325,7 @@ static void handle_room_http(const runtime_event_t *event)
             product_set_room(STARTER_ROOM_NONE, "");
         } else {
             starter_runtime_state_t state = session_state();
-            if (state == STARTER_RUNTIME_H5_ACTIVE) {
+            if (s_room_page_active && state == STARTER_RUNTIME_H5_ACTIVE) {
                 finish_session(0);
                 state = STARTER_RUNTIME_WAITING;
             }
@@ -3304,13 +3352,13 @@ static void handle_room_http(const runtime_event_t *event)
                                            ? heartbeat->valueint : 15;
             s_room_lease_seconds = cJSON_IsNumber(lease) && lease->valueint >= 3
                                        ? lease->valueint : 45;
-            starter_tirtc_accept_h5(false);
-            starter_media_stop();
             if (!xiaotai_runtime_begin(&s_session, XIAOTAI_OWNER_ROOM, false)) {
                 product_set_room(STARTER_ROOM_ERROR, "当前状态无法加入");
                 cJSON_Delete(root);
                 return;
             }
+            starter_tirtc_accept_h5(false);
+            starter_media_stop();
             if (!suspend_mqtt_for_external_connect()) {
                 finish_session(ESP_ERR_NO_MEM);
                 product_set_room(STARTER_ROOM_ERROR, "内存不足");
@@ -3447,17 +3495,31 @@ static void handle_room_command(const runtime_event_t *event)
 
 static void handle_room_action(const runtime_event_t *event)
 {
+    if (event->command == ROOM_ACTION_FOREGROUND) {
+        room_set_foreground(event->flag);
+        return;
+    }
     if (event->command == ROOM_ACTION_SYNC) { s_room_sync_due_ms = now_ms(); return; }
     if (event->command == ROOM_ACTION_PTT) {
         if (!s_room_joined || session_state() != STARTER_RUNTIME_ROOM_ACTIVE) return;
-        s_room_ptt = event->flag;
-        starter_media_set_uplink_enabled(event->flag);
+        if (event->flag && !atomic_load_explicit(&s_room_key_pressed,
+                                                memory_order_acquire)) return;
+        /* Release is unconditional; a failed command must never keep capture
+         * open. Admission of a press follows successful wire submission. */
+        if (!event->flag) {
+            s_room_ptt = false;
+            starter_media_set_uplink_enabled(false);
+        }
         char body[128];
         (void)snprintf(body, sizeof(body),
             "{\"jsonrpc\":\"2.0\",\"method\":\"set_mic_state\","
             "\"params\":{\"mic_state\":\"%s\"}}", event->flag ? "speaking" : "off");
-        (void)starter_tirtc_send_command(ROOM_COMMAND, body, (uint32_t)strlen(body));
-        product_set_room(STARTER_ROOM_JOINED, event->flag ? "正在说话" : "已加入");
+        int rc = starter_tirtc_send_command(ROOM_COMMAND, body, (uint32_t)strlen(body));
+        s_room_ptt = event->flag && rc >= 0 &&
+            atomic_load_explicit(&s_room_key_pressed, memory_order_acquire);
+        starter_media_set_uplink_enabled(s_room_ptt);
+        product_set_room(STARTER_ROOM_JOINED, s_room_ptt ? "正在说话" :
+            (event->flag && rc < 0 ? "请求失败，请重试" : "已加入"));
         return;
     }
     if (event->command == s_room_mutation_action ||
@@ -3468,6 +3530,8 @@ static void handle_room_action(const runtime_event_t *event)
         return;
     }
     if (event->command == ROOM_ACTION_LEAVE) {
+        /* A queued leave must invalidate a connect-token already in flight. */
+        ++s_room_page_epoch;
         s_room_resume_pending = false;
         room_stop_connection(NULL, 0);
         char body[256];
@@ -3539,6 +3603,71 @@ static void handle_wechat_quick_call(void)
     refresh_contacts();
 }
 
+static void dial_first_contact(void)
+{
+    if (s_product_mutex == NULL ||
+        xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(50)) != pdTRUE) return;
+    bool empty = s_product_snapshot.contact_count == 0U;
+    if (empty) ++s_product_snapshot.contact_guide_sequence;
+    xSemaphoreGive(s_product_mutex);
+    if (empty) end_ai_session();
+    else dial_contact(0, false);
+}
+
+static void handle_main_key(bool double_click)
+{
+    /* Incoming notifications overlay any current media owner. */
+    if (session_incoming_pending()) {
+        if (double_click) reject_or_hangup_call(true);
+        else accept_call();
+        return;
+    }
+    starter_runtime_state_t state = session_state();
+    if (state == STARTER_RUNTIME_CALL_INCOMING ||
+        state == STARTER_RUNTIME_CALL_CONNECTING ||
+        state == STARTER_RUNTIME_CALL_ACTIVE || state == XIAOTAI_STATE_CALL_ENDING) {
+        if (!double_click && state != XIAOTAI_STATE_CALL_ENDING)
+            reject_or_hangup_call(false);
+        return;
+    }
+    if (s_room_page_active || state == STARTER_RUNTIME_ROOM_CONNECTING ||
+        state == STARTER_RUNTIME_ROOM_ACTIVE) {
+        if (!double_click) {
+            room_set_foreground(false);
+            product_set_room(s_room_desired ? STARTER_ROOM_ASSIGNED : STARTER_ROOM_NONE,
+                             "已结束本机对讲，房间已保留");
+        }
+        return;
+    }
+    if (double_click) {
+        /* Platform order is authoritative, including device contacts. */
+        dial_first_contact();
+    } else if (state == STARTER_RUNTIME_AI_CONNECTING ||
+               state == STARTER_RUNTIME_AI_ACTIVE) {
+        end_ai_session();
+    } else {
+        begin_ai_session(0);
+    }
+}
+
+static void recover_product_http_delivery_failures(void)
+{
+    /* Callbacks cannot mutate business state. Recover on the owner task even
+     * when no response event could be allocated or queued. No assignment poll
+     * is scheduled: another MQTT/user edge is required after a failed read. */
+    uint32_t stage = atomic_exchange_explicit(&s_room_http_delivery_failed_stage,
+                                              0, memory_order_acq_rel);
+    if (stage != 0U) {
+        const runtime_event_t failed = {.type = EVENT_ROOM_HTTP, .command = stage};
+        handle_room_http(&failed);
+    }
+    if (atomic_exchange_explicit(&s_contacts_delivery_failed, false,
+                                  memory_order_acq_rel)) {
+        const runtime_event_t failed = {.type = EVENT_CONTACTS_RESULT};
+        handle_contacts_result(&failed);
+    }
+}
+
 static void runtime_task(void *argument)
 {
     (void)argument;
@@ -3572,6 +3701,7 @@ static void runtime_task(void *argument)
         if (recover_voip_profile_delivery_failure(now_ms())) {
             ESP_LOGW(TAG, "VoIP profile response was not delivered; retrying");
         }
+        recover_product_http_delivery_failures();
         service_call_cleanup();
         service_ai_end_drain();
         if (s_mqtt_suspended_for_connect && s_mqtt_resume_due_ms != 0 &&
@@ -3602,6 +3732,9 @@ static void runtime_task(void *argument)
                 break;
             case EVENT_AI_START:
                 begin_ai_session(event.generation);
+                break;
+            case EVENT_MAIN_KEY:
+                handle_main_key(event.flag);
                 break;
             case EVENT_AI_STOP:
                 s_ai_start_pending = false;
@@ -3708,7 +3841,7 @@ static void runtime_task(void *argument)
         }
         room_try_pending_presence();
         room_try_pending_action();
-        if (s_room_resume_pending && !s_room_http_inflight &&
+        if (s_room_page_active && s_room_resume_pending && !s_room_http_inflight &&
             s_room_pending_presence_body[0] == '\0' &&
             platform_client_ready() && !session_incoming_pending() &&
             session_state() == STARTER_RUNTIME_WAITING) {
@@ -3836,6 +3969,12 @@ esp_err_t starter_runtime_ai_stop(void)
     return enqueue_simple(EVENT_AI_STOP);
 }
 
+esp_err_t starter_runtime_main_key(bool double_click)
+{
+    const runtime_event_t event = {.type = EVENT_MAIN_KEY, .flag = double_click};
+    return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
+}
+
 esp_err_t starter_runtime_contacts_refresh(void)
 {
     return enqueue_simple(EVENT_CONTACTS_REFRESH);
@@ -3864,6 +4003,13 @@ static esp_err_t enqueue_room_json(room_action_t action, const char *json)
     if (!copy_event_text(&event, json, length)) return ESP_ERR_NO_MEM;
     if (!queue_event(&event)) { release_event(&event); return ESP_ERR_TIMEOUT; }
     return ESP_OK;
+}
+
+esp_err_t starter_runtime_room_set_foreground(bool active)
+{
+    const runtime_event_t event = {.type = EVENT_ROOM_ACTION,
+        .command = ROOM_ACTION_FOREGROUND, .flag = active};
+    return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
 esp_err_t starter_runtime_room_refresh(void)
@@ -3907,15 +4053,18 @@ esp_err_t starter_runtime_room_ptt(bool pressed)
 {
     /* Release closes the atomic media gate immediately even if the control
      * queue is momentarily full. The state task still owns wire signalling. */
+    atomic_store_explicit(&s_room_key_pressed, pressed, memory_order_release);
     if (!pressed) {
-        starter_media_set_uplink_enabled(false);
+        starter_media_set_room_pressed(false);
         atomic_store_explicit(&s_room_release_required, true,
                               memory_order_release);
     }
     const runtime_event_t event = {.type = EVENT_ROOM_ACTION,
                                    .command = ROOM_ACTION_PTT,
                                    .flag = pressed};
-    return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
+    bool queued = queue_event(&event);
+    if (pressed) starter_media_set_room_pressed(queued);
+    return queued ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
 esp_err_t starter_runtime_call_contact(uint8_t index)

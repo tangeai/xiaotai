@@ -67,14 +67,14 @@ class RoomAssignmentPolicyTest(unittest.TestCase):
         self.assertIn("s_room_desired = false;", closed)
         self.assertNotIn("s_room_sync_due_ms", closed)
 
-    def test_suspended_room_resumes_from_cached_assignment_only_when_idle(self):
+    def test_room_resume_requires_foreground_and_cached_assignment(self):
         stop = function_body(self.source, "room_stop_connection")
         self.assertIn('strcmp(presence, "suspended") == 0', stop)
         self.assertIn("s_room_resume_pending = resume_after_foreground;", stop)
         self.assertNotIn("room_request_assignment", stop)
 
         runtime = function_body(self.source, "runtime_task")
-        resume = runtime.split("if (s_room_resume_pending", 1)[1].split(
+        resume = runtime.split("if (s_room_page_active && s_room_resume_pending", 1)[1].split(
             "room_request_token();", 1
         )[0]
         self.assertIn("STARTER_RUNTIME_WAITING", resume)
@@ -84,6 +84,20 @@ class RoomAssignmentPolicyTest(unittest.TestCase):
 
         token = function_body(self.source, "room_request_token")
         self.assertIn("s_room_resume_pending = false;", token)
+
+    def test_late_tokens_cannot_reacquire_media_after_page_exit(self):
+        http = function_body(self.source, "handle_room_http")
+        token = http
+        self.assertLess(token.index("room_token_is_current()"),
+                        token.index("xiaotai_runtime_begin"))
+        request = function_body(self.source, "room_request_token")
+        self.assertIn("!s_room_page_active", request)
+        self.assertIn("s_room_token_epoch = s_room_page_epoch", request)
+
+    def test_user_call_ends_room_scope_before_call_media(self):
+        preempt = function_body(self.source, "preempt_for_call")
+        self.assertIn("room_set_foreground(false)", preempt)
+        self.assertNotIn('room_stop_connection("suspended"', preempt)
 
 
 if __name__ == "__main__":

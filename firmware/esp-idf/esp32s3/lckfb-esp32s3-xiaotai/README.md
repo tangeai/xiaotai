@@ -6,7 +6,7 @@
 AI 双向语音、设备/微信纯语音呼叫，以及原有 H5 MJPEG 实时画面与双向语音能力。
 S3 产品界面不显示视频通话、本地预览或摄像头开关。
 
-板级媒体路径已经接入资料记载的 GC0308、实机精确探测到的 GC2145，以及 ES7210、ES8311、PCA9557 和 NS4150B。摄像头以 QVGA RGB565 采集，再由 `esp32-camera` 软件转换为完整 JPEG；摄像头门禁只接受 GC0308 PID 或 GC2145 PID `0x2145`，其他传感器仍拒绝。传输音频仍为 G.711 A-law、8 kHz、单声道；硬件采集和播放改为 16 kHz。ES7210 RX 与 ES8311 TX 一次性注册为 I2S0 配对通道，标准 I2S 的两个 32-bit slot 与 TDM 的四个 16-bit slot 都使用 64 BCLK/frame，因此可在共享 MCLK/BCLK/WS 上同时采集和播放。Espressif ESP-SR 2.4.7 的 `AEC_MODE_FD_LOW_COST` 同时处理 MIC1 近端语音和 MIC3 硬件回采参考；远程链路将 AEC 输出降采样并切回 20 ms/8 kHz G.711 包。本地唤醒使用 Voicute TFLite 和“你好小钛”模型，独立 CPU0 任务读取 AEC clean 最新窗口；摄像头事件、软件 JPEG 和浮点 AEC 任务固定在 CPU1，AEC/JPEG 循环主动让出 RTOS tick。
+板级媒体路径已经接入资料记载的 GC0308、实机精确探测到的 GC2145，以及 ES7210、ES8311、PCA9557 和 NS4150B。摄像头以 QVGA RGB565 采集，再由 `esp32-camera` 软件转换为完整 JPEG；摄像头门禁只接受 GC0308 PID 或 GC2145 PID `0x2145`，其他传感器仍拒绝。AI 传输音频为 Opus、16 kHz、单声道、20 ms，目标码率 16 kbit/s；H5、设备呼叫、微信通话和多人对讲为 G.711 A-law、8 kHz、单声道。硬件采集和播放为 16 kHz。AI 下行保留最多 64 个压缩包，按 20 ms 帧计可容纳 1.28 秒；首次播放仍只预缓冲 4 包且最多等待 80 ms，不通过改变采样率加速消耗积压。突发数据可能形成较长待播积压，停止或切换连接时必须清空旧队列；超过容量仍会明确计入 overflow。ES7210 RX 与 ES8311 TX 一次性注册为 I2S0 配对通道，标准 I2S 的两个 32-bit slot 与 TDM 的四个 16-bit slot 都使用 64 BCLK/frame，因此可在共享 MCLK/BCLK/WS 上同时采集和播放。Espressif ESP-SR 2.4.7 的 `AEC_MODE_FD_LOW_COST` 同时处理 MIC1 近端语音和 MIC3 硬件回采参考；AI 直接将 16 kHz AEC 输出组成 20 ms Opus 包；其他远程链路将 AEC 输出降采样为 20 ms/8 kHz G.711 包。本地唤醒使用 Voicute TFLite 和“你好小钛”模型，独立 CPU0 任务读取 AEC clean 最新窗口；摄像头事件、软件 JPEG 和浮点 AEC 任务固定在 CPU1，AEC/JPEG 循环主动让出 RTOS tick。
 
 ## 构建和烧录
 
@@ -21,9 +21,9 @@ idf.py -p <SERIAL_PORT> flash monitor
 
 工程目录迁移后若提示 `build` 属于另一个 project，说明其中保留了旧机器的 CMake 绝对路径。不要复制 `build/`；移走该目录后在新路径重新执行 `idf.py build`。
 
-每次链接 ELF 后，CMake 会自动运行 I2C、绑定、UI、NTP、启动顺序、本地语音、摄像头、媒体实时性、I2S/AEC、内存、JPEG 和 AI/TLS 栈等门禁。绑定门禁要求临时 MQTT 先完成订阅，再用同一次 Report 的 `temp_token` 下载服务端验证码 PCM；验证码必须显示在专用页面、经板级媒体路径播报三次，且禁止写入串口日志。语音门禁检查独立推理、有界最新窗口和过期结果拒绝，最终 ELF 不含 MultiNet 或 ESP-SR 模型加载器。TFLite 模型内嵌于应用，无需额外模型分区。ESP-SR 仅因 AEC 依赖保留。AEC 门禁锁定 MIC1 槽 0、MIC3 参考槽 1、`FD_LOW_COST`、aggressive NLP、对齐 PSRAM 工作帧和固定 20 ms G.711 输出。I2S 门禁要求 TX/RX 在同一次 `i2s_new_channel()` 中注册，并禁止重新引入 I2S1 master 或播放时暂停采集。当前板级媒体链统一使用 driver_ng I2C；如果最终镜像同时出现 legacy `i2c_driver_install` 和 driver_ng `i2c_new_master_bus`，构建会直接失败。direct PSRAM camera DMA 虽能节省约 30 KiB 内部 SRAM，但实机截图已证明它会破坏本板 QVGA RGB565 行数据，因此禁止重新启用。AI/TLS 门禁从最终 ELF 读取实际 Xtensa 栈帧并保留 SDK/RTOS 安全余量。不要绕过这些门禁。
+每次链接 ELF 后，CMake 会自动运行 I2C、绑定、UI、NTP、启动顺序、本地语音、摄像头、媒体实时性、I2S/AEC、内存、JPEG 和 AI/TLS 栈等门禁。绑定门禁要求临时 MQTT 先完成订阅，再用同一次 Report 的 `temp_token` 下载服务端验证码 PCM；验证码必须显示在专用页面、经板级媒体路径播报三次，且禁止写入串口日志。语音门禁检查独立推理、有界最新窗口和过期结果拒绝，最终 ELF 不含 MultiNet 或 ESP-SR 模型加载器。TFLite 模型内嵌于应用，无需额外模型分区。ESP-SR 仅因 AEC 依赖保留。AEC 门禁锁定 MIC1 槽 0、MIC3 参考槽 1、`FD_LOW_COST`、aggressive NLP、对齐 PSRAM 工作帧以及 AI 20 ms Opus / 其他会话 20 ms G.711 输出。I2S 门禁要求 TX/RX 在同一次 `i2s_new_channel()` 中注册，并禁止重新引入 I2S1 master 或播放时暂停采集。当前板级媒体链统一使用 driver_ng I2C；如果最终镜像同时出现 legacy `i2c_driver_install` 和 driver_ng `i2c_new_master_bus`，构建会直接失败。direct PSRAM camera DMA 虽能节省约 30 KiB 内部 SRAM，但实机截图已证明它会破坏本板 QVGA RGB565 行数据，因此禁止重新启用。AI/TLS 门禁从最终 ELF 读取实际 Xtensa 栈帧并保留 SDK/RTOS 安全余量。不要绕过这些门禁。
 
-当前固件包含“你好小钛”专用唤醒模型、AI 预录交接以及 H5/AI/呼叫切换的迟到事件防护。不引入 MultiNet 或本地命令识别，保留 BOOT/屏幕 AI 入口。`voice-diag 20` 查看概率、推理耗时与音频强度；`voice-config 700` 临时设置阈值（重启恢复构建配置，默认 700）。声学结论必须来自当前固件的实机验收，构建通过不代表准确率通过。
+当前固件包含“你好小钛”专用唤醒模型、AI 预录交接以及 H5/AI/呼叫切换的迟到事件防护。不引入 MultiNet 或本地命令识别，BOOT 单击由运行时按当前状态启动/结束 AI、接听/挂断通话或结束本机房间媒体；双击拒接来电或呼叫平台列表第一个联系人。屏幕保留 AI 入口。`voice-diag 20` 查看概率、推理耗时与音频强度；`voice-config 700` 临时设置阈值（重启恢复构建配置，默认 700）。声学结论必须来自当前固件的实机验收，构建通过不代表准确率通过。
 
 `idf.py menuconfig` → `XiaoTai application` 可配置发现地址、门户和默认唤醒阈值。仓库主机回归入口为 `bash ../../../../tools/run_host_tests.sh`；项目内入口仅保留兼容转发。项目发布条件与二次开发约束见根目录 [CONTRIBUTING.md](../../../../CONTRIBUTING.md) 和 [THIRD_PARTY.md](../../../../THIRD_PARTY.md)。
 
@@ -33,7 +33,7 @@ idf.py -p <SERIAL_PORT> flash monitor
 
 
 
-从 5 fps 提到 8 fps 不增加并发帧数：摄像头仍使用两个 153,600-byte QVGA RGB565 PSRAM framebuffer，JPEG 转换与发送仍串行处理一帧。摄像头 DMA 先写入约 30 KiB 内部中转缓冲，再复制到 PSRAM framebuffer；8 个下行音频 slot、4 个平台请求 slot、8 KiB HTTP scratch、128 KiB JPEG 输出缓冲、播放升采样缓冲和 AEC 计算帧均显式放入 PSRAM，FreeRTOS 队列只传 1-byte 索引。AEC 的 I2S 目标缓冲保留在内部 SRAM，算法状态通过 `MALLOC_CAP_SPIRAM` 分配。历史 AEC 基线 ELF 静态 DIRAM 为 144,231 bytes（42.2%），不是当前 Voicute 固件的资源测量；启动日志会进一步输出 AEC 初始化实际消耗的 internal/PSRAM 字节数，以及全局 internal/DMA/PSRAM 的 free、minimum 和 largest。`status` 还会输出 AEC/JPEG 最大处理耗时与 deadline-miss。分配失败时会记录申请大小、capability 和函数名。
+H5 目标为 8 fps；JPEG 转换的 jpge/to_jpg/yuv 源文件单独使用 `-O2`，其他模块保留所选调试配置。下一帧等待最多 20 ms，临近 125 ms 帧期限时缩短等待，避免调度额外降低帧率。实际 8 fps 仍须以本次固件的实机编码耗时及连续发送计数确认。此优化不增加并发帧数：摄像头仍使用两个 153,600-byte QVGA RGB565 PSRAM framebuffer，JPEG 转换与发送仍串行处理一帧。摄像头 DMA 先写入约 30 KiB 内部中转缓冲，再复制到 PSRAM framebuffer；64 个下行音频 slot（AI 可用 64 个，其他实时会话准入上限仍为 24 个）、4 个平台请求 slot、8 KiB HTTP scratch、128 KiB JPEG 输出缓冲、播放升采样缓冲和 AEC 计算帧均显式放入 PSRAM，FreeRTOS 队列只传 1-byte 索引。AEC 的 I2S 目标缓冲保留在内部 SRAM，算法状态通过 `MALLOC_CAP_SPIRAM` 分配。历史 AEC 基线 ELF 静态 DIRAM 为 144,231 bytes（42.2%），不是当前 Voicute 固件的资源测量；启动日志会进一步输出 AEC 初始化实际消耗的 internal/PSRAM 字节数，以及全局 internal/DMA/PSRAM 的 free、minimum 和 largest。`status` 还会输出 AEC/JPEG 最大处理耗时与 deadline-miss。分配失败时会记录申请大小、capability 和函数名。
 
 工程默认使用 16 MB Flash、8 MB Octal PSRAM 和 USB Serial/JTAG 控制台。其他硬件规格需要同步调整 `sdkconfig.defaults`、`partitions.csv` 和板级驱动。
 

@@ -47,13 +47,13 @@ fi
 
 for token in \
     'EXT_RAM_BSS_ATTRstaticint16_ts_play_stereo' \
-    's_play_stereo[output_index]=current' \
-    's_play_stereo[output_index+2U]=midpoint' \
+    's_play_stereo[output_index]=needs_upsample?midpoint:current' \
+    's_play_stereo[output_index+2U]=current' \
     'AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT*sizeof(int16_t)' \
     's_audio_adapter->write_pcm(' \
     's_audio_adapter->read_pcm('; do
     if [[ "$source_compact" != *"$token"* ]]; then
-        echo "FAIL: ES8311 TX must use reference-compatible interleaved 16-bit stereo PCM: $token" >&2
+        echo "FAIL: ES8311 TX must use ordered interleaved 16-bit stereo PCM: $token" >&2
         exit 1
     fi
 done

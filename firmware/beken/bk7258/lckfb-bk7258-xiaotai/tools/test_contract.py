@@ -269,7 +269,7 @@ network_source = (ROOT / "ap/src/xiaotai_network.c").read_text()
 metrics_source = (ROOT / "ap/src/xiaotai_metrics.c").read_text()
 ui_assets_source = (ROOT / "ap/assets/xiaotai_ui_assets.c").read_text()
 ui_hit_test_source = (ROOT / "ap/src/xiaotai_ui_hit_test.c").read_text()
-phone_asset_source = (ROOT / "ap/assets/xiaotai_phone_shortcut.c").read_text()
+phone_asset_source = (REPO_ROOT / "product/assets/icons/wechat_call/icon_small.h").read_text()
 require("#define CONTROL_TASK_STACK_SIZE (12U * 1024U)" in app_source and
         "control_task, CONTROL_TASK_STACK_SIZE" in app_source,
         "control task must retain headroom for WebClient call chains")
@@ -905,7 +905,8 @@ require("phone_shortcut(frame);" in ui_source and
         (ROOT / "ap/include/xiaotai_ui_hit_test.h").read_text() and
         "XIAOTAI_UI_HOME_QUICK_CALL_ICON_Y 150U" in
         (ROOT / "ap/include/xiaotai_ui_hit_test.h").read_text() and
-        "Source SHA-256: 6c0bc141933f0dadb442b905dcd30bf4acc174ac99fbbb53a94f1e44f34b8706" in
+        ("Source SHA-256: " + json.loads((REPO_ROOT /
+        "product/assets/icons/wechat_call/manifest.json").read_text())["source_sha256"]) in
         phone_asset_source and
         "XIAOTAI_UI_ACTION_HOME_QUICK_CALL" in app_source and
         "handle_intent(XIAOTAI_INTENT_HOME_WECHAT_CALL);" in app_source and

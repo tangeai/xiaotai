@@ -6,6 +6,10 @@
  * 持有。屏幕休眠使用单调时间，触摸和持续声音活动均可唤醒。
  */
 #include "starter_product.h"
+#include "icon_small.h"
+#if CONFIG_IDF_TARGET_ESP32P4
+#include "icon_big.h"
+#endif
 
 #include <stdbool.h>
 #include <stdatomic.h>
@@ -122,6 +126,7 @@ typedef enum {
     PAGE_ROOM,
     PAGE_ROOM_CODE,
     PAGE_ROOM_PASSWORD,
+    PAGE_ROOM_LEAVE_CONFIRM,
 } product_page_t;
 
 typedef enum {
@@ -171,6 +176,10 @@ typedef enum {
     ACTION_ROOM_INPUT_SUBMIT,
     ACTION_ROOM_INPUT_SKIP,
     ACTION_ROOM_DIGIT_BASE = 40,
+    ACTION_ROOM_LEAVE_CONFIRM = 60,
+    ACTION_ROOM_LEAVE_CANCEL,
+    ACTION_ROOM_PREVIOUS,
+    ACTION_ROOM_NEXT,
     ACTION_CONTACT_BASE = 100,
     ACTION_CONTACT_CALL_BASE = 120,
     ACTION_EMOJI_BASE = 200,
@@ -196,6 +205,14 @@ static esp_lcd_touch_handle_t s_touch;
 #endif
 static lv_disp_t *s_display;
 static product_page_t s_page = PAGE_HOME_FACE;
+static bool s_room_ui_active;
+static uint8_t s_room_members_page;
+static lv_obj_t *s_room_code_label;
+static lv_obj_t *s_room_status_label;
+static lv_obj_t *s_room_member_labels[3];
+static lv_obj_t *s_room_page_label;
+static lv_obj_t *s_room_ptt_button;
+static lv_obj_t *s_room_connecting_label;
 static product_page_t s_call_return_page = PAGE_HOME_FACE;
 static product_preferences_t s_preferences = {
     .volume = 7, .microphone_sensitivity = 4, .sleep_index = 1,
@@ -269,6 +286,7 @@ static product_page_t s_network_back_page = PAGE_MENU;
 static uint8_t s_previous_contact_count;
 static starter_product_contact_t s_previous_contacts[STARTER_PRODUCT_CONTACTS_MAX];
 static bool s_wechat_qr_rendered_checked;
+static uint32_t s_contact_guide_sequence;
 static starter_room_ui_phase_t s_previous_room_phase;
 static bool s_previous_room_ptt;
 static uint8_t s_previous_room_online_count;
@@ -640,6 +658,7 @@ static lv_obj_t *make_button(lv_obj_t *parent,
                              lv_coord_t height,
                              product_action_t action);
 static void set_object_visible(lv_obj_t *object, bool visible);
+static void refresh_room_controls(const starter_runtime_product_snapshot_t *room);
 static void render_page(void);
 static void refresh_settings_controls(void);
 static void refresh_call_controls(starter_runtime_status_t runtime,
@@ -951,6 +970,16 @@ static void factory_reset_task(void *argument)
     esp_restart();
 }
 
+static bool room_action_submitted(esp_err_t err)
+{
+    if (err == ESP_OK) {
+        s_voice_feedback[0] = '\0';
+        return true;
+    }
+    set_voice_feedback("请求未提交，请重试", monotonic_ms());
+    return false;
+}
+
 static void on_action(lv_event_t *event)
 {
     product_action_t action = (product_action_t)(uintptr_t)lv_event_get_user_data(event);
@@ -1005,11 +1034,13 @@ static void on_action(lv_event_t *event)
         (void)starter_runtime_wechat_quick_call();
         s_page = PAGE_WECHAT_QR;
     } else if (action == ACTION_ROOM) {
+        s_voice_feedback[0] = '\0';
         s_page = PAGE_ROOM;
+        s_room_members_page = 0;
+        (void)starter_runtime_room_set_foreground(true);
         (void)starter_runtime_room_refresh();
     } else if (action == ACTION_ROOM_CREATE) {
-        (void)starter_runtime_room_create("");
-        s_page = PAGE_ROOM;
+        if (room_action_submitted(starter_runtime_room_create(""))) s_page = PAGE_ROOM;
     } else if (action == ACTION_ROOM_CREATE_PASSWORD) {
         memset(s_room_input, 0, sizeof(s_room_input));
         s_room_input_create = true;
@@ -1020,7 +1051,14 @@ static void on_action(lv_event_t *event)
         s_room_input_create = false;
         s_page = PAGE_ROOM_CODE;
     } else if (action == ACTION_ROOM_LEAVE) {
-        (void)starter_runtime_room_leave();
+        s_voice_feedback[0] = '\0';
+        s_page = PAGE_ROOM_LEAVE_CONFIRM;
+    } else if (action == ACTION_ROOM_LEAVE_CONFIRM &&
+               s_page == PAGE_ROOM_LEAVE_CONFIRM) {
+        if (room_action_submitted(starter_runtime_room_leave())) {
+            s_page = PAGE_ROOM;
+        }
+    } else if (action == ACTION_ROOM_LEAVE_CANCEL) {
         s_page = PAGE_ROOM;
     } else if (action >= ACTION_ROOM_DIGIT_BASE &&
                action < ACTION_ROOM_DIGIT_BASE + 10) {
@@ -1040,49 +1078,66 @@ static void on_action(lv_event_t *event)
             memset(s_room_input, 0, sizeof(s_room_input));
             s_page = PAGE_ROOM_PASSWORD;
         } else if (s_page == PAGE_ROOM_PASSWORD && strlen(s_room_input) == 4U) {
-            if (s_room_input_create)
-                (void)starter_runtime_room_create(s_room_input);
-            else
-                (void)starter_runtime_room_join(s_room_join_code, s_room_input);
-            s_page = PAGE_ROOM;
+            esp_err_t err = s_room_input_create
+                ? starter_runtime_room_create(s_room_input)
+                : starter_runtime_room_join(s_room_join_code, s_room_input);
+            if (room_action_submitted(err)) s_page = PAGE_ROOM;
         }
     } else if (action == ACTION_ROOM_INPUT_SKIP &&
                s_page == PAGE_ROOM_PASSWORD && !s_room_input_create) {
-        (void)starter_runtime_room_join(s_room_join_code, "");
-        s_page = PAGE_ROOM;
+        if (room_action_submitted(starter_runtime_room_join(s_room_join_code, "")))
+            s_page = PAGE_ROOM;
     } else if (action >= ACTION_DIAG_SYSTEM && action <= ACTION_DIAG_EVENTS) {
         s_diagnostics_tab = (unsigned)(action - ACTION_DIAG_SYSTEM);
         s_diagnostics_due_ms = 0;
         refresh_diagnostics(esp_timer_get_time() / 1000);
         if (s_diagnostics_panel != NULL) lv_obj_scroll_to_y(s_diagnostics_panel, 0, LV_ANIM_OFF);
     } else if (action == ACTION_VOLUME_DOWN && s_preferences.volume > 0U) {
-        s_preferences.volume--;
-        (void)starter_media_set_speaker_volume(s_preferences.volume);
-        preferences_save();
+        uint8_t requested = (uint8_t)(s_preferences.volume - 1U);
+        if (starter_media_set_speaker_volume(requested) == ESP_OK) {
+            s_preferences.volume = requested;
+            preferences_save();
+        } else {
+            ESP_LOGW(TAG, "audio setting rejected: volume=%u", requested);
+        }
     } else if (action == ACTION_VOLUME_UP && s_preferences.volume < 10U) {
-        s_preferences.volume++;
-        (void)starter_media_set_speaker_volume(s_preferences.volume);
-        preferences_save();
+        uint8_t requested = (uint8_t)(s_preferences.volume + 1U);
+        if (starter_media_set_speaker_volume(requested) == ESP_OK) {
+            s_preferences.volume = requested;
+            preferences_save();
+        } else {
+            ESP_LOGW(TAG, "audio setting rejected: volume=%u", requested);
+        }
     } else if (action == ACTION_SPEAKER_MUTE) {
-        s_preferences.speaker_muted = !s_preferences.speaker_muted;
-        (void)starter_media_set_speaker_muted(s_preferences.speaker_muted);
-        preferences_save();
+        bool requested = !s_preferences.speaker_muted;
+        if (starter_media_set_speaker_muted(requested) == ESP_OK) {
+            s_preferences.speaker_muted = requested;
+            preferences_save();
+        } else {
+            ESP_LOGW(TAG, "audio setting rejected: speaker_muted=%d", requested);
+        }
     } else if (action == ACTION_MIC_MUTE) {
         s_preferences.microphone_muted = !s_preferences.microphone_muted;
         starter_media_set_microphone_muted(s_preferences.microphone_muted);
         preferences_save();
     } else if (action == ACTION_MIC_SENSITIVITY_DOWN &&
                s_preferences.microphone_sensitivity > 1U) {
-        s_preferences.microphone_sensitivity--;
-        (void)starter_media_set_microphone_sensitivity(
-            s_preferences.microphone_sensitivity);
-        preferences_save();
+        uint8_t requested = (uint8_t)(s_preferences.microphone_sensitivity - 1U);
+        if (starter_media_set_microphone_sensitivity(requested) == ESP_OK) {
+            s_preferences.microphone_sensitivity = requested;
+            preferences_save();
+        } else {
+            ESP_LOGW(TAG, "audio setting rejected: microphone_sensitivity=%u", requested);
+        }
     } else if (action == ACTION_MIC_SENSITIVITY_UP &&
                s_preferences.microphone_sensitivity < 5U) {
-        s_preferences.microphone_sensitivity++;
-        (void)starter_media_set_microphone_sensitivity(
-            s_preferences.microphone_sensitivity);
-        preferences_save();
+        uint8_t requested = (uint8_t)(s_preferences.microphone_sensitivity + 1U);
+        if (starter_media_set_microphone_sensitivity(requested) == ESP_OK) {
+            s_preferences.microphone_sensitivity = requested;
+            preferences_save();
+        } else {
+            ESP_LOGW(TAG, "audio setting rejected: microphone_sensitivity=%u", requested);
+        }
     } else if (action == ACTION_SLEEP) {
         s_preferences.sleep_index = (uint8_t)((s_preferences.sleep_index + 1U) %
             (sizeof(s_sleep_minutes) / sizeof(s_sleep_minutes[0])));
@@ -1152,6 +1207,12 @@ static void on_action(lv_event_t *event)
             (uint8_t)((product.contact_count + CONTACTS_PER_PAGE - 1U) /
                       CONTACTS_PER_PAGE);
         if (s_contacts_page + 1U < page_count) s_contacts_page++;
+    } else if (action == ACTION_ROOM_PREVIOUS) {
+        if (s_room_members_page > 0U) --s_room_members_page;
+    } else if (action == ACTION_ROOM_NEXT) {
+        starter_runtime_product_snapshot_t room = starter_runtime_product_snapshot();
+        if ((s_room_members_page + 1U) * 3U < room.room_member_count)
+            ++s_room_members_page;
     } else if (action == ACTION_VOICE_CALL) {
         (void)starter_runtime_call_contact(s_selected_contact);
 #if CONFIG_IDF_TARGET_ESP32P4
@@ -1183,6 +1244,9 @@ static void on_action(lv_event_t *event)
         action == ACTION_CONTACTS_NEXT ||
         action == ACTION_FACTORY_RESET_CONFIRM) {
         render_page();
+    } else if (s_page == PAGE_ROOM) {
+        starter_runtime_product_snapshot_t room = starter_runtime_product_snapshot();
+        refresh_room_controls(&room);
     } else if (s_page == PAGE_SETTINGS) {
         refresh_settings_controls();
     } else if (s_page == PAGE_CALL) {
@@ -1319,48 +1383,26 @@ static lv_obj_t *make_home_menu_button(lv_obj_t *parent)
     return button;
 }
 
-/* One native-size, precomposed WeChat-call image. Each nibble is a 4-bit alpha
- * value, so the white chat bubble and its phone cutout keep smooth edges on the
- * RGB565 panel without relying on font baselines or child-object clipping. */
-static const LV_ATTRIBUTE_MEM_ALIGN uint8_t s_wechat_call_icon_map[] = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x11, 0x11, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x04, 0x9c, 0xef, 0xee, 0xee, 0xee, 0xda, 0x50, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x02, 0xbf, 0xff, 0xdb, 0xdf, 0xff, 0xff, 0xff, 0xfc, 0x30, 0x00, 0x00,
-    0x00, 0x00, 0x4e, 0xff, 0xb6, 0x10, 0x1b, 0xff, 0xff, 0xff, 0xff, 0xe5, 0x00, 0x00,
-    0x00, 0x02, 0xef, 0xf5, 0x00, 0x00, 0x03, 0xff, 0xff, 0xff, 0xff, 0xff, 0x30, 0x00,
-    0x00, 0x0b, 0xff, 0xb0, 0x00, 0x00, 0x03, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0x00,
-    0x00, 0x4f, 0xff, 0xb0, 0x00, 0x00, 0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf5, 0x00,
-    0x00, 0xaf, 0xff, 0x90, 0x00, 0x28, 0xdf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfb, 0x00,
-    0x00, 0xdf, 0xff, 0x80, 0x02, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x10,
-    0x01, 0xef, 0xff, 0xd0, 0x00, 0xdf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x20,
-    0x01, 0xef, 0xff, 0xf4, 0x00, 0x5f, 0xff, 0xff, 0xff, 0xfb, 0xbf, 0xff, 0xff, 0x20,
-    0x01, 0xef, 0xff, 0xf9, 0x00, 0x05, 0xff, 0xff, 0xff, 0x50, 0x05, 0xff, 0xff, 0x20,
-    0x01, 0xef, 0xff, 0xff, 0x50, 0x10, 0x5f, 0xff, 0xfa, 0x00, 0x00, 0xbf, 0xff, 0x20,
-    0x00, 0xdf, 0xff, 0xff, 0xf5, 0x01, 0x03, 0xcf, 0xe2, 0x00, 0x00, 0xbf, 0xfe, 0x10,
-    0x00, 0xaf, 0xff, 0xff, 0xff, 0x50, 0x00, 0x07, 0x40, 0x00, 0x04, 0xff, 0xfb, 0x00,
-    0x00, 0x5f, 0xff, 0xff, 0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x1d, 0xff, 0xf6, 0x00,
-    0x00, 0x0c, 0xff, 0xff, 0xff, 0xff, 0xc3, 0x00, 0x00, 0x00, 0x8f, 0xff, 0xd1, 0x00,
-    0x00, 0x03, 0xff, 0xff, 0xff, 0xff, 0xff, 0x96, 0x40, 0x05, 0xff, 0xff, 0x40, 0x00,
-    0x00, 0x00, 0x5f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfb, 0xbf, 0xff, 0xf6, 0x00, 0x00,
-    0x00, 0x00, 0x03, 0xdf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfd, 0x40, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0xaf, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xdb, 0x61, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x01, 0xef, 0xff, 0xa3, 0x22, 0x22, 0x22, 0x10, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x04, 0xff, 0xd5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x09, 0xf8, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x19, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-};
-
+/* Shared alpha4 artwork; native-size variants require no runtime scaling. */
 static const lv_img_dsc_t s_wechat_call_icon = {
     .header.always_zero = 0,
-    .header.w = 28,
-    .header.h = 28,
-    .data_size = sizeof(s_wechat_call_icon_map),
+    .header.w = XIAOTAI_WECHAT_CALL_SMALL_WIDTH,
+    .header.h = XIAOTAI_WECHAT_CALL_SMALL_HEIGHT,
+    .data_size = sizeof(xiaotai_wechat_call_small),
     .header.cf = LV_IMG_CF_ALPHA_4BIT,
-    .data = s_wechat_call_icon_map,
+    .data = xiaotai_wechat_call_small,
 };
+
+#if CONFIG_IDF_TARGET_ESP32P4
+static const lv_img_dsc_t s_wechat_call_icon_big = {
+    .header.always_zero = 0,
+    .header.w = XIAOTAI_WECHAT_CALL_BIG_WIDTH,
+    .header.h = XIAOTAI_WECHAT_CALL_BIG_HEIGHT,
+    .data_size = sizeof(xiaotai_wechat_call_big),
+    .header.cf = LV_IMG_CF_ALPHA_4BIT,
+    .data = xiaotai_wechat_call_big,
+};
+#endif
 
 static lv_obj_t *make_home_wechat_button(lv_obj_t *parent)
 {
@@ -1372,14 +1414,21 @@ static lv_obj_t *make_home_wechat_button(lv_obj_t *parent)
     lv_obj_set_style_radius(button, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_pad_all(button, 0, 0);
     lv_obj_set_style_border_width(button, 1, 0);
-    lv_obj_set_style_border_color(button, lv_color_hex(0x7EF1A3), 0);
-    lv_obj_set_style_bg_color(button, lv_color_hex(0x18A957), 0);
-    lv_obj_set_style_bg_color(button, lv_color_hex(0x0F7A40), LV_STATE_PRESSED);
+    lv_obj_set_style_border_color(button, lv_color_hex(XIAOTAI_WECHAT_CALL_BORDER), 0);
+    lv_obj_set_style_bg_color(button, lv_color_hex(XIAOTAI_WECHAT_CALL_BACKGROUND), 0);
+    lv_obj_set_style_bg_color(button, lv_color_hex(XIAOTAI_WECHAT_CALL_PRESSED), LV_STATE_PRESSED);
     lv_obj_add_event_cb(button, on_action, LV_EVENT_CLICKED,
                         (void *)(uintptr_t)ACTION_WECHAT_QUICK);
     lv_obj_t *icon = lv_img_create(button);
-    lv_img_set_src(icon, &s_wechat_call_icon);
-    lv_obj_set_style_img_recolor(icon, lv_color_hex(0xFFFFFF), 0);
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (xiaotai_wechat_call_use_big(display_driver_height())) {
+        lv_img_set_src(icon, &s_wechat_call_icon_big);
+    } else
+#endif
+    {
+        lv_img_set_src(icon, &s_wechat_call_icon);
+    }
+    lv_obj_set_style_img_recolor(icon, lv_color_hex(XIAOTAI_WECHAT_CALL_FOREGROUND), 0);
     lv_obj_set_style_img_recolor_opa(icon, LV_OPA_COVER, 0);
     lv_obj_center(icon);
     lv_obj_clear_flag(icon, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
@@ -1794,14 +1843,59 @@ static void on_room_ptt(lv_event_t *event)
     }
 }
 
+/* Update labels and visibility without replacing the pressed PTT object. */
+static void refresh_room_controls(const starter_runtime_product_snapshot_t *room)
+{
+    if (s_room_code_label == NULL) return;
+    char line[96];
+    (void)snprintf(line, sizeof(line), "房间号  %s%s", room->room_code,
+                   room->room_password_set ? "  |  有密码" : "");
+    label_set_text_if_changed(s_room_code_label, line);
+    (void)snprintf(line, sizeof(line), "在线 %u 人  |  %s",
+                   room->room_online_count, room->room_message);
+    label_set_text_if_changed(s_room_status_label, line);
+    const unsigned per_page = 3U;
+    unsigned pages = room->room_member_count == 0U ? 1U :
+        (room->room_member_count + per_page - 1U) / per_page;
+    if (s_room_members_page >= pages) s_room_members_page = (uint8_t)(pages - 1U);
+    unsigned first = s_room_members_page * per_page;
+    for (unsigned row = 0; row < per_page; ++row) {
+        unsigned index = first + row;
+        bool present = index < room->room_member_count;
+        if (present) {
+            (void)snprintf(line, sizeof(line), "%.18s%s",
+                room->room_members[index].self ? "本机" : room->room_members[index].id,
+                room->room_members[index].speaking ? " (说话)" : "");
+        } else {
+            (void)snprintf(line, sizeof(line), "%s",
+                row == 0U && room->room_member_count == 0U ? "等待成员同步" : "");
+        }
+        label_set_text_if_changed(s_room_member_labels[row], line);
+        set_object_visible(s_room_member_labels[row],
+            present || (row == 0U && room->room_member_count == 0U));
+    }
+    (void)snprintf(line, sizeof(line), "%u/%u 页 | 缓存 %u 人",
+        (unsigned)s_room_members_page + 1U, pages, room->room_member_count);
+    label_set_text_if_changed(s_room_page_label, line);
+    bool joined = room->room_phase == STARTER_ROOM_JOINED;
+    label_set_text_if_changed(s_room_connecting_label,
+        room->room_phase == STARTER_ROOM_ERROR ? "连接失败，请重新进入" :
+        room->room_phase == STARTER_ROOM_ASSIGNED ? "房间已保留" : "正在连接…");
+    set_button_text(s_room_ptt_button, room->room_ptt ? "松开停止" : "按住说话");
+    set_object_visible(s_room_ptt_button, joined);
+    set_object_visible(s_room_connecting_label, !joined);
+}
+
 static void render_room(lv_obj_t *screen)
 {
     starter_runtime_product_snapshot_t room = starter_runtime_product_snapshot();
     (void)make_header_back_button(screen, ACTION_MENU);
     render_header(screen, "多人对讲");
-    if (room.room_phase == STARTER_ROOM_NONE || room.room_phase == STARTER_ROOM_ERROR) {
+    if (room.room_code[0] == '\0' &&
+        (room.room_phase == STARTER_ROOM_NONE || room.room_phase == STARTER_ROOM_ERROR)) {
         (void)make_label(screen,
-            room.room_phase == STARTER_ROOM_ERROR ? room.room_message : "尚未加入对讲房间",
+            s_voice_feedback[0] ? s_voice_feedback :
+                (room.room_phase == STARTER_ROOM_ERROR ? room.room_message : "尚未加入对讲房间"),
             40, 48, 240, room.room_phase == STARTER_ROOM_ERROR
                               ? lv_color_hex(0xFF9D9D) : lv_color_hex(0xBFE9F3));
         (void)make_button(screen, "创建房间", 18, 86, 132, 40, ACTION_ROOM_CREATE);
@@ -1810,33 +1904,33 @@ static void render_room(lv_obj_t *screen)
         (void)make_button(screen, "加入房间", 84, 140, 152, 42, ACTION_ROOM_JOIN);
         return;
     }
-    char line[96];
-    (void)snprintf(line, sizeof(line), "房间号  %s%s", room.room_code,
-                   room.room_password_set ? "  |  有密码" : "");
-    (void)make_label(screen, line, 40, 42, 240, lv_color_hex(0xFFFFFF));
-    (void)snprintf(line, sizeof(line), "在线 %u 人  |  %s",
-                   room.room_online_count, room.room_message);
-    (void)make_label(screen, line, 40, 69, 240, lv_color_hex(0xBFE9F3));
-    char members[96] = "";
-    for (uint8_t i = 0; i < room.room_member_count && i < 2U; ++i) {
-        size_t used = strlen(members);
-        (void)snprintf(members + used, sizeof(members) - used, "%s%.18s%s",
-                       used ? "  " : "", room.room_members[i].self
-                           ? "本机" : room.room_members[i].id,
-                       room.room_members[i].speaking ? "(说话)" : "");
-    }
-    (void)make_label(screen, members[0] ? members : "等待成员同步", 30, 91, 260,
-                     lv_color_hex(0x91B0BC));
-    if (room.room_phase == STARTER_ROOM_JOINED) {
-        lv_obj_t *ptt = make_button(screen, room.room_ptt ? "松开停止" : "按住说话",
-                                    75, 117, 170, 54, ACTION_ROOM);
-        lv_obj_remove_event_cb(ptt, on_action);
-        lv_obj_add_event_cb(ptt, on_room_ptt, LV_EVENT_ALL, NULL);
-    } else {
-        (void)make_label(screen, "正在连接房间…", 70, 118, 180,
-                         lv_color_hex(0x72DEF8));
-    }
-    (void)make_button(screen, "退出房间", 104, 188, 112, 36, ACTION_ROOM_LEAVE);
+    s_room_code_label = make_label(screen, "", 40, 42, 240, lv_color_hex(0xFFFFFF));
+    s_room_status_label = make_label(screen, "", 40, 69, 240, lv_color_hex(0xBFE9F3));
+    for (unsigned row = 0; row < 3U; ++row)
+        s_room_member_labels[row] = make_label(screen, "", 30, 96 + row * 20, 260,
+                                              lv_color_hex(0x91B0BC));
+    s_room_page_label = make_label(screen, "", 70, 158, 180, lv_color_hex(0x91B0BC));
+    (void)make_button(screen, "<", 18, 151, 42, 30, ACTION_ROOM_PREVIOUS);
+    (void)make_button(screen, ">", 260, 151, 42, 30, ACTION_ROOM_NEXT);
+    (void)make_button(screen, "退出房间", 18, 192, 132, 36, ACTION_ROOM_LEAVE);
+    s_room_ptt_button = make_button(screen, "按住说话", 170, 188, 132, 44, ACTION_ROOM);
+    lv_obj_remove_event_cb(s_room_ptt_button, on_action);
+    lv_obj_add_event_cb(s_room_ptt_button, on_room_ptt, LV_EVENT_ALL, NULL);
+    s_room_connecting_label = make_label(screen, "正在连接…", 170, 197, 132,
+                                        lv_color_hex(0x72DEF8));
+    refresh_room_controls(&room);
+}
+
+static void render_room_leave_confirm(lv_obj_t *screen)
+{
+    render_header(screen, "确认退出房间？");
+    (void)make_label(screen,
+        "将取消本设备的房间分配。再次使用需要重新加入。",
+        24, 65, 272, lv_color_hex(0xBFE9F3));
+    (void)make_button(screen, "取消", 18, 174, 132, 44, ACTION_ROOM_LEAVE_CANCEL);
+    (void)make_button(screen, "退出房间", 170, 174, 132, 44, ACTION_ROOM_LEAVE_CONFIRM);
+    if (s_voice_feedback[0] != '\0')
+        (void)make_label(screen, s_voice_feedback, 24, 130, 272, lv_color_hex(0xFF9D9D));
 }
 
 static void render_room_input(lv_obj_t *screen)
@@ -1863,6 +1957,8 @@ static void render_room_input(lv_obj_t *screen)
     (void)make_button(screen, "确定", 198, 187, 62, 34, ACTION_ROOM_INPUT_SUBMIT);
     if (!code && !s_room_input_create)
         (void)make_button(screen, "无密码", 264, 187, 48, 34, ACTION_ROOM_INPUT_SKIP);
+    if (s_voice_feedback[0] != '\0')
+        (void)make_label(screen, s_voice_feedback, 24, 223, 272, lv_color_hex(0xFF9D9D));
 }
 
 static void render_menu(lv_obj_t *screen)
@@ -1890,26 +1986,25 @@ static void render_contacts(lv_obj_t *screen)
     uint8_t first = (uint8_t)(s_contacts_page * CONTACTS_PER_PAGE);
     uint8_t last = (uint8_t)(first + CONTACTS_PER_PAGE);
     if (last > product.contact_count) last = product.contact_count;
-    lv_obj_t *list = lv_obj_create(screen);
-    lv_obj_set_pos(list, 12, 36);
-    lv_obj_set_size(list, 296, 134);
-    set_bg(list, lv_color_hex(0x102832));
-    lv_obj_set_style_radius(list, 10, 0);
-    lv_obj_clear_flag(list, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_OFF);
+    /* Manual pagination: rows belong directly to the page. A themed list
+     * container adds padding/borders and clips the third row on compact UI. */
     if (product.contact_count == 0U) {
-        (void)make_label(list, "暂无联系人\n绑定设备或完成微信授权后下拉同步",
-                         12, 30, 252, lv_color_hex(0xABC0C9));
+        (void)make_label(screen, "暂无联系人\n绑定设备或完成微信授权后重新进入",
+                         24, 66, 272, lv_color_hex(0xABC0C9));
     }
     for (uint8_t i = first; i < last; ++i) {
         const starter_product_contact_t *contact = &product.contacts[i];
-        lv_obj_t *row = make_button(list, "", 4,
-                                    (lv_coord_t)(4 + (i - first) * 43),
-                                    270, 37,
+        lv_obj_t *row = make_button(screen, "", 16,
+                                    (lv_coord_t)(40 + (i - first) * 43),
+                                    288, 37,
                                     (product_action_t)(ACTION_CONTACT_BASE + i));
+        lv_obj_set_style_pad_all(row, 0, 0);
+        lv_obj_set_style_border_width(row, 0, 0);
         lv_obj_t *source_icon = lv_obj_create(row);
         lv_obj_set_pos(source_icon, 10, 8);
         lv_obj_set_size(source_icon, 20, 20);
+        lv_obj_set_style_pad_all(source_icon, 0, 0);
+        lv_obj_set_style_border_width(source_icon, 0, 0);
         set_bg(source_icon, contact->source == STARTER_CONTACT_WECHAT
                               ? lv_color_hex(0x55C98A) : lv_color_hex(0x72DEF8));
         lv_obj_set_style_radius(source_icon,
@@ -1942,19 +2037,19 @@ static void render_contacts(lv_obj_t *screen)
         lv_obj_set_style_text_font(name, &ui_font_cn_16, 0);
         lv_obj_set_style_text_color(name, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_pos(name, 42, 7);
-        lv_obj_set_width(name, 130);
+        lv_obj_set_width(name, 146);
         lv_obj_set_height(name, 18);
         lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
         if (contact->source != STARTER_CONTACT_WECHAT) {
             lv_obj_t *status = lv_obj_create(row);
-            lv_obj_set_pos(status, 188, 14);
+            lv_obj_set_pos(status, 206, 14);
             lv_obj_set_size(status, 8, 8);
             set_bg(status, contact->online ? lv_color_hex(0x55D88A)
                                            : lv_color_hex(0x71808A));
             lv_obj_set_style_radius(status, LV_RADIUS_CIRCLE, 0);
             lv_obj_clear_flag(status, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
         }
-        lv_obj_t *call = make_button(row, "", 210, 3, 54, 31,
+        lv_obj_t *call = make_button(row, "", 228, 3, 54, 31,
                                      (product_action_t)(ACTION_CONTACT_CALL_BASE + i));
         lv_obj_set_style_radius(call, 10, 0);
         lv_obj_t *call_icon = lv_label_create(call);
@@ -2511,13 +2606,33 @@ static void render_binding(lv_obj_t *screen)
     lv_obj_set_style_text_align(waiting, LV_TEXT_ALIGN_CENTER, 0);
 }
 
+static void sync_room_foreground(void)
+{
+    bool active = s_page == PAGE_ROOM || s_page == PAGE_ROOM_CODE ||
+                  s_page == PAGE_ROOM_PASSWORD || s_page == PAGE_ROOM_LEAVE_CONFIRM;
+    /* A pending incoming call is an overlay: it must keep the current media.
+     * Runtime closes Room on explicit answer, before installing the call. */
+    if (s_page == PAGE_CALL && starter_runtime_product_snapshot().call_incoming)
+        return;
+    if (active != s_room_ui_active &&
+        starter_runtime_room_set_foreground(active) == ESP_OK)
+        s_room_ui_active = active;
+}
+
 static void render_page(void)
 {
+    sync_room_foreground();
 #if CONFIG_IDF_TARGET_ESP32P4
     p4_video_ui_reset();
 #endif
     lv_obj_t *screen = lv_scr_act();
     lv_obj_clean(screen);
+    s_room_code_label = NULL;
+    s_room_status_label = NULL;
+    memset(s_room_member_labels, 0, sizeof(s_room_member_labels));
+    s_room_page_label = NULL;
+    s_room_ptt_button = NULL;
+    s_room_connecting_label = NULL;
     s_header_has_back = false;
     set_bg(screen, lv_color_hex(HOME_BACKGROUND_COLOR));
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
@@ -2580,6 +2695,7 @@ static void render_page(void)
     case PAGE_CALL_RESULT: render_call_result(content); break;
     case PAGE_WECHAT_QR: render_wechat_qr(content); break;
     case PAGE_ROOM: render_room(content); break;
+    case PAGE_ROOM_LEAVE_CONFIRM: render_room_leave_confirm(content); break;
     case PAGE_ROOM_CODE:
     case PAGE_ROOM_PASSWORD: render_room_input(content); break;
     default:
@@ -3160,6 +3276,13 @@ static void product_tick(lv_timer_t *timer)
     }
 
     /* 上面的通话/绑定跳转可能重建页面，后续刷新以当前页面为准。 */
+    if (product.contact_guide_sequence != s_contact_guide_sequence) {
+        s_contact_guide_sequence = product.contact_guide_sequence;
+        if (!call_now && !binding_required) {
+            s_page = PAGE_WECHAT_QR;
+            render_page();
+        }
+    }
     home = s_page == PAGE_HOME_FACE || s_page == PAGE_HOME_CLOCK;
 
     bool contacts_changed = product.contact_count != s_previous_contact_count ||
@@ -3182,7 +3305,14 @@ static void product_tick(lv_timer_t *timer)
                         product.room_online_count != s_previous_room_online_count ||
                         strcmp(product.room_code, s_previous_room_code) != 0 ||
                         strcmp(product.room_message, s_previous_room_message) != 0;
-    if (s_page == PAGE_ROOM && room_changed) render_page();
+    sync_room_foreground();
+    if (s_page == PAGE_ROOM) {
+        bool assigned = product.room_code[0] != '\0' ||
+                        (product.room_phase != STARTER_ROOM_NONE &&
+                         product.room_phase != STARTER_ROOM_ERROR);
+        if (assigned && s_room_code_label != NULL) refresh_room_controls(&product);
+        else if (room_changed || (assigned && s_room_code_label == NULL)) render_page();
+    }
 
     if ((runtime.state == STARTER_RUNTIME_AI_ACTIVE ||
          runtime.state == STARTER_RUNTIME_AI_CONNECTING) &&

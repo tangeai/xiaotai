@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "wechat_call",
+  "representation": "alpha4",
+  "source": "icon.svg",
+  "source_sha256": "95bbb8ac7793c8d202b81db1135317cba6562656b6f951d22139860da4431a0e",
+  "origin": "Rounded vector bubble and handset with curved terminals; native-size coverage rasterization",
+  "variants": {
+    "small": [
+      28,
+      28
+    ],
+    "big": [
+      56,
+      56
+    ]
+  },
+  "style": {
+    "foreground": "FFFFFF",
+    "background": "18A957",
+    "pressed": "0F7A40",
+    "border": "7EF1A3"
+  },
+  "generation": "each native size from SVG;8x supersampling, alpha4 quantization; no runtime scaling"
+}

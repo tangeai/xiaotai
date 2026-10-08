@@ -74,7 +74,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--release",
         action="store_true",
-        help="formal build: increment this board's +build.n before compiling",
+        help="use the release profile; every real build increments +build.n",
     )
     parser.add_argument(
         "--keep-going",
@@ -127,12 +127,11 @@ def main() -> int:
             if index:
                 print()
             variant = args.variant or board.default_variant()
-            if args.release:
-                version = bump_board_build(root, board.id)
-                print(f"firmware-version: {version}")
             command, cwd = print_build(root, board, variant)
             if args.dry_run:
                 continue
+            version = bump_board_build(root, board.id)
+            print(f"firmware-version: {version}")
             if board.data["platform"] == "esp-idf":
                 prepare_dependency_lock(cwd)
             try:

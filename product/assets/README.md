@@ -4,6 +4,8 @@ This directory owns immutable product assets shared by more than one target.
 Board projects select the bundle explicitly; they must not reference another
 board project's asset directory.
 
+- `icons`: shared small/big alpha4 button artwork and SDK-neutral style definitions.
+  Simple shapes and text remain drawn; PNG files are previews, not firmware inputs.
 - `audio/prompts`: 8 kHz, mono, signed 16-bit PCM acknowledgement prompts.
 - `audio/rings`: 8 kHz, mono, signed 16-bit PCM call tones.
 - `qr/wx_xiaotai.png`: audited source image for the XiaoTai WeChat QR code.

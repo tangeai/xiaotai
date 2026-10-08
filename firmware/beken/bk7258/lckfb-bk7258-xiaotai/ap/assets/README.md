@@ -10,10 +10,10 @@ or image dependency. It contains:
   ASCII, common symbols and punctuation, `U+4E00-U+9FFF`, and full-width
   forms.
 
-`xiaotai_phone_shortcut.c` is the 44x44 RGB565/alpha conversion of the
-canonical `starter_product/assets/phone_shortcut.png`. The generated source
-records the input SHA-256 so downstream ports can confirm that they use the
-same product asset.
+The home WeChat-call icon uses the shared 28x28 alpha4 resource in
+`product/assets/icons/wechat_call/icon_small.h` (392 bytes). Its green background
+and border are drawn from shared style definitions. The renderer uses the
+existing framebuffer and requires no icon allocation or RGB bitmap copy.
 
 When the official QR or fixed copy changes, regenerate the file explicitly:
 
@@ -23,12 +23,11 @@ python3 tools/generate_ui_assets.py \
   --output-dir ap/assets
 ```
 
-Regenerate the phone shortcut separately with:
+Regenerate shared icon variants from the repository root:
 
 ```bash
-python3 tools/generate_phone_shortcut.py \
-  --input /path/to/starter_product/assets/phone_shortcut.png \
-  --output-dir ap/assets
+python3 tools/generate_ui_icons.py
+python3 tools/generate_ui_icons.py --check
 ```
 
 The generator rasterizes the selected Unicode ranges from Noto Sans CJK. Noto Sans CJK

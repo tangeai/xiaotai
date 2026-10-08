@@ -21,7 +21,8 @@ idf_component_register(
         "${CMAKE_CURRENT_LIST_DIR}/src/ui_font_cn_24.c"
         ${XIAOTAI_STARTER_PRODUCT_EXTRA_SRCS}
     INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/include"
-    PRIV_INCLUDE_DIRS ${XIAOTAI_STARTER_PRODUCT_EXTRA_PRIV_INCLUDE_DIRS}
+    PRIV_INCLUDE_DIRS "${XIAOTAI_REPO_ROOT}/product/assets/icons/wechat_call"
+        ${XIAOTAI_STARTER_PRODUCT_EXTRA_PRIV_INCLUDE_DIRS}
     REQUIRES
         esp_driver_gpio esp_driver_i2c esp_driver_spi esp_lcd nvs_flash
         platform_client runtime_config starter_media starter_runtime starter_voice wifi_manager

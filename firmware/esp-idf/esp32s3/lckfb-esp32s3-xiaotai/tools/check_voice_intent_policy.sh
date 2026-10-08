@@ -21,7 +21,7 @@ rg -Fq 'MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT' "$backend"
 rg -Fq 'tflite::VerifyModelBuffer' "$backend"
 rg -Fq 'kws_postprocess' "$backend"
 rg -Fq 'starter_voice_feed_pcm16k(clean.pcm_16k' "$root/components/starter_media/src/starter_media.c"
-rg -Fq 'starter_runtime_ai_start' "$repo_dir/platforms/esp-idf/components/starter_button/src/starter_button.c"
+rg -Fq 'starter_runtime_main_key' "$repo_dir/platforms/esp-idf/components/starter_button/src/starter_button.c"
 if rg -n 'i2s_|TiRtc|starter_runtime_|starter_product_' "$backend"; then
     echo 'FAIL: inference backend must not own audio hardware or sessions' >&2
     exit 1

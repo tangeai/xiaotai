@@ -206,6 +206,7 @@ static atomic_bool s_speaker_muted;
 static atomic_bool s_microphone_muted;
 static atomic_uchar s_microphone_sensitivity = 4;
 static atomic_bool s_uplink_enabled;
+static atomic_bool s_room_pressed;
 /* 单调序号避免“清除取消标志”与新铃声启动之间的竞态。 */
 static atomic_uint_fast32_t s_pcm8k_cancel_sequence;
 
@@ -594,6 +595,13 @@ static esp_err_t audio_output_set_locked(bool enabled)
     return ESP_OK;
 }
 
+static bool uplink_allowed(starter_tirtc_mode_t mode)
+{
+    return atomic_load_explicit(&s_uplink_enabled, memory_order_acquire) &&
+        (mode != STARTER_TIRTC_ROOM ||
+         atomic_load_explicit(&s_room_pressed, memory_order_acquire));
+}
+
 static bool enqueue_uplink_pcm(starter_tirtc_mode_t mode,
                                uint32_t generation,
                                uint32_t timestamp_ms,
@@ -601,7 +609,7 @@ static bool enqueue_uplink_pcm(starter_tirtc_mode_t mode,
                                unsigned mute_epoch)
 {
     if (mute_epoch != atomic_load(&s_mute_epoch) || atomic_load(&s_microphone_muted) ||
-        !atomic_load(&s_uplink_enabled)) return false;
+        !uplink_allowed(mode)) return false;
     uint8_t slot = 0;
     if (pcm == NULL || sample_count == 0U ||
         sample_count > AUDIO_PACKET_SAMPLES_MAX || s_audio_tx_free_queue == NULL ||
@@ -643,7 +651,7 @@ static void audio_uplink_task(void *argument)
                      item->mute_epoch == atomic_load(&s_mute_epoch) &&
                      starter_tirtc_audio_ready() &&
                      !atomic_load_explicit(&s_microphone_muted, memory_order_acquire) &&
-                     atomic_load_explicit(&s_uplink_enabled, memory_order_acquire);
+                     uplink_allowed(item->mode);
         if (ready) {
             size_t ten_ms = item->mode == STARTER_TIRTC_AI
                                 ? AUDIO_PROCESS_16K_SAMPLES
@@ -916,8 +924,7 @@ static void audio_capture_task(void *argument)
                         starter_tirtc_audio_ready() &&
                         !atomic_load_explicit(&s_microphone_muted,
                                               memory_order_acquire) &&
-                        atomic_load_explicit(&s_uplink_enabled,
-                                             memory_order_acquire);
+                        uplink_allowed(mode);
         if (!session_ready) {
             continue;
         }
@@ -1025,32 +1032,31 @@ static bool play_audio_item(const audio_rx_item_t *item)
     if (mono_samples > AUDIO_RX_BYTES) {
         return false;
     }
-    bool needs_upsample = item->mode != STARTER_TIRTC_AI;
-    if (needs_upsample && s_playback_resampler_generation != item->generation) {
-        s_playback_resampler_generation = item->generation;
-        s_playback_previous = s_decode_pcm[0];
-    }
-    for (size_t i = 0; i < mono_samples; ++i) {
-        int16_t current = s_decode_pcm[i];
-        int16_t midpoint = (int16_t)(((int32_t)s_playback_previous + current) / 2);
-        size_t values_per_sample = needs_upsample
-                                       ? AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT : 2U;
-        size_t output_index = i * values_per_sample;
-        s_play_stereo[output_index] = current;
-        s_play_stereo[output_index + 1U] = current;
-        if (needs_upsample) {
-            s_play_stereo[output_index + 2U] = midpoint;
-            s_play_stereo[output_index + 3U] = midpoint;
-        }
-        s_playback_previous = current;
-    }
-
     if (xSemaphoreTake(s_audio_output_mutex, pdMS_TO_TICKS(500)) != pdTRUE) {
         return false;
     }
     bool played = false;
     if (same_session(item->mode, item->generation) && s_amp_enabled &&
         !atomic_load_explicit(&s_speaker_muted, memory_order_acquire)) {
+        bool needs_upsample = item->mode != STARTER_TIRTC_AI;
+        if (needs_upsample && s_playback_resampler_generation != item->generation) {
+            s_playback_resampler_generation = item->generation;
+            s_playback_previous = s_decode_pcm[0];
+        }
+        for (size_t i = 0; i < mono_samples; ++i) {
+            int16_t current = s_decode_pcm[i];
+            int16_t midpoint = (int16_t)(((int32_t)s_playback_previous + current) / 2);
+            size_t values_per_sample = needs_upsample
+                                           ? AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT : 2U;
+            size_t output_index = i * values_per_sample;
+            s_play_stereo[output_index] = needs_upsample ? midpoint : current;
+            s_play_stereo[output_index + 1U] = needs_upsample ? midpoint : current;
+            if (needs_upsample) {
+                s_play_stereo[output_index + 2U] = current;
+                s_play_stereo[output_index + 3U] = current;
+            }
+            s_playback_previous = current;
+        }
         size_t values_per_sample = needs_upsample
                                        ? AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT : 2U;
         size_t bytes = mono_samples * values_per_sample * sizeof(int16_t);
@@ -1455,10 +1461,10 @@ esp_err_t starter_media_play_pcm8k_at_epoch(const int16_t *pcm, size_t sample_co
             int16_t current = pcm[offset + i];
             int16_t midpoint = (int16_t)(((int32_t)previous + current) / 2);
             size_t output_index = i * AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT;
-            s_play_stereo[output_index] = current;
-            s_play_stereo[output_index + 1U] = current;
-            s_play_stereo[output_index + 2U] = midpoint;
-            s_play_stereo[output_index + 3U] = midpoint;
+            s_play_stereo[output_index] = midpoint;
+            s_play_stereo[output_index + 1U] = midpoint;
+            s_play_stereo[output_index + 2U] = current;
+            s_play_stereo[output_index + 3U] = current;
             previous = current;
         }
         size_t bytes = chunk_samples * AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT *
@@ -1611,6 +1617,11 @@ void starter_media_set_uplink_enabled(bool enabled)
 {
     atomic_store_explicit(&s_uplink_enabled, enabled, memory_order_release);
 }
+void starter_media_set_room_pressed(bool pressed)
+{
+    /* This gate is independent of AI/call/H5, including during owner changes. */
+    atomic_store_explicit(&s_room_pressed, pressed, memory_order_release);
+}
 esp_err_t starter_media_stop_for_ai(uint32_t token) { return stop_media(token); }
 
 void starter_media_request_key_frame(uint32_t generation)
@@ -1720,7 +1731,6 @@ starter_media_status_t starter_media_status(void)
                                                   memory_order_acquire),
         .microphone_sensitivity = atomic_load_explicit(
             &s_microphone_sensitivity, memory_order_acquire),
-        .uplink_enabled = atomic_load_explicit(&s_uplink_enabled,
-                                               memory_order_acquire),
+        .uplink_enabled = uplink_allowed((starter_tirtc_mode_t)atomic_load(&s_mode)),
     };
 }

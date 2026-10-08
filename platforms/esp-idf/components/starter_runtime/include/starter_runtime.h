@@ -105,6 +105,7 @@ typedef struct {
     bool call_video;
     bool call_camera_enabled;
     uint8_t contact_count;
+    uint32_t contact_guide_sequence; /**< Empty physical quick-call entry. */
     char call_peer[65];
     char call_result[33];
     bool wechat_contacts_checked;
@@ -139,6 +140,9 @@ esp_err_t starter_runtime_ai_start_from_wake(uint32_t wake_token);
 /** 非阻塞请求结束 AI 对讲；返回值只表示事件是否成功入队。 */
 esp_err_t starter_runtime_ai_stop(void);
 
+/** Physical main-key gesture; the runtime resolves its current business state. */
+esp_err_t starter_runtime_main_key(bool double_click);
+
 /** 联系人同步与纯语音呼叫控制，均只把意图投递给统一状态任务。 */
 esp_err_t starter_runtime_contacts_refresh(void);
 esp_err_t starter_runtime_wechat_quick_call(void);
@@ -153,6 +157,8 @@ esp_err_t starter_runtime_call_hangup(void);
 esp_err_t starter_runtime_call_set_microphone_muted(bool muted);
 
 /** 多人对讲控制；房间号固定 6 位，密码为空或 4 位数字。 */
+/* Foreground room UI owns local media; false preserves platform assignment. */
+esp_err_t starter_runtime_room_set_foreground(bool active);
 esp_err_t starter_runtime_room_refresh(void);
 esp_err_t starter_runtime_room_create(const char *password);
 esp_err_t starter_runtime_room_join(const char *room_code, const char *password);

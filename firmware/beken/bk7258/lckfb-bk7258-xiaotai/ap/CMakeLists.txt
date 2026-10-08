@@ -55,7 +55,6 @@ set(srcs
     "${XIAOTAI_BOARD_ROOT}/board_display.c"
     src/tirtc_bk_probe.c
     src/xiaotai_probe.c
-    assets/xiaotai_phone_shortcut.c
     assets/xiaotai_ui_assets.c
 )
 
@@ -64,6 +63,7 @@ set(incs
     include
     assets
     "${XIAOTAI_PRODUCT_ROOT}/include"
+    "${XIAOTAI_PRODUCT_ROOT}/assets/icons/wechat_call"
     "${XIAOTAI_COMMON_ROOT}/include"
     "${XIAOTAI_BOARD_ROOT}"
     "${TIRTC_ROOT}/include"

@@ -10,7 +10,7 @@
 
 #include "frame_buffer.h"
 #include "xiaotai_metrics.h"
-#include "xiaotai_phone_shortcut.h"
+#include "icon_small.h"
 #include "xiaotai_ui_assets.h"
 #include "xiaotai_ui_hit_test.h"
 #define TAG "xiaotai_ui"
@@ -134,22 +134,21 @@ static void phone_shortcut(frame_buffer_t *frame)
 {
     const int origin_x = (int)XIAOTAI_UI_HOME_QUICK_CALL_ICON_X;
     const int origin_y = (int)XIAOTAI_UI_HOME_QUICK_CALL_ICON_Y;
-    /* Match the canonical ESP32 treatment: white sits only beneath the
-     * transparent handset, while the PNG keeps its antialiased outer edge. */
-    circle(frame, origin_x + 22, origin_y + 22, 18, 0xffff);
-    for (unsigned y = 0; y < XIAOTAI_PHONE_SHORTCUT_HEIGHT; ++y) {
-        for (unsigned x = 0; x < XIAOTAI_PHONE_SHORTCUT_WIDTH; ++x) {
-            size_t index = (size_t)y * XIAOTAI_PHONE_SHORTCUT_WIDTH + x;
-            uint8_t alpha = xiaotai_phone_shortcut_alpha[index];
+    /* Preserve the 44px layout/hit region; centre the shared 40px treatment. */
+    circle(frame, origin_x + 22, origin_y + 22, 20,
+           xiaotai_icon_rgb565(XIAOTAI_WECHAT_CALL_BORDER));
+    circle(frame, origin_x + 22, origin_y + 22, 19,
+           xiaotai_icon_rgb565(XIAOTAI_WECHAT_CALL_BACKGROUND));
+    uint16_t foreground = xiaotai_icon_rgb565(XIAOTAI_WECHAT_CALL_FOREGROUND);
+    for (unsigned y = 0; y < XIAOTAI_WECHAT_CALL_SMALL_HEIGHT; ++y) {
+        for (unsigned x = 0; x < XIAOTAI_WECHAT_CALL_SMALL_WIDTH; ++x) {
+            uint8_t alpha = xiaotai_icon_alpha4(xiaotai_wechat_call_small,
+                XIAOTAI_WECHAT_CALL_SMALL_WIDTH, XIAOTAI_WECHAT_CALL_SMALL_HEIGHT, x, y);
             if (alpha == 0U) continue;
-            int screen_x = origin_x + (int)x;
-            int screen_y = origin_y + (int)y;
-            uint16_t color = xiaotai_phone_shortcut_rgb565[index];
-            if (alpha != 255U) {
-                color = blend_rgb565(color,
-                                     frame_pixel(frame, screen_x, screen_y),
-                                     alpha);
-            }
+            int screen_x = origin_x + 8 + (int)x;
+            int screen_y = origin_y + 8 + (int)y;
+            uint16_t color = blend_rgb565(foreground,
+                frame_pixel(frame, screen_x, screen_y), alpha);
             pixel(frame, screen_x, screen_y, color);
         }
     }
