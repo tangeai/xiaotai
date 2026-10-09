@@ -13,6 +13,7 @@ void xiaotai_ui_show_status(const char *status);
 /** Show touch controls for an established one-to-one audio call. */
 void xiaotai_ui_show_call_active(bool wechat, bool microphone_muted);
 void xiaotai_ui_show_verification_code(const char *code);
+void xiaotai_ui_refresh_verification_countdown(void);
 /** Show the fixed WeChat mini-program code when no authorized contact exists. */
 void xiaotai_ui_show_wechat_qr(void);
 /** Keep the binding code visible while reporting that server TTS failed. */
@@ -36,6 +37,8 @@ void xiaotai_ui_show_contact_detail(const char *name, bool online,
                                     bool wechat);
 void xiaotai_ui_show_expressions(unsigned selected,
                                  const char *active_emotion);
+void xiaotai_ui_show_reset_confirmation(unsigned status);
+void xiaotai_ui_show_diagnostics(unsigned tab, const char *details);
 void xiaotai_ui_show_network(int wifi_rssi, const char *ip_address);
 void xiaotai_ui_show_settings(uint8_t volume, bool speaker_muted,
                               bool microphone_muted,
@@ -44,6 +47,7 @@ void xiaotai_ui_show_settings(uint8_t volume, bool speaker_muted,
 void xiaotai_ui_show_room(const xiaotai_room_snapshot_t *room, size_t page);
 void xiaotai_ui_show_room_entry(bool request_pending);
 void xiaotai_ui_show_room_join_code(const char *room_code);
+void xiaotai_ui_show_room_password(bool create, const char *password);
 void xiaotai_ui_show_room_leave_confirm(void);
 int xiaotai_ui_set_backlight(bool enabled);
 bool xiaotai_ui_backlight_on(void);

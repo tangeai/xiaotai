@@ -20,6 +20,38 @@ static beken_thread_t s_thread;
 static beken_mutex_t s_state_mutex;
 static bool s_state_mutex_ready;
 static char s_state[24] = "BOOT";
+static xiaotai_metrics_snapshot_t s_snapshot;
+static struct {uint32_t at_ms; char state[24];} s_events[7];
+static unsigned s_event_count, s_event_next;
+
+void xiaotai_metrics_snapshot(xiaotai_metrics_snapshot_t *out)
+{
+    if (out == NULL) return;
+    memset(out, 0, sizeof(*out));
+    if (!s_state_mutex_ready) return;
+    rtos_lock_mutex(&s_state_mutex);
+    *out = s_snapshot;
+    snprintf(out->state, sizeof(out->state), "%s", s_state);
+    rtos_unlock_mutex(&s_state_mutex);
+}
+
+void xiaotai_metrics_copy_events(char *out, size_t capacity)
+{
+    if (out == NULL || capacity == 0U) return;
+    out[0] = '\0';
+    if (!s_state_mutex_ready) return;
+    rtos_lock_mutex(&s_state_mutex);
+    size_t used = 0U;
+    for (unsigned i = 0; i < s_event_count; ++i) {
+        unsigned index = (s_event_next + 7U - 1U - i) % 7U;
+        int n = snprintf(out + used, capacity - used, "%u s  %s\n",
+                         (unsigned)(s_events[index].at_ms / 1000U), s_events[index].state);
+        if (n < 0 || (size_t)n >= capacity - used) break;
+        used += (size_t)n;
+    }
+    if (s_event_count == 0U) snprintf(out, capacity, "暂无事件");
+    rtos_unlock_mutex(&s_state_mutex);
+}
 static atomic_uint s_sta_connects;
 static atomic_uint s_sta_disconnects;
 static uint32_t s_previous_total_runtime;
@@ -33,6 +65,12 @@ void xiaotai_metrics_set_state(const char *state)
 {
     if (!s_state_mutex_ready || state == NULL) return;
     rtos_lock_mutex(&s_state_mutex);
+    if (strncmp(s_state, state, sizeof(s_state) - 1U) != 0) {
+        s_events[s_event_next].at_ms = rtos_get_time();
+        snprintf(s_events[s_event_next].state, sizeof(s_events[s_event_next].state), "%s", state);
+        s_event_next = (s_event_next + 1U) % 7U;
+        if (s_event_count < 7U) ++s_event_count;
+    }
     snprintf(s_state, sizeof(s_state), "%s", state);
     rtos_unlock_mutex(&s_state_mutex);
 }
@@ -123,6 +161,13 @@ static void emit_snapshot(void)
     uint32_t rx_pps = 0U;
     uint32_t tx_pps = 0U;
 #endif
+    rtos_lock_mutex(&s_state_mutex);
+    s_snapshot.sampled = cpu_rc == BK_OK;
+    s_snapshot.cpu_percent = cpu;
+    s_snapshot.task_count = tasks;
+    s_snapshot.stack_low_words = stack_low;
+    snprintf(s_snapshot.stack_low_task, sizeof(s_snapshot.stack_low_task), "%s", stack_low_task);
+    rtos_unlock_mutex(&s_state_mutex);
     BK_LOGI(TAG,
             "METRICS {\"uptime_ms\":%u,\"state\":\"%s\","
             "\"internal\":{\"free\":%u,\"minimum\":%u,"

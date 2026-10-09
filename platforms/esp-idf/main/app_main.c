@@ -9,6 +9,7 @@
  */
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -141,22 +142,34 @@ static esp_err_t station_identity(char mac_address[18], char client_id[65])
     return ESP_OK;
 }
 
+static atomic_bool s_verification_prompt_cancelled;
+
+static void cancel_verification_prompt(void *user_data)
+{
+    (void)user_data;
+    atomic_store(&s_verification_prompt_cancelled, true);
+    starter_media_cancel_pcm8k_playback();
+}
+
 static esp_err_t play_verification_prompt(const int16_t *pcm,
                                           size_t sample_count,
                                           void *user_data)
 {
     (void)user_data;
+    uint32_t epoch = starter_media_playback_epoch();
     for (unsigned repeat = 0; repeat < VERIFICATION_PROMPT_REPEAT_COUNT; ++repeat) {
-        esp_err_t err = starter_media_play_pcm8k(pcm, sample_count);
-        if (err != ESP_OK) {
-            return err;
-        }
+        if (atomic_load(&s_verification_prompt_cancelled)) return ESP_OK;
+        esp_err_t err = starter_media_play_pcm8k_at_epoch(pcm, sample_count, epoch);
+        if (atomic_load(&s_verification_prompt_cancelled)) return ESP_OK;
+        if (err != ESP_OK) return err;
         if (repeat + 1U < VERIFICATION_PROMPT_REPEAT_COUNT) {
-            vTaskDelay(pdMS_TO_TICKS(VERIFICATION_PROMPT_GAP_MS));
+            for (unsigned waited = 0; waited < VERIFICATION_PROMPT_GAP_MS; waited += 20U) {
+                if (atomic_load(&s_verification_prompt_cancelled)) return ESP_OK;
+                vTaskDelay(pdMS_TO_TICKS(20));
+            }
         }
     }
-    ESP_LOGI(TAG,
-             "verification prompt completed repeats=%u",
+    ESP_LOGI(TAG, "verification prompt completed repeats=%u",
              VERIFICATION_PROMPT_REPEAT_COUNT);
     return ESP_OK;
 }
@@ -170,6 +183,7 @@ static esp_err_t provision_and_save(const char *mac_address, bool signed_rebind)
      * platform_client_provision() 阻塞等待用户输入验证码，因此本函数只能
      * 在 starter_start_task 中运行，不能放进 app_main 或 SDK 回调。
      */
+    atomic_store(&s_verification_prompt_cancelled, false);
     platform_provision_result_t result = {0};
     const platform_provision_config_t provision = {
         .mac_address = mac_address,
@@ -180,23 +194,23 @@ static esp_err_t provision_and_save(const char *mac_address, bool signed_rebind)
         .discovery_url = DISCOVERY_URL,
         .timeout_seconds = 190,
         .prompt_callback = play_verification_prompt,
+        .prompt_cancel_callback = cancel_verification_prompt,
         .prompt_user_data = NULL,
     };
     esp_err_t err = platform_client_provision(&provision, &result);
     if (err != ESP_OK) {
         return err;
     }
-    (void)snprintf(s_tirtc_config.device_id,
-                   sizeof(s_tirtc_config.device_id),
-                   "%s",
-                   result.device_id);
-    (void)snprintf(s_tirtc_config.device_secret,
-                   sizeof(s_tirtc_config.device_secret),
-                   "%s",
-                   result.device_secret);
-    err = runtime_config_save_tirtc(&s_tirtc_config);
+    /* Keep the active identity unchanged until the new credentials are durable.
+     * A failed save must retry signed provisioning with the original identity. */
+    runtime_tirtc_config_t candidate = s_tirtc_config;
+    (void)snprintf(candidate.device_id, sizeof(candidate.device_id), "%s", result.device_id);
+    (void)snprintf(candidate.device_secret, sizeof(candidate.device_secret), "%s", result.device_secret);
+    err = runtime_config_save_tirtc(&candidate);
     if (err == ESP_OK) {
+        s_tirtc_config = candidate;
         ESP_LOGI(TAG, "binding saved for device_id=%s", s_tirtc_config.device_id);
+        starter_product_binding_saved();
     }
     return err;
 }
@@ -358,7 +372,7 @@ static void starter_start_task(void *argument)
                 platform_err = provision_and_save(mac_address, true);
                 if (platform_err == ESP_OK) {
                     ESP_LOGI(TAG, "signed rebind saved; restarting with new credentials");
-                    vTaskDelay(pdMS_TO_TICKS(300));
+                    vTaskDelay(pdMS_TO_TICKS(1000));
                     esp_restart();
                 }
             }

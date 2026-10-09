@@ -39,5 +39,6 @@ int xiaotai_platform_service_request(const char *path, const char *json,
                                      void *context);
 bool xiaotai_platform_binding_active(void);
 const char *xiaotai_platform_verification_code(void);
+unsigned xiaotai_platform_verification_seconds_left(void);
 
 #endif

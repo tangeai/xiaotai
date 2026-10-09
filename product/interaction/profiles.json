@@ -7,19 +7,37 @@
       "navigation": "voice-and-physical-intents"
     },
     "display-key": {
-      "required_capabilities": ["display"],
+      "required_capabilities": [
+        "display"
+      ],
       "presentation": "status-caption-qr-display",
       "navigation": "voice-and-physical-intents"
     },
     "touch-full": {
-      "required_capabilities": ["display", "touch"],
+      "required_capabilities": [
+        "display",
+        "touch"
+      ],
       "presentation": "complete-touch-ui",
       "navigation": "touch-and-common-intents"
     }
   },
   "layouts": {
-    "none": {"required_capabilities": []},
-    "compact": {"required_capabilities": ["display"]},
-    "large": {"required_capabilities": ["display"]}
+    "none": {
+      "required_capabilities": [],
+      "font_size_px": 0
+    },
+    "compact": {
+      "required_capabilities": [
+        "display"
+      ],
+      "font_size_px": 16
+    },
+    "large": {
+      "required_capabilities": [
+        "display"
+      ],
+      "font_size_px": 24
+    }
   }
 }

@@ -107,6 +107,10 @@ def load_layout_profiles(root: Path) -> dict[str, dict[str, Any]]:
         required = layout.get("required_capabilities")
         if not isinstance(required, list) or not all(isinstance(item, str) for item in required):
             raise ManifestError(f"layout profile {name} has invalid required_capabilities")
+        expected_font = {"none": 0, "compact": 16, "large": 24}.get(name)
+        font_size = layout.get("font_size_px")
+        if type(font_size) is not int or font_size != expected_font:
+            raise ManifestError(f"layout profile {name} requires font_size_px={expected_font}")
     return layouts
 
 

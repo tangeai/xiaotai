@@ -1,3 +1,5 @@
+#include <stdatomic.h>
+#include "xiaotai_binding_countdown.h"
 #include "xiaotai_platform_client.h"
 
 #include <common/bk_err.h>
@@ -85,6 +87,7 @@ int xiaotai_platform_client_id(char *output, size_t capacity)
 static volatile bool s_binding;
 static bool s_clock_synchronized;
 static char s_verification_code[17];
+static _Atomic uint32_t s_verification_expiry;
 static beken_mutex_t s_service_mutex;
 static beken_mutex_t s_http_mutex;
 static bool s_service_cache_ready;
@@ -95,7 +98,7 @@ static char s_service_token[MQTT_TOKEN_MAX];
 static const char s_device_profile[] =
     "{\"hardware\":{\"chip_model\":\"BK7258\","
     "\"board_model\":\"lckfb-bk7258\"},"
-    "\"firmware_version\":\"1.0.0+build.9\","
+    "\"firmware_version\":\"1.0.0+build.28\","
     "\"profiles\":{\"stream\":{\"up_audio_streamid\":10,"
     "\"up_video_streamid\":11,\"down_audio_streamid\":14,"
     "\"down_video_streamid\":15,\"up_audio_mt\":[\"alaw\"],"
@@ -889,8 +892,10 @@ static int wait_for_auth_grant(const platform_services_t *services,
     bool subscribed = false;
     bool ack_pending = false;
     rc = BK_FAIL;
-    while ((uint32_t)(rtos_get_time() - start) <
-           XIAOTAI_BIND_TIMEOUT_SECONDS * 1000U) {
+    while (s_verification_expiry ? xiaotai_platform_verification_seconds_left() > 0U :
+           (uint32_t)(rtos_get_time() - start) < XIAOTAI_BIND_TIMEOUT_SECONDS * 1000U) {
+        unsigned seconds = xiaotai_platform_verification_seconds_left();
+        if (s_verification_expiry && seconds == 0U) break;
         int read_rc = mqtt_read_frame(socket_fd, &header, packet,
                                       sizeof(packet), &size);
         if (read_rc == 0) {
@@ -1480,11 +1485,12 @@ int xiaotai_platform_bind(xiaotai_device_credentials_t *out)
     int rc = discover_services_with_network_time(&services);
     if (rc == BK_OK) rc = report_device(&services, &report);
     if (rc == BK_OK) {
+        s_verification_expiry = xiaotai_binding_token_expiry(report.temp_token);
         rc = wait_for_auth_grant(&services, &report, out);
     }
     xiaotai_audio_cancel_prompt();
-    if (rc == BK_OK) xiaotai_ui_show_status("BOUND");
     memset(&report, 0, sizeof(report));
+    s_verification_expiry = 0;
     memset(s_verification_code, 0, sizeof(s_verification_code));
     s_binding = false;
     if (rc == BK_OK) BK_LOGI(TAG, "verification binding completed\n");
@@ -1499,4 +1505,9 @@ bool xiaotai_platform_binding_active(void)
 const char *xiaotai_platform_verification_code(void)
 {
     return s_verification_code;
+}
+
+unsigned xiaotai_platform_verification_seconds_left(void)
+{
+    return xiaotai_binding_seconds_left(s_verification_expiry, (uint32_t)time(NULL));
 }

@@ -31,6 +31,8 @@ int xiaotai_storage_clear_wifi(void);
 int xiaotai_storage_load_device(xiaotai_device_credentials_t *out);
 int xiaotai_storage_save_device(const xiaotai_device_credentials_t *value);
 int xiaotai_storage_clear_device(void);
+/** Clear only user keys; on success reject later saves until reboot. */
+int xiaotai_storage_reset_user_data(void);
 void xiaotai_product_settings_default(xiaotai_product_settings_t *out);
 int xiaotai_storage_load_settings(xiaotai_product_settings_t *out);
 int xiaotai_storage_save_settings(const xiaotai_product_settings_t *value);

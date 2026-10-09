@@ -32,7 +32,7 @@ assert p4["firmware_version"] == project_version(repo_root / p4_manifest["projec
 assert set(p4["profiles"]) == {"stream", "call", "voip"}
 stream, call, voip = (p4["profiles"][name] for name in ("stream", "call", "voip"))
 assert (stream["up_audio_streamid"], stream["up_video_streamid"]) == (10, 11)
-assert (stream["down_audio_streamid"], stream["down_video_streamid"]) == (10, 11)
+assert (stream["down_audio_streamid"], stream["down_video_streamid"]) == (14, 15)
 assert (stream["up_audio_mt"], stream["up_video_mt"]) == (["alaw"], ["h264"])
 assert (stream["down_audio_mt"], stream["down_video_mt"]) == (["alaw"], ["h264"])
 assert stream["camera_rotation"] == 270
@@ -59,6 +59,12 @@ s3_stream = s3["profiles"]["stream"]
 assert s3_stream["no_video"] is False, "S3 H5 still produces camera MJPEG"
 assert s3_stream["up_video_mt"] == ["mjpeg"]
 assert (s3_stream["up_audio_streamid"], s3_stream["up_video_streamid"]) == (10, 11)
+assert (s3_stream["down_audio_streamid"], s3_stream["down_video_streamid"]) == (14, 15)
+bk_source = (repo_root / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_platform_client.c").read_text()
+bk_profile = decode(re.search(r"static const char s_device_profile\[\] =\s*(.*?);", bk_source, re.S).group(1))
+bk_stream = bk_profile["profiles"]["stream"]
+assert (bk_stream["up_audio_streamid"], bk_stream["up_video_streamid"]) == (10, 11)
+assert (bk_stream["down_audio_streamid"], bk_stream["down_video_streamid"]) == (14, 15)
 assert s3_stream["audio_rate"] == 8000
 assert s3["profiles"]["call"]["no_video"] is True
 assert s3["profiles"]["voip"]["no_video"] is True

@@ -1,0 +1,70 @@
+--- a/ap/components/audio_play/src/onboard_speaker_play.c
++++ b/ap/components/audio_play/src/onboard_speaker_play.c
+@@ -216,16 +216,22 @@
+ 
+ spk_data_read_exit:
+ 
++    LOGI("[DEBUG-bk-spk-close] task-exit-received\n");
++
+     spk_data_read_handle->running = false;
+ 
+     if (spk_data_read_handle->can_process)
+     {
++        LOGI("[DEBUG-bk-spk-close] task-process-sem-delete-begin\n");
+         rtos_deinit_semaphore(&spk_data_read_handle->can_process);
++        LOGI("[DEBUG-bk-spk-close] task-process-sem-delete-returned\n");
+         spk_data_read_handle->can_process = NULL;
+     }
+ 
+     /* delete msg queue */
++    LOGI("[DEBUG-bk-spk-close] task-queue-delete-begin\n");
+     ret = rtos_deinit_queue(&spk_data_read_handle->spk_data_read_msg_que);
++    LOGI("[DEBUG-bk-spk-close] task-queue-delete-returned rc=%d\n", ret);
+     if (ret != kNoErr)
+     {
+         LOGE("%s, %d, delete message queue fail\n", __func__, __LINE__);
+@@ -235,7 +241,9 @@
+     /* delete task */
+     spk_data_read_handle->spk_data_read_task_hdl = NULL;
+ 
++    LOGI("[DEBUG-bk-spk-close] task-exit-signal-begin\n");
+     rtos_set_semaphore(&spk_data_read_handle->sem);
++    LOGI("[DEBUG-bk-spk-close] task-self-delete-begin\n");
+ 
+     rtos_delete_thread(NULL);
+ }
+@@ -335,7 +343,9 @@
+ 
+     LOGD("%s\n", __func__);
+ 
++    LOGI("[DEBUG-bk-spk-close] close-exit-send-begin\n");
+     ret = spk_data_read_send_msg(spk_data_read_handle->spk_data_read_msg_que, SPK_DATA_READ_EXIT, NULL);
++    LOGI("[DEBUG-bk-spk-close] close-exit-send-returned rc=%d\n", ret);
+     if (ret != BK_OK)
+     {
+         LOGE("%s, %d, send message: SPK_DATA_READ_EXIT fail\n", __func__, __LINE__);
+@@ -345,16 +355,23 @@
+     /* abort read speaker data from pipe ringbuffer.
+        And handle "SPK_DATA_READ_EXIT" opcode.
+      */
++    LOGI("[DEBUG-bk-spk-close] close-rb-abort-begin\n");
+     rb_abort(spk_data_read_handle->rb);
++    LOGI("[DEBUG-bk-spk-close] close-exit-wait-begin\n");
+ 
+     rtos_get_semaphore(&spk_data_read_handle->sem, BEKEN_NEVER_TIMEOUT);
+-
++    LOGI("[DEBUG-bk-spk-close] close-exit-wait-returned\n");
++
++    LOGI("[DEBUG-bk-spk-close] close-exit-sem-delete-begin\n");
+     rtos_deinit_semaphore(&spk_data_read_handle->sem);
+     spk_data_read_handle->sem = NULL;
++    LOGI("[DEBUG-bk-spk-close] close-exit-sem-delete-returned\n");
+ 
+     if (spk_data_read_handle->read_buff)
+     {
++        LOGI("[DEBUG-bk-spk-close] close-buffer-free-begin\n");
+         os_free(spk_data_read_handle->read_buff);
++        LOGI("[DEBUG-bk-spk-close] close-buffer-free-returned\n");
+     }
+ 
+     LOGD("deinit spk data read complete\n");

@@ -4,10 +4,14 @@
 import json
 from pathlib import Path
 import re
+import sys
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[5]
+sys.path.insert(0, str(ROOT / "tools/tests"))
+from test_temperature_font_symbols import font_glyphs  # noqa: E402
+
 BOARD = ROOT / "firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c"
 MEDIA = BOARD / "components/starter_media/src/starter_media.c"
 MEDIA_TUNING = BOARD / "main/media/media_tuning.h"
@@ -28,10 +32,10 @@ PRODUCT_FONT_24 = (
 
 class P4ReleaseContractTest(unittest.TestCase):
     def test_p4_static_product_copy_is_covered_by_one_24px_font(self) -> None:
-        product = PRODUCT.read_text()
+        product = PRODUCT.read_text() + (ROOT / "product/include/xiaotai_ui_copy.h").read_text()
         font = PRODUCT_FONT_24.read_text()
-        opts = font.split("Opts:", 1)[1].split("--no-kerning", 1)[0]
-        symbols = opts.split("--symbols", 1)[1]
+        symbols = {chr(codepoint) for codepoint, glyph in font_glyphs(font).items()
+                   if glyph.get("adv_w", 0) > 0}
         string_literals = "".join(
             re.findall(r'"(?:\\.|[^"\\])*"', product)
         )
@@ -46,8 +50,8 @@ class P4ReleaseContractTest(unittest.TestCase):
     def test_p4_runtime_ui_copy_is_covered_by_the_24px_font(self) -> None:
         runtime = RUNTIME.read_text()
         font = PRODUCT_FONT_24.read_text()
-        opts = font.split("Opts:", 1)[1].split("--no-kerning", 1)[0]
-        symbols = opts.split("--symbols", 1)[1]
+        symbols = {chr(codepoint) for codepoint, glyph in font_glyphs(font).items()
+                   if glyph.get("adv_w", 0) > 0}
         ui_arguments = re.findall(
             r"(?:finish_call_session|product_set_call_result|product_set_room)"
             r"\s*\((.*?)\);",
@@ -55,7 +59,7 @@ class P4ReleaseContractTest(unittest.TestCase):
             re.DOTALL,
         )
         # Ignore function definitions; only call sites feed the 24px result and
-        # room-status labels. AI captions use the complete 16px CJK font.
+        # room-status labels. AI captions use the same selected full CJK font.
         ui_arguments = [args for args in ui_arguments if "{" not in args]
         ui_literals = "".join(
             literal
@@ -165,7 +169,7 @@ class P4ReleaseContractTest(unittest.TestCase):
             product.index("static void render_contact_detail")
         ]
         self.assertIn(
-            "lv_obj_set_style_text_font(name, &ui_font_cn_16, 0)",
+            "lv_obj_set_style_text_font(name, product_ui_font(), 0)",
             contacts,
         )
 
@@ -288,12 +292,12 @@ class P4ReleaseContractTest(unittest.TestCase):
 
     def test_binding_caption_expression_and_hangup_are_user_safe(self) -> None:
         product = PRODUCT.read_text()
-        self.assertIn("https://xiaotai.chat", product)
-        self.assertIn("1. 浏览器打开 https://xiaotai.chat", product)
+        self.assertIn("XIAOTAI_UI_BIND_URL", product)
+        self.assertIn("https://xiaotai.chat", (ROOT / "product/include/xiaotai_ui_copy.h").read_text())
         subtitle = product[product.index("s_subtitle = make_label"):]
-        self.assertIn("lv_obj_set_style_text_font(s_subtitle, &ui_font_cn_16", subtitle)
+        self.assertIn("lv_obj_set_style_text_font(s_subtitle, product_ui_font()", subtitle)
         history = product[product.index("s_ai_history_label = make_label"):]
-        self.assertIn("lv_obj_set_style_text_font(s_ai_history_label, &ui_font_cn_16", history)
+        self.assertIn("lv_obj_set_style_text_font(s_ai_history_label, product_ui_font()", history)
         runtime = RUNTIME.read_text()
         self.assertIn("xiaotai_ai_view_apply", runtime)
         hangup = runtime[runtime.index("static void reject_or_hangup_call"):runtime.index("static void begin_ai_session")]
@@ -344,16 +348,17 @@ class P4ReleaseContractTest(unittest.TestCase):
         ):
             self.assertIn(text, wifi)
             self.assertIn(text, requirements)
-        for text in (
-            "将设备添加到你的小钛账号",
-            "1. 浏览器打开 https://xiaotai.chat",
-            "注册或登录账号",
-            "2. 选择“添加设备”",
-            "输入下面的验证码",
-            "正在等待绑定，验证码将语音播报 3 次",
+        copy = (ROOT / "product/include/xiaotai_ui_copy.h").read_text()
+        for macro, text in (
+            ("XIAOTAI_UI_BIND_URL", "打开 https://xiaotai.chat"),
+            ("XIAOTAI_UI_BIND_ACCOUNT", "首次使用先注册，已有账号直接登录"),
+            ("XIAOTAI_UI_BIND_ENTER", "选择「添加设备」，输入下方验证码"),
         ):
-            self.assertIn(text, binding)
+            self.assertIn(macro, binding)
+            self.assertIn(text, copy)
             self.assertIn(text, requirements)
+        self.assertIn("等待绑定，验证码将语音播报 3 次", binding)
+        self.assertIn("等待绑定，验证码将语音播报 3 次", requirements)
 
     def test_ap_provisioning_has_one_canonical_two_step_flow(self) -> None:
         requirements = (ROOT / "docs/product/PRODUCT_REQUIREMENTS.md").read_text()

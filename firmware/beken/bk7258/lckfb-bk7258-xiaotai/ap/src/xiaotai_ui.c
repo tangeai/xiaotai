@@ -1,4 +1,9 @@
+#include <stdatomic.h>
+#include "xiaotai_binding_countdown.h"
 #include "xiaotai_ui.h"
+#include "xiaotai_platform_client.h"
+#include "xiaotai_ui_copy.h"
+#include "xiaotai_ai_feedback.h"
 #include "board_display.h"
 
 #include <common/bk_err.h>
@@ -16,6 +21,9 @@
 #define TAG "xiaotai_ui"
 #define LCD_WIDTH XIAOTAI_BOARD_DISPLAY_WIDTH
 #define LCD_HEIGHT XIAOTAI_BOARD_DISPLAY_HEIGHT
+
+static atomic_bool s_verification_voice_error;
+static unsigned s_verification_displayed_seconds = ~0U;
 
 static void centered_text(frame_buffer_t *frame, int y, const char *value,
                           int scale, uint16_t color);
@@ -620,6 +628,7 @@ static const char *status_hint(const char *status)
     if (strcmp(status, "BOUND") == 0) return "正在进入首页";
     if (strcmp(status, "READY") == 0) return "短按按键开始对话";
     if (strcmp(status, "AI CONNECT") == 0) return "请稍候";
+    if (strcmp(status, "AI MIC MUTED") == 0) return XIAOTAI_AI_GLOBAL_MUTE_HINT;
     if (strcmp(status, "AI") == 0) return "短按按键结束对话";
     if (strcmp(status, "ENDING") == 0) return "请稍候";
     if (strcmp(status, "CALL PREP") == 0) return "正在释放AI音频";
@@ -651,9 +660,10 @@ static const char *status_title(const char *status)
     if (strcmp(status, "WIFI") == 0) return "正在连接网络";
     if (strcmp(status, "BIND") == 0) return "绑定设备";
     if (strcmp(status, "BIND VOICE ERR") == 0) return "语音获取失败";
-    if (strcmp(status, "BOUND") == 0) return "绑定成功";
+    if (strcmp(status, "BOUND") == 0) return XIAOTAI_UI_BIND_SUCCESS;
     if (strcmp(status, "READY") == 0) return "准备就绪";
     if (strcmp(status, "AI CONNECT") == 0) return "正在连接AI";
+    if (strcmp(status, "AI MIC MUTED") == 0) return XIAOTAI_AI_GLOBAL_MUTE_TITLE;
     if (strcmp(status, "AI") == 0) return "AI对话中";
     if (strcmp(status, "ENDING") == 0) return "正在结束对话";
     if (strcmp(status, "CALL PREP") == 0) return "正在准备通话";
@@ -751,14 +761,21 @@ static void present(const char *status, const char *code)
     mixed_text(frame, 12, 8, "小钛", 2, 0xffff);
     circle(frame, 296, 17, 6, accent);
     if (code != NULL && strlen(code) == 6U) {
-        centered_cjk_text(frame, 58, "设备绑定", accent);
-        rectangle(frame, 44, 98, 232, 64, 0x18e3);
-        rectangle_outline(frame, 44, 98, 232, 64, 2, accent);
-        centered_text(frame, 117, code, 5, 0xffe0);
+        centered_cjk_text(frame, 40, XIAOTAI_UI_BIND_TITLE, accent);
+        centered_mixed_text(frame, 64, XIAOTAI_UI_BIND_URL, 1, 0xffff);
+        centered_cjk_text(frame, 84, XIAOTAI_UI_BIND_ACCOUNT, 0xffff);
+        centered_cjk_text(frame, 104, XIAOTAI_UI_BIND_ENTER, 0xffff);
+        rectangle(frame, 44, 130, 232, 64, 0x18e3);
+        rectangle_outline(frame, 44, 130, 232, 64, 2, accent);
+        centered_text(frame, 149, code, 5, 0xffe0);
+        char countdown[96];
+        xiaotai_binding_countdown_text(countdown, sizeof(countdown),
+                                     xiaotai_platform_verification_seconds_left());
+        centered_mixed_text(frame, 200, countdown, 1, accent);
         if (strcmp(status, "BIND VOICE ERR") == 0) {
-            centered_cjk_text(frame, 191, "语音获取失败", 0xf800);
+            centered_cjk_text(frame, 221, "语音获取失败", 0xf800);
         } else {
-            centered_cjk_text(frame, 191, "验证码", 0xbdf7);
+            centered_mixed_text(frame, 221, "等待绑定，验证码将语音播报 3 次", 1, 0xbdf7);
         }
     } else {
         status_icon(frame, status, accent);
@@ -822,12 +839,14 @@ void xiaotai_ui_show_call_active(bool wechat, bool microphone_muted)
 
 void xiaotai_ui_show_verification_code(const char *code)
 {
+    atomic_store(&s_verification_voice_error, false);
     xiaotai_metrics_set_state("BIND");
     present("BIND", code);
 }
 
 void xiaotai_ui_show_verification_audio_error(const char *code)
 {
+    atomic_store(&s_verification_voice_error, true);
     present("BIND VOICE ERR", code);
     BK_LOGW(TAG, "binding code remains visible; server voice unavailable\n");
 }
@@ -928,7 +947,7 @@ void xiaotai_ui_show_launcher(unsigned selected)
     if (frame == NULL) return;
     const char *labels[6] = {
         "AI聊天", "通讯录", "多人对讲", "表情包",
-        "设备设置", "网络状态"
+        "设备设置", "运行状态"
     };
     for (int i = 0; i < 6; ++i) {
         int x = 10 + (i % 2) * 155;
@@ -1013,7 +1032,7 @@ void xiaotai_ui_show_expressions(unsigned selected,
 
 void xiaotai_ui_show_network(int wifi_rssi, const char *ip_address)
 {
-    frame_buffer_t *frame = page_frame("网络状态");
+    frame_buffer_t *frame = page_frame("网络信息");
     if (frame == NULL) return;
     char value[32];
     centered_mixed_text(frame, 58, wifi_rssi > -128 ? "WiFi已连接" :
@@ -1035,28 +1054,32 @@ void xiaotai_ui_show_settings(uint8_t volume, bool speaker_muted,
 {
     frame_buffer_t *frame = page_frame("设备设置");
     if (frame == NULL) return;
-    char value[24];
-    mixed_text(frame, 16, 54, "扬声器音量", 1, 0xffff);
-    rectangle(frame, 166, 44, 42, 36, 0x10a4);
-    rectangle_outline(frame, 166, 44, 42, 36, 2, 0x2d7f);
-    line(frame, 177, 62, 197, 62, 2, 0xffff);
-    snprintf(value, sizeof(value), "%u", (unsigned)volume);
-    centered_mixed_in(frame, 240, 54, value, 2, 0xffff, 42);
-    rectangle(frame, 271, 44, 41, 36, 0x10a4);
-    rectangle_outline(frame, 271, 44, 41, 36, 2, 0x2d7f);
-    line(frame, 281, 62, 301, 62, 2, 0xffff);
-    line(frame, 291, 52, 291, 72, 2, 0xffff);
-    mixed_text(frame, 16, 92, "扬声器", 1, 0xffff);
-    mixed_text(frame, 220, 92, speaker_muted ? "已静音" : "开启", 1,
-               speaker_muted ? 0xf800 : 0x07e0);
-    mixed_text(frame, 16, 130, "麦克风", 1, 0xffff);
-    mixed_text(frame, 220, 130, microphone_muted ? "已静音" : "开启", 1,
-               microphone_muted ? 0xf800 : 0x07e0);
-    mixed_text(frame, 16, 168, "麦克风灵敏度", 1, 0xffff);
-    snprintf(value, sizeof(value), "%u/5", (unsigned)microphone_sensitivity);
-    mixed_text(frame, 250, 168, value, 1, 0x2d7f);
-    mixed_text(frame, 16, 206, "自动息屏", 1, 0xffff);
-    mixed_text(frame, 220, 206, screen_timeout, 1, 0x2d7f);
+    char value[64];
+    const unsigned values[2] = {volume, microphone_sensitivity};
+    const char *labels[2] = {XIAOTAI_UI_VOLUME, XIAOTAI_UI_SENSITIVITY};
+    for (unsigned row = 0U; row < 2U; ++row) {
+        int y = 40 + (int)row * 42;
+        rectangle(frame, 8, y, 42, 38, 0x10a4);
+        rectangle(frame, 270, y, 42, 38, 0x10a4);
+        centered_mixed_in(frame, 29, y + 11, "-", 1, 0xffff, 38);
+        centered_mixed_in(frame, 291, y + 11, "+", 1, 0xffff, 38);
+        snprintf(value, sizeof(value), "%s  %u / %u", labels[row], values[row],
+                 row == 0U ? 10U : 5U);
+        centered_mixed_in(frame, 160, y + 11, value, 1, 0xffff, 184);
+    }
+    rectangle(frame, 8, 124, 148, 30, 0x10a4);
+    rectangle(frame, 164, 124, 148, 30, 0x10a4);
+    centered_mixed_in(frame, 82, 131,
+        speaker_muted ? "扬声器：已关闭" : "扬声器：已开启", 1, 0xffff, 140);
+    centered_mixed_in(frame, 238, 131,
+        microphone_muted ? "麦克风：已关闭" : "麦克风：已开启", 1, 0xffff, 140);
+    rectangle(frame, 8, 160, 304, 30, 0x10a4);
+    snprintf(value, sizeof(value), "自动息屏 %s", screen_timeout);
+    centered_mixed_in(frame, 160, 167, value, 1, 0xffff, 296);
+    rectangle(frame, 8, 196, 148, 30, 0x10a4);
+    centered_mixed_in(frame, 82, 203, "网络信息", 1, 0xffff, 140);
+    rectangle(frame, 164, 196, 148, 30, 0x10a4);
+    centered_mixed_in(frame, 238, 203, "重置设备", 1, 0xffff, 140);
     flush_page(frame);
 }
 
@@ -1064,15 +1087,22 @@ void xiaotai_ui_show_room(const xiaotai_room_snapshot_t *room, size_t page)
 {
     if (room == NULL) return;
     xiaotai_metrics_set_state(room->talking ? "ROOM TALK" : "ROOM LIST");
-    frame_buffer_t *frame = page_frame("多人对讲");
+    frame_buffer_t *frame = page_frame(XIAOTAI_UI_ROOM_TITLE);
     if (frame == NULL) return;
     char state[40];
-    snprintf(state, sizeof(state), "%s  %s  %u人",
-             room->assigned ? room->room_code : "未分配",
-             room->joined ? "已加入" : "等待加入", room->members);
-    centered_mixed_text(frame, 42, state, 1,
+    snprintf(state, sizeof(state), "房间号 %s",
+             room->assigned ? room->room_code : "未分配");
+    centered_mixed_text(frame, 38, state, 1, 0xffff);
+    snprintf(state, sizeof(state), "在线 %u 人 | %s", room->members,
+             room->joined ? (room->talking ? "正在说话" : "收听中") : "正在连接");
+    centered_mixed_text(frame, 59, state, 1,
                         room->joined ? 0x07e0 : 0xfbe0);
     page = xiaotai_ui_room_page_clamp(page, room->participant_count);
+    if (room->members > room->participant_count) {
+        snprintf(state, sizeof(state), "房间成员（显示 %u/%u 人）",
+                 (unsigned)room->participant_count, room->members);
+        mixed_text(frame, 12, 80, state, 1, 0xbdf7);
+    } else mixed_text(frame, 12, 80, "房间成员", 1, 0xbdf7);
     size_t start = page * XIAOTAI_UI_ROOM_PARTICIPANTS_PER_PAGE;
     size_t remaining = room->participant_count > start ?
                        room->participant_count - start : 0U;
@@ -1081,21 +1111,19 @@ void xiaotai_ui_show_room(const xiaotai_room_snapshot_t *room, size_t page)
     for (size_t i = 0U; i < shown; ++i) {
         const xiaotai_room_participant_t *participant =
             &room->participants[start + i];
-        int y = 65 + (int)i * 34;
-        rectangle(frame, 12, y - 5, 296, 29,
+        int y = 100 + (int)i * 20;
+        rectangle(frame, 12, y - 2, 296, 20,
                   participant->speaking ? 0x0320 : 0x0841);
-        mixed_text(frame, 20, y,
+        centered_mixed_in(frame, 100, y,
+                   participant->self ? "本机" :
                    participant->name[0] != '\0' ? participant->name :
-                   participant->id, 1, 0xffff);
-        if (participant->self) {
-            mixed_text(frame, 202, y, "本机", 1, 0x2d7f);
-        }
-        mixed_text(frame, 246, y,
-                   participant->speaking ? "说话中" : "收听",
+                   participant->id, 1, 0xffff, 160);
+        mixed_text(frame, 238, y,
+                   participant->speaking ? "正在说话" : "未发言",
                    1, participant->speaking ? 0xffe0 : 0xbdf7);
     }
     if (shown == 0U) {
-        centered_mixed_text(frame, 92, "暂无在线设备", 1, 0x8410);
+        centered_mixed_text(frame, 108, "等待成员同步", 1, 0x8410);
     }
     size_t pages = xiaotai_ui_room_page_count(room->participant_count);
     bool has_uncached_members = room->members > room->participant_count;
@@ -1112,25 +1140,22 @@ void xiaotai_ui_show_room(const xiaotai_room_snapshot_t *room, size_t page)
                   page + 1U < pages ? 0x10a4 : 0x4208);
         centered_mixed_in(frame, 50, 161, "上一页", 1, 0xffff, 72);
         centered_mixed_in(frame, 270, 161, "下一页", 1, 0xffff, 72);
-        if (has_uncached_members) {
-            snprintf(state, sizeof(state), "%u/%u 前%u/%u",
-                     (unsigned)(page + 1U), (unsigned)pages,
-                     (unsigned)room->participant_count, room->members);
-        } else {
-            snprintf(state, sizeof(state), "%u/%u",
-                     (unsigned)(page + 1U), (unsigned)pages);
-        }
+        snprintf(state, sizeof(state), "%u/%u 页",
+                 (unsigned)(page + 1U), (unsigned)pages);
         centered_mixed_in(frame, 160, 161, state, 1, 0xbdf7, 132);
     } else if (has_uncached_members) {
-        snprintf(state, sizeof(state), "显示前%u/%u",
+        snprintf(state, sizeof(state), "显示 %u/%u 人",
                  (unsigned)room->participant_count, room->members);
         centered_mixed_text(frame, 162, state, 1, 0x8410);
+    }
+    if (pages == 1U && !has_uncached_members && shown > 0U) {
+        centered_mixed_text(frame, 162, XIAOTAI_UI_ROOM_ALL_MEMBERS, 1, 0x8410);
     }
     const int button_y = (int)XIAOTAI_UI_ROOM_BUTTON_Y;
     const int button_w = (int)XIAOTAI_UI_ROOM_BUTTON_WIDTH;
     const int button_h = (int)XIAOTAI_UI_ROOM_BUTTON_HEIGHT;
     rectangle(frame, (int)XIAOTAI_UI_ROOM_LEAVE_X, button_y,
-              button_w, button_h, 0xa800);
+              button_w, button_h, 0x2104);
     rectangle(frame, (int)XIAOTAI_UI_ROOM_TALK_X, button_y,
               button_w, button_h,
               room->talking ? 0xf800 : (room->joined ? 0x2d7f : 0x8410));
@@ -1139,7 +1164,7 @@ void xiaotai_ui_show_room(const xiaotai_room_snapshot_t *room, size_t page)
         "退出房间", 1, 0xffff, button_w - 8);
     centered_mixed_in(frame,
         (int)XIAOTAI_UI_ROOM_TALK_X + button_w / 2, button_y + 16,
-        room->talking ? "正在说话" : "按住说话", 1,
+        room->talking ? "松开停止" : "按住说话", 1,
         room->talking ? 0xffff : 0x0000, button_w - 8);
     flush_page(frame);
 }
@@ -1147,40 +1172,42 @@ void xiaotai_ui_show_room(const xiaotai_room_snapshot_t *room, size_t page)
 void xiaotai_ui_show_room_entry(bool request_pending)
 {
     xiaotai_metrics_set_state("ROOM ENTRY");
-    frame_buffer_t *frame = page_frame("多人对讲");
+    frame_buffer_t *frame = page_frame(XIAOTAI_UI_ROOM_TITLE);
     if (frame == NULL) return;
     centered_mixed_text(frame, 58,
-                        request_pending ? "正在提交" : "尚未加入房间",
+                        request_pending ? "正在提交" : XIAOTAI_UI_ROOM_EMPTY,
                         2, request_pending ? 0xfbe0 : 0xffff);
     centered_mixed_text(frame, 104,
-                        request_pending ? "请稍候" : "创建新房间或输入房间码",
+                        request_pending ? "请稍候" : XIAOTAI_UI_ROOM_HINT,
                         1, 0xbdf7);
-    rectangle(frame, (int)XIAOTAI_UI_ROOM_LEAVE_X,
-              (int)XIAOTAI_UI_ROOM_BUTTON_Y,
-              (int)XIAOTAI_UI_ROOM_BUTTON_WIDTH,
-              (int)XIAOTAI_UI_ROOM_BUTTON_HEIGHT, 0x0320);
-    rectangle(frame, (int)XIAOTAI_UI_ROOM_TALK_X,
-              (int)XIAOTAI_UI_ROOM_BUTTON_Y,
-              (int)XIAOTAI_UI_ROOM_BUTTON_WIDTH,
-              (int)XIAOTAI_UI_ROOM_BUTTON_HEIGHT, 0x10a4);
-    centered_mixed_in(frame, 82, 200, "创建房间", 1, 0xffff, 140);
-    centered_mixed_in(frame, 238, 200, "加入房间", 1, 0xffff, 140);
+    /* Related create choices share a row; joining is a separate action. */
+    rectangle(frame, 8, 132, 148, 40, 0x0320);
+    rectangle(frame, 164, 132, 148, 40, 0x0320);
+    centered_mixed_in(frame, 82, 143, "无密码创建", 1, 0xffff, 140);
+    centered_mixed_in(frame, 238, 143, "有密码创建", 1, 0xffff, 140);
+    rectangle(frame, 8, (int)XIAOTAI_UI_ROOM_BUTTON_Y,
+              304, (int)XIAOTAI_UI_ROOM_BUTTON_HEIGHT, 0x10a4);
+    centered_mixed_in(frame, 160, 200, "加入房间", 1, 0xffff, 296);
     flush_page(frame);
 }
 
-void xiaotai_ui_show_room_join_code(const char *room_code)
+static void show_room_input(const char *input, bool password, bool create)
 {
-    xiaotai_metrics_set_state("ROOM JOIN");
-    frame_buffer_t *frame = page_frame("加入房间");
+    xiaotai_metrics_set_state(password ? "ROOM PASSWORD" : "ROOM JOIN");
+    frame_buffer_t *frame = page_frame(password ?
+        (create ? "设置4位密码" : "输入房间密码") : "输入6位房间号");
     if (frame == NULL) return;
-    char value[16];
-    size_t length = room_code == NULL ? 0U : strlen(room_code);
-    snprintf(value, sizeof(value), "%s%.*s", room_code == NULL ? "" : room_code,
-             (int)(6U - (length > 6U ? 6U : length)), "------");
+    char value[16] = {0};
+    size_t length = input == NULL ? 0U : strlen(input);
+    size_t limit = password ? 4U : 6U;
+    if (length > limit) length = limit;
+    for (size_t i = 0U; i < limit; ++i) {
+        value[i] = i < length ? (password ? '*' : input[i]) : '-';
+    }
     centered_mixed_in(frame, 160, 39, value, 1, 0x2d7f, 300);
-    static const char *keys[4][3] = {
+    const char *keys[4][3] = {
         {"1", "2", "3"}, {"4", "5", "6"},
-        {"7", "8", "9"}, {"删除", "0", ""},
+        {"7", "8", "9"}, {"删除", "0", "确定"},
     };
     for (unsigned row = 0U; row < 4U; ++row) {
         for (unsigned column = 0U; column < 3U; ++column) {
@@ -1192,20 +1219,30 @@ void xiaotai_ui_show_room_join_code(const char *room_code)
                               1, 0xffff, 91);
         }
     }
-    rectangle(frame, 8, 190, 304, 42,
-              length == 6U ? 0x0320 : 0x4208);
-    centered_mixed_in(frame, 160, 201, "加入房间", 1, 0xffff, 296);
+    if (password && !create)
+        centered_mixed_in(frame, 160, 196, XIAOTAI_UI_ROOM_PASSWORD_HINT,
+                          1, 0xffff, 304);
     flush_page(frame);
+}
+
+void xiaotai_ui_show_room_join_code(const char *room_code)
+{
+    show_room_input(room_code, false, false);
+}
+
+void xiaotai_ui_show_room_password(bool create, const char *password)
+{
+    show_room_input(password, true, create);
 }
 
 void xiaotai_ui_show_room_leave_confirm(void)
 {
     xiaotai_metrics_set_state("ROOM LEAVE");
-    frame_buffer_t *frame = page_frame("退出房间");
+    frame_buffer_t *frame = page_frame(XIAOTAI_UI_ROOM_TITLE);
     if (frame == NULL) return;
-    centered_mixed_text(frame, 62, "确认退出房间？", 2, 0xffff);
-    centered_mixed_text(frame, 108, "将取消本设备的房间分配", 1, 0xfbe0);
-    centered_mixed_text(frame, 132, "再次使用需要重新加入", 1, 0xbdf7);
+    centered_mixed_text(frame, 62, XIAOTAI_UI_ROOM_LEAVE_QUESTION, 1, 0xffff);
+    centered_mixed_text(frame, 108, XIAOTAI_UI_ROOM_LEAVE_BODY, 1, 0xfbe0);
+    centered_mixed_text(frame, 132, XIAOTAI_UI_ROOM_LEAVE_DETAIL, 1, 0xbdf7);
     rectangle(frame, 8, (int)XIAOTAI_UI_ROOM_BUTTON_Y, 148,
               (int)XIAOTAI_UI_ROOM_BUTTON_HEIGHT, 0x2104);
     rectangle(frame, 164, (int)XIAOTAI_UI_ROOM_BUTTON_Y, 148,
@@ -1223,4 +1260,64 @@ int xiaotai_ui_set_backlight(bool enabled)
 bool xiaotai_ui_backlight_on(void)
 {
     return xiaotai_board_display_backlight_on();
+}
+
+void xiaotai_ui_show_reset_confirmation(unsigned status)
+{
+    frame_buffer_t *frame = page_frame("重置设备");
+    if (frame == NULL) return;
+    if (status == 1U) {
+        centered_mixed_text(frame, 92, "正在清除用户数据", 1, 0xffff);
+        centered_mixed_text(frame, 122, "完成后设备将重启", 1, 0xffff);
+    } else {
+        const char *lines[] = {"将清除 Wi-Fi、设备 ID、",
+            "设备密钥和本机设置。", "固件、OTA 与硬件校准",
+            "不会被清除。"};
+        for (unsigned i = 0; i < 4U; ++i)
+            centered_mixed_text(frame, 60 + (int)i * 22, lines[i], 1, 0xffff);
+        if (status == 2U)
+            centered_mixed_text(frame, 153, "重置失败，请重试", 1, 0xf800);
+        rectangle(frame, 8, 184, 148, 42, 0x10a4);
+        rectangle(frame, 164, 184, 148, 42, 0x91e9);
+        centered_mixed_in(frame, 82, 197, "取消", 1, 0xffff, 140);
+        centered_mixed_in(frame, 238, 197, "确认重置", 1, 0xffff, 140);
+    }
+    flush_page(frame);
+}
+
+void xiaotai_ui_show_diagnostics(unsigned tab, const char *details)
+{
+    frame_buffer_t *frame = page_frame("运行状态");
+    if (frame == NULL) return;
+    const char *tabs[] = {"资源", "音频", "事件"};
+    for (unsigned i = 0; i < 3U; ++i) {
+        int x = 14 + (int)i * 101;
+        rectangle(frame, x, 36, 90, 32, i == tab ? 0x2d7f : 0x10a4);
+        centered_mixed_in(frame, x + 45, 44, tabs[i], 1, 0xffff, 82);
+    }
+    /* Adapter wraps bounded rows; no unbounded log or credential dump. */
+    const char *cursor = details;
+    for (int y = 78; cursor != NULL && *cursor != '\0' && y <= 222; y += 18) {
+        char row[128];
+        const char *end = strchr(cursor, '\n');
+        size_t length = end == NULL ? strlen(cursor) : (size_t)(end - cursor);
+        if (length >= sizeof(row)) length = sizeof(row) - 1U;
+        memcpy(row, cursor, length);
+        row[length] = '\0';
+        mixed_text_clipped(frame, 12, y, row, 1, 0xffff, 296);
+        cursor = end == NULL ? NULL : end + 1;
+    }
+    flush_page(frame);
+}
+
+/* Run on the control task, independently of blocking binding HTTP/PCM work. */
+void xiaotai_ui_refresh_verification_countdown(void)
+{
+    if (!xiaotai_platform_binding_active()) return;
+    const char *code = xiaotai_platform_verification_code();
+    if (strlen(code) != 6U) return;
+    unsigned seconds = xiaotai_platform_verification_seconds_left();
+    if (seconds == s_verification_displayed_seconds) return;
+    s_verification_displayed_seconds = seconds;
+    present(atomic_load(&s_verification_voice_error) ? "BIND VOICE ERR" : "BIND", code);
 }

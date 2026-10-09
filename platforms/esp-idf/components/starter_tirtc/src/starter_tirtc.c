@@ -25,7 +25,10 @@ _Static_assert(sizeof(StaticSemaphore_t) == TIRTC_SDK_STATIC_SEMAPHORE_SIZE,
                "FreeRTOS StaticSemaphore_t does not match the TiRTC SDK build contract");
 
 #define H5_AUDIO_STREAM 10U
+#define H5_DOWN_AUDIO_STREAM 14U
 #define H5_VIDEO_STREAM 11U
+#define H5_DOWN_VIDEO_STREAM 15U
+#define VOIP_VIDEO_STREAM 1U
 #define AI_AUDIO_STREAM 1U
 #define CALL_AUDIO_STREAM 10U
 #define VOIP_AUDIO_STREAM 0U
@@ -40,6 +43,16 @@ static uint8_t audio_stream_for_mode(starter_tirtc_mode_t mode)
     default: return CALL_AUDIO_STREAM;
     }
 }
+static uint8_t video_stream_for_mode(starter_tirtc_mode_t mode)
+{
+    return mode == STARTER_TIRTC_VOIP ? VOIP_VIDEO_STREAM : H5_VIDEO_STREAM;
+}
+
+static uint8_t down_video_stream_for_mode(starter_tirtc_mode_t mode)
+{
+    return mode == STARTER_TIRTC_H5 ? H5_DOWN_VIDEO_STREAM : video_stream_for_mode(mode);
+}
+
 /* SDK permits 1–50 ms. 20 ms avoids idle-core starvation without perceptible
  * call-control latency on this Wi-Fi S3 product. */
 #define TIRTC_TGTRP_POLL_TIMEOUT_MS 20
@@ -349,7 +362,7 @@ static void on_command(tirtc_conn_t connection,
 static void on_request_key_frame(tirtc_conn_t connection, uint8_t stream_id)
 {
     /* MJPEG 每帧独立；请求仅用于让采集任务尽快提交下一张完整 JPEG。 */
-    if (connection_matches(connection) && stream_id == H5_VIDEO_STREAM &&
+    if (connection_matches(connection) && stream_id == video_stream_for_mode(starter_tirtc_mode()) &&
         s_handlers.on_key_frame != NULL) {
         s_handlers.on_key_frame(
             (uint32_t)atomic_load_explicit(&s_active_generation,
@@ -388,7 +401,7 @@ static int on_subscribe_video(tirtc_conn_t connection, uint8_t stream_id)
                      || starter_tirtc_mode() == STARTER_TIRTC_VOIP
 #endif
                     ) &&
-                    stream_id == H5_VIDEO_STREAM;
+                    stream_id == video_stream_for_mode(starter_tirtc_mode());
     if (accepted) {
         atomic_store_explicit(&s_video_subscribed, true, memory_order_release);
         on_request_key_frame(connection, stream_id);
@@ -406,8 +419,7 @@ static void on_unsubscribe_audio(tirtc_conn_t connection, uint8_t stream_id)
 
 static void on_unsubscribe_video(tirtc_conn_t connection, uint8_t stream_id)
 {
-    (void)stream_id;
-    if (connection_matches(connection)) {
+    if (connection_matches(connection) && stream_id == video_stream_for_mode(starter_tirtc_mode())) {
         atomic_store_explicit(&s_video_subscribed, false, memory_order_release);
     }
 }
@@ -802,9 +814,22 @@ int starter_tirtc_send_h264(uint32_t timestamp_ms, const void *data, uint32_t le
 {
     tirtc_conn_t conn = (tirtc_conn_t)atomic_load(&s_connection);
     if (!conn || !data || !length || !starter_tirtc_video_ready()) return TIRTC_E_INVALID_PARAMETER;
-    TIRTCFRAMEINFO frame = {.stream_id = H5_VIDEO_STREAM, .media = TIRTC_VIDEO_H264,
+    TIRTCFRAMEINFO frame = {.stream_id = video_stream_for_mode(starter_tirtc_mode()), .media = TIRTC_VIDEO_H264,
         .flags = key ? TIRTC_FRAME_FLAG_KEY_FRAME : 0, .ts = timestamp_ms, .length = length};
     return TiRtcSendVideoStream(conn, &frame, data);
+}
+
+int starter_tirtc_subscribe_h5_audio(void)
+{
+    tirtc_conn_t conn = (tirtc_conn_t)atomic_load(&s_connection);
+    if (!conn || starter_tirtc_mode() != STARTER_TIRTC_H5) {
+        return TIRTC_E_INVALID_PARAMETER;
+    }
+    /* Device downlink is separate from the browser's uplink subscription. */
+    int rc = TiRtcSubscribeAudio(conn, H5_DOWN_AUDIO_STREAM);
+    ESP_LOGI(TAG, "H5 talkback audio subscribe stream=%u rc=%d",
+             H5_DOWN_AUDIO_STREAM, rc);
+    return rc;
 }
 
 int starter_tirtc_subscribe_call_audio(void)
@@ -822,7 +847,7 @@ int starter_tirtc_subscribe_call_video(void)
     tirtc_conn_t conn = (tirtc_conn_t)atomic_load(&s_connection);
     if (!conn || (starter_tirtc_mode() != STARTER_TIRTC_CALL &&
                   starter_tirtc_mode() != STARTER_TIRTC_VOIP)) return TIRTC_E_INVALID_PARAMETER;
-    int ret = TiRtcSubscribeVideo(conn, H5_VIDEO_STREAM);
+    int ret = TiRtcSubscribeVideo(conn, down_video_stream_for_mode(starter_tirtc_mode()));
 #if CONFIG_IDF_TARGET_ESP32P4
     if (ret >= 0 && starter_tirtc_mode() == STARTER_TIRTC_VOIP) {
         /* Pinned monitor tirtc_commands.c: showcase request word is
@@ -840,7 +865,7 @@ int starter_tirtc_subscribe_call_video(void)
 int starter_tirtc_request_remote_key_frame(void)
 {
     tirtc_conn_t conn = (tirtc_conn_t)atomic_load(&s_connection);
-    return conn ? TiRtcRequestKeyFrame(conn, H5_VIDEO_STREAM) : TIRTC_E_INVALID_PARAMETER;
+    return conn ? TiRtcRequestKeyFrame(conn, down_video_stream_for_mode(starter_tirtc_mode())) : TIRTC_E_INVALID_PARAMETER;
 }
 
 size_t starter_tirtc_send_buffer_used(void)

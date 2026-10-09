@@ -10,6 +10,22 @@ from board_registry import ManifestError, build_command, load_boards  # noqa: E4
 
 
 class BoardRegistryTest(unittest.TestCase):
+    def test_layout_requires_matching_font_size(self):
+        for size in (None, 24, True, '16'):
+            with self.subTest(size=size):
+                root = self.make_root()
+                self.write_manifest(root, self.manifest())
+                path = root / 'product/interaction/profiles.json'
+                data = json.loads(path.read_text())
+                data['layouts']['none']['font_size_px'] = 0
+                if size is not None:
+                    data['layouts']['compact']['font_size_px'] = size
+                else:
+                    data['layouts']['compact'].pop('font_size_px', None)
+                path.write_text(json.dumps(data))
+                with self.assertRaisesRegex(ManifestError, 'font_size_px'):
+                    load_boards(root)
+
     def make_root(self) -> Path:
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
@@ -24,8 +40,8 @@ class BoardRegistryTest(unittest.TestCase):
                         "touch-full": {"required_capabilities": ["display", "touch"]},
                     },
                     "layouts": {
-                        "none": {"required_capabilities": []},
-                        "compact": {"required_capabilities": ["display"]},
+                        "none": {"required_capabilities": [], "font_size_px": 0},
+                        "compact": {"required_capabilities": ["display"], "font_size_px": 16},
                     },
                 }
             ),

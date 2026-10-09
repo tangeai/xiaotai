@@ -11,6 +11,10 @@
 #include <string.h>
 
 #include "nvs.h"
+#include "esp_memory_utils.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 
 #define TIRTC_NVS_NAMESPACE "tirtc_cfg"
 
@@ -98,7 +102,7 @@ esp_err_t runtime_config_save_tirtc(const runtime_tirtc_config_t *config)
     return err;
 }
 
-esp_err_t runtime_config_clear_tirtc(void)
+static esp_err_t clear_tirtc_on_internal_stack(void)
 {
     nvs_handle_t nvs = 0;
     esp_err_t err = nvs_open(TIRTC_NVS_NAMESPACE, NVS_READWRITE, &nvs);
@@ -106,4 +110,47 @@ esp_err_t runtime_config_clear_tirtc(void)
     if (err == ESP_OK) err = nvs_commit(nvs);
     if (nvs != 0) nvs_close(nvs);
     return err;
+}
+
+
+typedef struct {
+    SemaphoreHandle_t done;
+    esp_err_t result;
+} clear_tirtc_request_t;
+
+static void clear_tirtc_task(void *argument)
+{
+    clear_tirtc_request_t *request = argument;
+    /* NVS may disable the PSRAM cache. Only this ordinary FreeRTOS task's
+     * internal stack is used during erase/commit. Access the caller's request
+     * again only after NVS has restored the cache. */
+    esp_err_t result = clear_tirtc_on_internal_stack();
+    SemaphoreHandle_t done = request->done;
+    request->result = result;
+    xSemaphoreGive(done);
+    /* Do not access request after signalling: the caller may have returned.
+     * Ordinary xTaskCreate/vTaskDelete is an intentional allocation pair. */
+    vTaskDelete(NULL);
+}
+
+esp_err_t runtime_config_clear_tirtc(void)
+{
+    unsigned stack_probe = 0;
+    if (esp_ptr_internal(&stack_probe)) {
+        return clear_tirtc_on_internal_stack();
+    }
+    clear_tirtc_request_t request = {.result = ESP_FAIL};
+    request.done = xSemaphoreCreateBinary();
+    if (request.done == NULL) return ESP_ERR_NO_MEM;
+    /* ESP-IDF's ordinary xTaskCreate allocates stack/TCB from internal RAM.
+     * Keep the 24 KiB session task in PSRAM; allocate this 6 KiB worker only
+     * for erase, then synchronously return its real NVS result. */
+    if (xTaskCreate(clear_tirtc_task, "clear_tirtc", 6144, &request,
+                    uxTaskPriorityGet(NULL), NULL) != pdPASS) {
+        vSemaphoreDelete(request.done);
+        return ESP_ERR_NO_MEM;
+    }
+    xSemaphoreTake(request.done, portMAX_DELAY);
+    vSemaphoreDelete(request.done);
+    return request.result;
 }

@@ -102,6 +102,39 @@ static int command_voice_diag(int argc, char **argv)
 }
 
 /* 汇总各深模块的只读快照，不读取或打印 device_secret。 */
+static void print_audio_timing(starter_media_status_t media)
+{
+    if (media.audio_rx_queue_capacity != 0U) {
+        printf("Audio RX buffer: slots=%lu overflow=%lu prefill-waits=%lu\n",
+               (unsigned long)media.audio_rx_queue_capacity,
+               (unsigned long)media.audio_rx_overflow,
+               (unsigned long)media.audio_rx_prefill_waits);
+        if (media.audio_pcm_last_samples == 0U) {
+            /* P4 currently does not populate PCM/decode/lock/write timings.
+             * Zero-initialized fields are unavailable, not zero-cost work. */
+            printf("Audio RX queue: queue-peak=%lu\n",
+                   (unsigned long)media.audio_rx_queue_peak);
+            printf("Audio timing: unavailable (not collected)\n");
+            return;
+        }
+        printf("Audio RX timing: burst10ms=%lu queue-peak=%lu pcm-last=%lu "
+               "decode/lock/write-max=%lu/%lu/%lu us\n",
+               (unsigned long)media.audio_rx_burst_max,
+               (unsigned long)media.audio_rx_queue_peak,
+               (unsigned long)media.audio_pcm_last_samples,
+               (unsigned long)media.audio_decode_max_us,
+               (unsigned long)media.audio_lock_max_us,
+               (unsigned long)media.audio_write_max_us);
+        printf("Audio timing avg: encode/decode/lock/write=%lu/%lu/%lu/%lu us "
+               "encode-max=%lu us\n",
+               (unsigned long)media.audio_encode_avg_us,
+               (unsigned long)media.audio_decode_avg_us,
+               (unsigned long)media.audio_lock_avg_us,
+               (unsigned long)media.audio_write_avg_us,
+               (unsigned long)media.audio_encode_max_us);
+    }
+}
+
 static int command_status(int argc, char **argv)
 {
     (void)argc;
@@ -148,27 +181,7 @@ static int command_status(int argc, char **argv)
            (unsigned long)media.audio_playback_dma_ms,
            (unsigned long)media.audio_rx_overflow,
            (unsigned long)media.audio_rx_last_ms);
-    if (media.audio_rx_queue_capacity != 0U) {
-        printf("Audio RX buffer: slots=%lu overflow=%lu prefill-waits=%lu\n",
-               (unsigned long)media.audio_rx_queue_capacity,
-               (unsigned long)media.audio_rx_overflow,
-               (unsigned long)media.audio_rx_prefill_waits);
-        printf("Audio RX timing: burst10ms=%lu queue-peak=%lu pcm-last=%lu "
-               "decode/lock/write-max=%lu/%lu/%lu us\n",
-               (unsigned long)media.audio_rx_burst_max,
-               (unsigned long)media.audio_rx_queue_peak,
-               (unsigned long)media.audio_pcm_last_samples,
-               (unsigned long)media.audio_decode_max_us,
-               (unsigned long)media.audio_lock_max_us,
-               (unsigned long)media.audio_write_max_us);
-        printf("Audio timing avg: encode/decode/lock/write=%lu/%lu/%lu/%lu us "
-               "encode-max=%lu us\n",
-               (unsigned long)media.audio_encode_avg_us,
-               (unsigned long)media.audio_decode_avg_us,
-               (unsigned long)media.audio_lock_avg_us,
-               (unsigned long)media.audio_write_avg_us,
-               (unsigned long)media.audio_encode_max_us);
-    }
+    print_audio_timing(media);
     printf("AEC: processed=%lu errors=%lu clipped-mic/ref=%lu/%lu\n",
            (unsigned long)media.aec_processed,
            (unsigned long)media.aec_errors,

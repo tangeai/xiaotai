@@ -487,9 +487,22 @@ static void media_worker(beken_thread_arg_t argument)
                  * active media pipeline and must not stop it. */
                 if (connection_matches(event.connection)) {
                     (void)xiaotai_video_stop();
+                    /* A remote AI close can race end_session while decoded
+                     * speech remains queued. Drain before audio_stop clears
+                     * that queue; user hangup still stops immediately. */
+                    if (event.mode == CONNECTION_AI && event.error != 0) {
+                        xiaotai_audio_set_uplink_enabled(false);
+                        drain_ai_playback_after_transport_close();
+                    }
                     (void)xiaotai_audio_stop();
                 }
+                BK_LOGI(TAG,
+                        "TiRtcDisconnect begin handle=%p mode=%d generation=%u\n",
+                        event.connection, (int)event.mode,
+                        (unsigned)event.generation);
                 (void)TiRtcDisconnect(event.connection);
+                BK_LOGI(TAG, "TiRtcDisconnect returned handle=%p\n",
+                        event.connection);
             }
             continue;
         }
@@ -666,12 +679,18 @@ static void media_worker(beken_thread_arg_t argument)
             continue;
         }
         if (event.type == MEDIA_EVENT_CLOSED) {
+            /* Temporary close-path probes: remove after the SMP stall has
+             * been reproduced with an identified failing boundary. */
+            BK_LOGI(TAG, "[DEBUG-bk-close] worker-received mode=%d generation=%u\n",
+                    (int)event.mode, (unsigned)event.generation);
             (void)xiaotai_video_stop();
-            if (event.mode == CONNECTION_AI) {
+            BK_LOGI(TAG, "[DEBUG-bk-close] worker-video-stopped\n");
+            if (event.mode == CONNECTION_AI && xiaotai_audio_running()) {
                 xiaotai_audio_set_uplink_enabled(false);
                 drain_ai_playback_after_transport_close();
             }
             (void)xiaotai_audio_stop();
+            BK_LOGI(TAG, "[DEBUG-bk-close] worker-audio-stopped\n");
             if (event.mode == CONNECTION_AI &&
                 s_handlers.on_ai_disconnected != NULL) {
                 s_handlers.on_ai_disconnected(event.generation, event.error,
@@ -694,6 +713,7 @@ static void media_worker(beken_thread_arg_t argument)
                 s_handlers.on_room_disconnected(event.generation, event.error,
                                                 s_handlers.context);
             }
+            BK_LOGI(TAG, "[DEBUG-bk-close] worker-handler-returned\n");
             if (event.mode == CONNECTION_ROOM) {
                 xiaotai_audio_set_uplink_enabled(true);
             } else if (event.mode == CONNECTION_STREAM) {
@@ -805,6 +825,14 @@ static void on_conn_accepted(tirtc_conn_t connection)
 static void on_conn_error(tirtc_conn_t connection, int error)
 {
     if (!connection_matches(connection)) return;
+    /* A submitted disconnect already owns teardown and its original result.
+     * TiRtcDisconnect may subsequently emit a generic close error. Like the
+     * ESP adapter's invalidated local handle, this callback must not re-enter
+     * teardown or replace a successful local exit with that SDK error. Keep
+     * the BK handle until on_disconnected so deferred room HTTP still waits
+     * for transport release. */
+    if (atomic_load_explicit(&s_active_disconnect_queued,
+                             memory_order_acquire)) return;
     atomic_store_explicit(&s_connection_error, error, memory_order_release);
     BK_LOGW(TAG, "connection error=%d\n", error);
     (void)queue_active_disconnect_once(connection,
@@ -813,6 +841,7 @@ static void on_conn_error(tirtc_conn_t connection, int error)
 
 static void on_disconnected(tirtc_conn_t connection)
 {
+    BK_LOGI(TAG, "TiRTC disconnected callback handle=%p\n", connection);
     uintptr_t cleanup = (uintptr_t)connection;
     if (atomic_compare_exchange_strong_explicit(
             &s_outgoing_cleanup_connection, &cleanup, 0,
@@ -824,13 +853,16 @@ static void on_disconnected(tirtc_conn_t connection)
                 (unsigned)rtos_get_psram_free_heap_size());
         require_recovery_if_heap_low("failed-handle-cleanup");
     }
+    BK_LOGI(TAG, "[DEBUG-bk-close] callback-cleanup-checked\n");
     uintptr_t expected = (uintptr_t)connection;
     if (!atomic_compare_exchange_strong_explicit(&s_connection,
                                                   &expected, 0,
                                                   memory_order_acq_rel,
                                                   memory_order_acquire)) {
+        BK_LOGI(TAG, "[DEBUG-bk-close] callback-stale handle=%p\n", connection);
         return;
     }
+    BK_LOGI(TAG, "[DEBUG-bk-close] callback-handle-cleared\n");
     atomic_store_explicit(&s_active_disconnect_queued, false,
                           memory_order_release);
     uint32_t generation = (uint32_t)atomic_exchange_explicit(
@@ -856,9 +888,12 @@ static void on_disconnected(tirtc_conn_t connection)
         .error = error,
         .mode = mode,
     };
+    BK_LOGI(TAG, "[DEBUG-bk-close] callback-queue-begin mode=%d generation=%u\n",
+            (int)mode, (unsigned)generation);
     if (rtos_push_to_queue(&s_media_queue, &event, 0) != BK_OK) {
         BK_LOGE(TAG, "media close event queue full\n");
     }
+    BK_LOGI(TAG, "[DEBUG-bk-close] callback-queue-returned\n");
 }
 
 static void on_command(tirtc_conn_t connection, uint32_t command,

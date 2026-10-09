@@ -1,3 +1,4 @@
+#include "xiaotai_binding_countdown.h"
 /*
  * ThingConnect 平台传输 adapter。
  *
@@ -96,6 +97,8 @@ typedef struct {
     int message_id;
     int subscribe_message_id;
     int ack_message_id;
+    void (*prompt_cancel_callback)(void *user_data);
+    void *prompt_user_data;
 } provision_mqtt_t;
 
 static const char *TAG = "platform_client";
@@ -124,7 +127,10 @@ static void *s_online_user_data;
 static volatile bool s_provisioning;
 static volatile bool s_binding_required;
 static bool s_services_ready;
+/* Startup/provision retries share one SNTP service owned by the startup task. */
+static bool s_sntp_initialized;
 static char s_verification_code[17];
+static _Atomic uint32_t s_verification_expiry;
 static platform_signal_callback_t s_signal_callback;
 static void *s_signal_user_data;
 static char s_mqtt_message[PLATFORM_SIGNAL_MAX];
@@ -693,9 +699,11 @@ static esp_err_t sync_clock(void)
     esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG_MULTIPLE(
         2,
         ESP_SNTP_SERVER_LIST("pool.ntp.org", "ntp.aliyun.com"));
-    esp_err_t err = esp_netif_sntp_init(&config);
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-        return err;
+    esp_err_t err = ESP_OK;
+    if (!s_sntp_initialized) {
+        err = esp_netif_sntp_init(&config);
+        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return err;
+        s_sntp_initialized = true;
     }
     if (time_was_valid) {
         ESP_LOGI(TAG,
@@ -934,6 +942,9 @@ static void provision_handle_message(provision_mqtt_t *context,
                                      const char *json,
                                      size_t length)
 {
+    /* QoS1 delivery may repeat. Keep the first accepted credentials and ACK
+     * until its PUBACK arrives; replacing them loses the matching completion. */
+    if (context->ack_message_id >= 0) return;
     /* 只处理 auth_grant；凭证完整校验后才发送 QoS1 ACK。 */
     cJSON *root = cJSON_ParseWithLength(json, length);
     const cJSON *type = root == NULL
@@ -1051,6 +1062,8 @@ static void provision_mqtt_event(void *handler_args,
         }
     } else if (event_id == MQTT_EVENT_PUBLISHED &&
                event->msg_id == context->ack_message_id) {
+        if (context->prompt_cancel_callback != NULL)
+            context->prompt_cancel_callback(context->prompt_user_data);
         ESP_LOGI(TAG, "binding ACK delivered");
         xEventGroupSetBits(context->events, PROVISION_DONE_BIT);
     } else if (event_id == MQTT_EVENT_ERROR) {
@@ -1068,6 +1081,8 @@ static esp_err_t wait_for_auth_grant(const provision_report_t *report,
         .message_id = -1,
         .subscribe_message_id = -1,
         .ack_message_id = -1,
+        .prompt_cancel_callback = config->prompt_cancel_callback,
+        .prompt_user_data = config->prompt_user_data,
     };
     (void)snprintf(context.temp_client_id,
                    sizeof(context.temp_client_id),
@@ -1119,6 +1134,11 @@ static esp_err_t wait_for_auth_grant(const provision_report_t *report,
     unsigned timeout_seconds = config->timeout_seconds == 0
                                    ? PLATFORM_DEFAULT_PROVISION_TIMEOUT_SECONDS
                                    : config->timeout_seconds;
+    unsigned valid_seconds = platform_client_verification_seconds_left();
+    if (s_verification_expiry &&
+        (config->timeout_seconds == 0U || valid_seconds < timeout_seconds)) {
+        timeout_seconds = valid_seconds;
+    }
     TickType_t wait_started = xTaskGetTickCount();
     TickType_t timeout_ticks = pdMS_TO_TICKS(timeout_seconds * 1000U);
     EventBits_t bits = xEventGroupWaitBits(context.events,
@@ -1209,6 +1229,7 @@ esp_err_t platform_client_provision(const platform_provision_config_t *config,
     if (err != ESP_OK) {
         return err;
     }
+    s_verification_expiry = xiaotai_binding_token_expiry(report.temp_token);
     (void)snprintf(s_verification_code,
                    sizeof(s_verification_code),
                    "%s",
@@ -1219,11 +1240,13 @@ esp_err_t platform_client_provision(const platform_provision_config_t *config,
     ESP_LOGW(TAG, "open device binding and enter the displayed code");
     err = wait_for_auth_grant(&report, config, result);
     s_provisioning = false;
+    s_verification_expiry = 0;
     mbedtls_platform_zeroize(s_verification_code,
                              sizeof(s_verification_code));
     mbedtls_platform_zeroize(&report, sizeof(report));
     if (err == ESP_OK) {
-        s_binding_required = false;
+        /* The caller still has to persist credentials. Keep onboarding active
+         * through storage failures and retries; normal startup releases it. */
         ESP_LOGI(TAG, "verification binding completed; credentials ready for NVS");
     }
     return err;
@@ -1276,6 +1299,7 @@ esp_err_t platform_client_start(const platform_client_config_t *config)
         return err;
     }
     s_ready = true;
+    s_binding_required = false;
     return ESP_OK;
 }
 
@@ -1490,4 +1514,9 @@ void platform_client_set_online_handler(platform_online_callback_t callback,
 {
     s_online_callback = callback;
     s_online_user_data = user_data;
+}
+
+unsigned platform_client_verification_seconds_left(void)
+{
+    return xiaotai_binding_seconds_left(s_verification_expiry, (uint32_t)time(NULL));
 }

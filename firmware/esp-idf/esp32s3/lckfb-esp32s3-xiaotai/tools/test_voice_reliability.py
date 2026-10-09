@@ -687,6 +687,7 @@ static xiaotai_ai_end_drain_t s_ai_end_drain;
 static bool s_ai_transport_closed;
 static char s_call_room_id[32];
 static unsigned finished, resumed, media_started;
+int starter_tirtc_subscribe_h5_audio(void) { return 0; }
 static int64_t now_ms(void) { return 100; }
 static starter_runtime_state_t session_state(void) { return s_session.state; }
 static uint32_t session_generation(void) { return s_session.generation; }

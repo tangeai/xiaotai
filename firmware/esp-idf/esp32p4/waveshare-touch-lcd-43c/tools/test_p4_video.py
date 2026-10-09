@@ -16,6 +16,7 @@ body = r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <stdatomic.h>
 typedef enum {STARTER_TIRTC_H5, STARTER_TIRTC_AI, STARTER_TIRTC_CALL, STARTER_TIRTC_VOIP} starter_tirtc_mode_t;
 #define taskENTER_CRITICAL(x) ((void)(x))
@@ -31,8 +32,14 @@ static bool s_worker_camera;
 typedef int esp_err_t;
 #define ESP_OK 0
 #define ESP_ERR_INVALID_STATE -1
+#define ESP_FAIL -2
+static atomic_uint s_sent;
 static bool camera_running;
 static unsigned camera_starts, camera_stops, key_frames;
+static void camera_pipeline_request_key_frame(void){}
+static void p4_video_capture_offer(const uint8_t *data,size_t len,uint16_t w,uint16_t h,bool key,uint32_t generation){
+    (void)data;(void)len;(void)w;(void)h;(void)key;(void)generation;
+}
 static bool camera_pipeline_is_running(void) { return camera_running; }
 static int camera_pipeline_set_rtc_video_enabled(bool enabled) {
     if(enabled) ++camera_starts; else ++camera_stops;
@@ -48,7 +55,7 @@ static atomic_bool s_video_subscribed;
 #define CONFIG_IDF_TARGET_ESP32P4 1
 static bool connection_matches(tirtc_conn_t conn) {return conn == (void*)1;}
 static void on_request_key_frame(tirtc_conn_t conn, uint8_t stream) {
-    assert(conn == (void*)1 && stream == 11);
+    assert(conn == (void*)1 && stream == (mode == STARTER_TIRTC_VOIP ? 1 : 11));
 }
 static uint32_t current_generation;
 static int64_t clock_us;
@@ -70,22 +77,28 @@ static int64_t esp_timer_get_time(void) { return clock_us; }
 static starter_tirtc_mode_t starter_tirtc_mode(void) { return mode; }
 static bool starter_tirtc_video_ready(void) { return ready; }
 #define H5_VIDEO_STREAM 11
+#define H5_DOWN_VIDEO_STREAM 15
+#define VOIP_VIDEO_STREAM 1
 #define TIRTC_VIDEO_H264 2
 #define TIRTC_FRAME_FLAG_KEY_FRAME 1
 #define TIRTC_E_INVALID_PARAMETER -1
 typedef struct {uint8_t stream_id, media, flags; uint32_t ts, length;} TIRTCFRAMEINFO;
 static TIRTCFRAMEINFO sent;
+static unsigned sdk_video_sends;
 static int TiRtcSendVideoStream(tirtc_conn_t c, const TIRTCFRAMEINFO *f, const void *data) {
-    assert(c && data); sent = *f; return 7;
+    assert(c && data); sent = *f; ++sdk_video_sends; return 7;
 }
 static int TiRtcSubscribeVideo(tirtc_conn_t c, uint8_t stream) {
-    assert(c && stream == 11); ++subscribe_calls; return subscribe_result;
+    assert(c && stream == (mode == STARTER_TIRTC_VOIP ? 1 : 11)); ++subscribe_calls; return subscribe_result;
 }
 '''
 body += function(video, "void p4_video_set_session(")
 body += function(video, "esp_err_t p4_video_set_camera_enabled(")
 body += function(video, "static void maintain_camera(")
+body += function(sdk, "static uint8_t video_stream_for_mode(")
+body += function(sdk, "static uint8_t down_video_stream_for_mode(")
 body += function(sdk, "int starter_tirtc_send_h264(")
+body += function(video, "static esp_err_t send_video(")
 body += function(sdk, "int starter_tirtc_subscribe_call_video(")
 body += function(sdk, "static int on_subscribe_video(")
 body += function(video, "static void maintain_subscription(")
@@ -161,13 +174,22 @@ int main(void) {
     s_worker_camera = camera_running = true;
     assert(p4_video_set_camera_enabled(19, false) == ESP_ERR_INVALID_STATE);
     assert(s_camera_enabled);
+    current_generation=20;
+    assert(send_video((const uint8_t*)data,5,640,480,1000,TIRTC_VIDEO_H264,true,NULL)==ESP_OK);
+    unsigned before_off=sdk_video_sends;
     assert(p4_video_set_camera_enabled(20, false) == ESP_OK);
+    for(int i=0;i<10;i++) {
+        assert(send_video((const uint8_t*)data,5,640,480,2000,TIRTC_VIDEO_H264,false,NULL)==ESP_ERR_INVALID_STATE);
+    }
+    assert(sdk_video_sends==before_off);
     assert(!s_tx_enabled && s_live_generation == 20);
     maintain_camera();
     assert(!camera_running && camera_stops == 1 && s_live_generation == 20);
     assert(p4_video_set_camera_enabled(20, true) == ESP_OK);
     maintain_camera();
     assert(camera_running && s_tx_enabled && key_frames == 1 && camera_starts == 1);
+    assert(send_video((const uint8_t*)data,5,640,480,3000,TIRTC_VIDEO_H264,true,NULL)==ESP_OK);
+    assert(sdk_video_sends==before_off+1);
     /* Quick off/on still drains the old worker, rather than leaving TX stuck. */
     p4_video_set_camera_enabled(20, false);
     p4_video_set_camera_enabled(20, true);
@@ -179,7 +201,8 @@ int main(void) {
     mode=STARTER_TIRTC_CALL; s_mode=mode;
     assert(on_subscribe_video((void*)1,11)==0);
     mode=STARTER_TIRTC_VOIP; s_mode=mode;
-    assert(on_subscribe_video((void*)1,11)==0);
+    assert(on_subscribe_video((void*)1,1)==0);
+    assert(on_subscribe_video((void*)1,11)==-1);
     mode=STARTER_TIRTC_H5; s_mode=mode;
     assert(on_subscribe_video((void*)1,11)==0);
     assert(on_subscribe_video((void*)2,11)==-1);

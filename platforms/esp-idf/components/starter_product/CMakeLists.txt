@@ -14,11 +14,17 @@ foreach(asset IN LISTS product_assets)
     endif()
 endforeach()
 
+file(READ "${XIAOTAI_REPO_ROOT}/product/interaction/profiles.json" product_profiles)
+string(JSON XIAOTAI_STARTER_PRODUCT_FONT_SIZE ERROR_VARIABLE font_error
+    GET "${product_profiles}" layouts "${XIAOTAI_STARTER_PRODUCT_LAYOUT_PROFILE}" font_size_px)
+if(font_error OR NOT XIAOTAI_STARTER_PRODUCT_FONT_SIZE MATCHES "^(16|24)$")
+    message(FATAL_ERROR "Select product font size 16 (compact) or 24 (large)")
+endif()
+
 idf_component_register(
     SRCS
         "${CMAKE_CURRENT_LIST_DIR}/src/starter_product.c"
-        "${CMAKE_CURRENT_LIST_DIR}/src/ui_font_cn_16.c"
-        "${CMAKE_CURRENT_LIST_DIR}/src/ui_font_cn_24.c"
+        "${CMAKE_CURRENT_LIST_DIR}/src/ui_font_cn_${XIAOTAI_STARTER_PRODUCT_FONT_SIZE}.c"
         ${XIAOTAI_STARTER_PRODUCT_EXTRA_SRCS}
     INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/include"
     PRIV_INCLUDE_DIRS "${XIAOTAI_REPO_ROOT}/product/assets/icons/wechat_call"
@@ -39,3 +45,6 @@ foreach(asset IN LISTS product_assets)
         RENAME_TO "${asset_name}"
     )
 endforeach()
+
+target_compile_definitions(${COMPONENT_LIB} PRIVATE
+    XIAOTAI_PRODUCT_FONT_SIZE=${XIAOTAI_STARTER_PRODUCT_FONT_SIZE})

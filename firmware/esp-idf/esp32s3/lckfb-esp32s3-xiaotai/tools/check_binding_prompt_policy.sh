@@ -29,8 +29,10 @@ require_text 'platform_client_verification_code()' "$product_source" \
     'product UI must read the transient verification code'
 require_text 'PAGE_BINDING' "$product_source" \
     'product UI must own a dedicated binding page'
-require_text 'BINDING_CODE_TOP_LEVEL' "$product_source" \
-    'verification digits must not be clipped by the themed panel content area'
+require_text 'xiaotai_verification_code_draw' "$product_source" \
+    'verification code must use the shared geometric digit renderer'
+require_text 'lv_obj_add_event_cb(code_panel, binding_code_draw, LV_EVENT_DRAW_MAIN' "$product_source" \
+    'verification digits must draw at actual panel coordinates without label clipping'
 require_text 'starter_media_play_pcm8k' "$media_source" \
     'verification PCM must use the board media output path'
 require_text 'VERIFICATION_PROMPT_REPEAT_COUNT 3U' "$main_source" \

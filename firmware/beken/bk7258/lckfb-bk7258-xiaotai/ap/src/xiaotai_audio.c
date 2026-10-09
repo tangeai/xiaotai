@@ -152,7 +152,10 @@ static void prompt_task(beken_thread_arg_t argument)
     if (ready) {
         for (unsigned repeat = 0; repeat < 3U && s_prompt_run; ++repeat) {
             if (!play_prompt_pcm()) break;
-            rtos_delay_milliseconds(700);
+            if (repeat + 1U < 3U) {
+                for (unsigned waited = 0; waited < 700U && s_prompt_run; waited += 20U)
+                    rtos_delay_milliseconds(20);
+            }
         }
     }
     xiaotai_board_prompt_audio_stop();

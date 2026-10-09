@@ -11,6 +11,7 @@
 
 static uint8_t blob[512];
 static size_t blob_size;
+static bool attempt_reset_during_write;
 
 size_t ef_get_env_blob(const char *key, void *value, size_t capacity,
                        size_t *saved_size)
@@ -26,6 +27,8 @@ EfErrCode ef_set_env_blob(const char *key, const void *value, size_t size)
 {
     (void)key;
     assert(size <= sizeof(blob));
+    if (attempt_reset_during_write)
+        assert(xiaotai_storage_reset_user_data() != 0);
     memcpy(blob, value, size);
     blob_size = size;
     return EF_NO_ERR;
@@ -92,8 +95,10 @@ int main(void)
     assert(settings.microphone_sensitivity ==
            XIAOTAI_MIC_SENSITIVITY_DEFAULT);
 
+    attempt_reset_during_write = true;
     settings.microphone_sensitivity = 5;
     assert(xiaotai_storage_save_settings(&settings) == 0);
+    attempt_reset_during_write = false;
     memset(&settings, 0, sizeof(settings));
     assert(xiaotai_storage_load_settings(&settings) == 0);
     assert(settings.microphone_sensitivity == 5);
@@ -102,5 +107,13 @@ int main(void)
     assert(xiaotai_storage_load_settings(&settings) != 0);
     assert(settings.microphone_sensitivity ==
            XIAOTAI_MIC_SENSITIVITY_DEFAULT);
+    /* Successful reset freezes all later user writes until reboot. */
+    assert(xiaotai_storage_reset_user_data() == 0);
+    assert(blob_size == 0);
+    assert(xiaotai_storage_save_settings(&settings) != 0);
+    assert(xiaotai_storage_clear_device() != 0);
+    assert(xiaotai_storage_clear_wifi() != 0);
+    assert(xiaotai_storage_reset_user_data() != 0);
+    assert(blob_size == 0);
     return 0;
 }

@@ -16,12 +16,13 @@ def run_room_case(checks):
     except AssertionError:
         controls = 'static void refresh_room_controls(const starter_runtime_product_snapshot_t *room) {(void)room;}'
     code = r'''
+#include "/home/workspace/xiaotai/product/include/xiaotai_ui_copy.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-typedef struct node {char text[128];bool visible;struct node *child;} lv_obj_t;
+typedef struct node {char text[128];bool visible,disabled;struct node *child;} lv_obj_t;
 typedef struct {int code;} lv_event_t;
 typedef int lv_event_code_t;
 #define LV_EVENT_PRESSED 1
@@ -35,7 +36,10 @@ static unsigned nodes;
 static char s_voice_feedback[64];
 static uint8_t s_room_members_page;
 lv_obj_t *s_room_code_label,*s_room_status_label,*s_room_member_labels[3],*s_room_page_label;
-lv_obj_t *s_room_ptt_button,*s_room_connecting_label;
+lv_obj_t *s_room_ptt_button,*s_room_connecting_label,*s_room_previous_button,*s_room_next_button,*s_room_members_caption;
+#define LV_STATE_DISABLED 1
+static void lv_obj_add_state(lv_obj_t *o,int s){if(o)o->disabled=true;}
+static void lv_obj_clear_state(lv_obj_t *o,int s){if(o)o->disabled=false;}
 #define PAGE_ROOM 1
 #define STARTER_ROOM_NONE 0
 #define STARTER_ROOM_ERROR 1
@@ -127,10 +131,10 @@ class RoomRefreshRegressions(unittest.TestCase):
         run_room_case(r'''
  strcpy(snapshot.room_members[0].id,"carol");snapshot.room_members[0].speaking=true;
  snapshot.room_ptt=true;product=snapshot;refresh_tick();
- assert(shown("carol (说话)") && !shown("alice"));
+ assert(shown("carol  正在说话") && !shown("alice"));
  assert(nodes==initial_nodes);
  snapshot.room_members[0].speaking=false;product=snapshot;refresh_tick();
- assert(shown("carol") && !shown("carol (说话)"));
+ assert(shown("carol") && !shown("carol  正在说话"));
  snapshot.room_member_count=1;product=snapshot;refresh_tick();assert(!shown("bob"));
  assert(shown("在线 100 人") && nodes==initial_nodes);
 ''')

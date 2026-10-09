@@ -14,6 +14,7 @@
  * 对外状态使用原子快照，供串口或产品 UI 无锁读取。
  */
 #include "starter_runtime.h"
+#include "xiaotai_ai_feedback.h"
 
 #include <ctype.h>
 #include <stdatomic.h>
@@ -1197,9 +1198,9 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.0.0+build.35\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.52\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
-        "\"down_audio_streamid\":10,\"down_video_streamid\":11,"
+        "\"down_audio_streamid\":14,\"down_video_streamid\":15,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
         "\"down_audio_mt\":[\"alaw\"],\"down_video_mt\":[\"h264\"],"
         /* Every uplink preserves sensor orientation. Scene receivers apply
@@ -1224,9 +1225,9 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-S3\","
         "\"board_model\":\"lckfb-esp32s3\"},"
-        "\"firmware_version\":\"1.0.0+build.14\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.38\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
-        "\"down_audio_streamid\":10,\"up_video_mt\":[\"mjpeg\"],"
+        "\"down_audio_streamid\":14,\"down_video_streamid\":15,\"up_video_mt\":[\"mjpeg\"],"
         "\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"
         "\"audio_rate\":8000,\"audio_channels\":1,\"no_video\":false},"
         "\"call\":{\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"
@@ -1751,13 +1752,18 @@ static void begin_ai_session(uint32_t wake_token)
          state != STARTER_RUNTIME_ROOM_CONNECTING &&
          state != STARTER_RUNTIME_ROOM_ACTIVE) || microphone_muted) {
         ESP_LOGW(TAG,
-                 "AI start rejected: state=%s platform_ready=%d tirtc_ready=%d microphone_muted=%d",
+                 "AI start rejected: state=%s platform_ready=%d tirtc_ready=%d microphone_muted=%d reason=%s",
                  starter_runtime_state_name(state), platform_ready ? 1 : 0,
-                 tirtc_ready ? 1 : 0, microphone_muted ? 1 : 0);
+                 tirtc_ready ? 1 : 0, microphone_muted ? 1 : 0,
+                 microphone_muted
+                     ? XIAOTAI_AI_GLOBAL_MUTE_REASON
+                     : "foreground session busy");
         starter_media_cancel_ai_preroll(wake_token);
         s_ai_start_pending = false;
         s_ai_ready_deadline_ms = 0;
-        product_set_ai_start_pending(false, "现在暂时不能开始对话");
+        product_set_ai_start_pending(false, microphone_muted
+            ? XIAOTAI_AI_GLOBAL_MUTE_MESSAGE
+            : "现在暂时不能开始对话");
         return;
     }
     if (!platform_ready || !tirtc_ready) {
@@ -2270,6 +2276,11 @@ static void handle_connection(const runtime_event_t *event)
         atomic_store_explicit(&s_last_error, 0, memory_order_release);
         if (starter_media_start(STARTER_TIRTC_H5, event->generation) != ESP_OK) {
             finish_session(ESP_ERR_INVALID_STATE);
+            return;
+        }
+        int subscribe_rc = starter_tirtc_subscribe_h5_audio();
+        if (subscribe_rc < 0) {
+            finish_session(subscribe_rc);
             return;
         }
         (void)xiaotai_runtime_media_started(&s_session, session_generation());

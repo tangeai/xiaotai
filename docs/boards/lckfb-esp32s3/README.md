@@ -11,6 +11,17 @@ Flash 是闪存，PSRAM 是用于音视频缓冲的大块运行内存。
 [ESP32-S3 ESP-IDF 5.5.4 入门指南](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32s3/get-started/)
 和[立创开发板官方教程](https://wiki.lckfb.com/zh-hans/szpi-esp32s3/)。
 
+## 屏幕布局与字体约束
+
+本板当前屏幕适配为 **320×240 横屏**，variant 选择 **`compact`** 布局，产品正文、
+按钮、设置值、联系人与动态字幕统一使用 **16 像素**字库。每个固件只链接所选字号，
+不允许缺字后回退到另一字号。字号由 `product/interaction/profiles.json` 的
+`font_size_px` 约束，不按芯片类型自行推断。
+
+更换屏幕时必须重新登记分辨率、方向与布局，并验证字号、换行和触摸区域。当前屏幕
+硬件证据仍以本板 Hardware IR / 探针资料为准；布局配置不能替代硬件证据。完整要求见
+[产品交互规范 §1.3](../../product/PRODUCT_INTERACTION_PROFILES.md#13-屏幕布局与字库约束)。
+
 ## 烧录
 
 ### 直接烧录发布包

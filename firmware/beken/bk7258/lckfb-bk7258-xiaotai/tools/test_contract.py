@@ -890,7 +890,7 @@ require('mixed_text(frame, 12, 8, "小钛"' in ui_source and
         'page_frame("功能菜单")' in ui_source and
         '"AI聊天", "通讯录", "多人对讲", "表情包"' in ui_source and
         'page_frame("设备设置")' in ui_source and
-        'page_frame("网络状态")' in ui_source and
+        'page_frame("网络信息")' in ui_source and
         '"XIAOTAI"' not in ui_source and
         "basic_cjk_characters" in
         (ROOT / "tools/generate_ui_assets.py").read_text() and
@@ -914,8 +914,8 @@ require("phone_shortcut(frame);" in ui_source and
         "XIAOTAI_UI_ACTION_VOLUME_UP" in app_source and
         "XIAOTAI_UI_HOME_MENU_HIT_Y" in ui_hit_test_source and
         "XIAOTAI_UI_HOME_QUICK_CALL_HIT_Y" in ui_hit_test_source and
-        "x >= 160U && x < 215U" in ui_hit_test_source and
-        "x >= 265U" in ui_hit_test_source and
+        "x >= 8U && x < 50U" in ui_hit_test_source and
+        "x >= 270U && x < 312U" in ui_hit_test_source and
         (ROOT / "tools/test_ui_hit_test.sh").exists(),
         "touch UI must expose distinct, tested home quick-call and volume controls")
 ui_hit_header = (ROOT / "ap/include/xiaotai_ui_hit_test.h").read_text()
@@ -957,14 +957,14 @@ require("UI_PAGE_ROOM_LEAVE_CONFIRM" in app_source and
                 "if (s_ui_page == UI_PAGE_ROOM_LEAVE_CONFIRM)"))
         ] and
         '"ROOM PAUSED"' in app_source and
-        '"确认退出房间？"' in ui_source and
-        '"将取消本设备的房间分配"' in ui_source and
+        'XIAOTAI_UI_ROOM_LEAVE_QUESTION' in ui_source and
+        'XIAOTAI_UI_ROOM_LEAVE_BODY' in ui_source and
         '"房间已保留，再次进入可连接"' in ui_source,
         "room back must preserve assignment while room leave requires confirmation")
 require('xiaotai_metrics_set_state(room->talking ? "ROOM TALK" : "ROOM LIST");' in
         ui_source and
         'xiaotai_metrics_set_state("ROOM ENTRY");' in ui_source and
-        'xiaotai_metrics_set_state("ROOM JOIN");' in ui_source and
+        'xiaotai_metrics_set_state(password ? "ROOM PASSWORD" : "ROOM JOIN");' in ui_source and
         'xiaotai_metrics_set_state("ROOM LEAVE");' in ui_source,
         "every room screen must publish its current foreground state")
 require("UI_PAGE_ROOM_JOIN_CODE" in app_source and
@@ -972,9 +972,10 @@ require("UI_PAGE_ROOM_JOIN_CODE" in app_source and
         "xiaotai_ui_show_room_join_code" in app_source and
         "xiaotai_ui_room_entry_action" in app_source and
         "XIAOTAI_ROOM_ACTION_CREATE" in app_source and
-        '"创建房间"' in ui_source and
+        '"无密码创建"' in ui_source and
+        '"有密码创建"' in ui_source and
         '"加入房间"' in ui_source and
-        '"尚未加入房间"' in ui_source and
+        'XIAOTAI_UI_ROOM_EMPTY' in ui_source and
         '"/v1/call/group/device/create"' in room_source,
         "unassigned touch room UI must offer create and numeric-code join")
 reject_pending_source = app_source[

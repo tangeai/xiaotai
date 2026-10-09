@@ -9,7 +9,12 @@ from repository import find_repository_root
 project = Path(__file__).resolve().parents[1]
 source = (find_repository_root(project) / "platforms/esp-idf/main/app_main.c").read_text()
 start = source.index("static esp_err_t station_identity(")
-end = source.index("\nstatic esp_err_t play_verification_prompt", start)
+end = source.index("{", start)
+depth = 1
+end += 1
+while depth:
+    depth += (source[end] == "{") - (source[end] == "}")
+    end += 1
 helper = source[start:end]
 test = r'''
 #include <assert.h>

@@ -21,7 +21,9 @@ sdk_patches=(
     "$project_dir/tools/patches/bk-avdk-gc0308-20fps.patch"
     "$project_dir/tools/patches/bk-avdk-redact-sensitive-logs.patch"
     "$project_dir/tools/patches/bk-avdk-touch-read-failure-release.patch"
+    "$project_dir/tools/patches/bk-avdk-touch-active-release-poll.patch"
     "$project_dir/tools/patches/bk-avdk-wifi-skb-dequeue-guard.patch"
+    "$project_dir/tools/patches/bk-avdk-speaker-close-diagnostics.patch"
 )
 
 export XIAOTAI_TOOLCHAIN_DIR="$toolchain_bin"

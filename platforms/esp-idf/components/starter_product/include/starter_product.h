@@ -12,6 +12,9 @@ extern "C" {
 /** 初始化 ST7789、FT6336/FT5x06 兼容触摸、LVGL 和产品 UI；重复调用安全。 */
 esp_err_t starter_product_start(void);
 
+/** Credentials persisted: queue success feedback until platform startup finishes. */
+void starter_product_binding_saved(void);
+
 /**
  * 非阻塞投递已经识别出的本地语音意图；UI 与产品状态只在 LVGL 任务内修改。
  * 开发控制台和后续 WakeNet/MultiNet 适配器必须共用此入口。

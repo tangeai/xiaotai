@@ -1,3 +1,4 @@
+#include "xiaotai_binding_countdown.h"
 /*
  * AIROBOT S3 产品界面。
  *
@@ -6,6 +7,8 @@
  * 持有。屏幕休眠使用单调时间，触摸和持续声音活动均可唤醒。
  */
 #include "starter_product.h"
+#include "xiaotai_ui_copy.h"
+#include "xiaotai_verification_code.h"
 #include "icon_small.h"
 #if CONFIG_IDF_TARGET_ESP32P4
 #include "icon_big.h"
@@ -49,8 +52,15 @@
 #include "board_display.h"
 #endif
 
-LV_FONT_DECLARE(ui_font_cn_16);
+#if XIAOTAI_PRODUCT_FONT_SIZE == 24
 LV_FONT_DECLARE(ui_font_cn_24);
+#define XIAOTAI_PRODUCT_FONT ui_font_cn_24
+#elif XIAOTAI_PRODUCT_FONT_SIZE == 16
+LV_FONT_DECLARE(ui_font_cn_16);
+#define XIAOTAI_PRODUCT_FONT ui_font_cn_16
+#else
+#error "Select a supported product font size"
+#endif
 
 #if CONFIG_IDF_TARGET_ESP32P4
 #define LCD_H_RES 480
@@ -217,8 +227,11 @@ static bool s_room_ui_active;
 static uint8_t s_room_members_page;
 static lv_obj_t *s_room_code_label;
 static lv_obj_t *s_room_status_label;
+static lv_obj_t *s_room_members_caption;
 static lv_obj_t *s_room_member_labels[3];
 static lv_obj_t *s_room_page_label;
+static lv_obj_t *s_room_previous_button;
+static lv_obj_t *s_room_next_button;
 static lv_obj_t *s_room_ptt_button;
 static lv_obj_t *s_room_connecting_label;
 static product_page_t s_call_return_page = PAGE_HOME_FACE;
@@ -277,6 +290,10 @@ static uint8_t s_expression_audio_level;
 static bool s_prefer_local_expression = true;
 static uint8_t s_idle_persona_stage = UINT8_MAX;
 static starter_runtime_state_t s_previous_runtime_state = STARTER_RUNTIME_WAITING;
+static bool s_previous_call_microphone_muted;
+#if CONFIG_IDF_TARGET_ESP32P4
+static bool s_previous_call_camera_enabled;
+#endif
 static bool s_previous_call_incoming;
 static starter_ai_ui_phase_t s_previous_ai_phase = STARTER_AI_UI_IDLE;
 static char s_previous_subtitle[193];
@@ -286,6 +303,8 @@ static char s_ai_history[2048];
 static char s_ai_display[2304];
 static char s_call_result[33];
 static char s_previous_verification_code[17];
+static lv_obj_t *s_binding_countdown_label;
+static unsigned s_binding_displayed_seconds;
 static char s_voice_feedback[65];
 static uint8_t s_selected_contact;
 static uint8_t s_contacts_page;
@@ -560,7 +579,7 @@ static void product_set_style_border_width(lv_obj_t *object,
 }
 static const lv_font_t *product_ui_font(void)
 {
-    return product_uses_centered_layout() ? &ui_font_cn_24 : &ui_font_cn_16;
+    return &XIAOTAI_PRODUCT_FONT;
 }
 static const lv_font_t *product_symbol_font(void)
 {
@@ -601,7 +620,7 @@ static lv_obj_t *product_create_content(lv_obj_t *screen)
 #if !CONFIG_IDF_TARGET_ESP32P4
 static const lv_font_t *product_ui_font(void)
 {
-    return &ui_font_cn_16;
+    return &XIAOTAI_PRODUCT_FONT;
 }
 static const lv_font_t *product_symbol_font(void)
 {
@@ -1094,16 +1113,14 @@ static void on_action(lv_event_t *event)
                            s_room_input);
             memset(s_room_input, 0, sizeof(s_room_input));
             s_page = PAGE_ROOM_PASSWORD;
-        } else if (s_page == PAGE_ROOM_PASSWORD && strlen(s_room_input) == 4U) {
+        } else if (s_page == PAGE_ROOM_PASSWORD &&
+                   (strlen(s_room_input) == 4U ||
+                    (!s_room_input_create && s_room_input[0] == '\0'))) {
             esp_err_t err = s_room_input_create
                 ? starter_runtime_room_create(s_room_input)
                 : starter_runtime_room_join(s_room_join_code, s_room_input);
             if (room_action_submitted(err)) s_page = PAGE_ROOM;
         }
-    } else if (action == ACTION_ROOM_INPUT_SKIP &&
-               s_page == PAGE_ROOM_PASSWORD && !s_room_input_create) {
-        if (room_action_submitted(starter_runtime_room_join(s_room_join_code, "")))
-            s_page = PAGE_ROOM;
     } else if (action >= ACTION_DIAG_SYSTEM && action <= ACTION_DIAG_EVENTS) {
         s_diagnostics_tab = (unsigned)(action - ACTION_DIAG_SYSTEM);
         s_diagnostics_due_ms = 0;
@@ -1317,11 +1334,11 @@ static lv_obj_t *make_settings_stepper(lv_obj_t *parent,
                                        product_action_t down,
                                        product_action_t up)
 {
-    (void)make_button(parent, "-", 18, y, 42, 38, down);
+    (void)make_button(parent, "-", 8, y, 42, 38, down);
     lv_obj_t *label = make_label(parent, text, 72, y + 5, 176,
                                  lv_color_hex(0xFFFFFF));
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-    (void)make_button(parent, "+", 260, y, 42, 38, up);
+    (void)make_button(parent, "+", 270, y, 42, 38, up);
     return label;
 }
 
@@ -1354,21 +1371,21 @@ static void refresh_settings_controls(void)
         return;
     }
     char text[48];
-    (void)snprintf(text, sizeof(text), "音量  %u / 10", s_preferences.volume);
+    (void)snprintf(text, sizeof(text), XIAOTAI_UI_VOLUME "  %u / 10", s_preferences.volume);
     lv_label_set_text(s_settings_volume, text);
-    (void)snprintf(text, sizeof(text), "扬声器  %s",
-                   s_preferences.speaker_muted ? "已静音" : "开启");
+    (void)snprintf(text, sizeof(text), "扬声器：%s",
+                   s_preferences.speaker_muted ? "已关闭" : "已开启");
     set_button_text(s_settings_speaker, text);
-    (void)snprintf(text, sizeof(text), "麦克风  %s",
-                   s_preferences.microphone_muted ? "已静音" : "开启");
+    (void)snprintf(text, sizeof(text), "麦克风：%s",
+                   s_preferences.microphone_muted ? "已关闭" : "已开启");
     set_button_text(s_settings_microphone, text);
-    (void)snprintf(text, sizeof(text), "灵敏度  %u / 5",
+    (void)snprintf(text, sizeof(text), XIAOTAI_UI_SENSITIVITY "  %u / 5",
                    s_preferences.microphone_sensitivity);
     lv_label_set_text(s_settings_microphone_sensitivity, text);
-    (void)snprintf(text, sizeof(text), "休眠  %s",
+    (void)snprintf(text, sizeof(text), "自动息屏  %s",
                    s_sleep_names[s_preferences.sleep_index]);
     set_button_text(s_settings_sleep, text);
-    (void)snprintf(text, sizeof(text), "回应声  %s",
+    (void)snprintf(text, sizeof(text), "回应声：%s",
                    s_preferences.acknowledgement_male ? "男声" : "女声");
     set_button_text(s_settings_acknowledgement, text);
 }
@@ -1720,9 +1737,8 @@ static void render_home(lv_obj_t *screen)
                          lv_color_hex(0xBFE9F3));
     lv_obj_set_style_text_align(s_state, LV_TEXT_ALIGN_CENTER, 0);
     s_subtitle = make_label(screen, "", 16, 177, 236, lv_color_hex(0xEDFAFF));
-    /* Dynamic AI text uses the complete 16 px CJK font.  The curated 24 px
-     * face font falls back glyph-by-glyph and otherwise produces mixed sizes. */
-    lv_obj_set_style_text_font(s_subtitle, &ui_font_cn_16, 0);
+    /* Dynamic captions and controls use the same complete, selected font. */
+    lv_obj_set_style_text_font(s_subtitle, product_ui_font(), 0);
     lv_obj_set_height(s_subtitle, 45);
     lv_label_set_long_mode(s_subtitle, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(s_subtitle, LV_TEXT_ALIGN_CENTER, 0);
@@ -1791,7 +1807,7 @@ static void render_ai_chat(lv_obj_t *screen)
                                     s_ai_history[0] == '\0'
                                         ? "请说，我在听。" : s_ai_history,
                                     4, 4, 266, lv_color_hex(0xFFFFFF));
-    lv_obj_set_style_text_font(s_ai_history_label, &ui_font_cn_16, 0);
+    lv_obj_set_style_text_font(s_ai_history_label, product_ui_font(), 0);
 }
 
 static const uint64_t s_wechat_qr_rows[37] = {
@@ -1880,9 +1896,9 @@ static void refresh_room_controls(const starter_runtime_product_snapshot_t *room
         unsigned index = first + row;
         bool present = index < room->room_member_count;
         if (present) {
-            (void)snprintf(line, sizeof(line), "%.18s%s",
+            (void)snprintf(line, sizeof(line), "%.18s  %s",
                 room->room_members[index].self ? "本机" : room->room_members[index].id,
-                room->room_members[index].speaking ? " (说话)" : "");
+                room->room_members[index].speaking ? "正在说话" : "未发言");
         } else {
             (void)snprintf(line, sizeof(line), "%s",
                 row == 0U && room->room_member_count == 0U ? "等待成员同步" : "");
@@ -1891,9 +1907,29 @@ static void refresh_room_controls(const starter_runtime_product_snapshot_t *room
         set_object_visible(s_room_member_labels[row],
             present || (row == 0U && room->room_member_count == 0U));
     }
-    (void)snprintf(line, sizeof(line), "%u/%u 页 | 缓存 %u 人",
-        (unsigned)s_room_members_page + 1U, pages, room->room_member_count);
+    bool partial = room->room_online_count > room->room_member_count;
+    if (pages > 1U) {
+        (void)snprintf(line, sizeof(line), "%u/%u 页",
+                      (unsigned)s_room_members_page + 1U, pages);
+    } else {
+        (void)snprintf(line, sizeof(line), "%s",
+                      room->room_member_count == 0U ? "等待成员同步" :
+                      partial ? "成员列表同步中" : XIAOTAI_UI_ROOM_ALL_MEMBERS);
+    }
     label_set_text_if_changed(s_room_page_label, line);
+    if (partial && room->room_member_count > 0U)
+        (void)snprintf(line, sizeof(line), "房间成员（显示 %u/%u 人）",
+                      room->room_member_count, room->room_online_count);
+    else (void)snprintf(line, sizeof(line), "房间成员");
+    label_set_text_if_changed(s_room_members_caption, line);
+    set_object_visible(s_room_previous_button, pages > 1U);
+    set_object_visible(s_room_next_button, pages > 1U);
+    if (s_room_members_page == 0U)
+        lv_obj_add_state(s_room_previous_button, LV_STATE_DISABLED);
+    else lv_obj_clear_state(s_room_previous_button, LV_STATE_DISABLED);
+    if ((unsigned)s_room_members_page + 1U >= pages)
+        lv_obj_add_state(s_room_next_button, LV_STATE_DISABLED);
+    else lv_obj_clear_state(s_room_next_button, LV_STATE_DISABLED);
     bool joined = room->room_phase == STARTER_ROOM_JOINED;
     label_set_text_if_changed(s_room_connecting_label,
         room->room_phase == STARTER_ROOM_ERROR ? "连接失败，请重新进入" :
@@ -1907,47 +1943,54 @@ static void render_room(lv_obj_t *screen)
 {
     starter_runtime_product_snapshot_t room = starter_runtime_product_snapshot();
     (void)make_header_back_button(screen, ACTION_MENU);
-    render_header(screen, "多人对讲");
+    render_header(screen, XIAOTAI_UI_ROOM_TITLE);
     if (room.room_code[0] == '\0' &&
         (room.room_phase == STARTER_ROOM_NONE || room.room_phase == STARTER_ROOM_ERROR)) {
         (void)make_label(screen,
             s_voice_feedback[0] ? s_voice_feedback :
-                (room.room_phase == STARTER_ROOM_ERROR ? room.room_message : "尚未加入对讲房间"),
+                (room.room_phase == STARTER_ROOM_ERROR ? room.room_message : XIAOTAI_UI_ROOM_EMPTY),
             40, 48, 240, room.room_phase == STARTER_ROOM_ERROR
                               ? lv_color_hex(0xFF9D9D) : lv_color_hex(0xBFE9F3));
-        (void)make_button(screen, "创建房间", 18, 86, 132, 40, ACTION_ROOM_CREATE);
-        (void)make_button(screen, "加密创建", 170, 86, 132, 40,
+        (void)make_label(screen, XIAOTAI_UI_ROOM_HINT, 18, 88, 284, lv_color_hex(0x91B0BC));
+        (void)make_button(screen, "无密码创建", 8, 132, 148, 40, ACTION_ROOM_CREATE);
+        (void)make_button(screen, "有密码创建", 164, 132, 148, 40,
                           ACTION_ROOM_CREATE_PASSWORD);
-        (void)make_button(screen, "加入房间", 84, 140, 152, 42, ACTION_ROOM_JOIN);
+        (void)make_button(screen, "加入房间", 8, 184, 304, 48, ACTION_ROOM_JOIN);
         return;
     }
-    s_room_code_label = make_label(screen, "", 40, 42, 240, lv_color_hex(0xFFFFFF));
-    s_room_status_label = make_label(screen, "", 40, 69, 240, lv_color_hex(0xBFE9F3));
+    s_room_code_label = make_label(screen, "", 18, 38, 284, lv_color_hex(0xFFFFFF));
+    s_room_status_label = make_label(screen, "", 18, 59, 284, lv_color_hex(0xBFE9F3));
+    s_room_members_caption = make_label(screen, "房间成员", 18, 80, 284, lv_color_hex(0xBFE9F3));
     for (unsigned row = 0; row < 3U; ++row)
-        s_room_member_labels[row] = make_label(screen, "", 30, 96 + row * 20, 260,
+        s_room_member_labels[row] = make_label(screen, "", 30, 100 + row * 20, 260,
                                               lv_color_hex(0x91B0BC));
-    s_room_page_label = make_label(screen, "", 70, 158, 180, lv_color_hex(0x91B0BC));
-    (void)make_button(screen, "<", 18, 151, 42, 30, ACTION_ROOM_PREVIOUS);
-    (void)make_button(screen, ">", 260, 151, 42, 30, ACTION_ROOM_NEXT);
-    (void)make_button(screen, "退出房间", 18, 192, 132, 36, ACTION_ROOM_LEAVE);
-    s_room_ptt_button = make_button(screen, "按住说话", 170, 188, 132, 44, ACTION_ROOM);
+    s_room_page_label = make_label(screen, "", 90, 158, 140, lv_color_hex(0x91B0BC));
+    s_room_previous_button = make_button(screen, "<", 12, 154, 64, 26, ACTION_ROOM_PREVIOUS);
+    s_room_next_button = make_button(screen, ">", 244, 154, 64, 26, ACTION_ROOM_NEXT);
+    (void)make_button(screen, "退出房间", 8, 184, 148, 48, ACTION_ROOM_LEAVE);
+    s_room_ptt_button = make_button(screen, "按住说话", 164, 184, 148, 48, ACTION_ROOM);
     lv_obj_remove_event_cb(s_room_ptt_button, on_action);
     lv_obj_add_event_cb(s_room_ptt_button, on_room_ptt, LV_EVENT_ALL, NULL);
-    s_room_connecting_label = make_label(screen, "正在连接…", 170, 197, 132,
+    s_room_connecting_label = make_label(screen, "正在连接…", 164, 200, 148,
                                         lv_color_hex(0x72DEF8));
     refresh_room_controls(&room);
 }
 
 static void render_room_leave_confirm(lv_obj_t *screen)
 {
-    render_header(screen, "确认退出房间？");
-    (void)make_label(screen,
-        "将取消本设备的房间分配。再次使用需要重新加入。",
-        24, 65, 272, lv_color_hex(0xBFE9F3));
-    (void)make_button(screen, "取消", 18, 174, 132, 44, ACTION_ROOM_LEAVE_CANCEL);
-    (void)make_button(screen, "退出房间", 170, 174, 132, 44, ACTION_ROOM_LEAVE_CONFIRM);
+    render_header(screen, XIAOTAI_UI_ROOM_TITLE);
+    (void)make_label(screen, XIAOTAI_UI_ROOM_LEAVE_QUESTION,
+                     24, 58, 272, lv_color_hex(0xFFFFFF));
+    (void)make_label(screen, XIAOTAI_UI_ROOM_LEAVE_BODY,
+                     24, 102, 272, lv_color_hex(0xBFE9F3));
+    (void)make_label(screen, XIAOTAI_UI_ROOM_LEAVE_DETAIL,
+                     24, 126, 272, lv_color_hex(0xBFE9F3));
+    (void)make_button(screen, "取消", 8, 184, 148, 48, ACTION_ROOM_LEAVE_CANCEL);
+    lv_obj_t *confirm = make_button(screen, "退出房间", 164, 184, 148, 48,
+                                    ACTION_ROOM_LEAVE_CONFIRM);
+    lv_obj_set_style_bg_color(confirm, lv_color_hex(0x963E4B), 0);
     if (s_voice_feedback[0] != '\0')
-        (void)make_label(screen, s_voice_feedback, 24, 130, 272, lv_color_hex(0xFF9D9D));
+        (void)make_label(screen, s_voice_feedback, 24, 153, 272, lv_color_hex(0xFF9D9D));
 }
 
 static void render_room_input(lv_obj_t *screen)
@@ -1972,10 +2015,13 @@ static void render_room_input(lv_obj_t *screen)
     (void)make_button(screen, "删除", 58, 187, 62, 34, ACTION_ROOM_INPUT_DELETE);
     (void)make_button(screen, "0", 128, 187, 62, 34, ACTION_ROOM_DIGIT_BASE);
     (void)make_button(screen, "确定", 198, 187, 62, 34, ACTION_ROOM_INPUT_SUBMIT);
-    if (!code && !s_room_input_create)
-        (void)make_button(screen, "无密码", 264, 187, 48, 34, ACTION_ROOM_INPUT_SKIP);
     if (s_voice_feedback[0] != '\0')
         (void)make_label(screen, s_voice_feedback, 24, 223, 272, lv_color_hex(0xFF9D9D));
+    else if (!code && !s_room_input_create) {
+        lv_obj_t *hint = make_label(screen, XIAOTAI_UI_ROOM_PASSWORD_HINT,
+                                    24, 223, 272, lv_color_hex(0xB8D4E0));
+        lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
+    }
 }
 
 static void render_menu(lv_obj_t *screen)
@@ -2051,7 +2097,7 @@ static void render_contacts(lv_obj_t *screen)
         }
         lv_obj_t *name = lv_label_create(row);
         lv_label_set_text(name, contact->name);
-        lv_obj_set_style_text_font(name, &ui_font_cn_16, 0);
+        lv_obj_set_style_text_font(name, product_ui_font(), 0);
         lv_obj_set_style_text_color(name, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_pos(name, 42, 7);
         lv_obj_set_width(name, 146);
@@ -2147,7 +2193,7 @@ static void render_call(lv_obj_t *screen)
     s_call_reject_button = make_button(screen, "拒绝", 175, 164, 110, 50,
                                        ACTION_CALL_REJECT);
     lv_obj_set_style_bg_color(s_call_reject_button, lv_color_hex(0xB64252), 0);
-    s_call_mute_button = make_button(screen, "静音", 82, 161, 62, 62,
+    s_call_mute_button = make_button(screen, "麦克风已开", 48, 161, 116, 62,
                                      ACTION_CALL_MUTE);
     lv_obj_set_style_radius(s_call_mute_button, LV_RADIUS_CIRCLE, 0);
     s_call_hangup_button = make_button(screen, "挂断", 176, 161, 62, 62,
@@ -2155,7 +2201,7 @@ static void render_call(lv_obj_t *screen)
     lv_obj_set_style_bg_color(s_call_hangup_button, lv_color_hex(0xB64252), 0);
     lv_obj_set_style_radius(s_call_hangup_button, LV_RADIUS_CIRCLE, 0);
 #if CONFIG_IDF_TARGET_ESP32P4
-    s_call_camera_button = make_button(screen, "关摄像头", 116, 184, 88, 42,
+    s_call_camera_button = make_button(screen, "摄像头已开", 116, 184, 88, 42,
                                        ACTION_CALL_CAMERA);
     s_call_rotate_button = lv_btn_create(screen);
     product_set_physical_pos(
@@ -2253,18 +2299,20 @@ static void refresh_call_controls(starter_runtime_status_t runtime,
              product->call_wechat ? 1 : 0);
     if (active && product->call_video)
         set_button_text(s_call_camera_button,
-                        product->call_camera_enabled ? "关摄像头" : "开摄像头");
+                        product->call_camera_enabled ? "摄像头已开" : "摄像头已关");
 #endif
     if (active) {
         set_button_text(s_call_mute_button,
-                        s_preferences.microphone_muted ? "开麦" : "静音");
+                        product->call_microphone_muted ? "麦克风已关" : "麦克风已开");
         set_button_text(s_call_hangup_button, "挂断");
+        lv_obj_set_pos(s_call_mute_button, 48, 161);
+        lv_obj_set_size(s_call_mute_button, 116, 62);
         lv_obj_set_pos(s_call_hangup_button, 176, 161);
         lv_obj_set_size(s_call_hangup_button, 62, 62);
 #if CONFIG_IDF_TARGET_ESP32P4
         if (product->call_video) {
             set_button_text(s_call_mute_button,
-                s_preferences.microphone_muted ? "开麦" : "关麦");
+                product->call_microphone_muted ? "麦克风已关" : "麦克风已开");
             lv_obj_set_pos(s_call_mute_button, 12, 184);
             lv_obj_set_size(s_call_mute_button, 88, 42);
             lv_obj_set_pos(s_call_hangup_button, 220, 184);
@@ -2333,37 +2381,37 @@ static void render_settings(lv_obj_t *screen)
     char volume[48];
     char speaker[48];
     char microphone[48];
-    (void)snprintf(volume, sizeof(volume), "音量  %u / 10", s_preferences.volume);
-    (void)snprintf(speaker, sizeof(speaker), "扬声器  %s",
-                   s_preferences.speaker_muted ? "已静音" : "开启");
-    (void)snprintf(microphone, sizeof(microphone), "麦克风  %s",
-                   s_preferences.microphone_muted ? "已静音" : "开启");
+    (void)snprintf(volume, sizeof(volume), XIAOTAI_UI_VOLUME "  %u / 10", s_preferences.volume);
+    (void)snprintf(speaker, sizeof(speaker), "扬声器：%s",
+                   s_preferences.speaker_muted ? "已关闭" : "已开启");
+    (void)snprintf(microphone, sizeof(microphone), "麦克风：%s",
+                   s_preferences.microphone_muted ? "已关闭" : "已开启");
     (void)make_header_back_button(screen, ACTION_MENU);
     render_header(screen, "设备设置");
     s_settings_volume = make_settings_stepper(
-        screen, volume, 38, ACTION_VOLUME_DOWN, ACTION_VOLUME_UP);
-    s_settings_speaker = make_button(screen, speaker, 18, 80, 132, 34,
+        screen, volume, 40, ACTION_VOLUME_DOWN, ACTION_VOLUME_UP);
+    s_settings_speaker = make_button(screen, speaker, 8, 124, 148, 30,
                                      ACTION_SPEAKER_MUTE);
-    s_settings_microphone = make_button(screen, microphone, 170, 80, 132, 34,
+    s_settings_microphone = make_button(screen, microphone, 164, 124, 148, 30,
                                         ACTION_MIC_MUTE);
     char sleep_text[48];
-    (void)snprintf(sleep_text, sizeof(sleep_text), "休眠  %s",
+    (void)snprintf(sleep_text, sizeof(sleep_text), "自动息屏  %s",
                    s_sleep_names[s_preferences.sleep_index]);
     char sensitivity[48];
-    (void)snprintf(sensitivity, sizeof(sensitivity), "灵敏度  %u / 5",
+    (void)snprintf(sensitivity, sizeof(sensitivity), XIAOTAI_UI_SENSITIVITY "  %u / 5",
                    s_preferences.microphone_sensitivity);
     s_settings_microphone_sensitivity = make_settings_stepper(
-        screen, sensitivity, 118,
+        screen, sensitivity, 82,
         ACTION_MIC_SENSITIVITY_DOWN, ACTION_MIC_SENSITIVITY_UP);
-    s_settings_sleep = make_button(screen, sleep_text, 18, 160, 132, 30,
+    s_settings_sleep = make_button(screen, sleep_text, 8, 160, 148, 30,
                                    ACTION_SLEEP);
-    (void)make_button(screen, "网络信息", 18, 194, 90, 28, ACTION_NETWORK);
+    (void)make_button(screen, "网络信息", 8, 196, 148, 30, ACTION_NETWORK);
     char acknowledgement[48];
-    (void)snprintf(acknowledgement, sizeof(acknowledgement), "回应声  %s",
+    (void)snprintf(acknowledgement, sizeof(acknowledgement), "回应声：%s",
                    s_preferences.acknowledgement_male ? "男声" : "女声");
-    s_settings_acknowledgement = make_button(screen, acknowledgement, 170, 160, 132, 30,
+    s_settings_acknowledgement = make_button(screen, acknowledgement, 164, 160, 148, 30,
                                               ACTION_ACK_VOICE);
-    (void)make_button(screen, "重置设备", 212, 194, 90, 28,
+    (void)make_button(screen, "重置设备", 164, 196, 148, 30,
                       ACTION_FACTORY_RESET);
 }
 
@@ -2570,56 +2618,78 @@ static void render_network(lv_obj_t *screen)
     }
 }
 
+typedef struct {
+    lv_draw_ctx_t *draw;
+    lv_area_t area;
+    lv_draw_rect_dsc_t style;
+} binding_code_draw_t;
+
+static void binding_code_fill(void *context, int x, int y, int w, int h)
+{
+    binding_code_draw_t *state = context;
+    lv_area_t pixel = {state->area.x1 + x, state->area.y1 + y,
+                       state->area.x1 + x + w - 1, state->area.y1 + y + h - 1};
+    lv_draw_rect(state->draw, &state->style, &pixel);
+}
+
+static void binding_code_draw(lv_event_t *event)
+{
+    binding_code_draw_t state = {.draw = lv_event_get_draw_ctx(event)};
+    lv_obj_get_coords(lv_event_get_target(event), &state.area);
+    lv_draw_rect_dsc_init(&state.style);
+    state.style.bg_color = lv_color_hex(0xFFE066);
+    state.style.bg_opa = LV_OPA_COVER;
+    state.style.border_width = 0;
+    state.style.radius = 0;
+    xiaotai_verification_code_draw(s_previous_verification_code,
+        state.area.x2 - state.area.x1 + 1, state.area.y2 - state.area.y1 + 1,
+        binding_code_fill, &state);
+}
+
+static atomic_bool s_binding_saved;
+static bool s_binding_saved_displayed;
+
+void starter_product_binding_saved(void)
+{
+    atomic_store(&s_binding_saved, true);
+}
+
 static void render_binding(lv_obj_t *screen)
 {
-    render_header(screen, "绑定设备");
-    lv_obj_t *purpose = make_label(screen, "将设备添加到你的小钛账号",
-                                   34, 34, 252, lv_color_hex(0x72DEF8));
-    lv_obj_set_style_text_align(purpose, LV_TEXT_ALIGN_CENTER, 0);
-    (void)make_label(screen,
-                     "1. 浏览器打开 https://xiaotai.chat\n   注册或登录账号\n"
-                     "2. 选择“添加设备”\n   输入下面的验证码",
-                     38, 55, 244, lv_color_hex(0xFFFFFF));
-
-    lv_obj_t *code_panel = lv_obj_create(screen);
-    lv_obj_set_pos(code_panel, 20, 112);
-    lv_obj_set_size(code_panel, 280, 58);
-    set_bg(code_panel, lv_color_hex(0x173B49));
-    lv_obj_set_style_radius(code_panel, 18, 0);
-    lv_obj_clear_flag(code_panel, LV_OBJ_FLAG_SCROLLABLE);
-    char spaced_code[18] = "- - - - - -";
-    if (strlen(s_previous_verification_code) == 6U) {
-        (void)snprintf(spaced_code,
-                       sizeof(spaced_code),
-                       "%c %c %c %c %c %c",
-                       s_previous_verification_code[0],
-                       s_previous_verification_code[1],
-                       s_previous_verification_code[2],
-                       s_previous_verification_code[3],
-                       s_previous_verification_code[4],
-                       s_previous_verification_code[5]);
+    render_header(screen, XIAOTAI_UI_BIND_TITLE);
+    if (atomic_load(&s_binding_saved)) {
+        lv_obj_t *success = make_label(screen, XIAOTAI_UI_BIND_SUCCESS, 8, 112, 304,
+                                       lv_color_hex(0x72DEF8));
+        lv_obj_set_style_text_align(success, LV_TEXT_ALIGN_CENTER, 0);
+        return;
     }
-    /* BINDING_CODE_TOP_LEVEL: avoid clipping by the panel's themed content area. */
-    lv_obj_t *code = make_label(screen,
-                                spaced_code,
-                                20,
-                                111,
-                                280,
-                                lv_color_hex(0xFFFFFF));
-    lv_obj_set_height(code, 58);
-    lv_obj_set_style_text_align(code, LV_TEXT_ALIGN_CENTER, 0);
-#if LV_FONT_MONTSERRAT_48
-    lv_obj_set_style_text_font(code, &lv_font_montserrat_48, 0);
-#endif
-
+    const char *steps[] = {XIAOTAI_UI_BIND_URL, XIAOTAI_UI_BIND_ACCOUNT,
+                           XIAOTAI_UI_BIND_ENTER};
+    for (unsigned i = 0; i < 3U; ++i) {
+        lv_obj_t *step = make_label(screen, steps[i], 8, 44 + i * 24, 304,
+                                    lv_color_hex(i == 0U ? 0x72DEF8 : 0xFFFFFF));
+        lv_obj_set_style_text_align(step, LV_TEXT_ALIGN_CENTER, 0);
+    }
+    lv_obj_t *code_panel = lv_obj_create(screen);
+    lv_obj_set_pos(code_panel, 20, 120);
+    lv_obj_set_size(code_panel, 280, 66);
+    set_bg(code_panel, lv_color_hex(0x173B49));
+    lv_obj_set_style_radius(code_panel, 12, 0);
+    lv_obj_clear_flag(code_panel, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(code_panel, LV_OBJ_FLAG_CLICKABLE);
+    /* Draw at actual widget coordinates after board layout scaling. */
+    lv_obj_add_event_cb(code_panel, binding_code_draw, LV_EVENT_DRAW_MAIN, NULL);
+    char countdown[96];
+    s_binding_displayed_seconds = platform_client_verification_seconds_left();
+    xiaotai_binding_countdown_text(countdown, sizeof(countdown), s_binding_displayed_seconds);
+    s_binding_countdown_label = make_label(screen, countdown, 8, 191, 304,
+                                          lv_color_hex(0x72DEF8));
+    lv_obj_set_style_text_align(s_binding_countdown_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_t *waiting = make_label(screen,
                                    platform_client_provisioning()
-                                       ? "正在等待绑定，验证码将语音播报 3 次"
+                                       ? "等待绑定，验证码将语音播报 3 次"
                                        : "正在刷新验证码，请稍候…",
-                                   22,
-                                   190,
-                                   276,
-                                   lv_color_hex(0x8DA5B1));
+                                   8, 216, 304, lv_color_hex(0x8DA5B1));
     lv_obj_set_style_text_align(waiting, LV_TEXT_ALIGN_CENTER, 0);
 }
 
@@ -2643,11 +2713,15 @@ static void render_page(void)
     p4_video_ui_reset();
 #endif
     lv_obj_t *screen = lv_scr_act();
+    s_binding_countdown_label = NULL;
     lv_obj_clean(screen);
     s_room_code_label = NULL;
     s_room_status_label = NULL;
+    s_room_members_caption = NULL;
     memset(s_room_member_labels, 0, sizeof(s_room_member_labels));
     s_room_page_label = NULL;
+    s_room_previous_button = NULL;
+    s_room_next_button = NULL;
     s_room_ptt_button = NULL;
     s_room_connecting_label = NULL;
     s_header_has_back = false;
@@ -3217,7 +3291,12 @@ static void product_tick(lv_timer_t *timer)
             (void)starter_runtime_call_set_microphone_muted(
                 s_preferences.microphone_muted);
             render_page();
-        } else if (runtime_changed) {
+        } else if (runtime_changed ||
+                   product.call_microphone_muted != s_previous_call_microphone_muted
+#if CONFIG_IDF_TARGET_ESP32P4
+                   || product.call_camera_enabled != s_previous_call_camera_enabled
+#endif
+                   ) {
             refresh_call_controls(runtime, &product);
         }
         /*
@@ -3266,9 +3345,19 @@ static void product_tick(lv_timer_t *timer)
     }
 
     /* Wi-Fi 已连但尚未绑定时，验证码页优先于所有空闲产品页。 */
-    bool binding_required = platform_client_binding_required();
+    bool binding_saved = atomic_load(&s_binding_saved) && !platform_client_ready();
+    if (atomic_load(&s_binding_saved) && platform_client_ready()) {
+        atomic_store(&s_binding_saved, false);
+        s_binding_saved_displayed = false;
+    }
+    if (binding_saved && !s_binding_saved_displayed) {
+        s_binding_saved_displayed = true;
+        s_page = PAGE_BINDING;
+        render_page();
+    }
+    bool binding_required = platform_client_binding_required() || binding_saved;
     const char *verification_code = platform_client_verification_code();
-    if (!call_now && session_idle && wifi_connected && binding_required &&
+    if (!binding_saved && !call_now && session_idle && wifi_connected && binding_required &&
         !wifi_notice_visible) {
         bool code_changed = strcmp(verification_code,
                                    s_previous_verification_code) != 0;
@@ -3290,6 +3379,16 @@ static void product_tick(lv_timer_t *timer)
                sizeof(s_previous_verification_code));
         s_page = PAGE_HOME_FACE;
         render_page();
+    }
+
+    if (s_page == PAGE_BINDING && s_binding_countdown_label != NULL) {
+        unsigned seconds = platform_client_verification_seconds_left();
+        if (seconds != s_binding_displayed_seconds) {
+            char countdown[96];
+            xiaotai_binding_countdown_text(countdown, sizeof(countdown), seconds);
+            lv_label_set_text(s_binding_countdown_label, countdown);
+            s_binding_displayed_seconds = seconds;
+        }
     }
 
     /* 上面的通话/绑定跳转可能重建页面，后续刷新以当前页面为准。 */
@@ -3554,6 +3653,10 @@ static void product_tick(lv_timer_t *timer)
     s_previous_wifi_connected = wifi_connected;
     s_previous_wifi_failed = wifi_failed;
     s_previous_runtime_state = runtime.state;
+    s_previous_call_microphone_muted = product.call_microphone_muted;
+#if CONFIG_IDF_TARGET_ESP32P4
+    s_previous_call_camera_enabled = product.call_camera_enabled;
+#endif
     s_previous_call_incoming = product.call_incoming;
     if (s_page == PAGE_DIAGNOSTICS && now >= s_diagnostics_due_ms) {
         refresh_diagnostics(now);

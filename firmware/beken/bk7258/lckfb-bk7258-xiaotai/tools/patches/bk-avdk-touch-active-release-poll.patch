@@ -1,0 +1,14 @@
+--- a/ap/middleware/driver/tp/tp_driver.c
++++ b/ap/middleware/driver/tp/tp_driver.c
+@@ -8,8 +8,9 @@
+ 
+ 	while (1)
+ 	{
+-		ret = rtos_get_semaphore(&tp_sema, BEKEN_NEVER_TIMEOUT);
+-		if(kNoErr != ret)
++		/* Poll actual controller state while held if a release IRQ is missed. */
++		ret = rtos_get_semaphore(&tp_sema, touch_active ? 20U : BEKEN_NEVER_TIMEOUT);
++		if(kNoErr != ret && !touch_active)
+ 		{
+ 			LOGE("%s, get semaphore fail!\r\n", __func__);
+ 		}

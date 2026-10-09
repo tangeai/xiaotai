@@ -30,7 +30,8 @@ esp_err_t runtime_config_load_tirtc(runtime_tirtc_config_t *config);
 /** 校验并原子提交一组凭证到 NVS。 */
 esp_err_t runtime_config_save_tirtc(const runtime_tirtc_config_t *config);
 
-/** 清空整个 TiRTC 凭证命名空间。 */
+/** 清空整个 TiRTC 凭证命名空间。同步等待擦除/提交完成并返回 NVS 错误；
+ * 可从内部 RAM 或 PSRAM 栈调用，Flash 操作始终在内部 RAM 栈执行。 */
 esp_err_t runtime_config_clear_tirtc(void);
 
 /** 只校验字段长度；error 可为 NULL。 */

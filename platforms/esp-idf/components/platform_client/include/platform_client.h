@@ -51,8 +51,9 @@ typedef struct {
     const char *existing_device_id;   /**< 重绑时提供；首次绑定传 NULL。 */
     const char *existing_device_secret; /**< 必须与 existing_device_id 同时提供。 */
     const char *discovery_url;        /**< NULL 使用默认发现入口。 */
-    unsigned timeout_seconds;         /**< 等待 auth_grant，0 使用默认值。 */
+    unsigned timeout_seconds;         /**< 等待 auth_grant 的上限；0 跟随服务端验证码期限。 */
     platform_verification_prompt_callback_t prompt_callback; /**< NULL 不播报。 */
+    void (*prompt_cancel_callback)(void *user_data); /**< ACK confirmed; nonblocking audio cancellation. */
     void *prompt_user_data;           /**< 原样传给 prompt_callback。 */
 } platform_provision_config_t;
 
@@ -116,6 +117,7 @@ esp_err_t platform_client_resume_mqtt_after_realtime(void);
 
 /** 仅绑定等待期间返回验证码，否则返回空字符串；返回值由模块持有。 */
 const char *platform_client_verification_code(void);
+unsigned platform_client_verification_seconds_left(void);
 
 /**
  * json_body 为 NULL 时发送 GET，否则发送 POST。请求复制进固定队列后立即返回；

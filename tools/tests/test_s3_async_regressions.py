@@ -135,7 +135,7 @@ int main(void){
     assert(calls==1 && s_page==PAGE_ROOM_PASSWORD && strcmp(s_room_input,"1234")==0);
     s_room_input_create=true;act(ACTION_ROOM_INPUT_SUBMIT);
     assert(calls==2 && s_page==PAGE_ROOM_PASSWORD);
-    s_room_input_create=false;act(ACTION_ROOM_INPUT_SKIP);
+    s_room_input_create=false;s_room_input[0]='\0';act(ACTION_ROOM_INPUT_SUBMIT);
     assert(calls==3 && s_page==PAGE_ROOM_PASSWORD);
     error=0;act(ACTION_ROOM_INPUT_SUBMIT);assert(calls==4 && s_page==PAGE_ROOM);
 }
@@ -173,7 +173,7 @@ int main(void){runtime_event_t e={.command=ROOM_ACTION_LEAVE};
         source = RUNTIME.read_text()
         start = function(source, "begin_ai_session")
         start = start[:start.index("    starter_tirtc_accept_h5(false);")] + "}"
-        run_c(r'''
+        run_c('#include \"' + str(ROOT / 'product/include/xiaotai_ai_feedback.h') + '\"\n' + r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>

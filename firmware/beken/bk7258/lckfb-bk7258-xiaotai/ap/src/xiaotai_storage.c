@@ -3,6 +3,7 @@
 #include <common/bk_err.h>
 #include <easyflash.h>
 #include <stdint.h>
+#include <stdatomic.h>
 #include <string.h>
 
 #include "xiaotai_audio_policy.h"
@@ -12,6 +13,56 @@
 #define XIAOTAI_WIFI_KEY "xiaotai_wifi_v1"
 #define XIAOTAI_DEVICE_KEY "xiaotai_device_v1"
 #define XIAOTAI_SETTINGS_KEY "xiaotai_settings_v1"
+
+/* EasyFlash already serializes ordinary writes. Only an explicit reset gates
+ * new writers; an in-flight save makes reset fail for a safe user retry. */
+static atomic_bool s_storage_reset_pending;
+static atomic_uint s_storage_writers;
+
+static bool storage_write_begin(void)
+{
+    if (atomic_load(&s_storage_reset_pending)) return false;
+    atomic_fetch_add(&s_storage_writers, 1U);
+    if (atomic_load(&s_storage_reset_pending)) {
+        atomic_fetch_sub(&s_storage_writers, 1U);
+        return false;
+    }
+    return true;
+}
+
+static int storage_write_blob(const char *key, const void *value, size_t size)
+{
+    if (!storage_write_begin()) return BK_FAIL;
+    EfErrCode rc = ef_set_env_blob(key, value, size);
+    atomic_fetch_sub(&s_storage_writers, 1U);
+    return rc == EF_NO_ERR ? BK_OK : BK_FAIL;
+}
+
+static int storage_delete(const char *key)
+{
+    if (!storage_write_begin()) return BK_FAIL;
+    EfErrCode rc = ef_del_env(key);
+    atomic_fetch_sub(&s_storage_writers, 1U);
+    return rc == EF_NO_ERR || rc == EF_ENV_NAME_ERR ? BK_OK : BK_FAIL;
+}
+
+int xiaotai_storage_reset_user_data(void)
+{
+    if (atomic_exchange(&s_storage_reset_pending, true)) return BK_FAIL;
+    if (atomic_load(&s_storage_writers) != 0U) {
+        atomic_store(&s_storage_reset_pending, false);
+        return BK_FAIL;
+    }
+    const char *keys[] = {XIAOTAI_DEVICE_KEY, XIAOTAI_WIFI_KEY, XIAOTAI_SETTINGS_KEY};
+    int result = BK_OK;
+    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i) {
+        EfErrCode rc = ef_del_env(keys[i]);
+        if (rc != EF_NO_ERR && rc != EF_ENV_NAME_ERR) result = BK_FAIL;
+    }
+    /* Success retains the gate until reboot; late saves cannot repopulate it. */
+    if (result != BK_OK) atomic_store(&s_storage_reset_pending, false);
+    return result;
+}
 
 typedef struct {
     uint32_t magic;
@@ -117,14 +168,12 @@ int xiaotai_storage_save_wifi(const xiaotai_wifi_credentials_t *value)
     xiaotai_wifi_record_t record = {0};
     record.payload = *value;
     make_header(&record.header, &record.payload, sizeof(record.payload));
-    return ef_set_env_blob(XIAOTAI_WIFI_KEY, &record, sizeof(record)) == EF_NO_ERR
-               ? BK_OK : BK_FAIL;
+    return storage_write_blob(XIAOTAI_WIFI_KEY, &record, sizeof(record));
 }
 
 int xiaotai_storage_clear_wifi(void)
 {
-    EfErrCode rc = ef_del_env(XIAOTAI_WIFI_KEY);
-    return rc == EF_NO_ERR || rc == EF_ENV_NAME_ERR ? BK_OK : BK_FAIL;
+    return storage_delete(XIAOTAI_WIFI_KEY);
 }
 
 int xiaotai_storage_load_device(xiaotai_device_credentials_t *out)
@@ -152,14 +201,12 @@ int xiaotai_storage_save_device(const xiaotai_device_credentials_t *value)
     xiaotai_device_record_t record = {0};
     record.payload = *value;
     make_header(&record.header, &record.payload, sizeof(record.payload));
-    return ef_set_env_blob(XIAOTAI_DEVICE_KEY, &record, sizeof(record)) == EF_NO_ERR
-               ? BK_OK : BK_FAIL;
+    return storage_write_blob(XIAOTAI_DEVICE_KEY, &record, sizeof(record));
 }
 
 int xiaotai_storage_clear_device(void)
 {
-    EfErrCode rc = ef_del_env(XIAOTAI_DEVICE_KEY);
-    return rc == EF_NO_ERR || rc == EF_ENV_NAME_ERR ? BK_OK : BK_FAIL;
+    return storage_delete(XIAOTAI_DEVICE_KEY);
 }
 
 void xiaotai_product_settings_default(xiaotai_product_settings_t *out)
@@ -221,6 +268,5 @@ int xiaotai_storage_save_settings(const xiaotai_product_settings_t *value)
     xiaotai_settings_record_t record = {0};
     record.payload = *value;
     make_header(&record.header, &record.payload, sizeof(record.payload));
-    return ef_set_env_blob(XIAOTAI_SETTINGS_KEY, &record, sizeof(record)) ==
-                   EF_NO_ERR ? BK_OK : BK_FAIL;
+    return storage_write_blob(XIAOTAI_SETTINGS_KEY, &record, sizeof(record));
 }
