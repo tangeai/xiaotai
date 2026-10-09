@@ -175,15 +175,23 @@ typedef enum {
     ACTION_ROOM_INPUT_DELETE,
     ACTION_ROOM_INPUT_SUBMIT,
     ACTION_ROOM_INPUT_SKIP,
-    ACTION_ROOM_DIGIT_BASE = 40,
     ACTION_ROOM_LEAVE_CONFIRM = 60,
     ACTION_ROOM_LEAVE_CANCEL,
     ACTION_ROOM_PREVIOUS,
     ACTION_ROOM_NEXT,
+    ACTION_ROOM_DIGIT_BASE = 80,
     ACTION_CONTACT_BASE = 100,
     ACTION_CONTACT_CALL_BASE = 120,
     ACTION_EMOJI_BASE = 200,
 } product_action_t;
+
+/* Numeric keypad actions must never alias navigation or editing actions. */
+_Static_assert(ACTION_ROOM_INPUT_SKIP < ACTION_ROOM_LEAVE_CONFIRM,
+               "room controls overlap confirmation actions");
+_Static_assert(ACTION_ROOM_NEXT < ACTION_ROOM_DIGIT_BASE,
+               "room controls overlap keypad actions");
+_Static_assert(ACTION_ROOM_DIGIT_BASE + 10 <= ACTION_CONTACT_BASE,
+               "room keypad overlaps contact actions");
 
 typedef struct {
     uint8_t volume;
@@ -746,6 +754,15 @@ static void show_wake_debug(const starter_voice_result_t *result, int64_t now)
     if (s_wake_debug_label == NULL) {
         s_wake_debug_label = make_label(lv_layer_top(), "", 8, 36, 304,
                                        lv_color_hex(0xFFFFFF));
+        /* The top layer spans the display, outside the centred page content. */
+        lv_obj_align(s_wake_debug_label, LV_ALIGN_TOP_MID, 0, 0);
+        lv_obj_set_y(s_wake_debug_label,
+#if CONFIG_IDF_TARGET_ESP32P4
+                     product_y(36)
+#else
+                     36
+#endif
+        );
         set_bg(s_wake_debug_label, lv_color_hex(0x163440));
         lv_obj_set_style_text_align(s_wake_debug_label, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_set_style_pad_ver(s_wake_debug_label, 4, 0);

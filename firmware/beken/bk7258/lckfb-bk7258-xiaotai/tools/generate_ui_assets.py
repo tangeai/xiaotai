@@ -75,6 +75,7 @@ def glyph_rows(font: ImageFont.FreeTypeFont, character: str) -> bytes:
 def basic_cjk_characters() -> str:
     """Match the ESP32 product font's UTF-8 coverage at 1 bit per pixel."""
     characters = set(PRODUCT_GLYPHS)
+    characters.update("°℃")  # angles and AI temperature captions
     ranges = (
         (0x20, 0x7E),       # ASCII
         (0x2000, 0x206F),   # general punctuation

@@ -682,7 +682,7 @@ require(audio_callback is not None and
         "downlink playback must not reject the peer's independent stream id")
 require("OPUS_CAPTURE_TASK_STACK (40U * 1024U)" in audio_source and
         "OPUS_PLAYBACK_TASK_STACK (40U * 1024U)" in audio_source and
-        "OPUS_PACKET_SLOTS 32U" in audio_source and
+        "OPUS_PACKET_SLOTS 64U" in audio_source and
         "capture_stack" in audio_source and "playback_stack" in audio_source,
         "Opus encode/decode tasks must retain their measured PSRAM stack headroom")
 require("#include <modules/aec.h>" in audio_source and

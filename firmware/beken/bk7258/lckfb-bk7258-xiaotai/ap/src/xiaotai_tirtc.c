@@ -158,6 +158,7 @@ static int normalize_tirtc_result(int rc)
 
 static void drain_ai_playback_after_transport_close(void)
 {
+    xiaotai_audio_log_playback_status("transport-close");
     uint32_t started_ms = rtos_get_time();
     while (xiaotai_audio_running() &&
            !xiaotai_audio_playback_is_drained(AI_CLOSE_PLAYBACK_QUIET_MS) &&
@@ -167,6 +168,7 @@ static void drain_ai_playback_after_transport_close(void)
     }
     bool drained = xiaotai_audio_playback_is_drained(
         AI_CLOSE_PLAYBACK_QUIET_MS);
+    xiaotai_audio_log_playback_status(drained ? "drained" : "timeout");
     BK_LOGI(TAG, "AI playback after transport close %s elapsed=%u ms\n",
             drained ? "drained" : "timeout",
             (unsigned)(rtos_get_time() - started_ms));

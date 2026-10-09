@@ -4,7 +4,12 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 python3 "$repo_dir/tools/tests/test_contact_pagination_layout.py"
+python3 "$repo_dir/tools/tests/test_tip_layout.py"
+python3 "$repo_dir/tools/tests/test_room_keypad.py"
+python3 "$repo_dir/tools/tests/test_p4_ai_playback.py"
+python3 "$repo_dir/tools/tests/test_bk_ai_playback.py"
 python3 "$repo_dir/tools/tests/test_shared_ui_icons.py"
+python3 "$repo_dir/tools/tests/test_temperature_font_symbols.py"
 python3 "$repo_dir/tools/tests/test_s3_product_regressions.py"
 python3 "$repo_dir/tools/tests/test_s3_room_refresh.py"
 python3 "$repo_dir/tools/tests/test_s3_async_regressions.py"

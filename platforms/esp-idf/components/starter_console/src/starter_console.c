@@ -141,6 +141,13 @@ static int command_status(int argc, char **argv)
            (unsigned long)media.audio_decode_failed,
            (unsigned long)media.audio_playback_blocked,
            (unsigned long)media.audio_write_failed);
+    printf("Audio playback: pending=%lu active=%s pcm-ms=%lu dma-ms=%lu rx-overflow=%lu last-rx-ms=%lu\n",
+           (unsigned long)media.audio_playback_pending,
+           media.audio_playback_active ? "yes" : "no",
+           (unsigned long)media.audio_playback_pcm_ms,
+           (unsigned long)media.audio_playback_dma_ms,
+           (unsigned long)media.audio_rx_overflow,
+           (unsigned long)media.audio_rx_last_ms);
     if (media.audio_rx_queue_capacity != 0U) {
         printf("Audio RX buffer: slots=%lu overflow=%lu prefill-waits=%lu\n",
                (unsigned long)media.audio_rx_queue_capacity,

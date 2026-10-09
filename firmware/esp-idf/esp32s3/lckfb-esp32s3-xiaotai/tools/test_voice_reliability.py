@@ -712,6 +712,7 @@ static void service_ai_end_drain(void) {
     assert(s_ai_end_drain.pending && s_ai_transport_closed);
     finish_session(0);
 }
+static void log_ai_playback_status(const char *stage) { (void)stage; }
 static void room_stop_connection(const char *presence,int error) {
     (void)presence; finish_session(error);
 }

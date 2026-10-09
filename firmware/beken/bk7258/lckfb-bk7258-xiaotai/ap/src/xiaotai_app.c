@@ -1804,6 +1804,7 @@ static void handle_ai_end(uint32_t generation)
     rtos_unlock_mutex(&s_runtime_mutex);
     if (!current) return;
     xiaotai_audio_set_uplink_enabled(false);
+    xiaotai_audio_log_playback_status("end-session");
     xiaotai_ui_show_status("ENDING");
     BK_LOGI(TAG,
             "AI end_session waiting for final playback generation=%u arrival-grace=%u timeout=%u ms\n",

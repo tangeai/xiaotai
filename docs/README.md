@@ -29,6 +29,7 @@
 
 - [参与开发](../CONTRIBUTING.md)：开发流程、测试门禁、文档和提交检查。
 - [测试与硬件验证](../tests/README.md)：主机测试、驱动 probe（探针测试）和产品业务 HIL（硬件在环测试）。
+- [二次开发易错点](development/pitfalls.md)：界面动作编号、提示布局、AI 音频排空的约束和回归入口。
 - [音视频参数](product/MEDIA_CONTRACT.md)：媒体流编号、设备能力和编解码约定。
 - [仓库布局](../ARCHITECTURE.md#目录导览)：产品、平台、板卡和固件工程的目录边界。
 

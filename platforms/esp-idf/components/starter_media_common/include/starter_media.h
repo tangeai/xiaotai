@@ -50,7 +50,10 @@ typedef struct {
     uint32_t audio_playback_blocked; /**< 静音、功放或会话门禁拒绝的帧数。 */
     uint32_t audio_write_failed; /**< I2S 写入失败或部分写入的帧数。 */
     uint32_t audio_playback_pending; /**< 已入队但尚未完成播放的帧数。 */
-    bool audio_playback_active;  /**< 播放任务当前正在写 I2S/DMA。 */
+    bool audio_playback_active;  /**< 正在处理下行或 I2S/DMA 尚有待播 PCM。 */
+    uint32_t audio_rx_last_ms;   /**< 最近下行入队时刻，单调时钟毫秒。 */
+    uint32_t audio_playback_pcm_ms; /**< 成功写入的 PCM 累计时长。 */
+    uint32_t audio_playback_dma_ms; /**< 按采样时长估算的 DMA 排空剩余时间。 */
     uint32_t aec_processed;      /**< 已完成的 16 kHz ESP-SR AEC 帧数。 */
     uint32_t aec_errors;         /**< AEC 输入帧不完整或处理边界错误数。 */
     uint32_t aec_mic_clipped;    /**< MIC1 接近满量程的累计采样数。 */

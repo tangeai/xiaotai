@@ -723,6 +723,24 @@ static void finish_session(int error)
     resume_mqtt_after_external_connect();
 }
 
+static void log_ai_playback_status(const char *stage)
+{
+    starter_media_status_t media = starter_media_status();
+    ESP_LOGI(TAG,
+             "AI playback stage=%s generation=%lu rx=%lu decoded=%lu written=%lu overflow=%lu pending=%lu active=%d pcm-ms=%lu dma-ms=%lu last-rx-age-ms=%lu",
+             stage, (unsigned long)session_generation(),
+             (unsigned long)media.audio_received,
+             (unsigned long)media.audio_decoded,
+             (unsigned long)media.audio_played,
+             (unsigned long)media.audio_rx_overflow,
+             (unsigned long)media.audio_playback_pending,
+             media.audio_playback_active ? 1 : 0,
+             (unsigned long)media.audio_playback_pcm_ms,
+             (unsigned long)media.audio_playback_dma_ms,
+             (unsigned long)(media.audio_rx_last_ms != 0U
+                 ? (uint32_t)now_ms() - media.audio_rx_last_ms : 0U));
+}
+
 static void begin_ai_end_drain(uint32_t arrival_grace_ms,
                                uint32_t timeout_ms,
                                bool transport_closed)
@@ -735,6 +753,7 @@ static void begin_ai_end_drain(uint32_t arrival_grace_ms,
                                timeout_ms);
     s_ai_transport_closed = transport_closed;
     starter_media_set_uplink_enabled(false);
+    log_ai_playback_status(transport_closed ? "transport-close" : "end-session");
     ESP_LOGI(TAG,
              "AI end_session waiting for final playback generation=%lu arrival-grace=%lu timeout=%lu transport-closed=%d",
              (unsigned long)generation,
@@ -777,6 +796,7 @@ static void service_ai_end_drain(void)
              (unsigned long)media.audio_playback_pending,
              media.audio_playback_active ? 1 : 0,
              s_ai_transport_closed ? 1 : 0);
+    log_ai_playback_status(drained ? "drained" : "timeout");
     finish_session(0);
 }
 
@@ -1177,7 +1197,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.0.0+build.24\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.34\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":10,\"down_video_streamid\":11,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
@@ -2212,6 +2232,7 @@ static void handle_connection(const runtime_event_t *event)
                 } else {
                     s_ai_transport_closed = true;
                     starter_media_set_uplink_enabled(false);
+                    log_ai_playback_status("transport-close");
                 }
                 service_ai_end_drain();
                 return;
@@ -2231,7 +2252,7 @@ static void handle_connection(const runtime_event_t *event)
             if (state == STARTER_RUNTIME_AI_CONNECTING ||
                 state == STARTER_RUNTIME_AI_ACTIVE) {
                 ESP_LOGI(TAG,
-                         "AI session closed by remote/server idle timeout error=%d generation=%lu",
+                         "AI session closed by transport error=%d generation=%lu",
                          event->error, (unsigned long)event->generation);
             }
             finish_session(event->error);

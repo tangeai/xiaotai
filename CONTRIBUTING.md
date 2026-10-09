@@ -89,6 +89,9 @@ flowchart TB
 
 ## 产品与媒体变更
 
+开始修改前，核对[二次开发易错点与回归入口](docs/development/pitfalls.md)，
+特别留意 UI 操作编号隔离、顶层提示布局、AI 音频突发队列和退出排空条件。
+
 界面、按键、语音控制或用户流程发生变化时，先阅读[产品交互配置](docs/product/PRODUCT_INTERACTION_PROFILES.md)和 `product/interaction/README.md`。交互适配器产生意图，产品运行时持有业务状态。
 
 音频格式、视频分辨率、帧率、码率、stream ID（媒体流编号）或 AEC（声学回声消除）路径变化时，必须同步更新[音视频参数](docs/product/MEDIA_CONTRACT.md)、设备能力上报和相应测试。

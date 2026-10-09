@@ -46,6 +46,8 @@
 
 #define AUDIO_TRANSPORT_SAMPLE_RATE_HZ 8000U
 #define AUDIO_HW_SAMPLE_RATE_HZ 16000U
+#define AUDIO_I2S_DMA_DESC_NUM 6U
+#define AUDIO_I2S_DMA_FRAME_NUM 240U
 #define AUDIO_PACKET_MS 20U
 #define ALAW_PACKET_SAMPLES \
     ((AUDIO_TRANSPORT_SAMPLE_RATE_HZ * AUDIO_PACKET_MS) / 1000U)
@@ -64,7 +66,10 @@
 #define AUDIO_MCLK_MULTIPLE 256U
 #define AUDIO_MCLK_HZ (AUDIO_HW_SAMPLE_RATE_HZ * AUDIO_MCLK_MULTIPLE)
 #define AUDIO_RX_BYTES 1500U
-#define AUDIO_RX_QUEUE_DEPTH 8U
+/* AI TTS can arrive ahead of the DAC: retain 1.28 s of 20 ms packets.
+ * Capacity does not delay playback; human calls keep the 8-slot budget. */
+#define AUDIO_RX_QUEUE_DEPTH 64U
+#define AUDIO_RX_LIVE_QUEUE_DEPTH 8U
 #define AUDIO_TX_QUEUE_DEPTH 12U
 #define AUDIO_PLAYBACK_UPSAMPLE 2U
 #define AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT (AUDIO_PLAYBACK_UPSAMPLE * 2U)
@@ -149,6 +154,13 @@ static atomic_uint_fast32_t s_audio_playback_blocked;
 static atomic_uint_fast32_t s_audio_write_failed;
 static atomic_uint_fast32_t s_audio_playback_pending;
 static atomic_bool s_audio_playback_active;
+/* Successful I2S writes enqueue PCM; they do not wait for the DAC to finish. */
+static atomic_int_fast64_t s_audio_dma_until_us;
+static atomic_uint_fast32_t s_audio_pcm_frames;
+static atomic_uint_fast32_t s_audio_rx_last_ms;
+static atomic_uint_fast32_t s_audio_rx_overflow;
+static atomic_uint_fast32_t s_audio_rx_queue_peak;
+static atomic_int_fast64_t s_audio_playback_started_us;
 static atomic_uint_fast32_t s_aec_processed;
 static atomic_uint_fast32_t s_agc_failures;
 /* [DEBUG-wake49] Capture-owned accumulator, fixed-size published snapshot. */
@@ -288,6 +300,8 @@ static esp_err_t audio_i2s_init(void)
     i2s_chan_config_t audio_channel =
         I2S_CHANNEL_DEFAULT_CONFIG(I2S_AUDIO_PORT, I2S_ROLE_MASTER);
     audio_channel.auto_clear = true;
+    audio_channel.dma_desc_num = AUDIO_I2S_DMA_DESC_NUM;
+    audio_channel.dma_frame_num = AUDIO_I2S_DMA_FRAME_NUM;
     esp_err_t err = i2s_new_channel(&audio_channel, &s_i2s_tx, &s_i2s_rx);
     if (err != ESP_OK) {
         return err;
@@ -994,6 +1008,26 @@ static void audio_capture_task(void *argument)
     }
 }
 
+static void audio_track_dma_write(int64_t write_start_us, size_t frames)
+{
+    int64_t until = atomic_load_explicit(&s_audio_dma_until_us,
+                                         memory_order_acquire);
+    if (until <= write_start_us) {
+        /* An idle TX ring may already contain silence ahead of this write. */
+        until = write_start_us +
+            (int64_t)AUDIO_I2S_DMA_DESC_NUM * AUDIO_I2S_DMA_FRAME_NUM *
+                1000000 / AUDIO_HW_SAMPLE_RATE_HZ;
+    }
+    until += (int64_t)frames * 1000000 / AUDIO_HW_SAMPLE_RATE_HZ;
+    atomic_store_explicit(&s_audio_dma_until_us, until, memory_order_release);
+    atomic_fetch_add_explicit(&s_audio_pcm_frames, frames, memory_order_relaxed);
+    if (atomic_load_explicit(&s_audio_playback_started_us,
+                             memory_order_acquire) == 0) {
+        atomic_store_explicit(&s_audio_playback_started_us, write_start_us,
+                              memory_order_release);
+    }
+}
+
 static bool play_audio_item(const audio_rx_item_t *item)
 {
     if (item == NULL || !same_session(item->mode, item->generation)) {
@@ -1061,20 +1095,28 @@ static bool play_audio_item(const audio_rx_item_t *item)
                                        ? AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT : 2U;
         size_t bytes = mono_samples * values_per_sample * sizeof(int16_t);
         size_t bytes_written = 0;
+        int64_t write_start_us = esp_timer_get_time();
         played = s_audio_adapter != NULL &&
                  s_audio_adapter->write_pcm(s_audio_adapter->context,
                                             s_play_stereo, bytes / 4U,
                                             &bytes_written) == ESP_OK &&
                  bytes_written == bytes;
         if (played) {
+            audio_track_dma_write(write_start_us, bytes / 4U);
             uint32_t count = (uint32_t)atomic_fetch_add_explicit(
                                  &s_audio_played, 1,
                                  memory_order_relaxed) + 1U;
             if (count == 1U || count % 100U == 0U) {
                 ESP_LOGI(TAG,
-                         "downlink audio played mode=%d generation=%lu frames=%lu pcm-bytes=%lu",
+                         "downlink audio played mode=%d generation=%lu frames=%lu pcm-bytes=%lu pcm-ms=%lu elapsed-ms=%lu queue=%lu rate=%u",
                          (int)item->mode, (unsigned long)item->generation,
-                         (unsigned long)count, (unsigned long)bytes_written);
+                         (unsigned long)count, (unsigned long)bytes_written,
+                         (unsigned long)((uint64_t)atomic_load(&s_audio_pcm_frames) *
+                                         1000 / AUDIO_HW_SAMPLE_RATE_HZ),
+                         (unsigned long)((esp_timer_get_time() -
+                             atomic_load(&s_audio_playback_started_us)) / 1000),
+                         (unsigned long)atomic_load(&s_audio_playback_pending),
+                         AUDIO_HW_SAMPLE_RATE_HZ);
             }
         } else {
             uint32_t failures = (uint32_t)atomic_fetch_add_explicit(
@@ -1539,6 +1581,11 @@ esp_err_t starter_media_start(starter_tirtc_mode_t mode, uint32_t generation)
     atomic_store_explicit(&s_audio_decode_failed, 0, memory_order_release);
     atomic_store_explicit(&s_audio_playback_blocked, 0, memory_order_release);
     atomic_store_explicit(&s_audio_write_failed, 0, memory_order_release);
+    atomic_store_explicit(&s_audio_pcm_frames, 0, memory_order_release);
+    atomic_store_explicit(&s_audio_rx_last_ms, 0, memory_order_release);
+    atomic_store_explicit(&s_audio_rx_overflow, 0, memory_order_release);
+    atomic_store_explicit(&s_audio_rx_queue_peak, 0, memory_order_release);
+    atomic_store_explicit(&s_audio_playback_started_us, 0, memory_order_release);
     atomic_store_explicit(&s_audio_playback_pending, 0, memory_order_release);
     atomic_store_explicit(&s_audio_playback_active, false, memory_order_release);
     atomic_store_explicit(&s_aec_processed, 0, memory_order_release);
@@ -1564,6 +1611,7 @@ esp_err_t starter_media_start(starter_tirtc_mode_t mode, uint32_t generation)
         atomic_store_explicit(&s_generation, 0, memory_order_release);
         return ESP_ERR_TIMEOUT;
     }
+    atomic_store_explicit(&s_audio_dma_until_us, 0, memory_order_release);
     esp_err_t err = audio_output_set_locked(
         !atomic_load_explicit(&s_speaker_muted, memory_order_acquire));
     xSemaphoreGive(s_audio_output_mutex);
@@ -1607,6 +1655,7 @@ static esp_err_t stop_media(uint32_t preserve_token)
     if (s_audio_output_mutex != NULL &&
         xSemaphoreTake(s_audio_output_mutex, pdMS_TO_TICKS(600)) == pdTRUE) {
         (void)audio_output_set_locked(false);
+        atomic_store_explicit(&s_audio_dma_until_us, 0, memory_order_release);
         xSemaphoreGive(s_audio_output_mutex);
     }
     return preserved ? ESP_OK : ESP_ERR_INVALID_STATE;
@@ -1647,8 +1696,12 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
         return;
     }
     uint8_t slot = 0;
-    if (xQueueReceive(s_audio_rx_free_queue, &slot, 0) != pdTRUE ||
+    if ((mode != STARTER_TIRTC_AI &&
+         uxQueueMessagesWaiting(s_audio_rx_free_queue) <=
+             AUDIO_RX_QUEUE_DEPTH - AUDIO_RX_LIVE_QUEUE_DEPTH) ||
+        xQueueReceive(s_audio_rx_free_queue, &slot, 0) != pdTRUE ||
         slot >= AUDIO_RX_QUEUE_DEPTH) {
+        atomic_fetch_add_explicit(&s_audio_rx_overflow, 1, memory_order_relaxed);
         atomic_fetch_add_explicit(&s_audio_dropped, 1, memory_order_relaxed);
         return;
     }
@@ -1662,8 +1715,14 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
     atomic_fetch_add_explicit(&s_audio_playback_pending, 1,
                               memory_order_acq_rel);
     if (xQueueSend(s_audio_rx_ready_queue, &slot, 0) == pdTRUE) {
+        update_max_counter(&s_audio_rx_queue_peak,
+                           uxQueueMessagesWaiting(s_audio_rx_ready_queue));
+        atomic_store_explicit(&s_audio_rx_last_ms,
+                              (uint32_t)(esp_timer_get_time() / 1000),
+                              memory_order_release);
         atomic_fetch_add_explicit(&s_audio_received, 1, memory_order_relaxed);
     } else {
+        atomic_fetch_add_explicit(&s_audio_rx_overflow, 1, memory_order_relaxed);
         atomic_fetch_sub_explicit(&s_audio_playback_pending, 1,
                                   memory_order_acq_rel);
         memset(item, 0, sizeof(*item));
@@ -1674,6 +1733,9 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
 
 starter_media_status_t starter_media_status(void)
 {
+    int64_t dma_remaining_us = atomic_load_explicit(&s_audio_dma_until_us,
+                                                    memory_order_acquire) -
+                               esp_timer_get_time();
     return (starter_media_status_t) {
         .active = atomic_load_explicit(&s_active, memory_order_acquire),
         .mode = (starter_tirtc_mode_t)atomic_load_explicit(&s_mode,
@@ -1687,6 +1749,15 @@ starter_media_status_t starter_media_status(void)
                                                           memory_order_acquire),
         .audio_dropped = (uint32_t)atomic_load_explicit(&s_audio_dropped,
                                                          memory_order_acquire),
+        .audio_rx_overflow = (uint32_t)atomic_load(&s_audio_rx_overflow),
+        .audio_rx_queue_peak = (uint32_t)atomic_load(&s_audio_rx_queue_peak),
+        .audio_rx_queue_capacity = atomic_load(&s_mode) == STARTER_TIRTC_AI
+            ? AUDIO_RX_QUEUE_DEPTH : AUDIO_RX_LIVE_QUEUE_DEPTH,
+        .audio_rx_last_ms = (uint32_t)atomic_load(&s_audio_rx_last_ms),
+        .audio_playback_pcm_ms = (uint32_t)((uint64_t)atomic_load(&s_audio_pcm_frames) *
+                                            1000 / AUDIO_HW_SAMPLE_RATE_HZ),
+        .audio_playback_dma_ms = dma_remaining_us > 0
+            ? (uint32_t)((dma_remaining_us + 999) / 1000) : 0U,
         .audio_decoded = (uint32_t)atomic_load_explicit(&s_audio_decoded,
                                                          memory_order_acquire),
         .audio_played = (uint32_t)atomic_load_explicit(&s_audio_played,
@@ -1701,6 +1772,7 @@ starter_media_status_t starter_media_status(void)
             &s_audio_playback_pending, memory_order_acquire),
         .audio_playback_active = atomic_load_explicit(
             &s_audio_playback_active, memory_order_acquire) ||
+            dma_remaining_us > 0 ||
             (s_audio_rx_ready_queue != NULL &&
              uxQueueMessagesWaiting(s_audio_rx_ready_queue) > 0U),
         .aec_processed = (uint32_t)atomic_load_explicit(&s_aec_processed,
