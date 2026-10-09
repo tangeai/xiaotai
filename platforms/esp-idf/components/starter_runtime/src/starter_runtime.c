@@ -1197,7 +1197,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.0.0+build.34\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.35\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":10,\"down_video_streamid\":11,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
@@ -3211,6 +3211,8 @@ static void room_stop_connection(const char *presence, int error)
                                    strcmp(presence, "suspended") == 0 &&
                                    s_room_desired;
     s_room_joined = false;
+    s_room_next_heartbeat_ms = 0;
+    s_room_lease_deadline_ms = 0;
     finish_session(error);
     product_set_room(s_room_desired ? STARTER_ROOM_ASSIGNED : STARTER_ROOM_NONE,
                      s_room_desired ? "等待恢复" : "");
@@ -3438,6 +3440,11 @@ static void handle_room_command(const runtime_event_t *event)
             return;
         }
         s_room_joined = true; s_room_ptt = false;
+        /* Each accepted join owns fresh timers. Presence HTTP may be delayed,
+         * so an earlier session's deadline must not tear down this session. */
+        int64_t joined_ms = now_ms();
+        s_room_next_heartbeat_ms = joined_ms + s_room_heartbeat_seconds * 1000;
+        s_room_lease_deadline_ms = joined_ms + s_room_lease_seconds * 1000;
         (void)xiaotai_runtime_media_started(&s_session, session_generation());
         starter_media_set_uplink_enabled(false);
         publish_state();
