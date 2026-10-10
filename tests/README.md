@@ -45,6 +45,12 @@ HAL 失败时无法提供实际消耗长度，不能安全地继续解析或简�
 
 ### P4 通话收发链路诊断（build.71）
 
+后续 build.72 的原生 VGA 采集实验、参考依据和验收步骤见
+[`P4_OV5647_NATIVE_VGA.md`](../docs/hardware/P4_OV5647_NATIVE_VGA.md)。
+`test_p4_native_vga.py` 回放实际传感器/V4L2 格式协商和无缩放预热入口；
+`test_full_frame_uplink.py` 验证两类对讲选择 640×480 原生采集，H5 仍选
+1280×960。发送帧率、码率和音频参数保持 build.69 基线；实板出图与性能仍待验收。
+
 本轮只增加被动观测，不修改 build.69 冻结的音视频参数、队列容量和任务优先级。
 P4 的 `CONFIG_ESP_HOSTED_PKT_STATS=y` 每 10 秒输出一行 `[DEBUG-link71] host`：
 

@@ -3303,10 +3303,10 @@ esp_err_t camera_pipeline_prewarm_call_scaler(void)
                         "camera not configured");
 
     video_yuv420_scaler_config_t config = {0};
-    ESP_RETURN_ON_FALSE(camera_pipeline_build_call_scaler_config(&config),
-                        ESP_ERR_NOT_SUPPORTED,
-                        TAG,
-                        "device-call profile does not require a YUV420 scaler");
+    if (!camera_pipeline_build_call_scaler_config(&config)) {
+        /* Native capture is already encoder-sized; no prewarm is necessary. */
+        return ESP_OK;
+    }
 
     video_yuv420_scaler_handle_t stale = NULL;
     taskENTER_CRITICAL(&s_lock);

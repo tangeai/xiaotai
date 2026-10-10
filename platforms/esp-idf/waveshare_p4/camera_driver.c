@@ -25,6 +25,7 @@
 #include "app_log_policy.h"
 #include "hardware_board.h"
 #include "hardware_board_config.h"
+#include "ov5647_vga_capture.h"
 
 static const char *TAG = "camera";
 
@@ -294,8 +295,34 @@ static esp_err_t camera_driver_open_device(void)
 	return ESP_OK;
 }
 
+static esp_err_t camera_driver_select_sensor_format(void)
+{
+	if (s_target_width != 640U || s_target_height != 480U) {
+		return ESP_OK;
+	}
+	esp_cam_sensor_format_t current = {0};
+	if (ioctl(s_fd, VIDIOC_G_SENSOR_FMT, &current) != 0) {
+		return ESP_FAIL;
+	}
+	if (current.width == 640U && current.height == 480U) {
+		return ESP_OK;
+	}
+	const esp_cam_sensor_format_t *vga = NULL;
+	ESP_RETURN_ON_ERROR(ov5647_build_vga_capture(&current, &vga), TAG,
+			    "OV5647 native VGA base mode is unsupported");
+	if (ioctl(s_fd, VIDIOC_S_SENSOR_FMT, vga) != 0) {
+		ESP_LOGE(TAG, "set OV5647 native VGA failed errno=%d", errno);
+		return ESP_FAIL;
+	}
+	ESP_LOGI(TAG, "OV5647 native VGA selected: 640x480; uplink PPA scale bypassed");
+	return ESP_OK;
+}
+
 static esp_err_t camera_driver_config_format(void)
 {
+	/* Custom sensor mode must precede pixel-format negotiation and buffers. */
+	ESP_RETURN_ON_ERROR(camera_driver_select_sensor_format(), TAG,
+			    "select camera sensor format failed");
 	struct v4l2_format format = {
 		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
 	};
@@ -348,6 +375,10 @@ static esp_err_t camera_driver_config_format(void)
 		 (unsigned)format.fmt.pix.bytesperline);
 
 	if (format.fmt.pix.pixelformat != CAMERA_DRIVER_TARGET_FORMAT) {
+		return ESP_ERR_NOT_SUPPORTED;
+	}
+	if (s_target_width == 640U && s_target_height == 480U &&
+	    (format.fmt.pix.width != 640U || format.fmt.pix.height != 480U)) {
 		return ESP_ERR_NOT_SUPPORTED;
 	}
 

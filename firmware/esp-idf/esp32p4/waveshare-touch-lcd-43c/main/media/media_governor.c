@@ -106,11 +106,13 @@ static void media_governor_select_native_capture_size(const media_governor_video
                                                        uint16_t *width,
                                                        uint16_t *height)
 {
-    /* Encoder resolution must not select the sensor's field of view. The
-     * OV5647 800x640 mode uses a narrower sensor window than 1280x960;
-     * containing that output cannot recover the missing scene. Keep the
-     * full-view capture mode and let PPA downscale for compact calls. */
-    (void)config;
+    /* VGA calls use sensor subsampling of the full capture window. Never
+     * substitute the narrower 800x640 mode. H5 retains its native 960p. */
+    if (config != NULL && config->width == 640U && config->height == 480U) {
+        *width = 640U;
+        *height = 480U;
+        return;
+    }
     *width = MEDIA_GOVERNOR_CAPTURE_WIDTH;
     *height = MEDIA_GOVERNOR_CAPTURE_HEIGHT;
 }

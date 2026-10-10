@@ -68,7 +68,7 @@ int main(void) {
     media_governor_camera_policy_t policy;
     media_governor_build_camera_policy(&config,&policy);
     w=policy.capture_width; h=policy.capture_height;
-    assert(w==1280 && h==960);
+    assert(w==640 && h==480);
     assert(policy.capture_fps==5 && policy.rtc_video_fps==5);
     assert(policy.rtc_width==640 && policy.rtc_height==480);
     assert(policy.h264_bitrate_bps==600000);
@@ -76,7 +76,7 @@ int main(void) {
     assert(video_yuv420_config_valid(&scale));
     uint16_t cw,ch,x,y,ox,oy; uint8_t step;
     assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
-    assert(cw==1280 && ch==960 && x==0 && y==0 && ox==0 && oy==0 && step==8);
+    assert(cw==640 && ch==480 && x==0 && y==0 && ox==0 && oy==0 && step==16);
     media_governor_build_wechat_video_config(&config);
     assert(config.width==640 && config.height==480 && config.fps==8 && config.bitrate_bps==500000);
     media_governor_build_camera_policy(&config,&policy);
@@ -84,11 +84,11 @@ int main(void) {
     assert(policy.capture_fps==8 && policy.rtc_video_fps==8 && policy.h264_bitrate_bps==500000);
     w=APP_MEDIA_CAMERA_CAPTURE_WIDTH; h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
     media_governor_select_native_capture_size(&config,&w,&h);
-    assert(w==1280 && h==960);
+    assert(w==640 && h==480);
     scale=(video_yuv420_scaler_config_t){w,h,config.width,config.height,false,false};
     assert(video_yuv420_config_valid(&scale));
     assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
-    assert(cw==1280 && ch==960 && x==0 && y==0 && step==8);
+    assert(cw==640 && ch==480 && x==0 && y==0 && step==16);
     media_governor_build_h5_video_config(&config);
     assert(config.width==1280 && config.height==960 && config.fps==20 && config.bitrate_bps==3000000);
     w=APP_MEDIA_CAMERA_CAPTURE_WIDTH; h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
@@ -146,4 +146,4 @@ for config in ("sdkconfig.defaults", "sdkconfig"):
 pipeline=(root/"main/media/camera_pipeline.c").read_text()
 assert "const bool rotate_ccw90 = false;" in pipeline
 assert '"yuv420-ppa-ccw90"' not in pipeline
-print("PASS: public call camera policy keeps full-view 1280x960 capture and uncropped 640x480 encoding")
+print("PASS: public call camera policy uses native VGA for calls and full capture for H5")
