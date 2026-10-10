@@ -45,6 +45,7 @@ static int s_session_mode, reset_count;
 #define ESP_LOGE(...) ((void)0)
 #define ESP_LOGW(...) ((void)0)
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 static bool tirtc_connect_is_connecting(void) { return false; }
 static bool tirtc_session_config_differs(const tirtc_session_config_t *a,
                                        const tirtc_session_config_t *b)

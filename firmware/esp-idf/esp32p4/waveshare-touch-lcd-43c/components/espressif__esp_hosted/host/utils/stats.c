@@ -209,10 +209,17 @@ struct mem_stats h_stats_g;
 #if ESP_PKT_STATS
 void stats_timer_func(void * arg)
 {
-	ESP_LOGI(TAG, "slave: sta_rx_in: %lu sta_rx_out: %lu sta_tx_in [pass: %lu drop: %lu] sta_tx_out: %lu ",
-			pkt_stats.sta_rx_in,pkt_stats.sta_rx_out,
-			pkt_stats.sta_tx_in_pass, pkt_stats.sta_tx_in_drop, pkt_stats.sta_tx_out);
-	ESP_LOGI(TAG, "wifi_tx_throttling %u", wifi_tx_throttling);
+	/* Host-side cumulative observations, not C6 counters or peer delivery.
+	 * Fields are independent snapshots while RX/TX workers keep running. */
+	ESP_LOGI(TAG, "[DEBUG-link71] host rx-valid/stack-ok/stack-fail=%lu/%lu/%lu "
+			"tx-queued/drop/bus-written=%lu/%lu/%lu throttle=%u",
+			(unsigned long)atomic_load_explicit(&pkt_stats.sta_rx_in, memory_order_relaxed),
+			(unsigned long)atomic_load_explicit(&pkt_stats.sta_rx_out, memory_order_relaxed),
+			(unsigned long)atomic_load_explicit(&pkt_stats.sta_rx_fail, memory_order_relaxed),
+			(unsigned long)atomic_load_explicit(&pkt_stats.sta_tx_in_pass, memory_order_relaxed),
+			(unsigned long)atomic_load_explicit(&pkt_stats.sta_tx_in_drop, memory_order_relaxed),
+			(unsigned long)atomic_load_explicit(&pkt_stats.sta_tx_out, memory_order_relaxed),
+			wifi_tx_throttling);
 }
 #endif
 

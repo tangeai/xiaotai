@@ -100,6 +100,7 @@ int main(void){
 #include <stddef.h>
 #define ESP_OK 0
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 #define ESP_LOGW(...) ((void)0)
 #define STARTER_RUNTIME_WAITING 0
 #define STARTER_RUNTIME_H5_ACTIVE 1

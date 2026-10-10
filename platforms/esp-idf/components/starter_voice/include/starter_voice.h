@@ -84,7 +84,7 @@ typedef struct {
     uint32_t max_detect_us;
     unsigned threshold_milli;
     bool ns_vad;
-    /* [DEBUG-wake49] Model invocations/results are distinct from dispatched detections. */
+    /* Model invocations/results are distinct from dispatched detections. */
     uint32_t model_frames, model_timeouts, model_detected;
     uint32_t skipped_unarmed, skipped_cooldown;
     uint32_t reject_epoch, reject_age, reject_vad, reject_id;

@@ -19,6 +19,7 @@ typedef int esp_sntp_config_t;
 #define ESP_NETIF_SNTP_DEFAULT_CONFIG_MULTIPLE(...) 0
 #define pdMS_TO_TICKS(x) (x)
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 #define ESP_LOGE(...) ((void)0)
 static bool s_sntp_initialized;
 static unsigned inits,waits,init_error;
@@ -52,6 +53,7 @@ typedef int esp_err_t;
 #define ESP_OK 0
 #define DISCOVERY_URL "test"
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 typedef struct {char device_id[65],device_secret[257],client_id[65];} runtime_tirtc_config_t;
 static runtime_tirtc_config_t s_tirtc_config={"old-id","old-key","client"};
 static atomic_bool s_verification_prompt_cancelled;
@@ -127,6 +129,7 @@ int main(void){provision_mqtt_t ctx={.events=(void*)1,.mqtt=1,.ack_message_id=-1
 #define EXPERIENCE_PLATFORM_URL "test"
 #define ESP_LOGW(...) ((void)0)
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 typedef int esp_err_t;
 typedef struct {const char *mac_address,*existing_device_id,*existing_device_secret,*discovery_url;} platform_provision_config_t;
 typedef struct {char device_id[65],device_secret[257];} platform_provision_result_t;

@@ -25,6 +25,7 @@ code = r'''
 #define EVENT_VOIP_CONNECT_RESULT 1
 #define ESP_ERR_INVALID_ARG -2
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 #define ESP_LOGE(...) ((void)0)
 typedef struct { char peer_id[4], token[4]; uint32_t generation; } voip_connect_request_t;
 typedef struct { int type; uint32_t generation; int error; } runtime_event_t;

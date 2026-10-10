@@ -203,6 +203,7 @@ typedef int esp_err_t;
 #define ESP_CODEC_DEV_OK 0
 #define ESP_CODEC_DEV_MAKE_CHANNEL_MASK(n) (1U << (n))
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 static void *s_microphone_dev = (void *)1;
 static float gain;
 static unsigned mask, calls;

@@ -176,6 +176,12 @@ int starter_tirtc_request_remote_key_frame(void);
 
 /** 返回当前 SDK 发送缓冲占用字节数，无连接时为 0。 */
 size_t starter_tirtc_send_buffer_used(void);
+/** Configured process-wide capacity; zero means unknown. */
+size_t starter_tirtc_send_buffer_limit(void);
+/** Media owner consumes the latest suggestion for its active generation. */
+bool starter_tirtc_take_video_bitrate(uint32_t generation, uint32_t *target_bps);
+int starter_tirtc_set_video_bitrate_range(uint32_t min_bps, uint32_t max_bps,
+                                         uint32_t start_bps);
 
 #ifdef __cplusplus
 }

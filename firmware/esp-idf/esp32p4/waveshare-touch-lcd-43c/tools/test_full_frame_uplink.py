@@ -23,13 +23,25 @@ code=r'''
 #define MEDIA_GOVERNOR_FULL_WIDTH APP_MEDIA_RTC_VIDEO_WIDTH
 #define MEDIA_GOVERNOR_FULL_HEIGHT APP_MEDIA_RTC_VIDEO_HEIGHT
 #define MEDIA_GOVERNOR_FULL_FPS APP_MEDIA_RTC_H264_FPS
+#define MEDIA_GOVERNOR_VIDEO_MIN_BITRATE_BPS 200000U
+#define taskENTER_CRITICAL(lock) ((void)(lock))
+#define taskEXIT_CRITICAL(lock) ((void)(lock))
+#define ESP_RETURN_ON_FALSE(ok, error, ...) do { if (!(ok)) return error; } while (0)
+#define ESP_LOGI(...) ((void)old_config)
 #define VIDEO_YUV420_SCALE_DENOMINATOR 16U
 static media_governor_video_config_t s_rtc_video_config;
+static media_governor_video_config_t s_adaptation_base_config;
+static int s_lock;
+static bool s_initialized, s_transport_adaptation_active;
+static uint32_t s_transport_requested_bitrate_bps;
+static uint32_t s_transport_protection_not_before_tick, s_transport_recovery_not_before_tick;
 typedef struct {uint16_t input_width,input_height,output_width,output_height; bool rotate_ccw90,fit_contain;} video_yuv420_scaler_config_t;
 '''
 code+=function(governor,"void media_governor_build_device_call_video_config(")
 code+=function(governor,"void media_governor_build_wechat_video_config(")
 code+=function(governor,"void media_governor_build_h5_video_config(")
+code+=function(governor,"static media_governor_video_config_t media_governor_normalize_video_config(")
+code+=function(governor,"esp_err_t media_governor_set_rtc_video_config(")
 code+=function(governor,"static void media_governor_select_native_capture_size(")
 code+=function(governor,"static media_governor_camera_policy_t media_governor_make_rtc_av_policy(")
 code+=function(governor,"void media_governor_build_camera_policy(")
@@ -66,14 +78,17 @@ int main(void) {
     assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
     assert(cw==1280 && ch==960 && x==0 && y==0 && ox==0 && oy==0 && step==8);
     media_governor_build_wechat_video_config(&config);
-    assert(config.width==960 && config.height==720 && config.fps==12 && config.bitrate_bps==1500000);
+    assert(config.width==640 && config.height==480 && config.fps==8 && config.bitrate_bps==500000);
+    media_governor_build_camera_policy(&config,&policy);
+    assert(policy.rtc_width==640 && policy.rtc_height==480);
+    assert(policy.capture_fps==8 && policy.rtc_video_fps==8 && policy.h264_bitrate_bps==500000);
     w=APP_MEDIA_CAMERA_CAPTURE_WIDTH; h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
     media_governor_select_native_capture_size(&config,&w,&h);
     assert(w==1280 && h==960);
     scale=(video_yuv420_scaler_config_t){w,h,config.width,config.height,false,false};
     assert(video_yuv420_config_valid(&scale));
     assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
-    assert(cw==1280 && ch==960 && x==0 && y==0 && step==12);
+    assert(cw==1280 && ch==960 && x==0 && y==0 && step==8);
     media_governor_build_h5_video_config(&config);
     assert(config.width==1280 && config.height==960 && config.fps==20 && config.bitrate_bps==3000000);
     w=APP_MEDIA_CAMERA_CAPTURE_WIDTH; h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
@@ -82,6 +97,34 @@ int main(void) {
     scale=(video_yuv420_scaler_config_t){w,h,config.width,config.height,false,false};
     assert(video_yuv420_config_valid(&scale));
     assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
+    /* Repeated scene changes discard the previous scene's degraded target. */
+    void (*builders[])(media_governor_video_config_t *) = {
+        media_governor_build_wechat_video_config,
+        media_governor_build_h5_video_config,
+        media_governor_build_device_call_video_config,
+    };
+    const uint16_t widths[]={640,1280,640}, heights[]={480,960,480};
+    const uint8_t fps[]={8,20,5};
+    const uint32_t rates[]={500000,3000000,600000};
+    assert(media_governor_set_rtc_video_config(NULL)==ESP_ERR_INVALID_ARG);
+    for (unsigned round=0; round<100; ++round) {
+        for (unsigned mode=0; mode<3; ++mode) {
+            builders[mode](NULL);
+            builders[mode](&config);
+            assert(media_governor_set_rtc_video_config(&config)==ESP_OK);
+            assert(s_rtc_video_config.width==widths[mode] && s_rtc_video_config.height==heights[mode]);
+            assert(s_rtc_video_config.fps==fps[mode] && s_rtc_video_config.bitrate_bps==rates[mode]);
+            assert(s_adaptation_base_config.bitrate_bps==rates[mode]);
+            assert(!s_transport_adaptation_active && s_transport_requested_bitrate_bps==0);
+            config.bitrate_bps=200000;
+            config.weak_network_mode=MEDIA_GOVERNOR_WEAK_NETWORK_FRAMERATE_PRIORITY;
+            config.weak_network_level=3;
+            assert(media_governor_set_rtc_video_config(&config)==ESP_OK);
+            assert(s_adaptation_base_config.bitrate_bps==rates[mode]);
+            s_transport_adaptation_active=true;
+            s_transport_requested_bitrate_bps=200000;
+        }
+    }
     assert(cw==1280 && ch==960 && x==0 && y==0 && step==16);
     scale=(video_yuv420_scaler_config_t){800,640,384,256,false,false};
     assert(video_yuv420_config_valid(&scale));
@@ -90,7 +133,7 @@ int main(void) {
 '''
 with tempfile.TemporaryDirectory(prefix="full-frame-uplink-") as tmp:
     p=Path(tmp); (p/"test.c").write_text(code)
-    (p/"esp_err.h").write_text("typedef int esp_err_t;\n")
+    (p/"esp_err.h").write_text("typedef int esp_err_t;\n#define ESP_OK 0\n#define ESP_ERR_INVALID_ARG 258\n")
     subprocess.run(["cc","-Wall","-Wextra","-Werror","-I",str(p),"-I",str(root/"main/media"),str(p/"test.c"),"-o",str(p/"test")],check=True)
     subprocess.run([str(p/"test")],check=True)
 video=(root/"components/p4_hardware/p4_video.c").read_text()

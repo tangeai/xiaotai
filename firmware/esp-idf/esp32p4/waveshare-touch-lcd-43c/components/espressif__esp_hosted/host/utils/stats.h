@@ -119,13 +119,15 @@ extern struct mem_stats h_stats_g;
 #endif
 
 #if ESP_PKT_STATS
+#include <stdatomic.h>
 #define ESP_PKT_STATS_REPORT_INTERVAL  10
 struct pkt_stats_t {
-	uint32_t sta_rx_in;
-	uint32_t sta_rx_out;
-	uint32_t sta_tx_in_pass;
-	uint32_t sta_tx_in_drop;
-	uint32_t sta_tx_out;
+	atomic_uint_fast32_t sta_rx_in;
+	atomic_uint_fast32_t sta_rx_out;
+	atomic_uint_fast32_t sta_rx_fail;
+	atomic_uint_fast32_t sta_tx_in_pass;
+	atomic_uint_fast32_t sta_tx_in_drop;
+	atomic_uint_fast32_t sta_tx_out;
 };
 
 extern struct pkt_stats_t pkt_stats;

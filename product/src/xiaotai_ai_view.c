@@ -165,6 +165,7 @@ void xiaotai_ai_view_set_emotion(xiaotai_ai_view_t *view,
     const emotion_entry_t *entry = emotion_entry(emotion);
     if (entry != NULL) {
         snprintf(view->emotion, sizeof(view->emotion), "%s", entry->tag);
+        view->emotion_tag_present = true;
     }
 }
 
@@ -189,8 +190,16 @@ bool xiaotai_ai_view_apply(xiaotai_ai_view_t *view, const char *json,
         cJSON_Delete(root);
         return false;
     }
+    bool previous_tag = view->emotion_tag_present;
     bool present = true;
     if (legacy_reply) {
+        if (strcmp(legacy_type->valuestring, "ai_reply") == 0) {
+            if (!view->emotion_tag_pending_caption) {
+                view->emotion_tag_present = false;
+                snprintf(view->emotion, sizeof(view->emotion), "happy");
+            }
+            view->emotion_tag_pending_caption = false;
+        }
         const char *emotion = json_emotion(root);
         const char *text = json_string(root, "text");
         if (emotion[0] != '\0') xiaotai_ai_view_set_emotion(view, emotion);
@@ -216,6 +225,12 @@ bool xiaotai_ai_view_apply(xiaotai_ai_view_t *view, const char *json,
         int type = caption_type->valueint;
         bool same_group = type == view->caption_type &&
                           strcmp(utterance_id, view->utterance_id) == 0;
+        if (type == 1 && !same_group && view->caption_type != -1 &&
+            !view->emotion_tag_pending_caption) {
+            view->emotion_tag_present = false;
+            snprintf(view->emotion, sizeof(view->emotion), "happy");
+        }
+        if (type == 1) view->emotion_tag_pending_caption = false;
         bool append = same_group && cJSON_IsNumber(mode) &&
                       mode->valueint == 1;
         caption_copy(view->caption, sizeof(view->caption),
@@ -230,10 +245,16 @@ bool xiaotai_ai_view_apply(xiaotai_ai_view_t *view, const char *json,
             (is_final ? XIAOTAI_AI_UI_THINKING : XIAOTAI_AI_UI_LISTENING);
         present = is_final || now_ms - view->last_present_ms >= 100U;
     } else if (strcmp(method->valuestring, "round_start") == 0) {
+        view->emotion_tag_pending_caption = false;
+        view->emotion_tag_present = false;
+        snprintf(view->emotion, sizeof(view->emotion), "happy");
+        view->caption_type = -1;
+        view->utterance_id[0] = '\0';
         const char *emotion = json_emotion(params);
         if (emotion[0] != '\0') xiaotai_ai_view_set_emotion(view, emotion);
         view->phase = XIAOTAI_AI_UI_SPEAKING;
     } else if (strcmp(method->valuestring, "round_end") == 0) {
+        view->emotion_tag_pending_caption = false;
         view->phase = XIAOTAI_AI_UI_LISTENING;
     } else if (strcmp(method->valuestring, "emotion") == 0 ||
                strcmp(method->valuestring, "ai_emotion") == 0 ||
@@ -244,11 +265,16 @@ bool xiaotai_ai_view_apply(xiaotai_ai_view_t *view, const char *json,
             present = false;
         } else {
             xiaotai_ai_view_set_emotion(view, emotion);
+            if (emotion_entry(emotion) != NULL) {
+                view->emotion_tag_pending_caption = true;
+            }
         }
     } else {
         present = false;
     }
     cJSON_Delete(root);
+    /* TAG ownership changes must reach the UI even inside caption throttling. */
+    if (previous_tag != view->emotion_tag_present) present = true;
     if (present) view->last_present_ms = now_ms;
     return present;
 }

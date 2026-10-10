@@ -17,6 +17,7 @@
 #include "driver/i2c_master.h"
 #include "esp_err.h"
 #include "starter_tirtc.h"
+#include "starter_playback_waveform.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,6 +32,8 @@ typedef struct {
     uint32_t audio_received;     /**< 成功复制到播放队列的音频帧数。 */
     uint32_t audio_dropped;      /**< 参数无效、队列满或代次过期的帧数。 */
     uint32_t audio_rx_overflow;  /**< 下行队列容量不足的丢包数，独立于上行。 */
+    uint32_t audio_rx_rebuffers; /**< P4 estimated DMA drain/reply-boundary recoveries. */
+    uint32_t audio_rx_prefill_target_ms;
     uint32_t audio_rx_prefill_waits; /**< 为吸收下行抖动进行预缓冲的次数。 */
     uint32_t audio_rx_queue_capacity; /**< 接收缓冲容量；0 表示未提供该诊断。 */
     uint32_t audio_rx_burst_max; /**< 单个 10 ms 时间桶内的最大有效到包数。 */
@@ -44,6 +47,16 @@ typedef struct {
     uint32_t audio_decode_avg_us; /**< 当前代次解码平均墙钟耗时。 */
     uint32_t audio_lock_avg_us; /**< 当前代次输出锁平均等待时间。 */
     uint32_t audio_write_avg_us; /**< 当前代次 I2S 写入平均墙钟耗时。 */
+    bool audio_trace_supported; /**< P4 bounded slow-write observation, no audio payload. */
+    uint32_t audio_trace_at_ms;
+    uint32_t audio_trace_frame;
+    uint32_t audio_trace_rx_gap_ms;
+    uint32_t audio_trace_queue_ms;
+    uint32_t audio_trace_write_gap_ms;
+    uint32_t audio_trace_decode_us;
+    uint32_t audio_trace_lock_us;
+    uint32_t audio_trace_write_us;
+    uint32_t audio_trace_pending;
     uint32_t audio_decoded;      /**< 已成功解码的下行帧数。 */
     uint32_t audio_played;       /**< 已完整写入 I2S 播放 DMA 的下行帧数。 */
     uint32_t audio_decode_failed; /**< 解码失败或空输出的帧数。 */
@@ -111,7 +124,7 @@ typedef struct {
 /** Nonblocking diagnostic snapshot. False means busy, not an empty cache. */
 bool starter_media_preroll_status(starter_media_preroll_status_t *out);
 
-/* [DEBUG-wake49] Last complete 32-frame observation window; mic/ref/clean order.
+/* Last complete 32-frame observation window; mic/ref/clean order.
  * RMS values are average/max of frame RMS, DC is signed frame-mean average.
  * Readers do not reset counters or affect capture/recognition. */
 typedef struct {
@@ -166,6 +179,11 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
 
 /** 返回由原子变量组成的瞬时状态快照，可从任意任务调用。 */
 starter_media_status_t starter_media_status(void);
+/** Recent successfully written AI PCM; inactive after 150 ms, mute or owner change. */
+void starter_media_playback_waveform(starter_playback_waveform_t *out);
+/** Volatile diagnostic control: bypass PCM visualization and face animation. */
+void starter_media_set_face_animation_enabled(bool enabled);
+bool starter_media_face_animation_enabled(void);
 #if CONFIG_IDF_TARGET_ESP32P4
 void starter_media_set_call_video(bool video);
 void starter_media_set_remote_video_presentation(uint16_t rotation,

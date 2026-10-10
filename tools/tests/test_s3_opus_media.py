@@ -2,7 +2,8 @@
 import unittest
 from test_s3_product_regressions import MEDIA, ROOT, function, run_c
 
-COMMON = r'''
+COMMON = f'#include "{ROOT / "platforms/esp-idf/components/starter_media_common/include/starter_playback_scope.h"}"\n' + r'''
+starter_playback_scope_t s_playback_scope = {.lock=ATOMIC_FLAG_INIT};
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -13,7 +14,9 @@ COMMON = r'''
 #define ESP_OK 0
 #define ESP_AUDIO_ERR_OK 0
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 #define ESP_LOGW(...) ((void)0)
+#define TAG "test"
 #define pdTRUE 1
 #define portMAX_DELAY 0
 #define pdMS_TO_TICKS(x) (x)
@@ -49,6 +52,7 @@ static int esp_opus_dec_reset(void *handle){resets++;return 0;}
 static bool same_session(int m,uint32_t g){return m==mode && g==active_generation;}
 '''
 
+COMMON += f'#include "{ROOT / "platforms/esp-idf/components/starter_media_common/include/starter_send_log.h"}"\n'
 
 class S3OpusMedia(unittest.TestCase):
     def test_codec_configuration_and_server_negotiation_agree(self):
@@ -255,7 +259,10 @@ int main(void){
     for(int i=0;i<100;i++){
         item.generation=active_generation=7+i;
         mode=item.mode=STARTER_TIRTC_AI;assert(play(&item));
+        assert(s_playback_scope.valid && s_playback_scope.generation==item.generation);
+        uint32_t published_ms=s_playback_scope.at_ms;
         mode=item.mode=STARTER_TIRTC_H5;assert(play(&item));
+        assert(s_playback_scope.at_ms==published_ms); /* non-AI audio leaves scope alone */
     }
     assert(opus_dec==100 && alaw_dec==100 && writes==200 && resets==100);
     assert(atomic_load(&s_audio_decode_max_us)==5000);

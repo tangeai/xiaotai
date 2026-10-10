@@ -23,7 +23,7 @@
  * Stable full-duplex device-call profile.
  *
  * The encoder bitrate is a rate-control target, not a hard ceiling. Device
- * calls use a VGA 4:3 surface independently from the portrait WeChat profile.
+ * calls use a VGA 4:3 surface independently from the WeChat profile.
  * The receiver converts it once to the panel viewport through PPA. The P4
  * must encode and decode concurrently. Field logs show that 12 fps can
  * outrun its software H264 decoder and force repeated reference-chain resets.
@@ -37,14 +37,15 @@
 #define APP_MEDIA_CALL_VIDEO_MIN_QP                     30U
 #define APP_MEDIA_CALL_VIDEO_MAX_QP                     46U
 
-/* XiaoTai phone/browser uplink: balanced full-duplex sensor-orientation
- * profile. Keep the full 4:3 field of view and scale it to 75%, but leave the
- * pixels unrotated. The receiver applies the reported clockwise 270-degree
- * camera rotation. */
-#define APP_MEDIA_WECHAT_VIDEO_WIDTH                    960U
-#define APP_MEDIA_WECHAT_VIDEO_HEIGHT                   720U
-#define APP_MEDIA_WECHAT_VIDEO_FPS                      12U
-#define APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS              1500000U
+/* WeChat VoIP uplink only. Field queues grew at 1.5 Mbit/s; start at VGA,
+ * 8 fps and 500 kbit/s, independently of H5 and device-call tuning. Keep the
+ * full 4:3 field of view and unrotated pixels; presentation rotation remains
+ * governed by the capability contract. Congestion can still pause video to
+ * retain audio. The encoder target is not a hard transport ceiling. */
+#define APP_MEDIA_WECHAT_VIDEO_WIDTH                    640U
+#define APP_MEDIA_WECHAT_VIDEO_HEIGHT                   480U
+#define APP_MEDIA_WECHAT_VIDEO_FPS                      8U
+#define APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS              500000U
 #define APP_MEDIA_WECHAT_VIDEO_MIN_QP                   30U
 #define APP_MEDIA_WECHAT_VIDEO_MAX_QP                   46U
 
@@ -53,12 +54,12 @@
  * avoids a blocking full-frame PPA pass on every frame. Keep the 20 fps cadence
  * while limiting the target to 3 Mbit/s so transport pressure does not turn
  * into non-key-frame suppression. */
-#define APP_MEDIA_H5_VIDEO_WIDTH                        APP_MEDIA_RTC_VIDEO_WIDTH
-#define APP_MEDIA_H5_VIDEO_HEIGHT                       APP_MEDIA_RTC_VIDEO_HEIGHT
-#define APP_MEDIA_H5_VIDEO_FPS                          APP_MEDIA_RTC_H264_FPS
+#define APP_MEDIA_H5_VIDEO_WIDTH                        1280U
+#define APP_MEDIA_H5_VIDEO_HEIGHT                       960U
+#define APP_MEDIA_H5_VIDEO_FPS                          20U
 #define APP_MEDIA_H5_VIDEO_BITRATE_BPS                  3000000U
-#define APP_MEDIA_H5_VIDEO_MIN_QP                       APP_MEDIA_RTC_H264_MIN_QP
-#define APP_MEDIA_H5_VIDEO_MAX_QP                       APP_MEDIA_RTC_H264_MAX_QP
+#define APP_MEDIA_H5_VIDEO_MIN_QP                       30U
+#define APP_MEDIA_H5_VIDEO_MAX_QP                       45U
 /* H264 encoder and transport protection. */
 /*
  * IPC and full-duplex calls both keep a two-second recovery interval. A short

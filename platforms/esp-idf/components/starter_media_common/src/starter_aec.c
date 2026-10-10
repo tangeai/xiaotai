@@ -169,7 +169,7 @@ esp_err_t starter_aec_process_capture(size_t capture_bytes,
         }
     }
 
-    /* [DEBUG-wake49] Observe inputs before the opaque AEC call; never modify them. */
+    /* Observe inputs before the opaque AEC call; never modify them. */
     int64_t measurement_start = esp_timer_get_time();
     starter_signal_level_t mic_level = starter_signal_measure(s_aec.mic, s_aec.frame_samples);
     starter_signal_level_t ref_level = starter_signal_measure(s_aec.reference, s_aec.frame_samples);

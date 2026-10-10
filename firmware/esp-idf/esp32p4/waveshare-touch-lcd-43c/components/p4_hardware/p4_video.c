@@ -25,6 +25,9 @@ static bool s_worker_video;
 static lv_obj_t *s_image;
 static lv_img_dsc_t s_image_desc;
 static bool s_presented_frame_held;
+static uint32_t s_presented_generation;
+static int64_t s_last_presented_us;
+#define VIDEO_STALE_US 3000000
 #define VIDEO_INGRESS_SLOTS 4
 #define VIDEO_INGRESS_BYTES (256U * 1024U)
 static struct {
@@ -38,6 +41,8 @@ static int64_t s_last_idr_us;
 static int64_t s_last_subscribe_us;
 static uint32_t s_subscribed_generation;
 static atomic_uint s_sent;
+static atomic_uint s_tx_failed;
+static atomic_int s_tx_last_error;
 static atomic_uint s_rx_seen, s_rx_dropped, s_rx_last_media, s_rx_last_stream;
 static int64_t s_health_due_us;
 
@@ -51,9 +56,11 @@ static void video_health(void)
     s_health_due_us = now + 5000000;
     call_video_renderer_stats_t stats = {0};
     call_video_renderer_get_stats(&stats);
-    ESP_LOGI("p4_video", "downlink generation=%lu mode=%d subscribed=%d rx=%u drop=%u "
+    ESP_LOGI("p4_video", "downlink generation=%lu mode=%d tx=%u tx-fail=%u tx-ret=%d send-buffer=%u/%u subscribed=%d rx=%u drop=%u "
              "stream=%u media=%u decoded=%lu converted=%lu presented=%lu decode-fail=%lu",
              (unsigned long)generation, (int)starter_tirtc_mode(),
+             atomic_load(&s_sent), atomic_load(&s_tx_failed), atomic_load(&s_tx_last_error),
+             (unsigned)starter_tirtc_send_buffer_used(), (unsigned)starter_tirtc_send_buffer_limit(),
              s_subscribed_generation == generation, atomic_load(&s_rx_seen),
              atomic_load(&s_rx_dropped), atomic_load(&s_rx_last_stream),
              atomic_load(&s_rx_last_media), (unsigned long)stats.decoded_frames,
@@ -63,6 +70,65 @@ static void video_health(void)
 static atomic_bool s_camera_enabled = true;
 static atomic_bool s_tx_enabled;
 static bool s_worker_camera;
+static uint32_t s_congestion_generation;
+static bool s_video_paused;
+static int64_t s_video_resume_after_us;
+static atomic_bool s_video_send_blocked;
+
+/* Media-owner only. SDK feedback and local pressure share one governor, whose
+ * protection/recovery holds prevent encoder oscillation. */
+static uint32_t s_bitrate_session, s_sdk_bitrate;
+static bool s_bitrate_configured;
+static bool s_bitrate_feedback_enabled;
+static int64_t s_bitrate_due_us;
+
+static void maintain_bitrate(void)
+{
+    uint32_t generation = atomic_load(&s_live_generation);
+    if (!generation || generation != starter_tirtc_generation() ||
+        !atomic_load(&s_tx_enabled)) return;
+    int64_t now = esp_timer_get_time();
+    if (s_bitrate_session != generation) {
+        s_bitrate_session = generation;
+        s_bitrate_configured = false;
+        s_bitrate_feedback_enabled = false;
+        s_sdk_bitrate = 0;
+        s_bitrate_due_us = 0;
+    }
+    if (now < s_bitrate_due_us) return;
+    s_bitrate_due_us = now + 500000;
+    media_governor_transport_bitrate_range_t range = {0};
+    media_governor_get_transport_bitrate_range(&range);
+    if (!s_bitrate_configured) {
+        int rc = starter_tirtc_set_video_bitrate_range(range.min_bitrate_bps,
+            range.max_bitrate_bps, range.start_bitrate_bps);
+        /* TGMP feedback is optional: WHIP/other transports may reject this
+         * API. Probe once per connection; local queue protection is independent
+         * and must run even when SDK feedback cannot be enabled. */
+        s_bitrate_configured = true;
+        s_bitrate_feedback_enabled = rc == 0;
+        s_sdk_bitrate = s_bitrate_feedback_enabled
+            ? range.start_bitrate_bps : range.max_bitrate_bps;
+        ESP_LOGI("p4_video", "bitrate control generation=%lu sdk-feedback=%d rc=%d local-protection=1",
+            (unsigned long)generation, s_bitrate_feedback_enabled, rc);
+    }
+    if (s_bitrate_feedback_enabled)
+        (void)starter_tirtc_take_video_bitrate(generation, &s_sdk_bitrate);
+    media_governor_video_config_t current = {0};
+    media_governor_get_rtc_video_config(&current);
+    size_t used = starter_tirtc_send_buffer_used();
+    size_t limit = starter_tirtc_send_buffer_limit();
+    uint32_t target = s_sdk_bitrate;
+    if (limit && used >= limit / 2U) {
+        uint32_t protection = current.bitrate_bps - current.bitrate_bps / 4U;
+        if (target > protection) target = protection;
+    } else if (limit && used > limit / 10U && target > current.bitrate_bps) {
+        target = current.bitrate_bps;
+    }
+    bool changed = false;
+    if (media_governor_apply_transport_bitrate_target(target, &changed) == ESP_OK && changed)
+        camera_pipeline_on_rtc_video_config_changed();
+}
 
 esp_err_t p4_video_set_camera_enabled(uint32_t generation, bool enabled)
 {
@@ -99,8 +165,34 @@ esp_err_t p4_video_rotate_remote_clockwise(uint16_t *rotation)
  * of the decoder/subscription, so disabling TX preserves remote video/audio. */
 static void maintain_camera(void)
 {
-    if (!atomic_load(&s_live_generation)) return;
-    bool enabled = atomic_load(&s_camera_enabled);
+    uint32_t generation = atomic_load(&s_live_generation);
+    if (!generation || generation != starter_tirtc_generation()) return;
+    if (s_congestion_generation != generation) {
+        s_congestion_generation = generation;
+        s_video_paused = false;
+        s_video_resume_after_us = 0;
+        atomic_store(&s_video_send_blocked, false);
+    }
+    starter_tirtc_mode_t mode = starter_tirtc_mode();
+    if (mode == STARTER_TIRTC_CALL || mode == STARTER_TIRTC_VOIP) {
+        size_t limit = starter_tirtc_send_buffer_limit();
+        size_t used = starter_tirtc_send_buffer_used();
+        int64_t now = esp_timer_get_time();
+        bool blocked = atomic_exchange(&s_video_send_blocked, false);
+        if (!s_video_paused && (blocked || (limit && used >= limit / 2U))) {
+            s_video_paused = true;
+            s_video_resume_after_us = now + 2000000;
+            atomic_store(&s_tx_enabled, false);
+            ESP_LOGI("p4_video", "video uplink paused; audio retained generation=%lu",
+                     (unsigned long)generation);
+        } else if (s_video_paused && !blocked && now >= s_video_resume_after_us &&
+                   (!limit || used <= limit / 10U)) {
+            s_video_paused = false;
+            ESP_LOGI("p4_video", "video uplink queue drained generation=%lu",
+                     (unsigned long)generation);
+        }
+    }
+    bool enabled = atomic_load(&s_camera_enabled) && !s_video_paused;
     if (s_worker_camera && (!enabled || !atomic_load(&s_tx_enabled))) {
         atomic_store(&s_tx_enabled, false);
         (void)camera_pipeline_set_rtc_video_enabled(false);
@@ -173,7 +265,15 @@ static esp_err_t send_video(const uint8_t *data, size_t len, uint16_t w, uint16_
         !generation || generation != starter_tirtc_generation() ||
         media != TIRTC_VIDEO_H264 || !starter_tirtc_video_ready()) return ESP_ERR_INVALID_STATE;
     p4_video_capture_offer(data, len, w, h, key, generation);
-    if (starter_tirtc_send_h264((uint32_t)(pts / 1000), data, len, key) < 0) {
+    int rc = starter_tirtc_send_h264((uint32_t)(pts / 1000), data, len, key);
+    if (rc < 0) {
+        atomic_fetch_add(&s_tx_failed, 1);
+        atomic_store(&s_tx_last_error, rc);
+        if (starter_tirtc_mode() == STARTER_TIRTC_CALL ||
+            starter_tirtc_mode() == STARTER_TIRTC_VOIP) {
+            atomic_store(&s_video_send_blocked, true);
+            atomic_store(&s_tx_enabled, false);
+        }
         /* A dropped reference frame makes subsequent P frames unusable. */
         camera_pipeline_request_key_frame();
         return ESP_FAIL;
@@ -232,6 +332,7 @@ void p4_video_poll(void)
     taskEXIT_CRITICAL(&s_lock);
     if (generation == s_worker_generation && mode == s_worker_mode && video == s_worker_video) {
         maintain_camera();
+        maintain_bitrate();
         return;
     }
     atomic_store(&s_live_generation, 0);
@@ -243,12 +344,18 @@ void p4_video_poll(void)
     if (camera_pipeline_is_running()) return; /* retained ownership; retry, no forced deletion */
     if (call_video_renderer_stop() != ESP_OK) return;
     s_worker_camera = false;
+    s_congestion_generation = generation;
+    s_video_paused = false;
+    s_video_resume_after_us = 0;
+    atomic_store(&s_video_send_blocked, false);
     atomic_store(&s_tx_enabled, false);
     s_subscribed_generation = 0;
     s_last_subscribe_us = 0;
     s_last_idr_us = 0;
     atomic_store(&s_need_idr, false);
     atomic_store(&s_sent, 0);
+    atomic_store(&s_tx_failed, 0);
+    atomic_store(&s_tx_last_error, 0);
     atomic_store(&s_rx_seen, 0);
     atomic_store(&s_rx_dropped, 0);
     atomic_store(&s_rx_last_stream, 0);
@@ -358,23 +465,43 @@ void p4_video_ui_reset(void)
     }
     s_image = NULL;
     s_image_desc.data = NULL;
+    s_presented_generation = 0;
+    s_last_presented_us = 0;
+}
+
+static void hide_video_image(void)
+{
+    if (s_image) lv_obj_add_flag(s_image, LV_OBJ_FLAG_HIDDEN);
+    if (s_presented_frame_held) {
+        lv_img_cache_invalidate_src(&s_image_desc);
+        s_image_desc.data = NULL;
+        call_video_renderer_release_presented_rgb565();
+        s_presented_frame_held = false;
+    }
 }
 
 void p4_video_ui_tick(lv_obj_t *screen, bool call_page)
 {
-    if (!call_page || !atomic_load(&s_live_generation)) {
-        if (s_image) lv_obj_add_flag(s_image, LV_OBJ_FLAG_HIDDEN);
-        if (s_presented_frame_held) {
-            call_video_renderer_release_presented_rgb565();
-            s_presented_frame_held = false;
-        }
+    uint32_t generation = atomic_load(&s_live_generation);
+    if (!call_page || !generation) {
+        hide_video_image();
+        s_presented_generation = 0;
         return;
+    }
+    if (s_presented_generation != generation) {
+        hide_video_image();
+        s_presented_generation = generation;
+        s_last_presented_us = 0;
     }
     const size_t frame_pixels =
         (size_t)CALL_VIDEO_RENDER_WIDTH * CALL_VIDEO_RENDER_HEIGHT;
     const uint16_t *pixels = NULL;
     size_t count = 0;
-    if (call_video_renderer_present_next_rgb565(&pixels, &count, NULL, NULL) != ESP_OK) return;
+    if (call_video_renderer_present_next_rgb565(&pixels, &count, NULL, NULL) != ESP_OK) {
+        if (s_presented_frame_held && esp_timer_get_time() - s_last_presented_us >= VIDEO_STALE_US)
+            hide_video_image();
+        return;
+    }
     if (!pixels || count != frame_pixels) {
         call_video_renderer_release_presented_rgb565();
         s_presented_frame_held = false;
@@ -385,6 +512,7 @@ void p4_video_ui_tick(lv_obj_t *screen, bool call_page)
      * Point LVGL at that stable PSRAM buffer directly instead of copying a
      * complete RGB565 frame on every video tick. */
     s_presented_frame_held = true;
+    s_last_presented_us = esp_timer_get_time();
     if (!s_image) {
         s_image_desc = (lv_img_dsc_t){
             .header = {

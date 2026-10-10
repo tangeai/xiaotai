@@ -54,6 +54,7 @@ COMMON = r'''
 #include <setjmp.h>
 #include "starter_runtime.h"
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 #define ESP_LOGW(...) ((void)0)
 #define ESP_LOGE(...) ((void)0)
 #define ESP_OK 0
@@ -118,6 +119,7 @@ int main(void) {
 
 def test_ack():
     body = r'''
+#define ESP_ERR_INVALID_STATE -1
 typedef enum { CALL_RING_NONE, CALL_RING_OUTGOING, CALL_RING_INCOMING, CALL_RING_AI_ACK } call_ring_kind_t;
 typedef struct { int64_t expires_ms; bool male; uint32_t expected_session, playback_epoch; } ai_ack_t;
 static atomic_uint s_call_ring_kind;
@@ -157,6 +159,7 @@ static void vTaskDelay(unsigned ms) {
     if (++delays == 4) longjmp(done, 1);
 }
 '''
+    body += function("../platforms/esp-idf/components/starter_product/src/starter_product.c", "ringtone_report_result")
     body += function("../platforms/esp-idf/components/starter_product/src/starter_product.c", "call_ring_task")
     body += r'''
 static void scenario(int state, int64_t expires, unsigned expected) {

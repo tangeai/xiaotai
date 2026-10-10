@@ -15,6 +15,7 @@
 
 /** Includes **/
 #include "string.h"
+#include <stdatomic.h>
 #include "sdio_drv.h"
 #include "sdio_reg.h"
 #include "serial_drv.h"
@@ -38,6 +39,9 @@ static const char TAG[] = "H_SDIO_DRV";
 
 #define SDIO_REG_SNAPSHOT_MAX_ATTEMPTS 3U
 #define SDIO_REG_SNAPSHOT_RETRY_US     200U
+/* The HAL length is uint16_t. Leave room for block-mode rounding and keep
+ * intermediate transfers aligned so a batch can span several CMD53 reads. */
+#define SDIO_RX_TRANSFER_MAX_BYTES ((UINT16_MAX / ESP_BLOCK_SIZE) * ESP_BLOCK_SIZE)
 
 /** Constants/Macros **/
 #define TO_SLAVE_QUEUE_SIZE               H_SDIO_TX_Q
@@ -562,24 +566,33 @@ static void sdio_write_task(void const* pvParameters)
 	uint32_t data_left;
 	uint32_t len_to_send;
 	uint32_t buf_needed;
-	uint8_t tx_needed = 1;
+	uint32_t empty_wakeups = 0;
 
 	while (!sdio_start_write_thread)
 		g_h.funcs->_h_msleep(10);
 
 	for (;;) {
+		/* Each dequeue owns one packet. Never retain a freed packet across an
+		 * empty wakeup or a failed wait during transport shutdown/recovery. */
+		len = 0;
+		sendbuf = NULL;
+		free_func = NULL;
+		buf_handle = (interface_buffer_handle_t){0};
 		/* Check if higher layers have anything to transmit */
-		g_h.funcs->_h_get_semaphore(sem_to_slave_queue, HOSTED_BLOCK_MAX);
+		if (g_h.funcs->_h_get_semaphore(sem_to_slave_queue, HOSTED_BLOCK_MAX))
+			continue;
 
 		/* Tx msg is present as per sem */
 		if (g_h.funcs->_h_dequeue_item(to_slave_queue[PRIO_Q_SERIAL], &buf_handle, 0))
 			if (g_h.funcs->_h_dequeue_item(to_slave_queue[PRIO_Q_BT], &buf_handle, 0))
 				if (g_h.funcs->_h_dequeue_item(to_slave_queue[PRIO_Q_OTHERS], &buf_handle, 0)) {
-					tx_needed = 0; /* No Tx msg */
+					if (++empty_wakeups == 1 || empty_wakeups % 256U == 0)
+						ESP_LOGW(TAG, "SDIO TX wake without queued packet: count=%lu",
+							(unsigned long)empty_wakeups);
+					continue;
 				}
 
-		if (tx_needed)
-			len = buf_handle.payload_len;
+		len = buf_handle.payload_len;
 
 		if (!len) {
 			ESP_LOGE(TAG, "%s: Empty len", __func__);
@@ -997,6 +1010,7 @@ static void sdio_read_task(void const* pvParameters)
 	uint32_t len_to_read;
 	uint8_t *pos;
 	uint32_t interrupts;
+	uint32_t large_batches = 0;
 
 #if DO_COMBINED_REG_READ
 	uint32_t *intr_index = NULL;
@@ -1184,11 +1198,17 @@ static void sdio_read_task(void const* pvParameters)
 			continue;
 		}
 
+		if (len_from_slave > SDIO_RX_TRANSFER_MAX_BYTES &&
+		    (++large_batches == 1 || large_batches % 256U == 0)) {
+			ESP_LOGW(TAG, "SDIO RX large batch split: bytes=%lu batches=%lu",
+				(unsigned long)len_from_slave, (unsigned long)large_batches);
+		}
 		data_left = len_from_slave;
 		pos = rxbuff;
 
 		do {
-			len_to_read = data_left;
+			len_to_read = data_left > SDIO_RX_TRANSFER_MAX_BYTES
+				? SDIO_RX_TRANSFER_MAX_BYTES : data_left;
 
 #if H_SDIO_RX_BLOCK_ONLY_XFER
 			/* Extend the transfer length to do block only transfers.
@@ -1197,11 +1217,11 @@ static void sdio_read_task(void const* pvParameters)
 			 */
 			uint32_t block_read_len = ((len_to_read + ESP_BLOCK_SIZE - 1) / ESP_BLOCK_SIZE) * ESP_BLOCK_SIZE;
 			ret = g_h.funcs->_h_sdio_read_block(sdio_handle,
-					ESP_SLAVE_CMD53_END_ADDR - data_left,
+					ESP_SLAVE_CMD53_END_ADDR - len_to_read,
 					pos, block_read_len, ACQUIRE_LOCK);
 #else
 			ret = g_h.funcs->_h_sdio_read_block(sdio_handle,
-					ESP_SLAVE_CMD53_END_ADDR - data_left,
+					ESP_SLAVE_CMD53_END_ADDR - len_to_read,
 					pos, len_to_read, ACQUIRE_LOCK);
 #endif
 			if (ret) {
@@ -1216,9 +1236,8 @@ static void sdio_read_task(void const* pvParameters)
 
 		SDIO_DRV_UNLOCK();
 
-		//TODO: unclear, on failure case
-		//sdio_rx_byte_count += (len_from_slave-data_left);
-		sdio_rx_byte_count += len_from_slave;
+		/* Only successful CMD53 requests have a known consumed length. */
+		sdio_rx_byte_count += len_from_slave - data_left;
 		sdio_rx_byte_count = sdio_rx_byte_count % ESP_RX_BYTE_MAX;
 
 		if (unlikely(ret))
@@ -1226,6 +1245,14 @@ static void sdio_read_task(void const* pvParameters)
 			g_h.funcs->_h_queue_item(sdio_rx_free_buf_queue,
 						   &rx_buffer_index,
 						   HOSTED_BLOCK_MAX);
+			/* The HAL supplies no consumed length on error. Even the
+			 * successful prefix may end inside a packet, so neither retrying
+			 * nor parsing a new batch can safely restore FIFO framing.
+			 * Use the existing fatal transport recovery after releasing
+			 * both the bus lock and this batch's buffer ownership.
+			 */
+			ESP_LOGE(TAG, "SDIO RX framing lost after read error; restarting host");
+			g_h.funcs->_h_restart_host();
 			continue;
 		}
 
@@ -1247,6 +1274,23 @@ static void sdio_read_task(void const* pvParameters)
 /**
  * TODO: unify sdio_process_rx_task() and spi_process_rx_task()
  */
+static int sdio_dispatch_network_rx(interface_buffer_handle_t *buffer,
+		void *payload, void *owner, uint16_t length)
+{
+	int ret = chan_arr[buffer->if_type]->rx(
+		chan_arr[buffer->if_type]->api_chan, payload, owner, length);
+#if ESP_PKT_STATS
+	if (buffer->if_type == ESP_STA_IF) {
+		if (ret == 0) {
+			atomic_fetch_add_explicit(&pkt_stats.sta_rx_out, 1U, memory_order_relaxed);
+		} else {
+			atomic_fetch_add_explicit(&pkt_stats.sta_rx_fail, 1U, memory_order_relaxed);
+		}
+	}
+#endif
+	return ret;
+}
+
 static void sdio_process_rx_task(void const* pvParameters)
 {
 	interface_buffer_handle_t buf_handle_l = {0};
@@ -1295,8 +1339,7 @@ static void sdio_process_rx_task(void const* pvParameters)
 					continue;
 				}
 				if (buf_handle->payload_zcopy) {
-					ret = chan_arr[buf_handle->if_type]->rx(
-						chan_arr[buf_handle->if_type]->api_chan,
+					ret = sdio_dispatch_network_rx(buf_handle,
 						buf_handle->payload,
 						buf_handle->priv_buffer_handle,
 						buf_handle->payload_len);
@@ -1320,7 +1363,7 @@ static void sdio_process_rx_task(void const* pvParameters)
 				memcpy(copy_payload, buf_handle->payload, buf_handle->payload_len);
 				H_FREE_PTR_WITH_FUNC(buf_handle->free_buf_handle, buf_handle->priv_buffer_handle);
 
-				ret = chan_arr[buf_handle->if_type]->rx(chan_arr[buf_handle->if_type]->api_chan,
+				ret = sdio_dispatch_network_rx(buf_handle,
 						copy_payload, copy_payload, buf_handle->payload_len);
 				if (unlikely(ret))
 					HOSTED_FREE(copy_payload);
@@ -1473,7 +1516,23 @@ int esp_hosted_tx(uint8_t iface_type, uint8_t iface_num,
 		pkt_prio = PRIO_Q_BT;
 	/* else OTHERS by default */
 
-	g_h.funcs->_h_queue_item(to_slave_queue[pkt_prio], &buf_handle, HOSTED_BLOCK_MAX);
+	/* Signal only a successfully queued packet. On failure the producer still
+	 * owns the buffer; returning success would leak it and create a phantom
+	 * semaphore credit for the shared Wi-Fi/RPC writer. */
+	if (g_h.funcs->_h_queue_item(to_slave_queue[pkt_prio], &buf_handle, HOSTED_BLOCK_MAX)) {
+#if ESP_PKT_STATS
+		if (buf_handle.if_type == ESP_STA_IF)
+			pkt_stats.sta_tx_in_drop++;
+#endif
+		static atomic_uint enqueue_failures;
+		unsigned count = atomic_fetch_add_explicit(&enqueue_failures, 1,
+			memory_order_relaxed) + 1;
+		if (count == 1 || count % 256U == 0)
+			ESP_LOGW(TAG, "SDIO TX enqueue failed: count=%lu",
+				(unsigned long)count);
+		H_FREE_PTR_WITH_FUNC(free_func, wbuffer);
+		return ESP_FAIL;
+	}
 	g_h.funcs->_h_post_semaphore(sem_to_slave_queue);
 
 #if ESP_PKT_STATS

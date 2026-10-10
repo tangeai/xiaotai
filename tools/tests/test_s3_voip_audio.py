@@ -10,6 +10,7 @@ COMMON=r'''
 #include <stdbool.h>
 #include <stddef.h>
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 #define CONFIG_IDF_TARGET_ESP32P4 0
 #define TIRTC_E_INVALID_PARAMETER -1
 #define TIRTC_AUDIO_ALAW 1

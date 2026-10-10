@@ -99,6 +99,7 @@ typedef struct {
     bool caption_final;
     char subtitle[193];
     char emotion[16];
+    bool emotion_tag_present;
     bool call_incoming;
     bool call_wechat;
     bool call_microphone_muted;

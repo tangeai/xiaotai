@@ -74,6 +74,10 @@ static atomic_int s_mode;
  */
 static atomic_uint_fast32_t s_generation_counter;
 static atomic_uint_fast32_t s_active_generation;
+static atomic_uint s_send_buffer_limit;
+/* One latest suggestion; never allocate or reconfigure hardware on SDK threads. */
+static portMUX_TYPE s_bitrate_lock = portMUX_INITIALIZER_UNLOCKED;
+static uint32_t s_bitrate_generation, s_bitrate_target;
 static atomic_uint_fast32_t s_request_counter;
 static atomic_uint_fast32_t s_pending_request;
 static atomic_uint_fast32_t s_pending_tag;
@@ -310,7 +314,7 @@ static void on_audio(tirtc_conn_t connection,
                             &s_downlink_audio_accepted, 1,
                             memory_order_relaxed) + 1U;
     if (accepted == 1U || accepted % 100U == 0U) {
-        ESP_LOGI(TAG,
+        ESP_LOGD(TAG,
                  "downlink accepted mode=%d stream=%u media=%u flags=%u len=%lu",
                  (int)mode,
                  (unsigned)copy.stream_id,
@@ -424,6 +428,47 @@ static void on_unsubscribe_video(tirtc_conn_t connection, uint8_t stream_id)
     }
 }
 
+static void on_update_bitrate(tirtc_conn_t connection, uint8_t stream_id,
+                              uint32_t target_bitrate_bps)
+{
+    starter_tirtc_mode_t mode = starter_tirtc_mode();
+    if (!connection_matches(connection) || !target_bitrate_bps ||
+        (mode != STARTER_TIRTC_H5 && mode != STARTER_TIRTC_CALL &&
+         mode != STARTER_TIRTC_VOIP) || stream_id != video_stream_for_mode(mode)) return;
+    taskENTER_CRITICAL(&s_bitrate_lock);
+    if (connection_matches(connection)) {
+        s_bitrate_generation = atomic_load(&s_active_generation);
+        s_bitrate_target = target_bitrate_bps;
+    }
+    taskEXIT_CRITICAL(&s_bitrate_lock);
+}
+
+bool starter_tirtc_take_video_bitrate(uint32_t generation, uint32_t *target_bps)
+{
+    if (!generation || !target_bps) return false;
+    taskENTER_CRITICAL(&s_bitrate_lock);
+    bool valid = generation == atomic_load(&s_active_generation) &&
+        generation == s_bitrate_generation && s_bitrate_target != 0;
+    if (valid) {
+        *target_bps = s_bitrate_target;
+        s_bitrate_target = 0;
+    }
+    taskEXIT_CRITICAL(&s_bitrate_lock);
+    return valid;
+}
+
+int starter_tirtc_set_video_bitrate_range(uint32_t min_bps, uint32_t max_bps,
+                                         uint32_t start_bps)
+{
+    tirtc_conn_t conn = (tirtc_conn_t)atomic_load(&s_connection);
+    starter_tirtc_mode_t mode = starter_tirtc_mode();
+    if (!conn || !min_bps || min_bps > start_bps || start_bps > max_bps ||
+        (mode != STARTER_TIRTC_H5 && mode != STARTER_TIRTC_CALL &&
+         mode != STARTER_TIRTC_VOIP)) return TIRTC_E_INVALID_PARAMETER;
+    return TiRtcConnSetVideoBitrateParams(conn, video_stream_for_mode(mode),
+                                         min_bps, max_bps, start_bps);
+}
+
 static const TIRTCCALLBACKS s_callbacks = {
     /* SDK 在自己的线程调用这些函数；每个函数都必须快速返回。 */
     .on_event = on_event,
@@ -438,6 +483,7 @@ static const TIRTCCALLBACKS s_callbacks = {
     .on_unsubscribe_video = on_unsubscribe_video,
     .on_subscribe_audio = on_subscribe_audio,
     .on_unsubscribe_audio = on_unsubscribe_audio,
+    .on_update_bitrate = on_update_bitrate,
 };
 
 const char *starter_tirtc_version(void) { return TiRtcGetVersion(); }
@@ -527,6 +573,7 @@ int starter_tirtc_start(const starter_tirtc_config_t *config)
     TiRtcLogSetCallback(sdk_log);
     TiRtcLogSetLevel(config->log_level > 0 ? config->log_level : 3);
     int rc = 0;
+    atomic_store(&s_send_buffer_limit, 0);
     if (config->max_send_buffer_bytes > 0U) {
         rc = TiRtcSetOption(TIRTC_OPT_MAX_SEND_BUFFER,
                             &config->max_send_buffer_bytes,
@@ -535,6 +582,7 @@ int starter_tirtc_start(const starter_tirtc_config_t *config)
             log_start_failure("TiRtcSetOption(MAX_SEND_BUFFER)", rc);
             return rc;
         }
+        atomic_store(&s_send_buffer_limit, config->max_send_buffer_bytes);
     }
     log_start_memory("pre-init");
     rc = TiRtcInit();
@@ -814,6 +862,16 @@ int starter_tirtc_send_h264(uint32_t timestamp_ms, const void *data, uint32_t le
 {
     tirtc_conn_t conn = (tirtc_conn_t)atomic_load(&s_connection);
     if (!conn || !data || !length || !starter_tirtc_video_ready()) return TIRTC_E_INVALID_PARAMETER;
+    /* Include this frame in admission. Audio bypasses this video budget.
+     * This is headroom, not a guarantee when the transport stops draining. */
+    size_t limit = atomic_load(&s_send_buffer_limit);
+    if (limit) {
+        size_t reserve = limit / 8U;
+        if (reserve > 65536U) reserve = 65536U;
+        size_t budget = limit - reserve;
+        size_t used = TiRtcGetSendBufferUsed(conn);
+        if (used >= budget || length > budget - used) return TIRTC_E_BUSY;
+    }
     TIRTCFRAMEINFO frame = {.stream_id = video_stream_for_mode(starter_tirtc_mode()), .media = TIRTC_VIDEO_H264,
         .flags = key ? TIRTC_FRAME_FLAG_KEY_FRAME : 0, .ts = timestamp_ms, .length = length};
     return TiRtcSendVideoStream(conn, &frame, data);
@@ -873,4 +931,9 @@ size_t starter_tirtc_send_buffer_used(void)
     tirtc_conn_t connection = (tirtc_conn_t)atomic_load_explicit(
         &s_connection, memory_order_acquire);
     return connection == NULL ? 0U : TiRtcGetSendBufferUsed(connection);
+}
+
+size_t starter_tirtc_send_buffer_limit(void)
+{
+    return atomic_load(&s_send_buffer_limit);
 }

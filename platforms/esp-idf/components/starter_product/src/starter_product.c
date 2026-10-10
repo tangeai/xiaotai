@@ -287,6 +287,11 @@ static bool s_hint_visible;
 static bool s_ambient_visible;
 static uint8_t s_previous_audio_level;
 static uint8_t s_expression_audio_level;
+static starter_playback_waveform_t s_playback_waveform;
+static bool s_rendered_waveform;
+static bool s_face_tag_active;
+static bool s_face_default_ai;
+static bool s_rendered_default_ai;
 static bool s_prefer_local_expression = true;
 static uint8_t s_idle_persona_stage = UINT8_MAX;
 static starter_runtime_state_t s_previous_runtime_state = STARTER_RUNTIME_WAITING;
@@ -1541,6 +1546,15 @@ static void on_home_tap(lv_event_t *event)
     render_page();
 }
 
+static void ringtone_report_result(esp_err_t err)
+{
+    if (err == ESP_OK) return;
+    /* Active media, mute and explicit cancellation intentionally reject prompts. */
+    if (err != ESP_ERR_INVALID_STATE)
+        ESP_LOGW(TAG, "call ringtone playback failed: %s", esp_err_to_name(err));
+    vTaskDelay(pdMS_TO_TICKS(100));
+}
+
 static void call_ring_task(void *argument)
 {
     (void)argument;
@@ -1599,10 +1613,7 @@ static void call_ring_task(void *argument)
             starter_media_play_pcm8k(
             (const int16_t *)(start + WAV_PCM_OFFSET),
             (bytes - WAV_PCM_OFFSET) / sizeof(int16_t));
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "call ringtone playback failed: %s", esp_err_to_name(err));
-            vTaskDelay(pdMS_TO_TICKS(100));
-        }
+        ringtone_report_result(err);
         /* One-shot acknowledgement was consumed before playback. Cancellation,
          * silence or a busy output never leaves it pending for another session. */
     }
@@ -2826,6 +2837,32 @@ typedef struct {
     uint32_t color;
 } expression_geometry_t;
 
+typedef struct {
+    uint32_t last_ms, slow_at_ms;
+    bool rendered, throttled;
+} expression_animation_budget_t;
+
+static bool expression_animation_due(expression_animation_budget_t *budget,
+                                     uint32_t now_ms, bool urgent)
+{
+    if (budget->throttled && (uint32_t)(now_ms - budget->slow_at_ms) >= 3000U)
+        budget->throttled = false;
+    uint32_t interval_ms = budget->throttled ? 200U : 100U;
+    return urgent || !budget->rendered ||
+        (uint32_t)(now_ms - budget->last_ms) >= interval_ms;
+}
+
+static void expression_animation_record(expression_animation_budget_t *budget,
+                                        uint32_t now_ms, int64_t elapsed_us)
+{
+    budget->last_ms = now_ms;
+    budget->rendered = true;
+    if (elapsed_us >= 10000) {
+        budget->throttled = true;
+        budget->slow_at_ms = now_ms;
+    }
+}
+
 static void clear_expression_part(const expression_geometry_t *geometry,
                                   bool left_eye,
                                   bool mouth,
@@ -2859,6 +2896,7 @@ static void apply_expression(const char *emotion,
     (void)phase;
     static expression_geometry_t previous_geometry;
     static bool previous_geometry_valid;
+    static starter_playback_waveform_t previous_waveform;
     if (s_face == NULL || s_face_canvas_buffer == NULL) {
         return;
     }
@@ -3101,13 +3139,47 @@ static void apply_expression(const char *emotion,
         geometry.color = 0x91F2C8;
     }
 
-    if (phase == STARTER_AI_UI_SPEAKING &&
+    if (s_page == PAGE_HOME_FACE && s_face_default_ai && !s_face_tag_active) {
+        /* Draw fixed squinting eyes once on entry. PCM and microphone activity
+         * only affect the mouth; there is no blink timer during AI playback. */
+        geometry.left_x = 18; geometry.left_y = 43;
+        geometry.left_w = 64; geometry.left_h = 6;
+        geometry.right_x = 138; geometry.right_y = 43;
+        geometry.right_w = 64; geometry.right_h = 6;
+        geometry.eye_radius = 3;
+    }
+    bool waveform = s_page == PAGE_HOME_FACE && !s_face_tag_active &&
+                    s_playback_waveform.active;
+    if (waveform) {
+        /* Keep a fixed clearing box below every emotion's eyes. */
+        geometry.mouth_x = 68; geometry.mouth_y = 78;
+        geometry.mouth_w = 84; geometry.mouth_h = 28;
+    } else if (!s_face_tag_active && phase == STARTER_AI_UI_SPEAKING &&
         strcmp(effective, "speech") != 0) {
         geometry.mouth_h = (lv_coord_t)(geometry.mouth_h + activity_level * 2U);
     }
-    /* Keep one persistent backing store, but clear only the three previous
-     * shapes.  Filling all 23,760 pixels in PSRAM on every mouth/eye change was
-     * measured at 20-34 ms on hardware and made the 100 ms UI tick noisy. */
+    bool previous_valid = previous_geometry_valid && s_rendered_expression[0] != '\0';
+    bool eyes_changed = !previous_valid || geometry.color != previous_geometry.color ||
+        geometry.eye_radius != previous_geometry.eye_radius ||
+        geometry.left_x != previous_geometry.left_x || geometry.left_y != previous_geometry.left_y ||
+        geometry.left_w != previous_geometry.left_w || geometry.left_h != previous_geometry.left_h ||
+        geometry.right_x != previous_geometry.right_x || geometry.right_y != previous_geometry.right_y ||
+        geometry.right_w != previous_geometry.right_w || geometry.right_h != previous_geometry.right_h;
+    bool mouth_changed = !previous_valid || geometry.color != previous_geometry.color ||
+        geometry.mouth_radius != previous_geometry.mouth_radius ||
+        geometry.mouth_x != previous_geometry.mouth_x || geometry.mouth_y != previous_geometry.mouth_y ||
+        geometry.mouth_w != previous_geometry.mouth_w || geometry.mouth_h != previous_geometry.mouth_h ||
+        waveform != previous_waveform.active ||
+        (waveform && memcmp(s_playback_waveform.points, previous_waveform.points,
+                            sizeof(previous_waveform.points)) != 0);
+    if (!eyes_changed && !mouth_changed) return;
+
+    /* Canvas draw calls invalidate the entire image in LVGL 8. Batch them
+     * while holding the existing UI lock, then submit one damaged region.
+     * Preserve an outer caller's invalidation setting. No audio lock is used. */
+    lv_disp_t *display = lv_obj_get_disp(s_face);
+    bool invalidation_enabled = lv_disp_is_invalidation_enabled(display);
+    lv_disp_enable_invalidation(display, false);
     lv_color_t color = lv_color_hex(geometry.color);
     lv_draw_rect_dsc_t eye_dsc;
     lv_draw_rect_dsc_init(&eye_dsc);
@@ -3119,25 +3191,75 @@ static void apply_expression(const char *emotion,
     mouth_dsc.bg_color = color;
     mouth_dsc.bg_opa = LV_OPA_COVER;
     mouth_dsc.radius = geometry.mouth_radius;
-    if (previous_geometry_valid && s_rendered_expression[0] != '\0') {
+    if (previous_valid) {
         lv_draw_rect_dsc_t clear_dsc;
         lv_draw_rect_dsc_init(&clear_dsc);
         clear_dsc.bg_color = lv_color_hex(HOME_BACKGROUND_COLOR);
         clear_dsc.bg_opa = LV_OPA_COVER;
         clear_dsc.radius = 0;
-        clear_expression_part(&previous_geometry, true, false, &clear_dsc);
-        clear_expression_part(&previous_geometry, false, false, &clear_dsc);
-        clear_expression_part(&previous_geometry, false, true, &clear_dsc);
+        if (eyes_changed) {
+            clear_expression_part(&previous_geometry, true, false, &clear_dsc);
+            clear_expression_part(&previous_geometry, false, false, &clear_dsc);
+        }
+        if (mouth_changed) clear_expression_part(&previous_geometry, false, true, &clear_dsc);
     }
-    lv_canvas_draw_rect(s_face, geometry.left_x, geometry.left_y,
-                        geometry.left_w, geometry.left_h, &eye_dsc);
-    lv_canvas_draw_rect(s_face, geometry.right_x, geometry.right_y,
-                        geometry.right_w, geometry.right_h, &eye_dsc);
-    lv_canvas_draw_rect(s_face, geometry.mouth_x, geometry.mouth_y,
-                        geometry.mouth_w, geometry.mouth_h, &mouth_dsc);
+    if (eyes_changed) {
+        lv_canvas_draw_rect(s_face, geometry.left_x, geometry.left_y,
+                            geometry.left_w, geometry.left_h, &eye_dsc);
+        lv_canvas_draw_rect(s_face, geometry.right_x, geometry.right_y,
+                            geometry.right_w, geometry.right_h, &eye_dsc);
+    }
+    if (mouth_changed && waveform) {
+        lv_point_t points[STARTER_PLAYBACK_WAVEFORM_POINTS];
+        for (size_t i = 0; i < STARTER_PLAYBACK_WAVEFORM_POINTS; ++i) {
+            points[i].x = (lv_coord_t)(70 + i * 80 /
+                (STARTER_PLAYBACK_WAVEFORM_POINTS - 1U));
+            points[i].y = (lv_coord_t)(92 - s_playback_waveform.points[i] * 12 / 16);
+        }
+        lv_draw_line_dsc_t line_dsc;
+        lv_draw_line_dsc_init(&line_dsc);
+        line_dsc.color = color;
+        line_dsc.width = 2;
+        line_dsc.opa = LV_OPA_COVER;
+        line_dsc.round_start = true;
+        line_dsc.round_end = true;
+        lv_canvas_draw_line(s_face, points, STARTER_PLAYBACK_WAVEFORM_POINTS,
+                            &line_dsc);
+    } else if (mouth_changed) {
+        lv_canvas_draw_rect(s_face, geometry.mouth_x, geometry.mouth_y,
+                            geometry.mouth_w, geometry.mouth_h, &mouth_dsc);
+    }
+    lv_disp_enable_invalidation(display, invalidation_enabled);
+    if (eyes_changed) {
+        lv_obj_invalidate(s_face);
+    } else {
+        /* Image zoom (pivot 0,0) is independent of object style transforms.
+         * Pass screen coordinates; LVGL applies ancestor transforms/clipping. */
+        lv_area_t coords;
+        lv_obj_get_coords(s_face, &coords);
+        uint32_t zoom = lv_img_get_zoom(s_face);
+        lv_coord_t x1 = geometry.mouth_x < previous_geometry.mouth_x ?
+            geometry.mouth_x : previous_geometry.mouth_x;
+        lv_coord_t y1 = geometry.mouth_y < previous_geometry.mouth_y ?
+            geometry.mouth_y : previous_geometry.mouth_y;
+        lv_coord_t x2 = geometry.mouth_x + geometry.mouth_w;
+        lv_coord_t y2 = geometry.mouth_y + geometry.mouth_h;
+        if (previous_geometry.mouth_x + previous_geometry.mouth_w > x2)
+            x2 = previous_geometry.mouth_x + previous_geometry.mouth_w;
+        if (previous_geometry.mouth_y + previous_geometry.mouth_h > y2)
+            y2 = previous_geometry.mouth_y + previous_geometry.mouth_h;
+        lv_area_t damage = {
+            .x1 = coords.x1 + (x1 - 2) * zoom / 256,
+            .y1 = coords.y1 + (y1 - 2) * zoom / 256,
+            .x2 = coords.x1 + ((x2 + 2) * zoom + 255) / 256,
+            .y2 = coords.y1 + ((y2 + 2) * zoom + 255) / 256,
+        };
+        lv_obj_invalidate_area(s_face, &damage);
+    }
     previous_geometry = geometry;
     previous_geometry_valid = true;
-    lv_obj_invalidate(s_face);
+    previous_waveform = s_playback_waveform;
+    previous_waveform.active = waveform;
 }
 
 static void append_ai_history(const char *subtitle)
@@ -3620,8 +3742,15 @@ static void product_tick(lv_timer_t *timer)
             label_set_text_if_changed(s_activity, "");
         }
     }
+    starter_media_playback_waveform(&s_playback_waveform);
+    s_face_tag_active = ai_now && product.emotion_tag_present;
+    s_face_default_ai = ai_now && !s_face_tag_active;
+    if (s_face_tag_active) s_playback_waveform.active = false;
     const char *emotion = product.emotion;
-    if (emotion[0] == '\0' || s_prefer_local_expression) {
+    /* A selected local face is an idle preference, never an override of an
+     * emotion supplied by the active AI session. */
+    if (emotion[0] == '\0' || (ai_now && !product.emotion_tag_present) ||
+        (s_prefer_local_expression && !ai_now)) {
         emotion = s_emoji_keys[s_preferences.emoji_index];
     }
     if (session_idle && s_ambient_visible) {
@@ -3631,14 +3760,22 @@ static void product_tick(lv_timer_t *timer)
     } else if (session_idle && idle_stage == 1U) {
         emotion = "relaxed";
     }
+    static expression_animation_budget_t animation_budget;
+    bool expression_urgent = strcmp(emotion, s_rendered_expression) != 0 ||
+        product.ai_phase != s_previous_ai_phase ||
+        s_face_default_ai != s_rendered_default_ai ||
+        s_playback_waveform.active != s_rendered_waveform;
     if (home && s_page == PAGE_HOME_FACE &&
-        (strcmp(emotion, s_rendered_expression) != 0 ||
-         product.ai_phase != s_previous_ai_phase ||
-         media.audio_activity_level != s_expression_audio_level)) {
+        (expression_urgent || media.audio_activity_level != s_expression_audio_level ||
+         s_playback_waveform.active) &&
+        expression_animation_due(&animation_budget, (uint32_t)now, expression_urgent)) {
         const int64_t expression_started_us = esp_timer_get_time();
         apply_expression(emotion, product.ai_phase, media.audio_activity_level);
         expression_elapsed_us = esp_timer_get_time() - expression_started_us;
+        expression_animation_record(&animation_budget, (uint32_t)now, expression_elapsed_us);
         s_expression_audio_level = media.audio_activity_level;
+        s_rendered_waveform = s_playback_waveform.active;
+        s_rendered_default_ai = s_face_default_ai;
         (void)snprintf(s_rendered_expression,
                        sizeof(s_rendered_expression), "%s", emotion);
     }

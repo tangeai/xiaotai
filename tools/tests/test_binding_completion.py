@@ -18,6 +18,7 @@ typedef int esp_err_t;
 #define VERIFICATION_PROMPT_GAP_MS 700
 #define pdMS_TO_TICKS(x) (x)
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 static atomic_bool s_verification_prompt_cancelled;
 static unsigned epoch, plays, delays, trigger;
 static uint32_t starter_media_playback_epoch(void){return epoch;}
@@ -89,6 +90,7 @@ int main(void){prompt_task(0);assert(writes==2 && delays<=20 && stops==1 && free
 #define MQTT_EVENT_PUBLISHED 1
 #define PROVISION_DONE_BIT 1
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 static atomic_bool s_verification_prompt_cancelled;
 static unsigned cancels,done;
 static void starter_media_cancel_pcm8k_playback(void){cancels++;}
@@ -120,6 +122,7 @@ typedef int esp_err_t;
 #define ESP_OK 0
 #define DISCOVERY_URL "test"
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 static atomic_bool s_verification_prompt_cancelled;
 typedef struct {char device_id[65],device_secret[257];} runtime_tirtc_config_t;
 static runtime_tirtc_config_t s_tirtc_config;

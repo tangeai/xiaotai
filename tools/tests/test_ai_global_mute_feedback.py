@@ -20,6 +20,7 @@ class AIGlobalMuteFeedback(unittest.TestCase):
 #define ESP_OK 0
 #define EVENT_AI_START 1
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 #define ESP_LOGW(tag,...) snprintf(log_text,sizeof(log_text),__VA_ARGS__)
 #define STARTER_RUNTIME_WAITING 0
 #define STARTER_RUNTIME_H5_ACTIVE 1

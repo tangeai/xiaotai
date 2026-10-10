@@ -53,7 +53,7 @@ static int command_version(int argc, char **argv)
     return 0;
 }
 
-/* [DEBUG-wake49] Console-only output: never print from the capture/model hot path. */
+/* Console-only output: never print from the capture/model hot path. */
 static void print_wake_diagnostics(void)
 {
     starter_media_audio_diagnostics_t audio;
@@ -69,13 +69,13 @@ static void print_wake_diagnostics(void)
            (unsigned long)v.detect_avg_us, (unsigned long)v.max_detect_us,
            (unsigned long)v.detect_over_budget, (unsigned long)v.reject_epoch,
            (unsigned long)v.reject_age, (unsigned long)v.reject_id);
-    printf("[DEBUG-wake49] level mic/ref/clean rms-avg=%lu/%lu/%lu rms-max=%lu/%lu/%lu "
+    printf("Voice levels: mic/ref/clean rms-avg=%lu/%lu/%lu rms-max=%lu/%lu/%lu "
            "peak=%lu/%lu/%lu dc=%ld/%ld/%ld\n",
            (unsigned long)audio.rms_avg[0], (unsigned long)audio.rms_avg[1], (unsigned long)audio.rms_avg[2],
            (unsigned long)audio.rms_max[0], (unsigned long)audio.rms_max[1], (unsigned long)audio.rms_max[2],
            (unsigned long)audio.peak[0], (unsigned long)audio.peak[1], (unsigned long)audio.peak[2],
            (long)audio.dc_avg[0], (long)audio.dc_avg[1], (long)audio.dc_avg[2]);
-    printf("[DEBUG-wake49] window=%lu frames=%lu at-ms=%lu age-ms=%lu "
+    printf("Voice window: id=%lu frames=%lu at-ms=%lu age-ms=%lu "
            "aec-us-avg=%lu measure-us-avg/max=%lu/%lu\n",
            (unsigned long)audio.window, (unsigned long)audio.frames,
            (unsigned long)audio.at_ms, (unsigned long)(now - audio.at_ms),
@@ -97,7 +97,7 @@ static int command_voice_diag(int argc, char **argv)
         print_wake_diagnostics();
         if (i != seconds) vTaskDelay(pdMS_TO_TICKS(1000));
     }
-    printf("[DEBUG-wake49] Observation complete; no configuration or model state changed.\n");
+    printf("Voice observation: complete; no configuration or model state changed.\n");
     return 0;
 }
 
@@ -110,7 +110,7 @@ static void print_audio_timing(starter_media_status_t media)
                (unsigned long)media.audio_rx_overflow,
                (unsigned long)media.audio_rx_prefill_waits);
         if (media.audio_pcm_last_samples == 0U) {
-            /* P4 currently does not populate PCM/decode/lock/write timings.
+            /* Before a decoded frame, timing fields have no observation.
              * Zero-initialized fields are unavailable, not zero-cost work. */
             printf("Audio RX queue: queue-peak=%lu\n",
                    (unsigned long)media.audio_rx_queue_peak);
@@ -125,14 +125,45 @@ static void print_audio_timing(starter_media_status_t media)
                (unsigned long)media.audio_decode_max_us,
                (unsigned long)media.audio_lock_max_us,
                (unsigned long)media.audio_write_max_us);
-        printf("Audio timing avg: encode/decode/lock/write=%lu/%lu/%lu/%lu us "
-               "encode-max=%lu us\n",
-               (unsigned long)media.audio_encode_avg_us,
+        printf("Audio timing avg: decode/lock/write=%lu/%lu/%lu us\n",
                (unsigned long)media.audio_decode_avg_us,
                (unsigned long)media.audio_lock_avg_us,
-               (unsigned long)media.audio_write_avg_us,
-               (unsigned long)media.audio_encode_max_us);
+               (unsigned long)media.audio_write_avg_us);
+        if (media.audio_encode_max_us != 0U) {
+            printf("Audio encode timing: avg/max=%lu/%lu us\n",
+                   (unsigned long)media.audio_encode_avg_us,
+                   (unsigned long)media.audio_encode_max_us);
+        } else {
+            printf("Audio encode timing: unavailable (not collected)\n");
+        }
     }
+}
+
+/* Temporary observation: normal reply boundaries may also cross the threshold. */
+static void print_audio_gap_observation(starter_media_status_t media)
+{
+    if (!media.audio_trace_supported) return;
+    if (media.audio_rx_prefill_target_ms != 0U) {
+        printf("Audio AI buffer: target-ms=%lu rebuffers=%lu\n",
+               (unsigned long)media.audio_rx_prefill_target_ms,
+               (unsigned long)media.audio_rx_rebuffers);
+    }
+    if (media.audio_trace_frame == 0U) {
+        printf("Audio gap observation: no complete observation; not a continuity verdict\n");
+        return;
+    }
+    printf("Audio gap observation: at-ms=%lu frame=%lu "
+           "write-gap-ms=%lu rx-gap-ms=%lu queue-ms=%lu pending=%lu "
+           "decode/lock/write=%lu/%lu/%lu us\n",
+           (unsigned long)media.audio_trace_at_ms,
+           (unsigned long)media.audio_trace_frame,
+           (unsigned long)media.audio_trace_write_gap_ms,
+           (unsigned long)media.audio_trace_rx_gap_ms,
+           (unsigned long)media.audio_trace_queue_ms,
+           (unsigned long)media.audio_trace_pending,
+           (unsigned long)media.audio_trace_decode_us,
+           (unsigned long)media.audio_trace_lock_us,
+           (unsigned long)media.audio_trace_write_us);
 }
 
 static int command_status(int argc, char **argv)
@@ -182,6 +213,7 @@ static int command_status(int argc, char **argv)
            (unsigned long)media.audio_rx_overflow,
            (unsigned long)media.audio_rx_last_ms);
     print_audio_timing(media);
+    print_audio_gap_observation(media);
     printf("AEC: processed=%lu errors=%lu clipped-mic/ref=%lu/%lu\n",
            (unsigned long)media.aec_processed,
            (unsigned long)media.aec_errors,
@@ -382,6 +414,27 @@ static int command_restart(int argc, char **argv)
     return 0;
 }
 
+static int command_face_animation(int argc, char **argv)
+{
+    if (argc > 2) {
+        printf("Usage: face-animation [on|off]\n");
+        return 1;
+    }
+    if (argc == 2) {
+        if (strcmp(argv[1], "on") == 0) {
+            starter_media_set_face_animation_enabled(true);
+        } else if (strcmp(argv[1], "off") == 0) {
+            starter_media_set_face_animation_enabled(false);
+        } else {
+            printf("Usage: face-animation [on|off]\n");
+            return 1;
+        }
+    }
+    printf("Face animation: %s\n",
+           starter_media_face_animation_enabled() ? "on" : "off");
+    return 0;
+}
+
 static esp_err_t register_command(const char *name,
                                   const char *help,
                                   esp_console_cmd_func_t function)
@@ -406,6 +459,8 @@ esp_err_t starter_console_start(void)
                         "starter_console", "register version");
     ESP_RETURN_ON_ERROR(register_command("status", "Show starter status", command_status),
                         "starter_console", "register status");
+    ESP_RETURN_ON_ERROR(register_command("face-animation", "face-animation [on|off]; volatile A/B control", command_face_animation),
+                        "starter_console", "register face-animation");
     ESP_RETURN_ON_ERROR(register_command("voice-config", "Set volatile Voicute threshold (50..990)", command_voice_config),
                         "starter_console", "register voice-config");
     ESP_RETURN_ON_ERROR(register_command("voice-diag", "Observe audio levels for 5..30 seconds", command_voice_diag),

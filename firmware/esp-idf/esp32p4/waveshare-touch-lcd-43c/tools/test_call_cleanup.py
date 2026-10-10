@@ -25,6 +25,7 @@ code = r'''
 #define PLATFORM_SERVICE_CALL 1
 #define ESP_LOGW(...) ((void)0)
 #define ESP_LOGI(...) ((void)0)
+#define ESP_LOGD(...) ((void)0)
 typedef int esp_err_t;
 typedef struct { int valueint; } cJSON;
 static cJSON json;

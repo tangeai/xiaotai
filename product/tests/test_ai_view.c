@@ -34,6 +34,7 @@ int main(void)
     xiaotai_ai_view_t view;
     xiaotai_ai_view_init(&view);
     assert(view.phase == XIAOTAI_AI_UI_LISTENING);
+    assert(!view.emotion_tag_present);
     assert(strcmp(view.emotion, "happy") == 0);
     for (size_t i = 0U;
          i < sizeof(platform_emotions) / sizeof(platform_emotions[0]); ++i) {
@@ -56,6 +57,7 @@ int main(void)
         "{\"method\":\"round_start\",\"params\":{\"emotion\":\"cool\"}}",
         102U));
     assert(strcmp(view.emotion, "cool") == 0);
+    assert(view.emotion_tag_present);
     assert(xiaotai_ai_view_apply(&view,
         "{\"type\":\"ai_reply\",\"text\":\"真棒\","
         "\"emotion\":\"surprised\",\"is_final\":true}", 103U));
@@ -75,7 +77,7 @@ int main(void)
         "\"is_final\":true,\"emotion\":\"thinking\"}}", 106U));
     assert(strcmp(view.emotion, "thinking") == 0);
 
-    assert(!xiaotai_ai_view_apply(&view,
+    assert(xiaotai_ai_view_apply(&view,
         "{\"method\":\"caption\",\"params\":{\"caption_type\":1,"
         "\"utterance_id\":\"u2\",\"text\":\"A\",\"mode\":0}}", 150U));
     assert(view.phase == XIAOTAI_AI_UI_SPEAKING);
@@ -94,6 +96,39 @@ int main(void)
         "{\"method\":\"caption\",\"params\":{\"caption_type\":1,"
         "\"utterance_id\":\"u4\",\"text\":\"没有情绪字段\",\"mode\":0,"
         "\"is_final\":true}}", 300U));
-    assert(strcmp(view.emotion, "sad") == 0);
+    assert(strcmp(view.emotion, "happy") == 0);
+    assert(!view.emotion_tag_present); /* new reply cannot inherit the last TAG */
+    assert(xiaotai_ai_view_apply(&view,
+        "{\"method\":\"round_start\",\"params\":{\"tag\":\"中性\"}}", 400U));
+    assert(view.emotion_tag_present && !strcmp(view.emotion,"neutral"));
+    assert(xiaotai_ai_view_apply(&view,
+        "{\"method\":\"caption\",\"params\":{\"caption_type\":1,\"utterance_id\":\"u5\",\"text\":\"A\",\"is_final\":true}}", 401U));
+    assert(view.emotion_tag_present); /* first caption preserves round_start TAG */
+    assert(xiaotai_ai_view_apply(&view,"{\"method\":\"round_start\"}", 500U));
+    assert(!view.emotion_tag_present && !strcmp(view.emotion,"happy"));
+    assert(xiaotai_ai_view_apply(&view,
+        "{\"method\":\"emotion\",\"params\":{\"tag\":\"unknown\"}}", 501U));
+    assert(!view.emotion_tag_present);
+    xiaotai_ai_view_init(&view);assert(!view.emotion_tag_present);
+    assert(xiaotai_ai_view_apply(&view,
+        "{\"method\":\"caption\",\"params\":{\"caption_type\":1,\"utterance_id\":\"a\",\"text\":\"A\",\"is_final\":true}}", 600U));
+    assert(xiaotai_ai_view_apply(&view,
+        "{\"method\":\"emotion\",\"params\":{\"tag\":\"angry\"}}", 601U));
+    assert(xiaotai_ai_view_apply(&view,
+        "{\"method\":\"caption\",\"params\":{\"caption_type\":1,\"utterance_id\":\"b\",\"text\":\"B\",\"is_final\":true}}", 602U));
+    assert(view.emotion_tag_present && !strcmp(view.emotion,"angry"));
+    assert(xiaotai_ai_view_apply(&view,
+        "{\"method\":\"caption\",\"params\":{\"caption_type\":1,\"utterance_id\":\"c\",\"text\":\"C\",\"is_final\":true}}", 603U));
+    assert(!view.emotion_tag_present); /* consume independent TAG once, not forever */
+
+    assert(xiaotai_ai_view_apply(&view,
+        "{\"method\":\"emotion\",\"params\":{\"tag\":\"sad\"}}", 604U));
+    assert(xiaotai_ai_view_apply(&view,
+        "{\"type\":\"ai_reply\",\"text\":\"legacy reply\"}", 605U));
+    assert(view.emotion_tag_present && !strcmp(view.emotion,"sad"));
+    assert(xiaotai_ai_view_apply(&view,
+        "{\"type\":\"ai_reply\",\"text\":\"next reply\"}", 606U));
+    assert(!view.emotion_tag_present);
+
     return 0;
 }

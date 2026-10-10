@@ -29,11 +29,17 @@ static atomic_uint s_live_generation;
 static atomic_bool s_camera_enabled = true;
 static atomic_bool s_tx_enabled;
 static bool s_worker_camera;
+static uint32_t s_congestion_generation;
+static bool s_video_paused;
+static int64_t s_video_resume_after_us;
+static atomic_bool s_video_send_blocked;
+#define ESP_LOGI(...) ((void)0)
 typedef int esp_err_t;
 #define ESP_OK 0
 #define ESP_ERR_INVALID_STATE -1
 #define ESP_FAIL -2
-static atomic_uint s_sent;
+static atomic_uint s_sent,s_tx_failed;
+static atomic_int s_tx_last_error;
 static bool camera_running;
 static unsigned camera_starts, camera_stops, key_frames;
 static void camera_pipeline_request_key_frame(void){}
@@ -79,14 +85,21 @@ static bool starter_tirtc_video_ready(void) { return ready; }
 #define H5_VIDEO_STREAM 11
 #define H5_DOWN_VIDEO_STREAM 15
 #define VOIP_VIDEO_STREAM 1
+#define TIRTC_E_BUSY -9
+static atomic_uint s_send_buffer_limit;
+static size_t queue_used;
+static size_t TiRtcGetSendBufferUsed(void *c){(void)c;return queue_used;}
+static size_t starter_tirtc_send_buffer_used(void){return queue_used;}
+static size_t starter_tirtc_send_buffer_limit(void){return atomic_load(&s_send_buffer_limit);}
 #define TIRTC_VIDEO_H264 2
 #define TIRTC_FRAME_FLAG_KEY_FRAME 1
 #define TIRTC_E_INVALID_PARAMETER -1
 typedef struct {uint8_t stream_id, media, flags; uint32_t ts, length;} TIRTCFRAMEINFO;
 static TIRTCFRAMEINFO sent;
 static unsigned sdk_video_sends;
+static int send_result=7;
 static int TiRtcSendVideoStream(tirtc_conn_t c, const TIRTCFRAMEINFO *f, const void *data) {
-    assert(c && data); sent = *f; ++sdk_video_sends; return 7;
+    assert(c && data); sent = *f; ++sdk_video_sends; return send_result;
 }
 static int TiRtcSubscribeVideo(tirtc_conn_t c, uint8_t stream) {
     assert(c && stream == (mode == STARTER_TIRTC_VOIP ? 1 : 11)); ++subscribe_calls; return subscribe_result;
@@ -104,6 +117,7 @@ body += function(sdk, "static int on_subscribe_video(")
 body += function(video, "static void maintain_subscription(")
 body += r'''
 int main(void) {
+    (void)starter_tirtc_send_buffer_used();(void)starter_tirtc_send_buffer_limit();
     p4_video_set_session(STARTER_TIRTC_CALL, 7, true);
     assert(s_desired_generation == 7 && s_live_generation == 0);
     atomic_store(&s_live_generation, 7);
@@ -190,11 +204,51 @@ int main(void) {
     assert(camera_running && s_tx_enabled && key_frames == 1 && camera_starts == 1);
     assert(send_video((const uint8_t*)data,5,640,480,3000,TIRTC_VIDEO_H264,true,NULL)==ESP_OK);
     assert(sdk_video_sends==before_off+1);
-    /* Quick off/on still drains the old worker, rather than leaving TX stuck. */
-    p4_video_set_camera_enabled(20, false);
-    p4_video_set_camera_enabled(20, true);
+    unsigned sent_before_failure=s_sent;
+    send_result=-1;
+    assert(send_video((const uint8_t*)data,5,640,480,4000,TIRTC_VIDEO_H264,true,NULL)==ESP_FAIL);
+    assert(s_tx_failed==1 && s_tx_last_error==-1 && s_sent==sent_before_failure);
+    send_result=7;
+    /* A failed video send pauses production without ending the audio owner. */
+    assert(!s_tx_enabled && s_video_send_blocked);
     maintain_camera();
-    assert(s_tx_enabled && camera_stops == 2 && camera_starts == 2);
+    assert(s_video_paused && !camera_running && s_live_generation==20);
+    unsigned paused_sends=sdk_video_sends;
+    for(unsigned i=0;i<100;i++) {
+        assert(send_video((const uint8_t*)data,5,640,480,4000,TIRTC_VIDEO_H264,false,NULL)==ESP_ERR_INVALID_STATE);
+        maintain_camera();
+    }
+    assert(sdk_video_sends==paused_sends && !camera_running);
+    clock_us+=2000000;maintain_camera();
+    assert(!s_video_paused && camera_running && s_tx_enabled);
+    /* Stop well before SDK saturation; no repeated restart while congested. */
+    s_send_buffer_limit=2097152;queue_used=1048576;
+    maintain_camera();
+    assert(s_video_paused && !camera_running && !s_tx_enabled && s_live_generation==20);
+    unsigned held_starts=camera_starts;
+    clock_us+=10000000;maintain_camera();
+    assert(camera_starts==held_starts && s_video_paused);
+    queue_used=209716;maintain_camera();assert(s_video_paused);
+    queue_used=209715;maintain_camera();
+    assert(!s_video_paused && camera_running && s_tx_enabled && camera_starts==held_starts+1);
+    /* Privacy off survives queue recovery, independently of remote video. */
+    queue_used=1048576;maintain_camera();
+    assert(p4_video_set_camera_enabled(20,false)==ESP_OK);
+    queue_used=0;clock_us+=2000000;maintain_camera();assert(!camera_running);
+    assert(p4_video_set_camera_enabled(20,true)==ESP_OK);maintain_camera();assert(camera_running);
+    /* Old congestion never carries into another generation. */
+    queue_used=1048576;maintain_camera();assert(s_video_paused);
+    p4_video_set_session(STARTER_TIRTC_CALL,21,true);s_live_generation=current_generation=21;
+    queue_used=0;maintain_camera();assert(!s_video_paused && !s_video_send_blocked && camera_running);
+    (void)s_congestion_generation;(void)s_video_resume_after_us;
+    s_send_buffer_limit=0;
+
+    /* Quick off/on still drains the old worker, rather than leaving TX stuck. */
+    unsigned starts_before=camera_starts,stops_before=camera_stops;
+    p4_video_set_camera_enabled(21, false);
+    p4_video_set_camera_enabled(21, true);
+    maintain_camera();
+    assert(s_tx_enabled && camera_stops == stops_before+1 && camera_starts == starts_before+1);
     p4_video_set_session(STARTER_TIRTC_H5, 0, false);
     assert(!s_live_generation && !s_tx_enabled);
     assert(p4_video_set_camera_enabled(20, true) == ESP_ERR_INVALID_STATE);

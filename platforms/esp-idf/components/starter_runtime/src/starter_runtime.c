@@ -439,12 +439,13 @@ static void product_set_ai_start_pending(bool pending, const char *message)
 }
 
 static bool supported_emotion(const char *emotion);
-static void product_set_emotion(const char *emotion)
+static void product_set_emotion(const char *emotion, bool tag_present)
 {
     if (!supported_emotion(emotion) || s_product_mutex == NULL ||
         xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(50)) != pdTRUE) return;
     (void)snprintf(s_product_snapshot.emotion,
                    sizeof(s_product_snapshot.emotion), "%s", emotion);
+    s_product_snapshot.emotion_tag_present = tag_present;
     xSemaphoreGive(s_product_mutex);
 }
 
@@ -561,7 +562,7 @@ static void publish_state(void)
     atomic_store_explicit(&s_public_connection_generation,
                           s_connection_generation,
                           memory_order_release);
-    ESP_LOGI(TAG,
+    ESP_LOGD(TAG,
              "state=%s session=%lu connection=%lu",
              starter_runtime_state_name(state),
              (unsigned long)session_generation(),
@@ -855,11 +856,14 @@ static void service_call_cleanup(void)
 
 static void finish_call_session(int error, const char *result)
 {
-    ESP_LOGW(TAG,
-             "[DEBUG-call] finish generation=%lu error=%d result=%s",
-             (unsigned long)session_generation(),
-             error,
-             result == NULL ? "" : result);
+    if (error == 0) {
+        ESP_LOGI(TAG, "call finished generation=%lu result=%s",
+                 (unsigned long)session_generation(), result == NULL ? "" : result);
+    } else {
+        ESP_LOGW(TAG, "call finished generation=%lu error=%d result=%s",
+                 (unsigned long)session_generation(), error,
+                 result == NULL ? "" : result);
+    }
     if (!s_call_wechat) schedule_call_cleanup(s_call_room_id);
     finish_session(error);
     product_set_call_result(result);
@@ -944,8 +948,8 @@ static bool queue_http_result(runtime_event_type_t type,
     };
     size_t length = body == NULL ? 0U : strnlen(body, RUNTIME_TEXT_MAX + 1U);
     if (type == EVENT_CALL_HTTP) {
-        ESP_LOGI(TAG,
-                 "[DEBUG-call] HTTP callback stage=%lu generation=%lu bytes=%u",
+        ESP_LOGD(TAG,
+                 "call HTTP callback stage=%lu generation=%lu bytes=%u",
                  (unsigned long)stage,
                  (unsigned long)request_tag,
                  (unsigned)length);
@@ -1198,7 +1202,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.0.0+build.52\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.71\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
@@ -1225,7 +1229,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-S3\","
         "\"board_model\":\"lckfb-esp32s3\"},"
-        "\"firmware_version\":\"1.0.0+build.38\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.46\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,\"up_video_mt\":[\"mjpeg\"],"
         "\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"
@@ -1426,6 +1430,7 @@ static bool begin_call_common(const starter_product_contact_t *contact)
     xiaotai_session_owner_t owner = s_call_wechat
         ? XIAOTAI_OWNER_WECHAT_VOIP : XIAOTAI_OWNER_DEVICE_CALL;
     if (!xiaotai_runtime_begin(&s_session, owner, false)) return false;
+    atomic_store_explicit(&s_last_error, 0, memory_order_release);
     s_call_outgoing = true;
     (void)snprintf(s_call_peer_id, sizeof(s_call_peer_id), "%s", contact->id);
     (void)snprintf(s_call_peer_name, sizeof(s_call_peer_name), "%s", contact->name);
@@ -1455,7 +1460,7 @@ static void dial_contact(uint8_t index, bool video)
     }
     xSemaphoreGive(s_product_mutex);
     if (!valid || !begin_call_common(&contact)) {
-        ESP_LOGW(TAG, "[DEBUG-call] dial rejected index=%u valid=%d", (unsigned)index,
+        ESP_LOGW(TAG, "call dial rejected index=%u valid=%d", (unsigned)index,
                  valid ? 1 : 0);
         return;
     }
@@ -1495,8 +1500,8 @@ static void dial_contact(uint8_t index, bool video)
     esp_err_t err = platform_client_request_timeout(
         service, path, body, CALL_CONNECT_TIMEOUT_MS - 2000U,
         call_http_response, call_http_tag(session_generation(), stage));
-    ESP_LOGI(TAG, "[DEBUG-call] dial submitted target=%s type=%s stage=%d ret=%s",
-             s_call_peer_id, s_call_wechat ? "wechat" : "device", (int)stage,
+    ESP_LOGI(TAG, "call dial submitted type=%s stage=%d ret=%s",
+             s_call_wechat ? "wechat" : "device", (int)stage,
              esp_err_to_name(err));
     if (err != ESP_OK) {
         finish_call_session(err, "网络中断");
@@ -1515,6 +1520,7 @@ static void accept_call(void)
     if (!xiaotai_runtime_accept_incoming(&s_session, &accepted, &generation)) {
         return;
     }
+    atomic_store_explicit(&s_last_error, 0, memory_order_release);
     starter_tirtc_accept_h5(false);
 #if CONFIG_IDF_TARGET_ESP32P4
     starter_media_set_call_video(s_call_video);
@@ -1557,12 +1563,12 @@ static void voip_connect_task(void *argument)
         event.error = starter_tirtc_voip_connect(request->peer_id,
                                                  request->token,
                                                  request->generation);
-        ESP_LOGI(TAG, "[DEBUG-voip] WHIP worker completed generation=%lu rc=%d",
+        ESP_LOGD(TAG, "VoIP WHIP worker completed generation=%lu rc=%d",
                  (unsigned long)request->generation, event.error);
         free(request);
     }
     if (!queue_event(&event)) {
-        ESP_LOGE(TAG, "[DEBUG-voip] WHIP result queue full; session will time out");
+        ESP_LOGE(TAG, "VoIP WHIP result queue full; session will time out");
     }
     /* WithCaps uses a statically registered stack/TCB. Ordinary deletion
      * removes the task but leaks both allocations on every WHIP attempt. */
@@ -1605,7 +1611,7 @@ static void connect_voip(void)
         finish_call_session(ESP_ERR_NO_MEM, "内存不足");
         return;
     }
-    ESP_LOGI(TAG, "[DEBUG-voip] WHIP worker started outgoing=%d generation=%lu",
+    ESP_LOGD(TAG, "VoIP WHIP worker started outgoing=%d generation=%lu",
              s_call_outgoing ? 1 : 0, (unsigned long)session_generation());
     arm_session_timeout(CALL_CONNECT_TIMEOUT_MS);
 }
@@ -1939,18 +1945,12 @@ static void handle_call_http(const runtime_event_t *event)
     const cJSON *code = cJSON_IsObject(root)
                             ? cJSON_GetObjectItemCaseSensitive(root, "code")
                             : NULL;
-    const cJSON *message = cJSON_IsObject(root)
-                               ? cJSON_GetObjectItemCaseSensitive(root, "message")
-                               : NULL;
-    if (!cJSON_IsString(message)) message = cJSON_GetObjectItemCaseSensitive(root, "msg");
-    ESP_LOGI(TAG,
-             "[DEBUG-call] HTTP result stage=%lu bytes=%u parse=%d code=%d message=%s",
+    ESP_LOGD(TAG,
+             "call HTTP result stage=%lu bytes=%u parse=%d code=%d",
              (unsigned long)event->command,
              (unsigned)event->length,
              root != NULL,
-             cJSON_IsNumber(code) ? code->valueint : -1,
-             cJSON_IsString(message) && message->valuestring != NULL
-                 ? message->valuestring : "");
+             cJSON_IsNumber(code) ? code->valueint : -1);
     if (event->command == CALL_HTTP_DEVICE_DIAL &&
         cJSON_IsNumber(code) && code->valueint == 40202) {
         char existing_room[129] = "";
@@ -1981,8 +1981,7 @@ static void handle_call_http(const runtime_event_t *event)
         }
         starter_tirtc_expect_call(session_generation());
         arm_session_timeout(CALL_CONNECT_TIMEOUT_MS);
-        ESP_LOGI(TAG, "[DEBUG-call] room created room=%s; awaiting callee/p2p",
-                 s_call_room_id);
+        ESP_LOGD(TAG, "call room created; awaiting callee/p2p");
         return;
     }
     if (event->command == CALL_HTTP_VOIP_DIAL) {
@@ -2013,8 +2012,7 @@ static void handle_call_http(const runtime_event_t *event)
         }
         int rc = starter_tirtc_call_connect(remote_id, token,
                                             session_generation());
-        ESP_LOGI(TAG, "[DEBUG-call] callee p2p submitted room=%s peer=%s rc=%d",
-                 s_call_room_id, remote_id, rc);
+        ESP_LOGD(TAG, "call callee p2p submitted rc=%d", rc);
         if (rc != 0) {
             resume_mqtt_after_external_connect();
             finish_call_session(rc, "网络中断");
@@ -2137,15 +2135,15 @@ static void maybe_activate_outgoing_device_call(const char *source)
     }
     if (starter_media_start(STARTER_TIRTC_CALL,
                             s_connection_generation) != ESP_OK) {
-        ESP_LOGE(TAG, "[DEBUG-call] caller media start failed source=%s room=%s",
-                 source, s_call_room_id);
+        ESP_LOGE(TAG, "call caller media start failed source=%s",
+                 source);
         finish_call_session(ESP_ERR_INVALID_STATE, "音频启动失败");
         return;
     }
     s_call_waiting_confirm = false;
     (void)xiaotai_runtime_media_started(&s_session, session_generation());
-    ESP_LOGI(TAG, "[DEBUG-call] caller active source=%s room=%s generation=%lu",
-             source, s_call_room_id, (unsigned long)s_connection_generation);
+    ESP_LOGI(TAG, "call caller active source=%s generation=%lu",
+             source, (unsigned long)s_connection_generation);
     publish_state();
 }
 
@@ -2345,9 +2343,9 @@ static void handle_connection(const runtime_event_t *event)
             arm_session_timeout(AI_RESPONSE_TIMEOUT_MS);
             if (event->mode == STARTER_TIRTC_CALL && s_call_outgoing) {
                 s_call_p2p_connected = true;
-                ESP_LOGI(TAG,
-                         "[DEBUG-call] caller p2p accepted room=%s answered=%d",
-                         s_call_room_id, s_call_peer_answered ? 1 : 0);
+                ESP_LOGD(TAG,
+                         "call caller p2p accepted answered=%d",
+                         s_call_peer_answered ? 1 : 0);
                 maybe_activate_outgoing_device_call("p2p");
             }
         }
@@ -2685,6 +2683,7 @@ static void handle_ai_command(const runtime_event_t *event)
         /* 服务端明确接受后才开放麦克风，避免把音频发到未建立的 AI 会话。 */
         cJSON_Delete(root);
         xiaotai_ai_view_init(&s_ai_view);
+        product_set_emotion(s_ai_view.emotion, false);
         if (starter_media_start(STARTER_TIRTC_AI,
                                 s_connection_generation) != ESP_OK) {
             finish_session(ESP_ERR_INVALID_STATE);
@@ -2697,7 +2696,7 @@ static void handle_ai_command(const runtime_event_t *event)
     } else if (state == STARTER_RUNTIME_AI_ACTIVE) {
         if (xiaotai_ai_view_apply(&s_ai_view, event->text,
                                   (uint32_t)now_ms())) {
-            product_set_emotion(s_ai_view.emotion);
+            product_set_emotion(s_ai_view.emotion, s_ai_view.emotion_tag_present);
             product_set_phase(product_phase_from_ai_view(s_ai_view.phase));
         }
         const cJSON *method = cJSON_GetObjectItemCaseSensitive(root, "method");
@@ -2925,9 +2924,9 @@ static void handle_platform_signal(const runtime_event_t *event)
         bool matched = state == STARTER_RUNTIME_CALL_CONNECTING &&
                        !s_call_wechat && s_call_outgoing &&
                        room[0] != '\0' && strcmp(room, s_call_room_id) == 0;
-        ESP_LOGI(TAG,
-                 "[DEBUG-call] callee_answered room=%s matched=%d p2p=%d",
-                 room[0] != '\0' ? room : "-", matched ? 1 : 0,
+        ESP_LOGD(TAG,
+                 "call callee_answered matched=%d p2p=%d",
+                 matched ? 1 : 0,
                  s_call_p2p_connected ? 1 : 0);
         if (matched) {
             s_call_peer_answered = true;

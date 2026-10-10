@@ -16,6 +16,9 @@ class VideoStreams(unittest.TestCase):
         run_c(COMMON+r'''
 #undef CONFIG_IDF_TARGET_ESP32P4
 #define CONFIG_IDF_TARGET_ESP32P4 1
+#define TIRTC_E_BUSY -9
+static atomic_uint s_send_buffer_limit;
+static size_t TiRtcGetSendBufferUsed(void *c){(void)c;return 0;}
 #define TIRTC_VIDEO_H264 9
 #define TIRTC_FRAME_FLAG_KEY_FRAME 1
 static atomic_bool s_video_subscribed;

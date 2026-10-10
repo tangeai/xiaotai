@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* [DEBUG-wake49] Read-only integer PCM measurements. Full scale is 32768;
+/* Read-only integer PCM measurements. Full scale is 32768;
  * these are sample amplitudes, not calibrated acoustic dB SPL. */
 typedef struct {
     uint32_t rms;

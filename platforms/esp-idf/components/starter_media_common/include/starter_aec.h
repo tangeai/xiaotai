@@ -28,7 +28,7 @@ typedef struct {
     size_t samples;
     uint32_t mic_clipped;
     uint32_t reference_clipped;
-    starter_signal_level_t level[3]; /**< [DEBUG-wake49] mic/ref/clean, same frame. */
+    starter_signal_level_t level[3]; /**< mic/ref/clean, same frame. */
     uint32_t measurement_us;
 } starter_aec_output_t;
 

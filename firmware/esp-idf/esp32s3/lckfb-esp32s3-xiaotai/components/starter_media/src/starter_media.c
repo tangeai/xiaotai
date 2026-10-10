@@ -13,6 +13,7 @@
  * 板上的 ES8311 差分输出经电阻网络接入 ES7210 MIC3，作为同步 AEC 参考。
  */
 #include "starter_media.h"
+#include "starter_playback_scope.h"
 #include "starter_aec.h"
 #include "starter_jpeg_collector.h"
 #include "starter_voice.h"
@@ -35,6 +36,7 @@
 #include "esp_camera.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "starter_send_log.h"
 #include "esp_memory_utils.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -122,6 +124,7 @@ static atomic_uint s_mute_epoch;
 static atomic_bool s_preroll_gap;
 static atomic_uint s_capture_epoch;
 static atomic_bool s_active;
+static starter_playback_scope_t s_playback_scope = {.lock = ATOMIC_FLAG_INIT};
 static atomic_bool s_video_refresh_requested;
 static atomic_int s_mode;
 static atomic_uint_fast32_t s_generation;
@@ -160,7 +163,7 @@ static atomic_uint_fast32_t s_audio_decode_failed;
 static atomic_uint_fast32_t s_audio_playback_blocked;
 static atomic_uint_fast32_t s_audio_write_failed;
 static atomic_uint_fast32_t s_aec_processed;
-/* [DEBUG-wake49] Capture-owned accumulator, fixed-size published snapshot. */
+/* Capture-owned accumulator, fixed-size published snapshot. */
 static starter_media_audio_diagnostics_t s_audio_diag_acc, s_audio_diag;
 static portMUX_TYPE s_audio_diag_lock = portMUX_INITIALIZER_UNLOCKED;
 
@@ -387,6 +390,7 @@ static bool enqueue_uplink_pcm(starter_tirtc_mode_t mode,
  * rtc_audio_tx worker. The producer only hands off a bounded 20 ms PCM frame. */
 static void audio_uplink_task(void *argument)
 {
+    starter_send_log_t send_log = {0};
     (void)argument;
     uint8_t encoded_packet[OPUS_MAX_PACKET_BYTES];
     uint32_t opus_generation = 0;
@@ -431,6 +435,8 @@ static void audio_uplink_task(void *argument)
                                               output.encoded_bytes)
                     : starter_tirtc_send_alaw(item->timestamp_ms, encoded_packet,
                                               output.encoded_bytes);
+                starter_send_log_record(&send_log, TAG, item->generation,
+                    (int)item->mode, ret, (uint32_t)(esp_timer_get_time() / 1000));
                 if (ret >= 0) {
                     uint32_t sent = (uint32_t)atomic_fetch_add_explicit(
                         &s_audio_sent, 1, memory_order_relaxed) + 1U;
@@ -441,9 +447,6 @@ static void audio_uplink_task(void *argument)
                                  (unsigned)output.encoded_bytes,
                                  (unsigned long)item->timestamp_ms);
                     }
-                } else {
-                    ESP_LOGW(TAG, "uplink send failed mode=%d bytes=%u ret=%d",
-                             (int)item->mode, (unsigned)output.encoded_bytes, ret);
                 }
             } else {
                 ESP_LOGW(TAG, "uplink encode failed mode=%d ret=%s bytes=%u",
@@ -769,6 +772,11 @@ static bool play_audio_item(const audio_rx_item_t *item)
         update_timing_average(&s_write_average, item->generation,
                               &s_audio_write_avg_us, write_us);
         if (played) {
+            if (item->mode == STARTER_TIRTC_AI) {
+                starter_playback_scope_publish(&s_playback_scope, s_decode_pcm,
+                    mono_samples, (uint32_t)(esp_timer_get_time() / 1000),
+                    item->generation);
+            }
             atomic_fetch_add_explicit(&s_audio_played, 1, memory_order_relaxed);
         } else {
             atomic_fetch_add_explicit(&s_audio_write_failed, 1,
@@ -1590,4 +1598,27 @@ starter_media_status_t starter_media_status(void)
                                                   memory_order_acquire),
         .uplink_enabled = uplink_allowed((starter_tirtc_mode_t)atomic_load(&s_mode)),
     };
+}
+
+void starter_media_playback_waveform(starter_playback_waveform_t *out)
+{
+    if (out == NULL) return;
+    bool enabled = atomic_load_explicit(&s_active, memory_order_acquire) &&
+        atomic_load_explicit(&s_mode, memory_order_acquire) == STARTER_TIRTC_AI &&
+        !atomic_load_explicit(&s_speaker_muted, memory_order_acquire) &&
+        atomic_load_explicit(&s_speaker_volume, memory_order_acquire) != 0U;
+    starter_playback_scope_read(&s_playback_scope,
+        (uint32_t)(esp_timer_get_time() / 1000),
+        (uint32_t)atomic_load_explicit(&s_generation, memory_order_acquire),
+        enabled, out);
+}
+
+void starter_media_set_face_animation_enabled(bool enabled)
+{
+    atomic_store_explicit(&s_playback_scope.disabled, !enabled, memory_order_relaxed);
+}
+
+bool starter_media_face_animation_enabled(void)
+{
+    return !atomic_load_explicit(&s_playback_scope.disabled, memory_order_relaxed);
 }
