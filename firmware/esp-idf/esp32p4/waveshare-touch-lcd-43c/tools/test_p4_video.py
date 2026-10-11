@@ -82,6 +82,7 @@ static uint32_t starter_tirtc_generation(void) { return current_generation; }
 static int64_t esp_timer_get_time(void) { return clock_us; }
 static starter_tirtc_mode_t starter_tirtc_mode(void) { return mode; }
 static bool starter_tirtc_video_ready(void) { return ready; }
+static bool starter_tirtc_debug_video_submit_admit(bool key) { (void)key; return true; }
 #define H5_VIDEO_STREAM 11
 #define H5_DOWN_VIDEO_STREAM 15
 #define VOIP_VIDEO_STREAM 1

@@ -265,6 +265,7 @@ static esp_err_t send_video(const uint8_t *data, size_t len, uint16_t w, uint16_
         !generation || generation != starter_tirtc_generation() ||
         media != TIRTC_VIDEO_H264 || !starter_tirtc_video_ready()) return ESP_ERR_INVALID_STATE;
     p4_video_capture_offer(data, len, w, h, key, generation);
+    if (!starter_tirtc_debug_video_submit_admit(key)) return ESP_OK;
     int rc = starter_tirtc_send_h264((uint32_t)(pts / 1000), data, len, key);
     if (rc < 0) {
         atomic_fetch_add(&s_tx_failed, 1);

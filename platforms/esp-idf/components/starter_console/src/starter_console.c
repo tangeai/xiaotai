@@ -168,6 +168,26 @@ static void print_audio_gap_observation(starter_media_status_t media)
            (unsigned long)media.audio_trace_write_us);
 }
 
+static int command_video_submit(int argc, char **argv)
+{
+    if (argc != 2 || (strcmp(argv[1], "pause") != 0 &&
+                      strcmp(argv[1], "resume") != 0 &&
+                      strcmp(argv[1], "show") != 0)) {
+        printf("Usage: video-submit pause|resume|show\n");
+        return 1;
+    }
+    if (strcmp(argv[1], "show") != 0 &&
+        !starter_tirtc_debug_video_submit_pause(strcmp(argv[1], "pause") == 0)) {
+        printf("Video submit probe requires a connected P4 device call and development diagnostics.\n");
+        return 1;
+    }
+    unsigned state = starter_tirtc_debug_video_submit_state();
+    printf("Video submit probe: state=%s skipped=%u; camera/encoder unchanged; SDK backlog may still drain\n",
+           state == 1 ? "paused" : state == 2 ? "await-keyframe" : "submitting",
+           starter_tirtc_debug_video_submit_skipped());
+    return 0;
+}
+
 static int command_media_diag(int argc, char **argv)
 {
 #if !CONFIG_STARTER_PIPELINE_DIAGNOSTICS
@@ -477,6 +497,8 @@ esp_err_t starter_console_start(void)
                         "register help");
     ESP_RETURN_ON_ERROR(register_command("version", "Show firmware identity", command_version),
                         "starter_console", "register version");
+    ESP_RETURN_ON_ERROR(register_command("video-submit", "Development probe: pause|resume|show encoded video submission", command_video_submit),
+                        "starter_console", "register video-submit");
     ESP_RETURN_ON_ERROR(register_command("media-diag", "Development pipeline counters: on|off|show|reset", command_media_diag),
                         "starter_console", "register media-diag");
     ESP_RETURN_ON_ERROR(register_command("status", "Show starter status", command_status),

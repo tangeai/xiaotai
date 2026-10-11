@@ -166,6 +166,17 @@ int starter_tirtc_send_mjpeg(uint32_t timestamp_ms,
  */
 bool starter_tirtc_audio_ready(void);
 bool starter_tirtc_video_ready(void);
+/** Development-only P4 device-call probe. Never controls camera/encoder.
+ * State: 0 submitting, 1 paused, 2 waiting for a keyframe after resume.
+ * Pause/resume rejected outside a connected device call or compiled-out build.
+ * Connection lifecycle clears the probe. Already queued SDK packets may drain.
+ */
+bool starter_tirtc_debug_video_submit_pause(bool paused);
+unsigned starter_tirtc_debug_video_submit_state(void);
+unsigned starter_tirtc_debug_video_submit_skipped(void);
+/** Board encoded-frame callback admission; skipped frames are not TX failures. */
+bool starter_tirtc_debug_video_submit_admit(bool key);
+void starter_tirtc_debug_video_submit_reset(void);
 int starter_tirtc_send_h264(uint32_t timestamp_ms, const void *data, uint32_t length, bool key);
 int starter_tirtc_subscribe_call_video(void);
 /** Subscribe H5 stream 14 after local playback is ready, on the runtime task. */

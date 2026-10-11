@@ -104,8 +104,81 @@ static uint32_t next_generation(void)
                &s_generation_counter, 1, memory_order_acq_rel) + 1U;
 }
 
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS && CONFIG_IDF_TARGET_ESP32P4
+/* Development probe: encoded frames still reach the board callback. */
+static atomic_uint s_debug_video_submit_state; /* 0=run, 1=pause, 2=wait IDR */
+static atomic_uint s_debug_video_submit_skipped;
+#endif
+
+void starter_tirtc_debug_video_submit_reset(void)
+{
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS && CONFIG_IDF_TARGET_ESP32P4
+    atomic_store(&s_debug_video_submit_state, 0);
+    atomic_store(&s_debug_video_submit_skipped, 0);
+#endif
+}
+
+bool starter_tirtc_debug_video_submit_pause(bool paused)
+{
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS && CONFIG_IDF_TARGET_ESP32P4
+    if (!starter_tirtc_connected() || starter_tirtc_mode() != STARTER_TIRTC_CALL)
+        return false;
+    if (paused) {
+        atomic_store(&s_debug_video_submit_state, 1);
+    } else {
+        unsigned expected = 1;
+        (void)atomic_compare_exchange_strong(&s_debug_video_submit_state,
+                                            &expected, 2);
+    }
+    return true;
+#else
+    (void)paused;
+    return false;
+#endif
+}
+
+unsigned starter_tirtc_debug_video_submit_state(void)
+{
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS && CONFIG_IDF_TARGET_ESP32P4
+    return atomic_load(&s_debug_video_submit_state);
+#else
+    return 0;
+#endif
+}
+
+unsigned starter_tirtc_debug_video_submit_skipped(void)
+{
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS && CONFIG_IDF_TARGET_ESP32P4
+    return atomic_load(&s_debug_video_submit_skipped);
+#else
+    return 0;
+#endif
+}
+
+bool starter_tirtc_debug_video_submit_admit(bool key)
+{
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS && CONFIG_IDF_TARGET_ESP32P4
+    if (starter_tirtc_mode() != STARTER_TIRTC_CALL) return true;
+    unsigned state = atomic_load(&s_debug_video_submit_state);
+    if (state == 2 && key) {
+        unsigned expected = 2;
+        if (atomic_compare_exchange_strong(&s_debug_video_submit_state,
+                                           &expected, 0)) return true;
+        state = expected;
+    }
+    if (state != 0) {
+        atomic_fetch_add(&s_debug_video_submit_skipped, 1);
+        return false;
+    }
+#else
+    (void)key;
+#endif
+    return true;
+}
+
 static void clear_subscriptions(void)
 {
+    starter_tirtc_debug_video_submit_reset();
     atomic_store_explicit(&s_audio_subscribed, false, memory_order_release);
     atomic_store_explicit(&s_video_subscribed, false, memory_order_release);
 }
