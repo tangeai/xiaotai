@@ -1,15 +1,24 @@
+# Keep vendor files outside the component so SDK replacement preserves project gates.
+get_filename_component(TIRTC_SDK_DIR
+    "${CMAKE_CURRENT_LIST_DIR}/../../third_party/tirtc" ABSOLUTE)
+foreach(required IN ITEMS include/tirtc/tiRTC.h lib/libTiRTC.a manifest/build-contract.env)
+    if(NOT EXISTS "${TIRTC_SDK_DIR}/${required}")
+        message(FATAL_ERROR "Incomplete TiRTC P4 SDK: ${TIRTC_SDK_DIR}/${required}")
+    endif()
+endforeach()
+
 idf_component_register(
-    INCLUDE_DIRS "include"
+    INCLUDE_DIRS "${TIRTC_SDK_DIR}/include" "${TIRTC_SDK_DIR}/include/tirtc"
     REQUIRES freertos esp_http_client esp_netif esp_timer hal json lwip mbedtls soc
 )
 
-set(TIRTC_LIB "${CMAKE_CURRENT_LIST_DIR}/lib/esp32p4/libTiRTC.a")
+set(TIRTC_LIB "${TIRTC_SDK_DIR}/lib/libTiRTC.a")
 
 if(NOT EXISTS "${TIRTC_LIB}")
     message(FATAL_ERROR "TiRTC static library not found: ${TIRTC_LIB}")
 endif()
 
-# This archive is a patched P4 build, not interchangeable with the S3 SDK.
+# The supplied TiRTC 2.5.0 P4 archive is not interchangeable with the S3 SDK.
 if(NOT IDF_TARGET STREQUAL "esp32p4")
     message(FATAL_ERROR "XiaoTai P4 requires the ESP32-P4 target")
 endif()
@@ -24,15 +33,15 @@ if(NOT CONFIG_FREERTOS_HZ EQUAL 1000 OR
 endif()
 file(SHA256 "${TIRTC_LIB}" TIRTC_LIB_SHA256)
 if(NOT TIRTC_LIB_SHA256 STREQUAL
-   "a7a01ffd496a55364c7e4d665ff3884d078147bba96752a965d97befca12e451")
+   "9b4e35c7a2cb203fc463417739199429057c8b036936faa11f844c726455301f")
     message(FATAL_ERROR "TiRTC archive differs from the pinned P4 baseline; review its ABI before updating the contract")
 endif()
 
 add_library(tirtc_single_prebuilt STATIC IMPORTED)
-file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/manifest/build-contract.env"
+file(STRINGS "${TIRTC_SDK_DIR}/manifest/build-contract.env"
     TIRTC_SEMAPHORE_CONTRACT REGEX "^STATIC_SEMAPHORE_T_SIZE=[0-9]+$")
 if(NOT TIRTC_SEMAPHORE_CONTRACT STREQUAL "STATIC_SEMAPHORE_T_SIZE=84")
-    message(FATAL_ERROR "Pinned P4 archive requires an 84-byte StaticSemaphore_t (see VERSION.md)")
+    message(FATAL_ERROR "Pinned P4 archive requires an 84-byte StaticSemaphore_t (see manifest/build-contract.env)")
 endif()
 target_compile_definitions(${COMPONENT_LIB} INTERFACE TIRTC_SDK_STATIC_SEMAPHORE_SIZE=84)
 set_target_properties(tirtc_single_prebuilt PROPERTIES IMPORTED_LOCATION "${TIRTC_LIB}")

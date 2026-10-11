@@ -32,6 +32,11 @@ bash tools/check.sh
 
 ## 测试驱动开发约定
 
+`test_p4_sdk_link.py` 配置实际 P4 SDK CMake 入口，验证链接的是
+`third_party/tirtc/lib/libTiRTC.a`、库内版本为 2.5.0 且对象为 RISC-V。
+迁移只调整厂商文件位置；`components/tirtc_sdk/` 保留工程校验和链接配置。
+
+
 开发阶段的可复用音视频统计及双机采集步骤见
 [`MEDIA_PIPELINE_DIAGNOSTICS.md`](../docs/development/MEDIA_PIPELINE_DIAGNOSTICS.md)。
 `test_pipeline_diag.py` 覆盖生产 SDK 发送入口、实际 socket 包装、并发与开关/复位；

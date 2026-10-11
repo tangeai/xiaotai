@@ -124,12 +124,17 @@ TODO：下一次实板回归时，重新保存主叫、被叫、上行首包和�
 | 主机环境 | Linux/WSL2、Git、Python 3 | [Git](https://git-scm.com/downloads)、[Python](https://www.python.org/downloads/) | 无 |
 | ESP-IDF | `v5.5.4`，提交 `735507283d5b2f9fb363a1901172dbd9e847945d` | [Espressif 官方仓库](https://github.com/espressif/esp-idf/tree/735507283d5b2f9fb363a1901172dbd9e847945d) | 无 |
 | C/C++ 编译器 | `riscv32-esp-elf-gcc 14.2.0`，构建标识 `esp-14.2.0_20260121` | [ESP-IDF 工具清单](https://github.com/espressif/esp-idf/blob/735507283d5b2f9fb363a1901172dbd9e847945d/tools/tools.json) | 无，安装器按工具清单校验下载文件 |
-| TiRTC | 2.3.0，`libTiRTC.a` | [ESP32-P4 发布目录](https://repo-sdk.tange-ai.com/service/rest/repository/browse/tirtc-sdks/releases/espressif_esp32p4/) | `a7a01ffd496a55364c7e4d665ff3884d078147bba96752a965d97befca12e451` |
+| TiRTC | 2.5.0，`lib/libTiRTC.a` | [ESP32-P4 发布目录](https://repo-sdk.tange-ai.com/service/rest/repository/browse/tirtc-sdks/releases/espressif_esp32p4/) | `9b4e35c7a2cb203fc463417739199429057c8b036936faa11f844c726455301f` |
 | ESP-IDF 组件 | ESP-Hosted 1.4.7、ESP-SR 2.4.6、`esp_h264` 1.3.8、`esp_codec_dev` 1.5.10、Waveshare 4.3 BSP v1.0.1 | [工程依赖锁定文件](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/dependencies.lock) | 无 |
 | C6 从机固件 | 与当前主工程匹配的版本 | 无 | 无 |
 
 组件的完整解析版本以工程依赖锁定文件和 TiRTC
-[校验清单](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/tirtc_sdk/SHA256SUMS.txt)为准。
+[校验清单](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/third_party/tirtc/SHA256SUMS.txt)为准。
+
+TiRTC SDK 与 S3 工程采用相同目录划分：`third_party/tirtc/` 存放厂商库、
+头文件、版本和编译契约；`components/tirtc_sdk/CMakeLists.txt` 保留项目的
+ABI 校验和链接配置。升级时仅替换前者，并核对后者锁定的库 SHA-256、
+目标芯片和 ABI 要求；不要用 SDK 包覆盖整个 component。P4 与 S3 的库不能混用。
 
 ## 原理图与硬件资料
 
