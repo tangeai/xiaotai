@@ -1565,7 +1565,7 @@ static void call_video_log_stats_if_due(call_video_log_window_t *window,
                  "drop=%u/%u fail=%u/%u age=%u/%ums depth=%u/%u "
                  "buf=%u/%u@%ums adapt=%u ms=au/cvt/ppa:%u/%u/%u kd=%u/%u gap=%u/%u "
                  "old=%u/%u reset=%u/%u ovf=%u parts=pack/swap/ui:%u/%u/%u "
-                 "max=au/cvt/ppa:%u/%u/%u",
+                 "max=au/cvt/ppa:%u/%u/%u engine=%s",
                  source_width,
                  source_height,
                  received_fps_x10 / 10U,
@@ -1608,7 +1608,8 @@ static void call_video_log_stats_if_due(call_video_log_window_t *window,
                  average_present_copy_us / 1000U,
                  current.decode_access_unit_max_us / 1000U,
                  current.convert_max_us / 1000U,
-                 current.converter.ppa_max_us / 1000U);
+                 current.converter.ppa_max_us / 1000U,
+                 video_frame_converter_mode_name(video_frame_converter_get_mode(converter)));
     }
     *window = current;
 }
@@ -2088,6 +2089,7 @@ static void call_video_renderer_task(void *arg)
                         VIDEO_FRAME_FIT_COVER : VIDEO_FRAME_FIT_CONTAIN,
         .prevent_upscale = false,
         .require_ppa = true,
+        .prefer_direct_i420 = true,
         .output_rgb565_byte_swap = true,
     };
 
@@ -2141,7 +2143,7 @@ static void call_video_renderer_task(void *arg)
     }
 
     ESP_LOGI(TAG,
-             "H264 downlink renderer ready: decoder=%s conversion=pipelined-%s output=%ux%u "
+             "H264 downlink renderer ready: decoder=%s conversion=pipelined-%s direct-vga=imgfx output=%ux%u "
              "source=dynamic<=%ux%u fit=%s rotation=%s source=%s input_slots=%u input_cap=%u decoded_slots=%u "
              "decoded_cap=%u presentation=latest-%u priorities=decode:%u ingress:%u helper:%u convert:%u "
              "cores=decode:%d helper:%d convert:%d ui:%d camera:%d",

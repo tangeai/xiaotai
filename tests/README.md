@@ -338,3 +338,11 @@ P4 `.67` 修正 SDIO streaming RX 批次长度与 HAL 的 16 位参数不匹配�
 微信视频后语音、MQTT、AI 是否可用；本测试证明长度缺陷，不替代本次故障的
 实板因果验证。协议依据：Espressif `Communication with ESP SDIO Slave` 中
 FIFO 地址等于 `0x1F800 - requested length`，单次请求不能超过当前可读长度。
+
+### P4 VGA 下行直转（build.73）
+
+`tools/tests/test_p4_direct_i420.py` 从生产公开转换入口回放官方 imgfx/PPA
+SDK 边界：640×480 原尺寸无旋转绕过 pack/PPA/swap，验证 RGB565 两种字节序
+配置、句柄复用及释放，旋转/小尺寸/未启用/库失败继续回退 PPA。
+修改前该入口仍进入 PPA，回归断言失败；修改后通过并注册 `tools/check.sh`。
+主机桩不执行乐鑫 P4 汇编库，像素颜色、并发性能和音频双讲仍需 build.73 实板验收。

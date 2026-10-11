@@ -8,6 +8,7 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_imgfx_color_convert.h"
 #include "driver/ppa.h"
 #include "freertos/FreeRTOS.h"
 #include "sdkconfig.h"
@@ -21,6 +22,8 @@ struct video_frame_converter {
     portMUX_TYPE stats_lock;
     int32_t luma_terms[256];
     ppa_client_handle_t ppa_client;
+    esp_imgfx_color_convert_handle_t imgfx;
+    bool imgfx_timing_logged;
     uint8_t *packed_yuv420;
     size_t packed_yuv420_size;
     video_frame_converter_stats_t stats;
@@ -827,8 +830,51 @@ void video_frame_converter_destroy(video_frame_converter_handle_t handle)
     if (handle->ppa_client != NULL) {
         (void)ppa_unregister_client(handle->ppa_client);
     }
+    if (handle->imgfx != NULL) {
+        (void)esp_imgfx_color_convert_close(handle->imgfx);
+    }
     heap_caps_free(handle->packed_yuv420);
     heap_caps_free(handle);
+}
+
+/* The official P4 optimized converter accepts planar I420 directly and
+ * produces panel byte order in one pass. Keep transforms on the PPA path.
+ * The owning conversion worker serializes all use of this handle. */
+static esp_err_t video_frame_convert_i420_direct(video_frame_converter_handle_t handle,
+                                                 const uint8_t *i420,
+                                                 uint16_t *output)
+{
+    if (handle->imgfx == NULL) {
+        esp_imgfx_color_convert_cfg_t config = {
+            .in_res = {.width = 640, .height = 480},
+            .in_pixel_fmt = ESP_IMGFX_PIXEL_FMT_I420,
+            .out_pixel_fmt = handle->config.output_rgb565_byte_swap ?
+                                ESP_IMGFX_PIXEL_FMT_RGB565_BE : ESP_IMGFX_PIXEL_FMT_RGB565_LE,
+            .color_space_std = ESP_IMGFX_COLOR_SPACE_STD_BT601,
+        };
+        if (esp_imgfx_color_convert_open(&config, &handle->imgfx) != ESP_IMGFX_ERR_OK) {
+            return ESP_ERR_NOT_SUPPORTED;
+        }
+    }
+    esp_imgfx_data_t input = {.data = (uint8_t *)i420, .data_len = 640U * 480U * 3U / 2U};
+    esp_imgfx_data_t destination = {.data = (uint8_t *)output, .data_len = 640U * 480U * 2U};
+    int64_t started = esp_timer_get_time();
+    if (esp_imgfx_color_convert_process(handle->imgfx, &input, &destination) != ESP_IMGFX_ERR_OK) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    uint32_t elapsed = (uint32_t)(esp_timer_get_time() - started);
+    video_frame_record_render_layout(handle, 640, 480, 0, 0);
+    taskENTER_CRITICAL(&handle->stats_lock);
+    handle->stats.software_frames++;
+    handle->stats.software_time_us += elapsed;
+    if (elapsed > handle->stats.software_max_us) handle->stats.software_max_us = elapsed;
+    taskEXIT_CRITICAL(&handle->stats_lock);
+    if (!handle->imgfx_timing_logged) {
+        handle->imgfx_timing_logged = true;
+        ESP_LOGI(TAG, "I420 direct display: engine=esp_image_effects size=640x480 time=%luus byte_swap=%d; pack/PPA/swap bypassed",
+                 (unsigned long)elapsed, handle->config.output_rgb565_byte_swap);
+    }
+    return ESP_OK;
 }
 
 esp_err_t video_frame_converter_i420_to_rgb565(video_frame_converter_handle_t handle,
@@ -871,6 +917,16 @@ esp_err_t video_frame_converter_i420_to_rgb565(video_frame_converter_handle_t ha
                                                    &crop_height),
                         TAG,
                         "resolve I420 fit failed");
+    if (handle->config.prefer_direct_i420 &&
+        rotation == VIDEO_FRAME_ROTATION_CLOCKWISE_0 &&
+        source_width == 640U && source_height == 480U &&
+        handle->config.output_width == 640U && handle->config.output_height == 480U &&
+        crop_x == 0U && crop_y == 0U && crop_width == 640U && crop_height == 480U &&
+        video_frame_convert_i420_direct(handle, i420, output) == ESP_OK) {
+        handle->last_mode = VIDEO_FRAME_CONVERTER_MODE_IMGFX;
+        if (mode_used != NULL) *mode_used = VIDEO_FRAME_CONVERTER_MODE_IMGFX;
+        return ESP_OK;
+    }
     if (handle->ppa_client != NULL) {
         esp_err_t ppa_ret = video_frame_convert_yuv420_ppa(handle,
                                                            i420,
@@ -1361,6 +1417,8 @@ void video_frame_converter_get_stats(video_frame_converter_handle_t handle,
 const char *video_frame_converter_mode_name(video_frame_converter_mode_t mode)
 {
     switch (mode) {
+    case VIDEO_FRAME_CONVERTER_MODE_IMGFX:
+        return "imgfx-direct";
     case VIDEO_FRAME_CONVERTER_MODE_PPA:
         return "ppa";
     case VIDEO_FRAME_CONVERTER_MODE_SOFTWARE:

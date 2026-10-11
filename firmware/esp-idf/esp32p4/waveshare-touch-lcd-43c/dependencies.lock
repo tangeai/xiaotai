@@ -60,7 +60,7 @@ dependencies:
       require: private
       version: '>=5.1'
     source:
-      registry_url: https://components.espressif.com
+      registry_url: https://components.espressif.com/
       type: service
     version: 1.3.2
   espressif/esp-sr:
@@ -147,6 +147,16 @@ dependencies:
       path: $PWD/components/espressif__esp_hosted
       type: local
     version: 1.4.7
+  espressif/esp_image_effects:
+    component_hash: a9a9a18173dc338f94559e61ebbfc1aeff5ebb2f7703e7e3d2431c5bb3450fe6
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.1.0
   espressif/esp_ipa:
     component_hash: 7547b050a99351a85aaba8ba38211c36fd4769c2ae3e570fa330dc90dfd2704c
     dependencies:
@@ -306,6 +316,7 @@ direct_dependencies:
 - espressif/dl_fft
 - espressif/eppp_link
 - espressif/esp-dsp
+- espressif/esp-nn
 - espressif/esp-sr
 - espressif/esp-tflite-micro
 - espressif/esp_audio_codec
@@ -313,6 +324,7 @@ direct_dependencies:
 - espressif/esp_codec_dev
 - espressif/esp_h264
 - espressif/esp_hosted
+- espressif/esp_image_effects
 - espressif/esp_ipa
 - espressif/esp_jpeg
 - espressif/esp_lcd_st7701
@@ -324,6 +336,6 @@ direct_dependencies:
 - espressif/quirc
 - idf
 - lvgl/lvgl
-manifest_hash: d54c43c29d2bd981ec9d6d45f29c683c5dfb05633e0edf7d2cd8418a69a4e00e
+manifest_hash: 1a4149147026c85e37f83aaf628d02f4e5f10e2cb20bc97373ba798854ce78ca
 target: esp32p4
 version: 2.0.0

@@ -10,6 +10,7 @@ typedef struct video_frame_converter *video_frame_converter_handle_t;
 typedef enum {
     VIDEO_FRAME_CONVERTER_MODE_SOFTWARE = 0,
     VIDEO_FRAME_CONVERTER_MODE_PPA,
+    VIDEO_FRAME_CONVERTER_MODE_IMGFX,
 } video_frame_converter_mode_t;
 
 typedef enum {
@@ -42,9 +43,12 @@ typedef struct {
     /* Keep sources smaller than the viewport at native size and center them
      * instead of manufacturing detail through upscaling. */
     bool prevent_upscale;
-    /* Realtime receive paths may drop a frame instead of running an
-     * unbounded software conversion that can starve the idle/LVGL tasks. */
+    /* Reject the scalar software fallback on realtime receive paths.
+     * The explicitly enabled optimized VGA converter is still eligible. */
     bool require_ppa;
+    /* Opt in to bounded VGA I420 -> RGB565 conversion without transforms.
+     * Unsupported geometry or library failure retains the PPA path. */
+    bool prefer_direct_i420;
     bool output_rgb565_byte_swap;
 } video_frame_converter_config_t;
 
