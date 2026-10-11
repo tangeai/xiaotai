@@ -40,6 +40,8 @@ bash tools/check.sh
 
 `test_p4_sdk_link.py` 配置实际 P4 SDK CMake 入口，验证链接的是
 `third_party/tirtc/lib/libTiRTC.a`、库内版本为 2.5.0 且对象为 RISC-V。
+build.84 对照版进一步核对 fixes2 库哈希与构建契约；build.83 回退点为
+`c4eedec`，其原始 BIN/ELF 保留在工程 `artifacts/1.0.0+build.83/`。
 迁移只调整厂商文件位置；`components/tirtc_sdk/` 保留工程校验和链接配置。
 
 `test_s3_sdk_link.py` 对两个 S3 工程执行同样的实际 CMake 链接检查，
@@ -404,3 +406,26 @@ P4 build.82 增加只读 `board-probe` 和 SDK 传输初始化白名单日志。
 `tools/check.sh`。保留现有媒体回归覆盖 unchanged 640×480 收发行为。
 真机尚须核验板卡修订、Flash/PSRAM、C6 RPC 兼容性及每次建连 TP 日志。
 配置引脚、CPU 频率和 Wi-Fi protocol bitmap 均不是实际接线/协商速率证据。
+
+P4 build.85 提高设备通话目标至 VGA/8 fps，固定 150 kbps 沿用 build.84。
+`test_p4_fixed_call_bitrate.py` 执行生产配置、采集间隔和 GOP 计算，
+先因实际仍为 5 fps 失败，再验证 8 fps、125 ms、GOP16（2 秒）及固定
+码率范围。现有 full-frame uplink 回归验证采集/RTC 策略和跨场景复位；
+测试均由 `tools/check.sh` 执行。实际双向显示帧率和声音需要两板验证。
+
+P4 build.86 两档上行由 `test_p4_video_quality.py` 执行真实媒体 owner 控制器
+及 governor 档位配置：持续积压/带宽不足降档、发送失败立即降档、健康
+30 秒恢复、短暂积压不切换、反馈过期、SDK 不支持反馈时本地保护、隐私
+暂停计时、陈旧连接拒绝及新会话复位。新增前生产接口缺失失败，新增后通过。
+同测试执行生产目标尺寸选择，验证 QVGA 可恢复 VGA、资源 fallback 和输入
+尺寸边界，并核对摄像头 worker 使用该选择器；已注册 tools/check.sh。
+原配置/采集/RTC 策略回归改为两档高档 5 fps，验证 200 ms 和 GOP10。
+实际 PPA 缩放、编码器重建后 SPS/PPS/IDR、接收端动态分辨率、VoIP 兼容性
+及持续双向音频均待实板验证；主机测试通过不表示已完成硬件验收。
+
+P4 build.87 将 CALL/VoIP 两档控制改为本地积压/失败判断，取消 SDK 码率
+范围配置与建议消费，以隔离 build.86 相比稳定基线引入的传输控制变量。
+`test_p4_video_quality.py` 先在生产 owner 调用 SDK 范围入口处断言失败，
+再验证该入口不被调用、SDK 建议不能改变健康链路档位，同时保留拥塞
+降档/健康恢复/隐私/会话边界回归。主机测试不证明 SDK 配置是卡顿根因；
+两端 build.87 的完整双向通话和切档仍待硬件验证。

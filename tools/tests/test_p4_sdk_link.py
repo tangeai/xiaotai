@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Configure the actual P4 SDK component and validate the linked archive."""
 from pathlib import Path
+import hashlib
 import subprocess
 import tempfile
 
@@ -8,6 +9,10 @@ root = Path(__file__).resolve().parents[2]
 project = root / "firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c"
 sdk = project / "third_party/tirtc"
 component = project / "components/tirtc_sdk"
+expected = "6c5c1543f4a099c2f8fdfdff5b50ef728cf181ce09931c2798d34e84d22473b1"
+assert hashlib.sha256((sdk / "lib/libTiRTC.a").read_bytes()).hexdigest() == expected, "P4 SDK candidate not installed"
+assert "LIB_SHA256=" + expected in (sdk / "manifest/build-contract.env").read_text()
+
 with tempfile.TemporaryDirectory(prefix="p4-sdk-link-") as directory:
     p = Path(directory)
     (p / "dummy.c").write_text("int sdk_link_test;\n")
@@ -18,6 +23,8 @@ set(IDF_VERSION_MAJOR 5)
 set(IDF_VERSION_MINOR 5)
 set(IDF_VERSION_PATCH 4)
 set(CONFIG_FREERTOS_HZ 1000)
+set(CONFIG_MBEDTLS_CERTIFICATE_BUNDLE ON)
+set(CONFIG_LWIP_MAX_SOCKETS 16)
 function(idf_component_register)
   add_library(sdk_component STATIC "${{CMAKE_SOURCE_DIR}}/dummy.c")
   set(COMPONENT_LIB sdk_component PARENT_SCOPE)

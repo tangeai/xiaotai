@@ -90,6 +90,8 @@ static size_t used,limit=2097152;
 static unsigned configured,changes,calls;
 static int config_result;
 static bool fixed_probe;
+/* Non-call modes retain the generic bitrate controller. */
+static bool maintain_call_quality(void){return false;}
 typedef struct {uint32_t min_bitrate_bps,max_bitrate_bps,start_bitrate_bps;} media_governor_transport_bitrate_range_t;
 typedef struct {uint32_t bitrate_bps;} media_governor_video_config_t;
 static uint32_t starter_tirtc_generation(void){return 7;}

@@ -34,8 +34,11 @@ if(NOT CONFIG_FREERTOS_HZ EQUAL 1000 OR
     message(FATAL_ERROR "TiRTC P4 requires 1000 Hz ticks and disabled trace/runtime stats")
 endif()
 file(SHA256 "${TIRTC_LIB}" TIRTC_LIB_SHA256)
+if(NOT CONFIG_MBEDTLS_CERTIFICATE_BUNDLE OR NOT CONFIG_LWIP_MAX_SOCKETS EQUAL 16)
+    message(FATAL_ERROR "P4 fixes2 SDK requires the certificate bundle and 16 application sockets")
+endif()
 if(NOT TIRTC_LIB_SHA256 STREQUAL
-   "9b4e35c7a2cb203fc463417739199429057c8b036936faa11f844c726455301f")
+   "6c5c1543f4a099c2f8fdfdff5b50ef728cf181ce09931c2798d34e84d22473b1")
     message(FATAL_ERROR "TiRTC archive differs from the pinned P4 baseline; review its ABI before updating the contract")
 endif()
 

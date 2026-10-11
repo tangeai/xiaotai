@@ -27,8 +27,8 @@
  * The receiver converts it once to the panel viewport through PPA. The P4
  * must encode and decode concurrently. Field logs show that 12 fps can
  * outrun its software H264 decoder and force repeated reference-chain resets.
- * Development experiment: keep VGA/5 fps but start and stay at 150 kbit/s
- * to distinguish startup send backlog from sustained duplex stalls.
+ * Start at VGA/5 fps and 150 kbit/s. The media owner can select QVGA/5 fps
+ * at 96 kbit/s after sustained congestion; recovery is deliberately slower.
  * This is an encoder target, not a hard per-frame or wire-rate limit.
  */
 #define APP_MEDIA_CALL_VIDEO_WIDTH                      640U
@@ -36,18 +36,22 @@
 #define APP_MEDIA_CALL_VIDEO_FPS                        5U
 #define APP_MEDIA_CALL_VIDEO_BITRATE_BPS                150000U
 #define APP_MEDIA_CALL_FIXED_BITRATE_PROBE              1
+/* Two-tier CALL/VOIP owner: fixed target within each tier. */
+#define APP_MEDIA_CALL_LOW_WIDTH                        320U
+#define APP_MEDIA_CALL_LOW_HEIGHT                       240U
+#define APP_MEDIA_CALL_LOW_BITRATE_BPS                  96000U
 #define APP_MEDIA_CALL_VIDEO_MIN_QP                     30U
 #define APP_MEDIA_CALL_VIDEO_MAX_QP                     46U
 
 /* WeChat VoIP uplink only. Field queues grew at 1.5 Mbit/s; start at VGA,
- * 8 fps and 500 kbit/s, independently of H5 and device-call tuning. Keep the
+ * 5 fps and 150 kbit/s with the same two-tier protection as device calls. Keep the
  * full 4:3 field of view and unrotated pixels; presentation rotation remains
  * governed by the capability contract. Congestion can still pause video to
  * retain audio. The encoder target is not a hard transport ceiling. */
 #define APP_MEDIA_WECHAT_VIDEO_WIDTH                    640U
 #define APP_MEDIA_WECHAT_VIDEO_HEIGHT                   480U
-#define APP_MEDIA_WECHAT_VIDEO_FPS                      8U
-#define APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS              500000U
+#define APP_MEDIA_WECHAT_VIDEO_FPS                      5U
+#define APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS              150000U
 #define APP_MEDIA_WECHAT_VIDEO_MIN_QP                   30U
 #define APP_MEDIA_WECHAT_VIDEO_MAX_QP                   46U
 

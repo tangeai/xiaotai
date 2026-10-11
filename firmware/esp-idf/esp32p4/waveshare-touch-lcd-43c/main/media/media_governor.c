@@ -108,7 +108,9 @@ static void media_governor_select_native_capture_size(const media_governor_video
 {
     /* VGA calls use sensor subsampling of the full capture window. Never
      * substitute the narrower 800x640 mode. H5 retains its native 960p. */
-    if (config != NULL && config->width == 640U && config->height == 480U) {
+    if (config != NULL &&
+        ((config->width == 640U && config->height == 480U) ||
+         (config->width == 320U && config->height == 240U))) {
         *width = 640U;
         *height = 480U;
         return;
@@ -286,13 +288,19 @@ static media_governor_video_config_t media_governor_normalize_video_config(const
     } else if (normalized.fps > 30U) {
         normalized.fps = 30U;
     }
-    const uint32_t minimum_bitrate_bps =
-        APP_MEDIA_CALL_FIXED_BITRATE_PROBE &&
-        normalized.width == APP_MEDIA_CALL_VIDEO_WIDTH &&
-        normalized.height == APP_MEDIA_CALL_VIDEO_HEIGHT &&
+    const bool low_call_profile =
+        normalized.width == APP_MEDIA_CALL_LOW_WIDTH &&
+        normalized.height == APP_MEDIA_CALL_LOW_HEIGHT &&
         normalized.fps == APP_MEDIA_CALL_VIDEO_FPS &&
-        normalized.bitrate_bps == APP_MEDIA_CALL_VIDEO_BITRATE_BPS ?
-            APP_MEDIA_CALL_VIDEO_BITRATE_BPS : MEDIA_GOVERNOR_VIDEO_MIN_BITRATE_BPS;
+        normalized.bitrate_bps == APP_MEDIA_CALL_LOW_BITRATE_BPS;
+    const uint32_t minimum_bitrate_bps = low_call_profile ?
+        APP_MEDIA_CALL_LOW_BITRATE_BPS :
+        (APP_MEDIA_CALL_FIXED_BITRATE_PROBE &&
+         normalized.width == APP_MEDIA_CALL_VIDEO_WIDTH &&
+         normalized.height == APP_MEDIA_CALL_VIDEO_HEIGHT &&
+         normalized.fps == APP_MEDIA_CALL_VIDEO_FPS &&
+         normalized.bitrate_bps == APP_MEDIA_CALL_VIDEO_BITRATE_BPS ?
+             APP_MEDIA_CALL_VIDEO_BITRATE_BPS : MEDIA_GOVERNOR_VIDEO_MIN_BITRATE_BPS);
     if (normalized.bitrate_bps < minimum_bitrate_bps) {
         normalized.bitrate_bps = minimum_bitrate_bps;
     } else if (normalized.bitrate_bps > 12U * 1000U * 1000U) {
@@ -345,7 +353,7 @@ esp_err_t media_governor_set_rtc_video_config(const media_governor_video_config_
             memcmp(&s_adaptation_base_config, &normalized, sizeof(normalized)) != 0;
         s_adaptation_base_config = normalized;
         s_adaptation_base_config.weak_network_level = 0U;
-        if (base_changed) {
+        if (base_changed || old_config.weak_network_level != 0U) {
             s_transport_adaptation_active = false;
             s_transport_requested_bitrate_bps = 0U;
             s_transport_protection_not_before_tick = 0;
@@ -735,6 +743,25 @@ void media_governor_build_wechat_video_config(media_governor_video_config_t *con
         .h264_min_qp = APP_MEDIA_WECHAT_VIDEO_MIN_QP,
         .h264_max_qp = APP_MEDIA_WECHAT_VIDEO_MAX_QP,
     };
+}
+
+void media_governor_build_call_quality_config(bool voip, bool low,
+                                               media_governor_video_config_t *config)
+{
+    if (config == NULL) return;
+    if (voip) media_governor_build_wechat_video_config(config);
+    else media_governor_build_device_call_video_config(config);
+    /* This controller owns CALL/VOIP; disable the legacy multi-level policy. */
+    config->weak_network_mode = MEDIA_GOVERNOR_WEAK_NETWORK_OFF;
+    config->weak_network_level = 0U;
+    if (low) {
+        config->width = APP_MEDIA_CALL_LOW_WIDTH;
+        config->height = APP_MEDIA_CALL_LOW_HEIGHT;
+        config->bitrate_bps = APP_MEDIA_CALL_LOW_BITRATE_BPS;
+        /* Preserve the high-profile base while this tier is active. */
+        config->weak_network_mode = MEDIA_GOVERNOR_WEAK_NETWORK_RESOLUTION_PRIORITY;
+        config->weak_network_level = 1U;
+    }
 }
 
 void media_governor_build_h5_video_config(media_governor_video_config_t *config)

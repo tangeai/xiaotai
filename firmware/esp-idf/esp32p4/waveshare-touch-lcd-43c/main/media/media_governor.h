@@ -113,3 +113,7 @@ void media_governor_note_network_backpressure(void);
 uint32_t media_governor_get_network_backpressure_count(void);
 bool media_governor_is_network_backpressured(void);
 const char *media_governor_profile_name(media_governor_profile_t profile);
+
+/* Device-call/VoIP uplink tiers; receiver presentation remains independent. */
+void media_governor_build_call_quality_config(bool voip, bool low,
+                                               media_governor_video_config_t *config);

@@ -82,8 +82,76 @@ static bool s_bitrate_configured;
 static bool s_bitrate_feedback_enabled;
 static int64_t s_bitrate_due_us;
 
+typedef struct { /* Two-tier state is owned exclusively by p4_video_poll. */
+    uint32_t generation;
+    int mode;
+    bool low;
+    uint32_t failed;
+    int64_t due_us, pressure_since_us, healthy_since_us;
+} call_quality_state_t;
+static call_quality_state_t s_quality;
+
+static bool maintain_call_quality(void)
+{
+    int mode = starter_tirtc_mode();
+    if (mode != STARTER_TIRTC_CALL && mode != STARTER_TIRTC_VOIP) return false;
+    uint32_t generation = atomic_load(&s_live_generation);
+    if (!generation || generation != starter_tirtc_generation()) return true;
+    if (!atomic_load(&s_camera_enabled)) {
+        s_quality.pressure_since_us = 0;
+        s_quality.healthy_since_us = 0;
+        s_quality.due_us = 0;
+        s_quality.failed = atomic_load(&s_tx_failed);
+        return true;
+    }
+    int64_t now = esp_timer_get_time();
+    bool initialize = s_quality.generation != generation || s_quality.mode != mode;
+    if (initialize) {
+        s_quality = (call_quality_state_t){.generation = generation, .mode = mode,
+                                          .failed = atomic_load(&s_tx_failed)};
+        /* Preserve the build.84 transport setup. Configuring the SDK range
+         * also changes its controller; it is not a passive bandwidth probe.
+         * CALL/VOIP tiers use local backlog/failures without that extra owner. */
+        ESP_LOGI("p4_video", "video quality generation=%lu sdk-feedback=0 control=local high=640x480@5/150k low=320x240@5/96k",
+                 (unsigned long)generation);
+    }
+    if (!initialize && now < s_quality.due_us) return true;
+    s_quality.due_us = now + 500000;
+    size_t used = starter_tirtc_send_buffer_used();
+    uint32_t failed = atomic_load(&s_tx_failed);
+    bool failure = failed != s_quality.failed;
+    s_quality.failed = failed;
+    bool pressure = failure || used >= 64U * 1024U;
+    bool healthy = !pressure && used <= 8U * 1024U;
+    bool low = s_quality.low;
+    if (pressure) {
+        s_quality.healthy_since_us = 0;
+        if (!s_quality.pressure_since_us) s_quality.pressure_since_us = now;
+        if (failure || now - s_quality.pressure_since_us >= 1500000) low = true;
+    } else {
+        s_quality.pressure_since_us = 0;
+        if (healthy) {
+            if (!s_quality.healthy_since_us) s_quality.healthy_since_us = now;
+            if (now - s_quality.healthy_since_us >= 30000000) low = false;
+        } else s_quality.healthy_since_us = 0;
+    }
+    if (!initialize && low == s_quality.low) return true;
+    media_governor_video_config_t config = {0};
+    media_governor_build_call_quality_config(mode == STARTER_TIRTC_VOIP, low, &config);
+    if (media_governor_set_rtc_video_config(&config) != ESP_OK) return true;
+    s_quality.low = low;
+    s_quality.pressure_since_us = s_quality.healthy_since_us = 0;
+    camera_pipeline_on_rtc_video_config_changed();
+    camera_pipeline_request_stream_start_key_frame();
+    ESP_LOGI("p4_video", "video quality tier=%s output=%ux%u@%u bitrate=%lu backlog=%u",
+             low ? "low" : "high", config.width, config.height, config.fps,
+             (unsigned long)config.bitrate_bps, (unsigned)used);
+    return true;
+}
+
 static void maintain_bitrate(void)
 {
+    if (maintain_call_quality()) return;
     uint32_t generation = atomic_load(&s_live_generation);
     if (!generation || generation != starter_tirtc_generation() ||
         !atomic_load(&s_tx_enabled)) return;

@@ -1981,6 +1981,22 @@ static void camera_pipeline_h264_return_output(camera_pipeline_h264_encoder_t *e
     }
 }
 
+static void camera_pipeline_h264_target_dimensions(uint16_t desired_width,
+    uint16_t desired_height, uint16_t source_width, uint16_t source_height,
+    uint16_t fallback_width, uint16_t fallback_height,
+    uint16_t *width, uint16_t *height)
+{
+    *width = desired_width && desired_width <= source_width ? desired_width : source_width;
+    *height = desired_height && desired_height <= source_height ? desired_height : source_height;
+    if (fallback_width && fallback_height &&
+        fallback_width <= *width && fallback_height <= *height) {
+        *width = fallback_width;
+        *height = fallback_height;
+    }
+    *width &= ~1U;
+    *height &= ~1U;
+}
+
 static void camera_pipeline_task(void *arg)
 {
     (void)arg;
@@ -2297,33 +2313,17 @@ static void camera_pipeline_task(void *arg)
         /* All uplink modes preserve sensor orientation. H5, device call and
          * WeChat receivers apply the scene-specific camera_rotation metadata. */
         const bool rotate_ccw90 = false;
-        if (target_width == 0U || target_width > source_width) {
-            target_width = camera_pipeline_even_dimension(source_width);
+        if ((h264_fallback_width == 0U || h264_fallback_height == 0U) &&
+            CAMERA_PIPELINE_H264_RESOURCE_FALLBACK_ENABLE) {
+            (void)camera_pipeline_select_h264_internal_fit(target_width,
+                target_height, &h264_fallback_width, &h264_fallback_height);
         }
-        if (target_height == 0U || target_height > source_height) {
-            target_height = camera_pipeline_even_dimension(source_height);
-        }
-        if (camera_pipeline_h264_is_open(&h264) &&
-            h264.width <= target_width &&
-            h264.height <= target_height) {
-            target_width = h264.width;
-            target_height = h264.height;
-        } else {
-            if ((h264_fallback_width == 0U || h264_fallback_height == 0U) &&
-                CAMERA_PIPELINE_H264_RESOURCE_FALLBACK_ENABLE) {
-                (void)camera_pipeline_select_h264_internal_fit(target_width,
-                                                               target_height,
-                                                               &h264_fallback_width,
-                                                               &h264_fallback_height);
-            }
-            if (h264_fallback_width > 0U &&
-                h264_fallback_height > 0U &&
-                h264_fallback_width <= target_width &&
-                h264_fallback_height <= target_height) {
-                target_width = h264_fallback_width;
-                target_height = h264_fallback_height;
-            }
-        }
+        /* The previous encoder size is not a ceiling: a healthy connection
+         * must be able to rebuild QVGA back to VGA. Real resource fallbacks
+         * remain bounded by the recorded fallback dimensions. */
+        camera_pipeline_h264_target_dimensions(target_width, target_height,
+            source_width, source_height, h264_fallback_width, h264_fallback_height,
+            &target_width, &target_height);
         size_t h264_input_len = camera_pipeline_h264_input_size(target_width, target_height);
         const uint8_t *h264_input_data = NULL;
         bool frame_released = false;
@@ -2529,6 +2529,7 @@ static void camera_pipeline_task(void *arg)
                 continue;
             }
             next_h264_open_tick = 0;
+            stream_start_key_frame_requested = false;
         }
 
         const uint8_t *h264_data = NULL;

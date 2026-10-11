@@ -1,0 +1,29 @@
+build.84 单端用户日志观察，2026-10-11
+
+身份：status 显示 1.0.0+build.84 / Oct 11 2026 20:48:21 /
+ELF 前缀 985ac61ee，与保留的 build.84 产物相符。
+本次不是完整双机、非静音、两分钟验收；不能宣称 SDK 修复了卡顿。
+
+关键观测：
+37.141 秒会话开始；103.680 秒仍有通话日志，覆盖约 66 秒。
+固定目标 150000 bps；上行相机约 5 fps，接收约 4.8～5.0 fps，
+显示约 4.5～4.8 fps。本段没有数秒 video stall 告警。
+周期 p4_video 行的 send-buffer 采样最高 18459 字节，其余多接近零。
+这是日志采样上限，不是窗口内真实峰值。
+status 音频 rx-overflow=0，decoded=1118，played=1117，pending=1，
+last-rx-ms=92812；只证明状态查询附近收到音频，不能证明全程连续。
+
+关键对照限制：
+W (30086) starter_runtime: AI start rejected: state=waiting platform_ready=1 tirtc_ready=1 microphone_muted=1 reason=global microphone muted; enable microphone in Settings
+随后 status：audio-tx=883、video-tx=286、audio-rx=1118。
+约 57 秒内 883 个音频发送帧，明显低于全程每 20 ms 一帧的预期数量。
+日志没有显示何时解除静音，不能假定整次通话都静音，也不能直接按帧数
+归因为 SDK 丢包。本次至少存在音频发送负载与 build.83 不同的混杂因素。
+
+开场首次拨号返回“正在结束上次通话，请等待”，随后 cleanup confirmed，
+第二次拨号成功；此处没有 SDK 崩溃或新 SDK 错误码的证据。
+
+判断：新 SDK 已能建立 TGMP 视频通话，当前节选没有明显视频退化。
+相较 build.83 的额外收益尚未证实，音频 overflow=0 不能单独归功于换库。
+应先在两端麦克风均开启的相同负载下比较；若无改善，按用户指示回退
+已保留的 build.83（ELF 前缀 31fb5079f，源码提交 c4eedec）。
