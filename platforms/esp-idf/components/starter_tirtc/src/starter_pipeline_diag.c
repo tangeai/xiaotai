@@ -83,7 +83,7 @@ void starter_pipeline_diag_report(bool reset_window)
     if (reset_window) reset_locked();
     taskEXIT_CRITICAL(&lock);
     const char *names[] = {"sdk-audio-submit", "sdk-video-submit", "audio-callback",
-        "video-callback", "socket-send", "socket-sendto", "socket-recv", "socket-recvfrom"};
+        "video-callback", "socket-send", "socket-sendto", "socket-recv", "socket-recvfrom", "socket-sendmsg"};
     printf("Media diagnostic: enabled=%d window-ms=%" PRIu64 " socket-scope=all-lwip; recv-us includes blocking wait\n",
         starter_pipeline_diag_enabled(), start && now >= start ? (now-start)/1000 : 0);
     for (unsigned i=0; i<PIPELINE_STAGE_COUNT; i++) {
@@ -113,6 +113,8 @@ WRAP_SOCKET(send, PIPELINE_SOCKET_SEND,
  (int s,const void *data,size_t size,int flags),(s,data,size,flags))
 WRAP_SOCKET(sendto, PIPELINE_SOCKET_SENDTO,
  (int s,const void *data,size_t size,int flags,const struct sockaddr *to,socklen_t len),(s,data,size,flags,to,len))
+WRAP_SOCKET(sendmsg, PIPELINE_SOCKET_SENDMSG,
+ (int s,const struct msghdr *message,int flags),(s,message,flags))
 WRAP_SOCKET(recv, PIPELINE_SOCKET_RECV,
  (int s,void *data,size_t size,int flags),(s,data,size,flags))
 WRAP_SOCKET(recvfrom, PIPELINE_SOCKET_RECVFROM,

@@ -51,6 +51,7 @@ P4 2.5.0 的 `rtc_thread` 从 8 KiB 提升至最少 24 KiB，更大请求、其�
 开发阶段的可复用音视频统计及双机采集步骤见
 [`MEDIA_PIPELINE_DIAGNOSTICS.md`](../docs/development/MEDIA_PIPELINE_DIAGNOSTICS.md)。
 `test_pipeline_diag.py` 覆盖生产 SDK 发送入口、实际 socket 包装、并发与开关/复位；
+SDK 正数成功返回与 sendmsg 分散发送也纳入回归。
 默认关闭，编译关闭路径也纳入回归。实板链路耗时与诊断开销仍需两端日志验证。
 
 `test_p4_hosted_rx_transfer.py` 回放真实 SDIO 接收循环，覆盖 16 位 HAL
@@ -367,3 +368,9 @@ SDK 边界：640×480 原尺寸无旋转绕过 pack/PPA/swap，验证 RGB565 两
 配置、句柄复用及释放，旋转/小尺寸/未启用/库失败继续回退 PPA。
 修改前该入口仍进入 PPA，回归断言失败；修改后通过并注册 `tools/check.sh`。
 主机桩不执行乐鑫 P4 汇编库，像素颜色、并发性能和音频双讲仍需 build.73 实板验收。
+
+`test_p4_video_scheduling.py` 回放生产解码/转换循环的帧结束边界，
+在持续积压、5 fps 输入下验证两个工作线程均执行正 tick 休眠，
+较长窗口按墙钟而非每 30 帧触发。已接入 `tools/check.sh`。
+该测试保护让出 CPU 的机会，不模拟闭源解码器与双核 FreeRTOS；
+IDLE1 看门狗消失、音频溢出及双向画面流畅度仍需 build.78 实板验证。

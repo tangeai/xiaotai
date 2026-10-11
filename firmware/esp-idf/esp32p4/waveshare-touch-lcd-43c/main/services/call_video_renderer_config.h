@@ -121,13 +121,10 @@ _Static_assert(CALL_VIDEO_INPUT_SLOT_COUNT >=
 #define CALL_VIDEO_ADAPTIVE_CRITICAL_INTERVAL_US  \
     ((1000000U + CALL_VIDEO_ADAPTIVE_CRITICAL_FPS - 1U) / \
      CALL_VIDEO_ADAPTIVE_CRITICAL_FPS)
-/* The short window applies only after the compressed input queue is empty. RTC
- * input has a higher priority than the decoder, so delaying every backlogged
- * access unit merely accumulates latency on high-motion frames. The longer
- * periodic window still applies with backlog: it gives IDLE0 one deterministic
- * opportunity per second and stays well inside the five-second TWDT deadline. */
+/* Positive sleeps let lower-priority tasks run during continuous video bursts.
+ * The larger window is wall-clock based, independent of the source frame rate. */
 #define CALL_VIDEO_DECODE_SCHEDULING_WINDOW_MS      1U
 #define CALL_VIDEO_DECODE_IDLE_WINDOW_MS            5U
-#define CALL_VIDEO_DECODE_IDLE_WINDOW_EVERY_FRAMES 30U
+#define CALL_VIDEO_DECODE_IDLE_WINDOW_INTERVAL_US   500000LL
 #define CALL_VIDEO_DECODE_HANG_TIMEOUT_US       (2LL * 1000LL * 1000LL)
 #define CALL_VIDEO_STALL_LOG_INTERVAL_US       (5LL * 1000LL * 1000LL)

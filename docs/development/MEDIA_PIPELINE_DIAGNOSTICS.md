@@ -35,15 +35,16 @@ status
 | --- | --- | --- |
 | `sdk-audio-submit` / `sdk-video-submit` | 调用 TiRTC 发送接口至返回 | 成功提交的调用开始时间 |
 | `audio-callback` / `video-callback` | SDK 回调内执行应用媒体处理函数 | 应用处理函数入口时间 |
-| `socket-send` / `socket-sendto` | lwIP 调用至返回 | 成功调用完成时间 |
+| `socket-send` / `socket-sendto` / `socket-sendmsg` | lwIP 调用至返回 | 成功调用完成时间 |
 | `socket-recv` / `socket-recvfrom` | lwIP 调用至返回，包含阻塞等待 | 成功调用完成时间 |
 
 `call-us` 和 `gap-us` 均为微秒的平均值/最大值；`n` 包括失败调用，
-`bytes` 仅累计成功字节，`fail` 为非零 SDK 返回值或负 socket 返回值的次数。
+`bytes` 仅累计成功字节，`fail` 为负 SDK 返回值或负 socket 返回值的次数。SDK 正数返回值表示成功发送字节数；
+SDK 行的 `bytes` 累计成功提交的媒体载荷长度，可能不等于包含帧头的 SDK 返回字节数。
 `last-error` 保留窗口内最后一次错误，socket 使用 errno；超时轮询错误不重置
 成功事件间隔。socket 的成功零字节返回也计入事件。
 
-socket 统计覆盖经这四个 lwIP 符号的所有业务，包含 MQTT/HTTP；未按 fd、
+socket 统计覆盖经这五个 lwIP 符号的所有业务，包含 MQTT/HTTP；未按 fd、
 协议或 TiRTC 会话分流。它既不是 C6 无线收发统计，也不代表对端已经收到。
 `recv` 的长耗时包含等待，不能直接解释为 CPU 占用。
 回调统计从 SDK 交付到应用开始，不能拆出闭源 SDK 内部的组帧、重传与调度耗时。
@@ -73,3 +74,18 @@ socket 统计覆盖经这四个 lwIP 符号的所有业务，包含 MQTT/HTTP；
 失败提交、跨 reset 的陈旧调用、并发累计、socket 返回值/errno/参数保留，以及
 编译关闭路径。已经注册至 `bash tools/check.sh`。诊断使用固定存储，不记录
 地址、凭据或媒体载荷；新处理阶段应接入公共统计接口并补实际入口回归测试。
+
+## build.78 统计修正与调度复测
+
+build.77 会将 SDK 正数成功返回误计为失败，且未观测 SDK 媒体发送使用的
+`lwip_sendmsg`。旧日志中的“全部提交失败”和 sendto 零计数不能用于归责。
+`recvfrom` 的 errno=11 通常表示非阻塞轮询暂无数据，不能直接作为丢包率。
+
+P4 视频解码和转换在持续有帧时也执行至少一个 tick 的休眠，另按 500 ms
+墙钟周期安排 5 ms 休眠；不再依赖每 30 帧一次的窗口。5 fps 下原周期约 6 秒，
+已超过 5 秒看门狗间隔。保留看门狗、优先级、640×480、帧率和码率策略。
+这是让出 CPU 的修复，不保证两个核的 IDLE 已实际运行，也不证明所有断流均来自调度。
+
+实板需双向连续运动和语音至少 10 分钟，确认不再出现 IDLE1 看门狗，比较两端
+音频溢出增量、视频回调间隔、转换耗时和输出帧率。采集每 10 秒一个诊断窗口；
+仍有秒级回调缺口时结合新 `socket-sendmsg` 和双端收包观测继续区分 SDK/网络。

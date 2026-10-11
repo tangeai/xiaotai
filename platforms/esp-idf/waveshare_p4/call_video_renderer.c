@@ -1927,10 +1927,28 @@ static void call_video_output_finish_write(uint8_t slot_index,
     xSemaphoreGive(s_renderer.frame_mutex);
 }
 
+/* A nonempty queue does not block its consumer. Both CPU-heavy workers must
+ * sleep even during bursts; taskYIELD only admits equal/higher priorities.
+ * Use elapsed time: 30 frames at the current 5 fps exceeds the 5 s TWDT period.
+ * This creates scheduling opportunities; real IDLE execution remains a HIL check.
+ */
+static void call_video_worker_scheduling_window(int64_t *next_idle_window_us)
+{
+    int64_t now_us = esp_timer_get_time();
+    uint32_t delay_ms = CALL_VIDEO_DECODE_SCHEDULING_WINDOW_MS;
+    if (now_us >= *next_idle_window_us) {
+        delay_ms = CALL_VIDEO_DECODE_IDLE_WINDOW_MS;
+        *next_idle_window_us = now_us + CALL_VIDEO_DECODE_IDLE_WINDOW_INTERVAL_US;
+    }
+    TickType_t ticks = pdMS_TO_TICKS(delay_ms);
+    vTaskDelay(ticks > 0 ? ticks : 1);
+}
+
 static void call_video_converter_task(void *arg)
 {
     video_frame_converter_handle_t converter = (video_frame_converter_handle_t)arg;
     int64_t last_stall_log_at_us = 0;
+    int64_t next_idle_window_us = 0;
 
     while (!call_video_stop_requested()) {
         uint8_t index = 0;
@@ -2039,10 +2057,7 @@ static void call_video_converter_task(void *arg)
                      esp_err_to_name(convert_ret));
         }
         call_video_return_decoded_slot(index);
-        /* Conversion and LVGL intentionally share CPU1 and the same priority.
-         * Yield to a ready UI owner without adding one mandatory tick to every
-         * frame when the converter is the only runnable peer. */
-        taskYIELD();
+        call_video_worker_scheduling_window(&next_idle_window_us);
     }
 
     call_video_drain_decoded_ready_queue();
@@ -2072,8 +2087,7 @@ static void call_video_renderer_task(void *arg)
     int64_t last_stall_log_at_us = 0;
     uint32_t last_trace_generation = UINT32_MAX;
     uint32_t decoder_generation = UINT32_MAX;
-    uint32_t idle_window_countdown =
-        CALL_VIDEO_DECODE_IDLE_WINDOW_EVERY_FRAMES;
+    int64_t next_idle_window_us = 0;
     const video_frame_converter_config_t converter_config = {
         .output_width = CALL_VIDEO_RENDER_WIDTH,
         .output_height = CALL_VIDEO_RENDER_HEIGHT,
@@ -2203,8 +2217,7 @@ static void call_video_renderer_task(void *arg)
             last_input_received_at_us = 0;
             last_decode_completed_at_us = 0;
             last_stall_log_at_us = 0;
-            idle_window_countdown =
-                CALL_VIDEO_DECODE_IDLE_WINDOW_EVERY_FRAMES;
+            next_idle_window_us = 0;
         }
 
         int64_t dequeued_at_us = esp_timer_get_time();
@@ -2371,30 +2384,7 @@ static void call_video_renderer_task(void *arg)
             last_stall_log_at_us = access_unit_finished_us;
         }
         call_video_return_slot(index);
-        /* The RTC task runs above this worker and already preempts it whenever
-         * compressed input arrives. Sleeping after every access unit therefore
-         * adds pure latency when high-motion frames consume the full 66.7 ms
-         * budget. Only reserve an explicit scheduling window after the input
-         * backlog has been drained; while backlog exists, continue decoding so
-         * the queue cannot accumulate one tick per frame. */
-        uint32_t queued_after_decode = call_video_input_queue_depth();
-        if (idle_window_countdown > 0U) {
-            idle_window_countdown--;
-        }
-        if (idle_window_countdown == 0U) {
-            /* IDLE0 must run before the five-second TWDT deadline even while
-             * continuous motion keeps compressed input queued. Reserve a short
-             * window every two seconds; a 20 ms window every second consumed
-             * the entire remaining budget when TinyH264 needed about 66 ms per
-             * high-motion access unit. */
-            vTaskDelay(pdMS_TO_TICKS(CALL_VIDEO_DECODE_IDLE_WINDOW_MS));
-            idle_window_countdown =
-                CALL_VIDEO_DECODE_IDLE_WINDOW_EVERY_FRAMES;
-        } else if (queued_after_decode == 0U) {
-            uint32_t scheduling_window_ms =
-                CALL_VIDEO_DECODE_SCHEDULING_WINDOW_MS;
-            vTaskDelay(pdMS_TO_TICKS(scheduling_window_ms));
-        }
+        call_video_worker_scheduling_window(&next_idle_window_us);
         if (generation_stale) {
             if (decoder != NULL) {
                 taskENTER_CRITICAL(&s_renderer.lock);

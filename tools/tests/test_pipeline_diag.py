@@ -14,6 +14,7 @@ code=r'''
 #include <string.h>
 #include <stdio.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <pthread.h>
 #include "starter_pipeline_diag.h"
 static atomic_uintptr_t s_connection=1;
@@ -34,6 +35,9 @@ ssize_t __real_lwip_send(int s,const void*d,size_t z,int f){assert(s==9&&d&&z==4
 ssize_t __real_lwip_sendto(int s,const void*d,size_t z,int f,const struct sockaddr*t,socklen_t l){(void)s;(void)d;(void)z;(void)f;(void)t;(void)l;errno=ENOMEM;return -1;}
 ssize_t __real_lwip_recv(int s,void*d,size_t z,int f){(void)s;(void)f;assert(z==4);memcpy(d,"abc",4);errno=EAGAIN;return 3;}
 ssize_t __real_lwip_recvfrom(int s,void*d,size_t z,int f,struct sockaddr*t,socklen_t*l){(void)s;(void)d;(void)z;(void)f;assert(t&&l);*l=2;errno=EWOULDBLOCK;return -1;}
+static const struct msghdr *expected_message;
+ssize_t __real_lwip_sendmsg(int s,const struct msghdr *m,int f){assert(s==9&&m==expected_message&&f==123&&m->msg_iovlen==2);assert(m->msg_iov[0].iov_len==2&&m->msg_iov[1].iov_len==3);errno=EINTR;return 4;}
+ssize_t __wrap_lwip_sendmsg(int,const struct msghdr*,int);
 ssize_t __wrap_lwip_send(int,const void*,size_t,int);
 ssize_t __wrap_lwip_sendto(int,const void*,size_t,int,const struct sockaddr*,socklen_t);
 ssize_t __wrap_lwip_recv(int,void*,size_t,int);
@@ -54,13 +58,16 @@ int main(void){
  sdk_ret=-35;assert(starter_tirtc_send_alaw(40,data,160)==-35);
  pipeline_diag_ticket_t old=starter_pipeline_diag_begin();starter_pipeline_diag_reset();
  starter_pipeline_diag_end(old,PIPELINE_AUDIO_CALLBACK,999,0,false);
- sdk_ret=0;assert(starter_tirtc_send_alaw(60,data,160)==0);
+ sdk_ret=172;assert(starter_tirtc_send_alaw(60,data,160)==172);
  sdk_ret=-35;assert(starter_tirtc_send_alaw(80,data,160)==-35);
  char bytes[4]={0};assert(__wrap_lwip_send(9,bytes,4,123)==3&&errno==EINTR);
  assert(__wrap_lwip_sendto(0,bytes,4,0,NULL,0)==-1&&errno==ENOMEM);
  assert(__wrap_lwip_recv(0,bytes,4,0)==3&&errno==EAGAIN&&!memcmp(bytes,"abc",4));
  struct sockaddr addr={0};socklen_t len=sizeof(addr);
  assert(__wrap_lwip_recvfrom(0,bytes,4,0,&addr,&len)==-1&&errno==EWOULDBLOCK&&len==2);
+ struct iovec parts[2]={{bytes,2},{bytes,3}};
+ struct msghdr message={.msg_iov=parts,.msg_iovlen=2};expected_message=&message;
+ assert(__wrap_lwip_sendmsg(9,&message,123)==4&&errno==EINTR);
  starter_pipeline_diag_sample_buffer(100);starter_pipeline_diag_sample_buffer(200);
  pthread_t a,b;assert(!pthread_create(&a,NULL,observe,NULL));assert(!pthread_create(&b,NULL,observe,NULL));pthread_join(a,NULL);pthread_join(b,NULL);
  starter_pipeline_diag_report(false);
@@ -73,7 +80,7 @@ with tempfile.TemporaryDirectory(prefix='pipeline-diag-') as d:
  (p/'sdkconfig.h').write_text('#ifndef CONFIG_STARTER_PIPELINE_DIAGNOSTICS\n#define CONFIG_STARTER_PIPELINE_DIAGNOSTICS 1\n#endif\n')
  (p/'freertos/FreeRTOS.h').write_text('#include <pthread.h>\ntypedef pthread_mutex_t portMUX_TYPE;\n#define portMUX_INITIALIZER_UNLOCKED PTHREAD_MUTEX_INITIALIZER\n#define taskENTER_CRITICAL(p) pthread_mutex_lock(p)\n#define taskEXIT_CRITICAL(p) pthread_mutex_unlock(p)\n')
  (p/'esp_timer.h').write_text('#include <stdint.h>\nint64_t esp_timer_get_time(void);\n')
- (p/'lwip/sockets.h').write_text('#include <sys/socket.h>\n')
+ (p/'lwip/sockets.h').write_text('#include <sys/socket.h>\n#include <sys/uio.h>\n')
  (p/'test.c').write_text(code)
  subprocess.run(['cc','-std=c11','-DCONFIG_STARTER_PIPELINE_DIAGNOSTICS=1','-Wall','-Wextra','-Werror','-fsanitize=undefined','-pthread','-I',str(p),'-I',str(component/'include'),str(p/'test.c'),str(component/'src/starter_pipeline_diag.c'),'-o',str(p/'test')],check=True)
  output=subprocess.check_output([str(p/'test')],text=True)
@@ -81,6 +88,7 @@ with tempfile.TemporaryDirectory(prefix='pipeline-diag-') as d:
  assert 'audio-callback n=0 bytes=0' in output,output
  assert 'socket-send n=1 bytes=3 fail=0' in output,output
  assert 'socket-sendto n=1 bytes=0 fail=1' in output,output
+ assert 'socket-sendmsg n=1 bytes=4 fail=0' in output,output
  assert 'socket-recv n=1 bytes=3 fail=0' in output,output
  assert 'socket-recvfrom n=1 bytes=0 fail=1' in output,output
  assert 'video-callback n=2000 bytes=2000 fail=0' in output,output

@@ -11,5 +11,6 @@ idf_component_register(
 if(CONFIG_STARTER_PIPELINE_DIAGNOSTICS)
     target_link_libraries(${COMPONENT_LIB} INTERFACE
         "-Wl,--wrap=lwip_send" "-Wl,--wrap=lwip_sendto"
+        "-Wl,--wrap=lwip_sendmsg"
         "-Wl,--wrap=lwip_recv" "-Wl,--wrap=lwip_recvfrom")
 endif()

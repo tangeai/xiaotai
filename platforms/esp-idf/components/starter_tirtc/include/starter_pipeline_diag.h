@@ -9,6 +9,7 @@ typedef enum {
     PIPELINE_AUDIO_CALLBACK, PIPELINE_VIDEO_CALLBACK,
     PIPELINE_SOCKET_SEND, PIPELINE_SOCKET_SENDTO,
     PIPELINE_SOCKET_RECV, PIPELINE_SOCKET_RECVFROM,
+    PIPELINE_SOCKET_SENDMSG,
     PIPELINE_STAGE_COUNT
 } pipeline_diag_stage_t;
 typedef struct { uint64_t started_us; uint32_t epoch; } pipeline_diag_ticket_t;

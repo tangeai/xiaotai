@@ -802,7 +802,7 @@ int starter_tirtc_send_alaw(uint32_t timestamp_ms,
 #if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
     pipeline_diag_ticket_t ticket = starter_pipeline_diag_begin();
     int result = TiRtcSendAudioStream(connection, &frame, data);
-    starter_pipeline_diag_end(ticket, PIPELINE_AUDIO_SUBMIT, length, result, false);
+    starter_pipeline_diag_end(ticket, PIPELINE_AUDIO_SUBMIT, length, result < 0 ? result : 0, false);
     return result;
 #else
     return TiRtcSendAudioStream(connection, &frame, data);
@@ -829,7 +829,7 @@ int starter_tirtc_send_opus(uint32_t timestamp_ms,
 #if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
     pipeline_diag_ticket_t ticket = starter_pipeline_diag_begin();
     int result = TiRtcSendAudioStream(connection, &frame, data);
-    starter_pipeline_diag_end(ticket, PIPELINE_AUDIO_SUBMIT, length, result, false);
+    starter_pipeline_diag_end(ticket, PIPELINE_AUDIO_SUBMIT, length, result < 0 ? result : 0, false);
     return result;
 #else
     return TiRtcSendAudioStream(connection, &frame, data);
@@ -857,7 +857,7 @@ int starter_tirtc_send_mjpeg(uint32_t timestamp_ms,
 #if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
     pipeline_diag_ticket_t ticket = starter_pipeline_diag_begin();
     int result = TiRtcSendVideoStream(connection, &frame, data);
-    starter_pipeline_diag_end(ticket, PIPELINE_VIDEO_SUBMIT, length, result, false);
+    starter_pipeline_diag_end(ticket, PIPELINE_VIDEO_SUBMIT, length, result < 0 ? result : 0, false);
     return result;
 #else
     return TiRtcSendVideoStream(connection, &frame, data);
@@ -912,7 +912,7 @@ int starter_tirtc_send_h264(uint32_t timestamp_ms, const void *data, uint32_t le
 #if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
     pipeline_diag_ticket_t ticket = starter_pipeline_diag_begin();
     int result = TiRtcSendVideoStream(conn, &frame, data);
-    starter_pipeline_diag_end(ticket, PIPELINE_VIDEO_SUBMIT, length, result, false);
+    starter_pipeline_diag_end(ticket, PIPELINE_VIDEO_SUBMIT, length, result < 0 ? result : 0, false);
     return result;
 #else
     return TiRtcSendVideoStream(conn, &frame, data);
