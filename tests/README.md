@@ -32,6 +32,11 @@ bash tools/check.sh
 
 ## 测试驱动开发约定
 
+开发阶段的可复用音视频统计及双机采集步骤见
+[`MEDIA_PIPELINE_DIAGNOSTICS.md`](../docs/development/MEDIA_PIPELINE_DIAGNOSTICS.md)。
+`test_pipeline_diag.py` 覆盖生产 SDK 发送入口、实际 socket 包装、并发与开关/复位；
+默认关闭，编译关闭路径也纳入回归。实板链路耗时与诊断开销仍需两端日志验证。
+
 `test_p4_hosted_rx_transfer.py` 回放真实 SDIO 接收循环，覆盖 16 位 HAL
 边界、计数回绕及第一/中间/最后一段读取失败。只有成功读取的字节计入接收计数；
 失败批次不交给解析器，释放总线锁并归还缓冲后走既有主机重启恢复路径。

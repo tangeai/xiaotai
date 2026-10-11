@@ -6,6 +6,8 @@
  * ESP console 的命令处理函数。
  */
 #include "starter_console.h"
+#include "starter_pipeline_diag.h"
+#include "sdkconfig.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -164,6 +166,24 @@ static void print_audio_gap_observation(starter_media_status_t media)
            (unsigned long)media.audio_trace_decode_us,
            (unsigned long)media.audio_trace_lock_us,
            (unsigned long)media.audio_trace_write_us);
+}
+
+static int command_media_diag(int argc, char **argv)
+{
+#if !CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+    (void)argc; (void)argv;
+    printf("Media diagnostics compiled out; enable CONFIG_STARTER_PIPELINE_DIAGNOSTICS in a development build.\n");
+    return 1;
+#else
+    if (argc != 2) { printf("Usage: media-diag on|off|show|reset\n"); return 1; }
+    if (strcmp(argv[1], "on") == 0) starter_pipeline_diag_set_enabled(true);
+    else if (strcmp(argv[1], "off") == 0) starter_pipeline_diag_set_enabled(false);
+    else if (strcmp(argv[1], "reset") == 0) starter_pipeline_diag_reset();
+    else if (strcmp(argv[1], "show") != 0) { printf("Usage: media-diag on|off|show|reset\n"); return 1; }
+    (void)starter_tirtc_send_buffer_used();
+    starter_pipeline_diag_report(strcmp(argv[1], "show") == 0);
+    return 0;
+#endif
 }
 
 static int command_status(int argc, char **argv)
@@ -457,6 +477,8 @@ esp_err_t starter_console_start(void)
                         "register help");
     ESP_RETURN_ON_ERROR(register_command("version", "Show firmware identity", command_version),
                         "starter_console", "register version");
+    ESP_RETURN_ON_ERROR(register_command("media-diag", "Development pipeline counters: on|off|show|reset", command_media_diag),
+                        "starter_console", "register media-diag");
     ESP_RETURN_ON_ERROR(register_command("status", "Show starter status", command_status),
                         "starter_console", "register status");
     ESP_RETURN_ON_ERROR(register_command("face-animation", "face-animation [on|off]; volatile A/B control", command_face_animation),

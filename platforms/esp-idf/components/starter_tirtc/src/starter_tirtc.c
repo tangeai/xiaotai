@@ -7,6 +7,8 @@
  * 不执行 HTTP、阻塞等待、TiRtcStop 或 TiRtcUninit。
  */
 #include "starter_tirtc.h"
+#include "starter_pipeline_diag.h"
+#include "sdkconfig.h"
 
 #include <stdatomic.h>
 #include <stdint.h>
@@ -322,7 +324,13 @@ static void on_audio(tirtc_conn_t connection,
                  (unsigned)copy.flags,
                  (unsigned long)copy.length);
     }
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+    pipeline_diag_ticket_t ticket = starter_pipeline_diag_begin();
+#endif
     s_handlers.on_audio(mode, generation, &copy, data, s_handlers.user_data);
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+    starter_pipeline_diag_end(ticket, PIPELINE_AUDIO_CALLBACK, copy.length, 0, false);
+#endif
 }
 
 static void on_video(tirtc_conn_t connection,
@@ -337,8 +345,14 @@ static void on_video(tirtc_conn_t connection,
             .stream_id = frame->stream_id, .media = frame->media,
             .flags = frame->flags, .timestamp_ms = frame->ts, .length = frame->length,
         };
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+        pipeline_diag_ticket_t ticket = starter_pipeline_diag_begin();
+#endif
         s_handlers.on_video(starter_tirtc_mode(), starter_tirtc_generation(),
                              &copy, data, s_handlers.user_data);
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+        starter_pipeline_diag_end(ticket, PIPELINE_VIDEO_CALLBACK, copy.length, 0, false);
+#endif
     }
 }
 
@@ -785,7 +799,14 @@ int starter_tirtc_send_alaw(uint32_t timestamp_ms,
         .ts = timestamp_ms,
         .length = length,
     };
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+    pipeline_diag_ticket_t ticket = starter_pipeline_diag_begin();
+    int result = TiRtcSendAudioStream(connection, &frame, data);
+    starter_pipeline_diag_end(ticket, PIPELINE_AUDIO_SUBMIT, length, result, false);
+    return result;
+#else
     return TiRtcSendAudioStream(connection, &frame, data);
+#endif
 }
 
 int starter_tirtc_send_opus(uint32_t timestamp_ms,
@@ -805,7 +826,14 @@ int starter_tirtc_send_opus(uint32_t timestamp_ms,
         .ts = timestamp_ms,
         .length = length,
     };
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+    pipeline_diag_ticket_t ticket = starter_pipeline_diag_begin();
+    int result = TiRtcSendAudioStream(connection, &frame, data);
+    starter_pipeline_diag_end(ticket, PIPELINE_AUDIO_SUBMIT, length, result, false);
+    return result;
+#else
     return TiRtcSendAudioStream(connection, &frame, data);
+#endif
 }
 
 int starter_tirtc_send_mjpeg(uint32_t timestamp_ms,
@@ -826,7 +854,14 @@ int starter_tirtc_send_mjpeg(uint32_t timestamp_ms,
         .ts = timestamp_ms,
         .length = length,
     };
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+    pipeline_diag_ticket_t ticket = starter_pipeline_diag_begin();
+    int result = TiRtcSendVideoStream(connection, &frame, data);
+    starter_pipeline_diag_end(ticket, PIPELINE_VIDEO_SUBMIT, length, result, false);
+    return result;
+#else
     return TiRtcSendVideoStream(connection, &frame, data);
+#endif
 }
 
 bool starter_tirtc_audio_ready(void)
@@ -874,7 +909,14 @@ int starter_tirtc_send_h264(uint32_t timestamp_ms, const void *data, uint32_t le
     }
     TIRTCFRAMEINFO frame = {.stream_id = video_stream_for_mode(starter_tirtc_mode()), .media = TIRTC_VIDEO_H264,
         .flags = key ? TIRTC_FRAME_FLAG_KEY_FRAME : 0, .ts = timestamp_ms, .length = length};
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+    pipeline_diag_ticket_t ticket = starter_pipeline_diag_begin();
+    int result = TiRtcSendVideoStream(conn, &frame, data);
+    starter_pipeline_diag_end(ticket, PIPELINE_VIDEO_SUBMIT, length, result, false);
+    return result;
+#else
     return TiRtcSendVideoStream(conn, &frame, data);
+#endif
 }
 
 int starter_tirtc_subscribe_h5_audio(void)
@@ -930,7 +972,11 @@ size_t starter_tirtc_send_buffer_used(void)
 {
     tirtc_conn_t connection = (tirtc_conn_t)atomic_load_explicit(
         &s_connection, memory_order_acquire);
-    return connection == NULL ? 0U : TiRtcGetSendBufferUsed(connection);
+    size_t used = connection == NULL ? 0U : TiRtcGetSendBufferUsed(connection);
+#if CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+    starter_pipeline_diag_sample_buffer(used);
+#endif
+    return used;
 }
 
 size_t starter_tirtc_send_buffer_limit(void)

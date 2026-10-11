@@ -1,0 +1,9 @@
+menu "XiaoTai development diagnostics"
+config STARTER_PIPELINE_DIAGNOSTICS
+    bool "Build optional media pipeline diagnostics"
+    default y
+    help
+        Fixed-size counters for SDK submissions/callbacks and lwIP calls.
+        Runtime collection is OFF at boot; enable with media-diag on.
+        Disable this option to remove diagnostics and socket wrappers in production.
+endmenu
