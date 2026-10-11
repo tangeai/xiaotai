@@ -10,7 +10,7 @@ set(TIRTC_SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/third_party/tirtc"
     CACHE PATH "TiRTC ESP32-S3 SDK root")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-set(PROJECT_VER "1.0.0+build.1")
+set(PROJECT_VER "1.0.0+build.2")
 project(atk_xiaotai_s3)
 
 # tirtc-runtime-semantic-gate-v1

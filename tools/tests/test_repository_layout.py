@@ -373,7 +373,7 @@ class RepositoryLayoutTests(unittest.TestCase):
             "lckfb-esp32s3": (
                 "735507283d5b2f9fb363a1901172dbd9e847945d",
                 "xtensa-esp-elf-gcc 14.2.0",
-                "43b06d1da421c7d24cc7fdb1385d600ecdffbfd2d3801f7faf0c540fb5cdbaa2",
+                "7334e846ed4261b5297607c85acafe1d586a22374f7c8e37b102b2742e47c7aa",
             ),
             "waveshare-esp32p4-touch-lcd-43c-v10": (
                 "735507283d5b2f9fb363a1901172dbd9e847945d",

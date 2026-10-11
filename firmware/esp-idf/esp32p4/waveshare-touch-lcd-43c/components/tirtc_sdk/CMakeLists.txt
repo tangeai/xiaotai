@@ -8,6 +8,8 @@ foreach(required IN ITEMS include/tirtc/tiRTC.h lib/libTiRTC.a manifest/build-co
 endforeach()
 
 idf_component_register(
+    SRCS "src/tirtc_task_stack_policy.c"
+    WHOLE_ARCHIVE
     INCLUDE_DIRS "${TIRTC_SDK_DIR}/include" "${TIRTC_SDK_DIR}/include/tirtc"
     REQUIRES freertos esp_http_client esp_netif esp_timer hal json lwip mbedtls soc
 )
@@ -63,3 +65,7 @@ target_link_libraries(tirtc_link_bundle INTERFACE
     "-Wl,--end-group")
 
 target_link_libraries(${COMPONENT_LIB} INTERFACE tirtc_link_bundle)
+
+# Preserve SDK ABI while raising only the rtc_thread minimum stack budget.
+target_link_libraries(${COMPONENT_LIB} INTERFACE
+    "-Wl,--wrap=freertos_ThreadCreateWithStackSize")

@@ -36,6 +36,17 @@ bash tools/check.sh
 `third_party/tirtc/lib/libTiRTC.a`、库内版本为 2.5.0 且对象为 RISC-V。
 迁移只调整厂商文件位置；`components/tirtc_sdk/` 保留工程校验和链接配置。
 
+`test_s3_sdk_link.py` 对两个 S3 工程执行同样的实际 CMake 链接检查，
+要求使用工程内的 2.5.0 Xtensa 库；两类芯片的库独立保存。升级 SDK 后仍需
+重新编译并在设备上验证音视频通话、AEC、挂断重拨及重连。
+
+`test_p4_tirtc_stack.py` 通过真实链接包装函数回放 SDK 的线程创建调用：
+P4 2.5.0 的 `rtc_thread` 从 8 KiB 提升至最少 24 KiB，更大请求、其他线程、
+入口函数及返回值保持原样。build.76 实板日志在约 8 KiB 栈的 `sprintf`
+路径触发栈保护；该测试保护创建边界，不模拟闭源 SDK 的完整栈峰值。
+修复版仍需复测双向视频、码率反馈/关键帧请求及长通话，并确认启动日志
+出现 `TiRTC task stack adjusted: name=rtc_thread requested=8192 effective=24576`。
+
 
 开发阶段的可复用音视频统计及双机采集步骤见
 [`MEDIA_PIPELINE_DIAGNOSTICS.md`](../docs/development/MEDIA_PIPELINE_DIAGNOSTICS.md)。
