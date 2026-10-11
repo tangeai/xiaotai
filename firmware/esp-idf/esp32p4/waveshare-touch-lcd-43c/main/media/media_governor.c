@@ -286,8 +286,15 @@ static media_governor_video_config_t media_governor_normalize_video_config(const
     } else if (normalized.fps > 30U) {
         normalized.fps = 30U;
     }
-    if (normalized.bitrate_bps < MEDIA_GOVERNOR_VIDEO_MIN_BITRATE_BPS) {
-        normalized.bitrate_bps = MEDIA_GOVERNOR_VIDEO_MIN_BITRATE_BPS;
+    const uint32_t minimum_bitrate_bps =
+        APP_MEDIA_CALL_FIXED_BITRATE_PROBE &&
+        normalized.width == APP_MEDIA_CALL_VIDEO_WIDTH &&
+        normalized.height == APP_MEDIA_CALL_VIDEO_HEIGHT &&
+        normalized.fps == APP_MEDIA_CALL_VIDEO_FPS &&
+        normalized.bitrate_bps == APP_MEDIA_CALL_VIDEO_BITRATE_BPS ?
+            APP_MEDIA_CALL_VIDEO_BITRATE_BPS : MEDIA_GOVERNOR_VIDEO_MIN_BITRATE_BPS;
+    if (normalized.bitrate_bps < minimum_bitrate_bps) {
+        normalized.bitrate_bps = minimum_bitrate_bps;
     } else if (normalized.bitrate_bps > 12U * 1000U * 1000U) {
         normalized.bitrate_bps = 12U * 1000U * 1000U;
     }
@@ -384,7 +391,8 @@ void media_governor_build_device_call_video_config(media_governor_video_config_t
         .height = APP_MEDIA_CALL_VIDEO_HEIGHT,
         .fps = APP_MEDIA_CALL_VIDEO_FPS,
         .bitrate_bps = APP_MEDIA_CALL_VIDEO_BITRATE_BPS,
-        .weak_network_mode = CONFIG_APP_RTC_VIDEO_AUTO_ADAPT_ENABLE ?
+        .weak_network_mode = CONFIG_APP_RTC_VIDEO_AUTO_ADAPT_ENABLE &&
+                             !APP_MEDIA_CALL_FIXED_BITRATE_PROBE ?
                                  MEDIA_GOVERNOR_WEAK_NETWORK_RESOLUTION_PRIORITY :
                                  MEDIA_GOVERNOR_WEAK_NETWORK_OFF,
         .weak_network_level = 0U,
@@ -662,6 +670,18 @@ static void media_governor_build_transport_bitrate_range(
     const media_governor_video_config_t *base,
     media_governor_transport_bitrate_range_t *range)
 {
+    if (APP_MEDIA_CALL_FIXED_BITRATE_PROBE &&
+        base->width == APP_MEDIA_CALL_VIDEO_WIDTH &&
+        base->height == APP_MEDIA_CALL_VIDEO_HEIGHT &&
+        base->fps == APP_MEDIA_CALL_VIDEO_FPS &&
+        base->bitrate_bps == APP_MEDIA_CALL_VIDEO_BITRATE_BPS) {
+        *range = (media_governor_transport_bitrate_range_t) {
+            .min_bitrate_bps = base->bitrate_bps,
+            .max_bitrate_bps = base->bitrate_bps,
+            .start_bitrate_bps = base->bitrate_bps,
+        };
+        return;
+    }
     const uint32_t frame_pixels = (uint32_t)base->width * (uint32_t)base->height;
     const uint32_t profile_floor_bps =
         frame_pixels <= MEDIA_GOVERNOR_TRANSPORT_COMPACT_MAX_PIXELS ?

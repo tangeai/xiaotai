@@ -1,0 +1,47 @@
+2026-10-11 板卡与传输探针补充
+
+来源：用户在 build.82 交付后提供的单端控制台节选。本段未包含 status
+中的固件版本和 ELF 摘要，不能将运行结果严格绑定到 build.82 完整哈希。
+尚未收到另一端的同类身份探针。不据此推断两端载板完全相同。
+
+原始关键行：
+BOARD-PROBE: chip-model=18 revision=1.3 cores=2 idf=v5.5.4-dirty
+BOARD-PROBE: flash-rc=0 flash-bytes=33554432 psram-allocator-bytes=33536632 cpu-config-mhz=360
+BOARD-PROBE: carrier=unverified; configured SDIO width=4 clock-khz=40000 clk/cmd/d0/d1/d2/d3/reset=18/19/14/15/16/17/54
+W (26131) rpc_core: Timeout waiting for Resp for Req[0x15e]
+E (26132) rpc_core: Response not received for [0x15e]
+BOARD-PROBE: C6 Hosted version=unknown rc=-1; no update attempted
+BOARD-PROBE: wifi-rssi=-29 dBm channel=5
+BOARD-PROBE: wifi-enabled-protocol-mask=0x47 (capability setting, not negotiated PHY)
+I (50619) starter_tirtc: TP init proto=TGMP transport=tgtrp mtu=1200 poll_segments=16 sndcap=2097152
+I (60902) p4_video: downlink generation=1 mode=4 tx=49 tx-fail=0 tx-ret=0 send-buffer=304319/2097152 subscribed=1 rx=20 drop=0 stream=11 media=66 decoded=20 converted=20 presented=20 decode-fail=0
+I (65902) p4_video: downlink generation=1 mode=4 tx=74 tx-fail=0 tx-ret=0 send-buffer=205160/2097152 subscribed=1 rx=20 drop=0 stream=11 media=66 decoded=20 converted=20 presented=20 decode-fail=0
+W (69066) call_video: video stall: stage=input decode=82961us input_gap=9409370us done_gap=9425065us queue_age=48us key=0 bytes=4219 q=3/1 hwm=12840
+W (76802) call_video: video stall: stage=input decode=58675us input_gap=7240654us done_gap=6649011us queue_age=54us key=0 bytes=2578 q=3/1 hwm=12840
+
+本段确认：
+1. 当前观测板的芯片修订为 1.3，Flash 为 32 MiB；PSRAM 数字为分配器
+   管理容量。CPU 360 MHz、SDIO 4 线 40 MHz 和引脚是编译配置。
+   不能套用参照项目 rev3.2+/400 MHz/16 MB/3.5 寸的板级配置。
+2. 该次连接实际初始化 TGMP/tgtrp，MTU=1200，poll_segments=16，
+   send buffer=2 MiB。poll_segments 不是轮询超时毫秒数。
+3. C6 Hosted 版本 RPC 未收到响应。当前主机 protobuf 中请求编号 350
+   即 0x15e；仓库内 slave 源码有对应处理函数，但不能证明实板正在运行
+   此 slave 固件。未知版本、接口不兼容、响应丢失等原因尚未区分。
+   随后的 RSSI/协议信息查询和通话成功，不支持“C6 完全失去响应”的说法。
+4. 信号强度采样为 -29 dBm，不能用信号弱解释此采样时刻；仍不能排除
+   干扰、重试或其他时刻的无线异常。protocol mask 不是协商 PHY。
+5. 该段再次记录 9.409 秒和 7.241 秒输入间隔，同时单帧解码约 83 ms
+   和 59 ms；短队列年龄只代表此帧入队后等待，不表示端到端时延。
+
+参照项目源码复核：
+components/tirtc_sdk/VERSION.md 与 BUILD_EVIDENCE.md 表明候选库为同一
+TiRTC 2.5.0 的本地修复批次 20260922-p4-fixes2，包含反馈/TURN 栈缩减、
+失败建连资源回收和 HTTPS；明确不改变重传、心跳、jitter 或传输协商。
+这些文件没有证明该库修复当前双向视频断流，且记录此批次实板验证待完成。
+因此不将简单替换该库作为已知卡顿修复，也不根据 RPC 超时更新 C6。
+
+结论边界：SDK 的 TGMP 传输处理与 Hosted/无线双向负载仍需区分。
+本次是身份与协议证据补充，不是 SDK 缺陷或硬件修复验收。
+若进一步插桩，应获取该 TGMP 连接的 ACK/重传/接收分片/完整帧时间，
+而非套用 KCP 参数或重复无连接范围的全 lwIP 计数。

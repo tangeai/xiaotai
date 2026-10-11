@@ -99,6 +99,16 @@ static void maintain_bitrate(void)
     s_bitrate_due_us = now + 500000;
     media_governor_transport_bitrate_range_t range = {0};
     media_governor_get_transport_bitrate_range(&range);
+    /* Equal bounds are the local fixed-rate experiment, not valid SDK range
+     * parameters. Keep its startup encoder target through pressure/recovery. */
+    if (range.min_bitrate_bps == range.max_bitrate_bps && range.max_bitrate_bps) {
+        if (!s_bitrate_configured) {
+            s_bitrate_configured = true;
+            ESP_LOGI("p4_video", "fixed bitrate probe generation=%lu target=%lu bps sdk-feedback=0",
+                     (unsigned long)generation, (unsigned long)range.max_bitrate_bps);
+        }
+        return;
+    }
     if (!s_bitrate_configured) {
         int rc = starter_tirtc_set_video_bitrate_range(range.min_bitrate_bps,
             range.max_bitrate_bps, range.start_bitrate_bps);
@@ -283,8 +293,12 @@ static esp_err_t send_video(const uint8_t *data, size_t len, uint16_t w, uint16_
     return ESP_OK;
 }
 
+int p4_board_probe_register(void);
+
 esp_err_t p4_video_init(void)
 {
+    int probe_rc = p4_board_probe_register();
+    if (probe_rc != ESP_OK) ESP_LOGW("p4_video", "board-probe registration failed rc=%d", probe_rc);
     s_free = xQueueCreate(VIDEO_INGRESS_SLOTS, sizeof(uint8_t));
     s_pending = xQueueCreate(VIDEO_INGRESS_SLOTS, sizeof(uint8_t));
     if (!s_free || !s_pending) return ESP_ERR_NO_MEM;

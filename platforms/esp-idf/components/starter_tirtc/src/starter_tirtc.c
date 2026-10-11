@@ -11,6 +11,7 @@
 #include "sdkconfig.h"
 
 #include <stdatomic.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -18,6 +19,9 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "tirtc/tiRTC.h"
+#if CONFIG_IDF_TARGET_ESP32P4 && CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+#include "tirtc/tgtrp.h"
+#endif
 
 #ifndef TIRTC_SDK_STATIC_SEMAPHORE_SIZE
 #error "TiRTC SDK build contract did not define StaticSemaphore_t size"
@@ -198,6 +202,58 @@ static void notify_connection(starter_tirtc_mode_t mode,
                                  s_handlers.user_data);
     }
 }
+
+#if CONFIG_IDF_TARGET_ESP32P4 && CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+static void sdk_transport_log(const char *format, va_list args)
+{
+    /* SDK 2.3.0 / e3911473 and 2.5.0 / f72f5d3c emit these after creating
+     * the transport. Match the entire format before reading varargs; never
+     * print SDK text, source paths, SDP, tokens, or negotiation capability.
+     * Unknown SDK formats fail closed and are not proof of a protocol. */
+    if (format == NULL) return;
+    bool tgmp = strcmp(format,
+        "(%s:%d) peer_connection_tgtrp_init ok ice=%p mtu=%u "
+        "poll_segments=%u pacing=%u send_buffer_max=%zu") == 0;
+    bool kcp = strcmp(format,
+        "(%s:%d) peer_connection_kcp_init ikcp_nodelay(%d %d %d %d) "
+        "sndwnd=%d mtu=%d") == 0;
+    bool failed = strcmp(format,
+        "(%s:%d) peer_connection_tgtrp_init failed ice=%p ret=%d mtu=%u "
+        "poll_segments=%u send_buffer_max=%zu") == 0;
+    if (!tgmp && !kcp && !failed) return;
+
+    va_list values;
+    va_copy(values, args);
+    (void)va_arg(values, const char *);
+    (void)va_arg(values, int);
+    if (tgmp || failed) {
+        (void)va_arg(values, void *);
+        int error = failed ? va_arg(values, int) : 0;
+        unsigned mtu = va_arg(values, unsigned);
+        unsigned poll = va_arg(values, unsigned);
+        if (tgmp) (void)va_arg(values, unsigned); /* Initial pacing, not throughput. */
+        size_t capacity = va_arg(values, size_t);
+        if (failed) {
+            ESP_LOGE(TAG, "TP init-failed proto=TGMP rc=%d mtu=%u "
+                     "poll_segments=%u sndcap=%zu", error, mtu, poll, capacity);
+        } else {
+            ESP_LOGI(TAG, "TP init proto=TGMP transport=tgtrp mtu=%u "
+                     "poll_segments=%u sndcap=%zu", mtu, poll, capacity);
+        }
+    } else {
+        int nodelay = va_arg(values, int);
+        int interval = va_arg(values, int);
+        int resend = va_arg(values, int);
+        int nc = va_arg(values, int);
+        int window = va_arg(values, int);
+        int mtu = va_arg(values, int);
+        ESP_LOGI(TAG, "TP init proto=KCP transport=kcp nodelay=%d interval_ms=%d "
+                 "resend=%d nc=%d sndwnd=%d mtu=%d",
+                 nodelay, interval, resend, nc, window, mtu);
+    }
+    va_end(values);
+}
+#endif
 
 static void sdk_log(const char *log, uint32_t length)
 {
@@ -659,6 +715,13 @@ int starter_tirtc_start(const starter_tirtc_config_t *config)
      */
     TiRtcLogSetCallback(sdk_log);
     TiRtcLogSetLevel(config->log_level > 0 ? config->log_level : 3);
+#if CONFIG_IDF_TARGET_ESP32P4 && CONFIG_STARTER_PIPELINE_DIAGNOSTICS
+    /* NOTICE only, no STAT/per-packet logging. Unknown formats are discarded
+     * before reading varargs or formatting. A library version is not proof
+     * of the transport selected for this connection. */
+    tgtrp_set_log_callback(sdk_transport_log);
+    tgtrp_set_log_level(5);
+#endif
     int rc = 0;
     atomic_store(&s_send_buffer_limit, 0);
     if (config->max_send_buffer_bytes > 0U) {

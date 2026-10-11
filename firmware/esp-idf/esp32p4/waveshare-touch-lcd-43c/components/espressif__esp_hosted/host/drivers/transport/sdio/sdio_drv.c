@@ -531,8 +531,15 @@ static int sdio_is_write_buffer_available(uint32_t buf_needed)
 				ESP_LOGV(TAG, "Retry get write buffers %d", retry);
 				retry--;
 
-				if (retry < MAX_WRITE_BUF_RETRIES/2)
+				if (retry < MAX_WRITE_BUF_RETRIES/2) {
+					/* Only the TX worker consumes cached credits. Let RX use
+					 * the shared bus while waiting for the slave to replenish
+					 * them; retain the caller's lock for every register access
+					 * and the following CMD53 write. */
+					SDIO_DRV_UNLOCK();
 					g_h.funcs->_h_msleep(1);
+					SDIO_DRV_LOCK();
+				}
 
 				continue;
 			}

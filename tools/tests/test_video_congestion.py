@@ -89,11 +89,12 @@ static uint32_t suggestion,applied,current=1500000;
 static size_t used,limit=2097152;
 static unsigned configured,changes,calls;
 static int config_result;
+static bool fixed_probe;
 typedef struct {uint32_t min_bitrate_bps,max_bitrate_bps,start_bitrate_bps;} media_governor_transport_bitrate_range_t;
 typedef struct {uint32_t bitrate_bps;} media_governor_video_config_t;
 static uint32_t starter_tirtc_generation(void){return 7;}
 static int64_t esp_timer_get_time(void){return clock_us;}
-static void media_governor_get_transport_bitrate_range(media_governor_transport_bitrate_range_t*r){*r=(media_governor_transport_bitrate_range_t){250000,1500000,1200000};}
+static void media_governor_get_transport_bitrate_range(media_governor_transport_bitrate_range_t*r){*r=fixed_probe?(media_governor_transport_bitrate_range_t){150000,150000,150000}:(media_governor_transport_bitrate_range_t){250000,1500000,1200000};}
 static int starter_tirtc_set_video_bitrate_range(uint32_t a,uint32_t b,uint32_t c){assert(a==250000&&b==1500000&&c==1200000);configured++;return config_result;}
 static bool starter_tirtc_take_video_bitrate(uint32_t g,uint32_t*t){assert(g==7);if(!suggestion)return false;*t=suggestion;suggestion=0;return true;}
 static size_t starter_tirtc_send_buffer_used(void){return used;}
@@ -121,6 +122,15 @@ int main(void){
  s_bitrate_session=0;config_result=-40013;used=1500000;clock_us+=500000;
  maintain_bitrate();assert(applied==1125000 && configured==3);
  clock_us+=500000;maintain_bitrate();assert(configured==3);
+ /* Fixed call experiment never invokes the strict min < start < max SDK API,
+  * consumes no SDK feedback, and cannot change target even under backlog. */
+ fixed_probe=true;s_bitrate_session=0;current=150000;used=limit;suggestion=600000;
+ n=calls;clock_us+=500000;maintain_bitrate();
+ assert(configured==3&&calls==n&&suggestion==600000);
+ clock_us+=500000;maintain_bitrate();assert(calls==n&&configured==3);
+ /* A later adaptive session must re-enable its original controller. */
+ fixed_probe=false;s_bitrate_session=0;suggestion=300000;used=0;config_result=0;
+ clock_us+=500000;maintain_bitrate();assert(configured==4&&applied==300000);
 }
 ''')
 if __name__=='__main__':unittest.main()

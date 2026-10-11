@@ -63,7 +63,7 @@ int main(void) {
     assert(memcmp(black, expected_black, sizeof(black)) == 0);
     media_governor_video_config_t config;
     media_governor_build_device_call_video_config(&config);
-    assert(config.width==640 && config.height==480 && config.fps==5 && config.bitrate_bps==600000);
+    assert(config.width==640 && config.height==480 && config.fps==5 && config.bitrate_bps==150000);
     uint16_t w=APP_MEDIA_CAMERA_CAPTURE_WIDTH,h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
     media_governor_camera_policy_t policy;
     media_governor_build_camera_policy(&config,&policy);
@@ -71,7 +71,7 @@ int main(void) {
     assert(w==640 && h==480);
     assert(policy.capture_fps==5 && policy.rtc_video_fps==5);
     assert(policy.rtc_width==640 && policy.rtc_height==480);
-    assert(policy.h264_bitrate_bps==600000);
+    assert(policy.h264_bitrate_bps==150000);
     video_yuv420_scaler_config_t scale={w,h,config.width,config.height,false,true};
     assert(video_yuv420_config_valid(&scale));
     uint16_t cw,ch,x,y,ox,oy; uint8_t step;
@@ -105,7 +105,7 @@ int main(void) {
     };
     const uint16_t widths[]={640,1280,640}, heights[]={480,960,480};
     const uint8_t fps[]={8,20,5};
-    const uint32_t rates[]={500000,3000000,600000};
+    const uint32_t rates[]={500000,3000000,150000};
     assert(media_governor_set_rtc_video_config(NULL)==ESP_ERR_INVALID_ARG);
     for (unsigned round=0; round<100; ++round) {
         for (unsigned mode=0; mode<3; ++mode) {

@@ -27,13 +27,15 @@
  * The receiver converts it once to the panel viewport through PPA. The P4
  * must encode and decode concurrently. Field logs show that 12 fps can
  * outrun its software H264 decoder and force repeated reference-chain resets.
- * Five fps stays within the measured sustained decode rate; 600 kbit/s keeps
- * per-frame complexity bounded while retaining the VGA canvas.
+ * Development experiment: keep VGA/5 fps but start and stay at 150 kbit/s
+ * to distinguish startup send backlog from sustained duplex stalls.
+ * This is an encoder target, not a hard per-frame or wire-rate limit.
  */
 #define APP_MEDIA_CALL_VIDEO_WIDTH                      640U
 #define APP_MEDIA_CALL_VIDEO_HEIGHT                     480U
 #define APP_MEDIA_CALL_VIDEO_FPS                        5U
-#define APP_MEDIA_CALL_VIDEO_BITRATE_BPS                600000U
+#define APP_MEDIA_CALL_VIDEO_BITRATE_BPS                150000U
+#define APP_MEDIA_CALL_FIXED_BITRATE_PROBE              1
 #define APP_MEDIA_CALL_VIDEO_MIN_QP                     30U
 #define APP_MEDIA_CALL_VIDEO_MAX_QP                     46U
 
