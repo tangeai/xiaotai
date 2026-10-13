@@ -27,8 +27,9 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 
 ### 直接烧录发布包
 
-从 [GitHub Releases](https://github.com/tangeai/xiaotai/releases) 下载名称以
-`waveshare-esp32p4-touch-lcd-43c-v10-` 开头的压缩包。解压后先核对 `MANIFEST.json`
+从 [P4 v1.0.0 首版验证固件](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.0)
+下载名称以 `waveshare-esp32p4-touch-lcd-43c-v10-` 开头的压缩包。该版已有设备互呼
+实板日志，完整功能和长稳验收仍在进行，具体范围见发布说明。解压后先核对 `MANIFEST.json`
 中的板卡 ID、SHA-256 和 `flash_files`（烧录文件及地址列表），再按包内 `README.txt` 的命令烧录。
 
 也可以使用[乐鑫官方 ESP Web Tool](https://espressif.github.io/esptool-js/)。在 Chrome 或
@@ -181,6 +182,13 @@ xiaotai/
 `build/` 是构建生成目录，不是源码入口。依赖组件通过 `idf_component.yml` 和锁定文件
 更新，不要直接修改 `managed_components/` 中的下载副本。
 
+P4 的版本改动记在工程 [`CHANGELOG.md`](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/CHANGELOG.md)；
+采集、编解码和显示的试验过程及踩坑数据记在[媒体诊断记录](../../development/MEDIA_PIPELINE_DIAGNOSTICS.md)。
+
+面向用户的音视频参数以[媒体合同](../../product/MEDIA_CONTRACT.md)为准；
+未完成的实板验收项见[开发板问题清单](../ISSUES_AND_REQUIREMENTS.md)。
+引脚、外设及证据等级以工程 `hardware-ir.json` 为准。
+
 ### 按任务查找代码
 
 | 要修改的内容 | 首先查看 | 边界说明 |
@@ -247,10 +255,16 @@ VoIP。音视频分别记录实际帧率、码率、丢帧、首包、AEC 参考
 但该版 90°/270° 因 `cover` 策略曾中心裁切；当前代码改为 `contain` 完整显示，
 画面视觉效果仍需实屏确认。
 
+[首版验证固件](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.0)
+为 build.113（应用 BIN SHA-256 `b46088f12733d76b202e01958392c0989448169b948a896b363a24a85008cd94`）。
+用户提供的该版设备互呼日志中，10 秒窗口上行 7.9 fps、80 帧发送无丢帧，
+音频接收缓冲溢出为零；同期累计下行接收 776 帧、解码 689 帧、提交显示 442 帧。
+这已是实板运行证据，但不能据此确认液晶实际刷新率和全场景验收。
+
 旧版 build.87 与 build.101/103 的 H.264 试验仅作历史对照。双机日志、比较条件和限制见
 [通话诊断记录](../../development/MEDIA_PIPELINE_DIAGNOSTICS.md)及[视频性能记录](../../product/P4_VIDEO_PERFORMANCE.md)。
-build.112 尚未完成画面颜色、四向旋转的视觉效果、微信 VoIP、H5、弱网恢复和长时间稳定性
-验收；发布新固件时须分别覆盖这些项目及双向发起、挂断重拨。
+build.113 尚缺画面颜色、四向旋转的视觉效果、微信 VoIP、H5、弱网恢复和长时间稳定性
+的同版记录；后续验收还须覆盖双向发起、挂断重拨。
 
 板级配置位于 `boards/waveshare/esp32p4-touch-lcd-43c/`；硬件事实和证据等级见工程
 `hardware-ir.json`。
