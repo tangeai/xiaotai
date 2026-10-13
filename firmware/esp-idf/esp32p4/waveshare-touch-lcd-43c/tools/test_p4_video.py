@@ -32,7 +32,7 @@ static bool s_worker_camera;
 static uint32_t s_congestion_generation;
 static bool s_video_paused;
 static int64_t s_video_resume_after_us;
-static atomic_bool s_video_send_blocked;
+static atomic_bool s_video_send_blocked, s_video_uplink_stopped;
 #define ESP_LOGI(...) ((void)0)
 typedef int esp_err_t;
 #define ESP_OK 0
@@ -93,6 +93,7 @@ static size_t TiRtcGetSendBufferUsed(void *c){(void)c;return queue_used;}
 static size_t starter_tirtc_send_buffer_used(void){return queue_used;}
 static size_t starter_tirtc_send_buffer_limit(void){return atomic_load(&s_send_buffer_limit);}
 #define TIRTC_VIDEO_H264 2
+#define TIRTC_VIDEO_JPEG 1
 #define TIRTC_FRAME_FLAG_KEY_FRAME 1
 #define TIRTC_E_INVALID_PARAMETER -1
 typedef struct {uint8_t stream_id, media, flags; uint32_t ts, length;} TIRTCFRAMEINFO;
@@ -112,6 +113,7 @@ body += function(video, "static void maintain_camera(")
 body += function(sdk, "static uint8_t video_stream_for_mode(")
 body += function(sdk, "static uint8_t down_video_stream_for_mode(")
 body += function(sdk, "int starter_tirtc_send_h264(")
+body += function(sdk, "int starter_tirtc_send_mjpeg(")
 body += function(video, "static esp_err_t send_video(")
 body += function(sdk, "int starter_tirtc_subscribe_call_video(")
 body += function(sdk, "static int on_subscribe_video(")
@@ -143,6 +145,11 @@ int main(void) {
     assert(sent.stream_id == 11 && sent.media == TIRTC_VIDEO_H264 && sent.flags == 1);
     assert(sent.ts == 40 && sent.length == 5);
     assert(starter_tirtc_send_h264(41, data, 5, false) == 7 && sent.flags == 0);
+    mode = STARTER_TIRTC_CALL;
+    assert(starter_tirtc_send_mjpeg(42, data, 5) == 7);
+    assert(sent.stream_id == 11 && sent.media == TIRTC_VIDEO_JPEG && sent.flags == 1);
+    mode = STARTER_TIRTC_VOIP;
+    assert(starter_tirtc_send_mjpeg(42, data, 5) == -1);
     mode = STARTER_TIRTC_AI;
     assert(starter_tirtc_subscribe_call_video() == -1);
     mode = STARTER_TIRTC_CALL;
@@ -168,7 +175,7 @@ int main(void) {
     clock_us = 1000100;
     subscribe_result = 8;
     maintain_subscription();
-    assert(subscribe_calls == 2 && s_subscribed_generation == 9 && s_need_idr);
+    assert(subscribe_calls == 2 && s_subscribed_generation == 9 && !s_need_idr);
     clock_us += 2000000;
     maintain_subscription();
     assert(subscribe_calls == 2); /* successful generation is subscribed once */
@@ -250,8 +257,27 @@ int main(void) {
     p4_video_set_camera_enabled(21, true);
     maintain_camera();
     assert(s_tx_enabled && camera_stops == stops_before+1 && camera_starts == starts_before+1);
+    /* Congestion latch stops only local capture/send, preserving receive ownership.
+     * Queue drain alone and repeated enable cannot silently restart video. */
+    unsigned rx_generation=s_subscribed_generation;
+    s_video_uplink_stopped=true;s_tx_enabled=false;
+    maintain_camera();assert(!camera_running&&s_live_generation==21);
+    held_starts=camera_starts;clock_us+=60000000;maintain_camera();
+    assert(camera_starts==held_starts&&s_video_uplink_stopped&&s_camera_enabled);
+    assert(send_video((const uint8_t*)data,5,640,480,4000,TIRTC_VIDEO_H264,true,NULL)==ESP_ERR_INVALID_STATE);
+    assert(p4_video_set_camera_enabled(20,true)==ESP_ERR_INVALID_STATE&&s_video_uplink_stopped);
+    assert(p4_video_set_camera_enabled(21,true)==ESP_OK&&s_video_uplink_stopped);
+    assert(s_subscribed_generation==rx_generation);
+    p4_video_set_camera_enabled(21,false);p4_video_set_camera_enabled(21,true);
+    maintain_camera();assert(!s_video_uplink_stopped&&camera_running&&s_tx_enabled);
+    s_video_uplink_stopped=true;
+    p4_video_set_session(STARTER_TIRTC_CALL,21,true);assert(s_video_uplink_stopped);
+    p4_video_set_session(STARTER_TIRTC_CALL,22,true);assert(!s_video_uplink_stopped);
+    s_live_generation=current_generation=22;
+    maintain_camera();assert(!s_video_uplink_stopped&&camera_running);
+    s_video_uplink_stopped=true;
     p4_video_set_session(STARTER_TIRTC_H5, 0, false);
-    assert(!s_live_generation && !s_tx_enabled);
+    assert(!s_live_generation && !s_tx_enabled && !s_video_uplink_stopped);
     assert(p4_video_set_camera_enabled(20, true) == ESP_ERR_INVALID_STATE);
     mode=STARTER_TIRTC_CALL; s_mode=mode;
     assert(on_subscribe_video((void*)1,11)==0);

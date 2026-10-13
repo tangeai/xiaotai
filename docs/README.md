@@ -1,6 +1,7 @@
 # 小钛文档中心
 
-这里是项目文档的总入口。先按自己的目的选择入口，不必从目录树里猜哪一篇最重要。
+这里是供二次开发者使用的项目文档总入口。按开发任务选择入口；当前固件参数
+优先看产品媒体合同与对应板卡指南，实验记录只作历史证据。
 
 根目录提供三个稳定入口：[快速体验](../README.md)、[架构与二次开发](../ARCHITECTURE.md)
 和[参与开发](../CONTRIBUTING.md)。本页继续收录完整的产品、板卡和工程文档。
@@ -27,10 +28,12 @@
 
 ## 我想维护、测试或发布项目
 
+- [开发板问题与需求清单](boards/ISSUES_AND_REQUIREMENTS.md)：按四块板整理实际问题、功能需求和实板验收缺口。
 - [参与开发](../CONTRIBUTING.md)：开发流程、测试门禁、文档和提交检查。
 - [测试与硬件验证](../tests/README.md)：主机测试、驱动 probe（探针测试）和产品业务 HIL（硬件在环测试）。
 - [二次开发易错点](development/pitfalls.md)：界面动作编号、提示布局、AI 音频排空的约束和回归入口。
 - [音视频参数](product/MEDIA_CONTRACT.md)：媒体流编号、设备能力和编解码约定。
+- [P4 媒体架构](../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/docs/P4_MEDIA_ARCHITECTURE.md)：当前 P4 媒体模块、帧所有权和性能边界。
 - [仓库布局](../ARCHITECTURE.md#目录导览)：产品、平台、板卡和固件工程的目录边界。
 
 产品文档统一放在 `docs/product/`；板卡的完整使用文档放在
@@ -43,7 +46,9 @@
 已经实现，也不能代替当前板卡参数或发布验证。
 
 - [多人对讲协议](product/ROOM_PROTOCOL.md)：设备 API 路径与服务端设计分别标注。
-- [P4 视频性能记录](product/P4_VIDEO_PERFORMANCE.md)：5 fps 基线的测量范围、结果和待验证项。
+- [P4 视频性能记录](product/P4_VIDEO_PERFORMANCE.md)：历史 5 fps 基线的测量范围、结果和待验证项。
+- [P4 官方资料与实板测量](development/P4_OFFICIAL_MEDIA_RESEARCH.md)：JPEG/PPA 硬件约束与 build.112 阶段计时。
+- [P4 两档与 IDF 5.5.5 试验](development/P4_TIERS_IDF_555_TRIAL.md)：12/8 fps 两档、停发保护、固件身份与验证范围。
 - [S3 内存优化实验](../firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/docs/ESP32S3_MEMORY_OPTIMIZATION_PLAN.md)：历史方案与已回退路径。
 
 同一参数优先在音视频合同或板卡指南维护，模块文档链接引用。实验记录保留固件身份、

@@ -21,7 +21,7 @@ project(p4_sdk_link C)
 set(IDF_TARGET esp32p4)
 set(IDF_VERSION_MAJOR 5)
 set(IDF_VERSION_MINOR 5)
-set(IDF_VERSION_PATCH 4)
+set(IDF_VERSION_PATCH 5)
 set(CONFIG_FREERTOS_HZ 1000)
 set(CONFIG_MBEDTLS_CERTIFICATE_BUNDLE ON)
 set(CONFIG_LWIP_MAX_SOCKETS 16)
@@ -45,4 +45,12 @@ file(WRITE "${{CMAKE_BINARY_DIR}}/sdk-archive.txt" "${{archive}}")
     with (p / "member.o").open("wb") as output:
         subprocess.run(["ar", "p", str(archive), "crc32.o"], stdout=output, check=True)
     assert "RISC-V" in subprocess.check_output(["readelf", "-h", str(p / "member.o")], text=True)
+    # The application baseline is deliberately upgraded; incompatible IDF
+    # versions remain rejected rather than bypassing the component gate.
+    cmake = p / "CMakeLists.txt"
+    cmake.write_text(cmake.read_text().replace("set(IDF_VERSION_PATCH 5)",
+                                             "set(IDF_VERSION_PATCH 4)"))
+    result = subprocess.run(["cmake", "-S", str(p), "-B", str(p / "old-idf")],
+                            capture_output=True, text=True)
+    assert result.returncode != 0 and "requires ESP-IDF 5.5.5" in result.stderr
 print("PASS: actual P4 component selects the supplied RISC-V TiRTC 2.5.0 archive")

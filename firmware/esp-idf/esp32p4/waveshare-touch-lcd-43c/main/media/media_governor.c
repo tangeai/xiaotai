@@ -106,9 +106,10 @@ static void media_governor_select_native_capture_size(const media_governor_video
                                                        uint16_t *width,
                                                        uint16_t *height)
 {
-    /* VGA calls use sensor subsampling of the full capture window. Never
-     * substitute the narrower 800x640 mode. H5 retains its native 960p. */
-    if (config != NULL &&
+    /* Native VGA is retained only as an explicit experiment. Normal CALL,
+     * VoIP and H5 use the established full-window 960p sensor mode; never
+     * substitute the narrower 800x640 mode. */
+    if (APP_MEDIA_CALL_NATIVE_VGA_CAPTURE_ENABLE && config != NULL &&
         ((config->width == 640U && config->height == 480U) ||
          (config->width == 320U && config->height == 240U))) {
         *width = 640U;
@@ -291,7 +292,7 @@ static media_governor_video_config_t media_governor_normalize_video_config(const
     const bool low_call_profile =
         normalized.width == APP_MEDIA_CALL_LOW_WIDTH &&
         normalized.height == APP_MEDIA_CALL_LOW_HEIGHT &&
-        normalized.fps == APP_MEDIA_CALL_VIDEO_FPS &&
+        normalized.fps == APP_MEDIA_CALL_LOW_FPS &&
         normalized.bitrate_bps == APP_MEDIA_CALL_LOW_BITRATE_BPS;
     const uint32_t minimum_bitrate_bps = low_call_profile ?
         APP_MEDIA_CALL_LOW_BITRATE_BPS :
@@ -300,7 +301,13 @@ static media_governor_video_config_t media_governor_normalize_video_config(const
          normalized.height == APP_MEDIA_CALL_VIDEO_HEIGHT &&
          normalized.fps == APP_MEDIA_CALL_VIDEO_FPS &&
          normalized.bitrate_bps == APP_MEDIA_CALL_VIDEO_BITRATE_BPS ?
-             APP_MEDIA_CALL_VIDEO_BITRATE_BPS : MEDIA_GOVERNOR_VIDEO_MIN_BITRATE_BPS);
+             APP_MEDIA_CALL_VIDEO_BITRATE_BPS :
+         APP_MEDIA_CALL_FIXED_BITRATE_PROBE &&
+         normalized.width == APP_MEDIA_WECHAT_VIDEO_WIDTH &&
+         normalized.height == APP_MEDIA_WECHAT_VIDEO_HEIGHT &&
+         normalized.fps == APP_MEDIA_WECHAT_VIDEO_FPS &&
+         normalized.bitrate_bps == APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS ?
+             APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS : MEDIA_GOVERNOR_VIDEO_MIN_BITRATE_BPS);
     if (normalized.bitrate_bps < minimum_bitrate_bps) {
         normalized.bitrate_bps = minimum_bitrate_bps;
     } else if (normalized.bitrate_bps > 12U * 1000U * 1000U) {
@@ -678,11 +685,16 @@ static void media_governor_build_transport_bitrate_range(
     const media_governor_video_config_t *base,
     media_governor_transport_bitrate_range_t *range)
 {
-    if (APP_MEDIA_CALL_FIXED_BITRATE_PROBE &&
-        base->width == APP_MEDIA_CALL_VIDEO_WIDTH &&
-        base->height == APP_MEDIA_CALL_VIDEO_HEIGHT &&
-        base->fps == APP_MEDIA_CALL_VIDEO_FPS &&
-        base->bitrate_bps == APP_MEDIA_CALL_VIDEO_BITRATE_BPS) {
+    if ((APP_MEDIA_CALL_FIXED_BITRATE_PROBE &&
+         base->width == APP_MEDIA_CALL_VIDEO_WIDTH &&
+         base->height == APP_MEDIA_CALL_VIDEO_HEIGHT &&
+         base->fps == APP_MEDIA_CALL_VIDEO_FPS &&
+         base->bitrate_bps == APP_MEDIA_CALL_VIDEO_BITRATE_BPS) ||
+        (APP_MEDIA_CALL_FIXED_BITRATE_PROBE &&
+         base->width == APP_MEDIA_WECHAT_VIDEO_WIDTH &&
+         base->height == APP_MEDIA_WECHAT_VIDEO_HEIGHT &&
+         base->fps == APP_MEDIA_WECHAT_VIDEO_FPS &&
+         base->bitrate_bps == APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS)) {
         *range = (media_governor_transport_bitrate_range_t) {
             .min_bitrate_bps = base->bitrate_bps,
             .max_bitrate_bps = base->bitrate_bps,
@@ -755,9 +767,13 @@ void media_governor_build_call_quality_config(bool voip, bool low,
     config->weak_network_mode = MEDIA_GOVERNOR_WEAK_NETWORK_OFF;
     config->weak_network_level = 0U;
     if (low) {
-        config->width = APP_MEDIA_CALL_LOW_WIDTH;
-        config->height = APP_MEDIA_CALL_LOW_HEIGHT;
-        config->bitrate_bps = APP_MEDIA_CALL_LOW_BITRATE_BPS;
+        config->width = voip ? APP_MEDIA_WECHAT_VIDEO_WIDTH : APP_MEDIA_CALL_LOW_WIDTH;
+        config->height = voip ? APP_MEDIA_WECHAT_VIDEO_HEIGHT : APP_MEDIA_CALL_LOW_HEIGHT;
+        config->fps = voip ? APP_MEDIA_WECHAT_VIDEO_FPS : APP_MEDIA_CALL_LOW_FPS;
+        config->bitrate_bps = voip ? APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS :
+                                     APP_MEDIA_CALL_LOW_BITRATE_BPS;
+    }
+    if (low) {
         /* Preserve the high-profile base while this tier is active. */
         config->weak_network_mode = MEDIA_GOVERNOR_WEAK_NETWORK_RESOLUTION_PRIORITY;
         config->weak_network_level = 1U;

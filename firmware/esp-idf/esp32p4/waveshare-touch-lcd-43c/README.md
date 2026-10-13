@@ -1,8 +1,9 @@
 # 小钛 ESP32-P4 工程
 
-本目录是 `ESP32-P4-WIFI6-Touch-LCD-4.3` 的 ESP-IDF 工程。面向使用者的规格、
-依赖、编译、烧录和首次使用步骤，请从
+本目录是 `ESP32-P4-WIFI6-Touch-LCD-4.3` 的 ESP-IDF 工程，供二次开发者定位
+构建入口与媒体实现。规格、依赖、编译、烧录和硬件验证步骤请从
 [开发板使用说明](../../../../docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md) 开始。
+本轮修改、新增功能、验证结果和未完成的实板检查见[工程变更记录](CHANGELOG.md)。
 
 ## 工程边界
 
@@ -44,6 +45,23 @@ bash tools/check.sh
 
 ## 证据与待办
 
-已有实板结论的适用范围见开发板指南及[视频性能记录](../../../../docs/product/P4_VIDEO_PERFORMANCE.md)。
-设备互呼当前以 5 fps 为基线，不声明 8 fps 已通过稳定性验收。主机测试防止接口回退，
-不能替代新固件的双向音视频、四向旋转、连续挂断重拨和弱网回归。
+当前媒体参数以 `main/media/media_tuning.h` 和
+[音视频合同](../../../../docs/product/MEDIA_CONTRACT.md)为准：H5 上行 H.264
+1280×960/20 fps/3 Mbit/s；设备互呼上行 MJPEG
+640×480/8 fps/质量 75/4 Mbit/s 发送预算，下行 MJPEG；微信 VoIP 上行
+H.264 320×240/15 fps/200 kbit/s，下行 MJPEG。设备互呼从 OV5647 的
+1280×960 全幅画面半缩为 UYVY，再用 YUV422 JPEG 编码；原生 VGA 采集仍关闭。
+
+build.112（ELF SHA-256 前缀 `a14250e62`）的设备互呼日志确认 JPEG 能持续编码、
+发送和解码，没有 build.111 的 DMA2D 超时。上行实测约 6.3–6.6 fps、
+2.67–3.30 Mbit/s，下行约 8 fps 接收、约 7.2 fps 解码、约 4.8 fps
+交付显示；音频接收缓冲溢出为零。`presented` 不等于面板实际刷新率。
+约 15 分钟的同版日志还显示：低档持续积压后本端视频上行停发，音频和下行继续，
+人工重开摄像头后上行恢复。该版四向旋转有几何日志，90°/270° 曾按 `cover`
+策略中心裁切；当前代码已改为设备互呼 `contain`、微信 `cover`，仍待实屏验收。
+画面颜色、旋转视觉效果、H5/微信和长时间稳定性尚未验收。
+
+历史实验与阶段计时见[官方资料和本板测量](../../../../docs/development/P4_OFFICIAL_MEDIA_RESEARCH.md)、
+[通话诊断记录](../../../../docs/development/MEDIA_PIPELINE_DIAGNOSTICS.md)及
+[视频性能记录](../../../../docs/product/P4_VIDEO_PERFORMANCE.md)。修改媒体配置后
+仍需双机实测双向音视频、挂断重拨、旋转、弱网恢复和资源释放。

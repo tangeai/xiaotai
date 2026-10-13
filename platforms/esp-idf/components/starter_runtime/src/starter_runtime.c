@@ -1202,7 +1202,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.0.0+build.87\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.113\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
@@ -1212,8 +1212,8 @@ static void request_device_profile(void)
         "\"audio_rate\":8000,\"audio_channels\":1,\"camera_rotation\":270,"
         "\"aspect_ratio\":0.75,\"hor_mirror\":false,\"vert_mirror\":false,"
         "\"object_fit\":\"contain\",\"no_video\":false},"
-        "\"call\":{\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
-        "\"down_audio_mt\":[\"alaw\"],\"down_video_mt\":[\"h264\"],"
+        "\"call\":{\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"mjpeg\"],"
+        "\"down_audio_mt\":[\"alaw\"],\"down_video_mt\":[\"mjpeg\"],"
         "\"audio_rate\":8000,\"audio_channels\":1,\"camera_rotation\":270,"
         "\"aspect_ratio\":0.75,\"hor_mirror\":false,\"vert_mirror\":false,"
         "\"object_fit\":\"contain\",\"no_video\":false},"
@@ -1229,7 +1229,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-S3\","
         "\"board_model\":\"lckfb-esp32s3\"},"
-        "\"firmware_version\":\"1.0.0+build.47\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.48\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,\"up_video_mt\":[\"mjpeg\"],"
         "\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"

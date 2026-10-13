@@ -63,11 +63,17 @@ class RepositoryLayoutTests(unittest.TestCase):
         self.assertIn("project(lckfb_esp32s3_xiaotai)", cmake)
         self.assertIn("# lckfb_esp32s3_xiaotai", project_readme)
         self.assertEqual(hardware_ir["board"]["id"], "lckfb_esp32s3")
-        for artifact in hardware_ir["build_evidence"]["artifacts"]:
-            self.assertTrue(
-                artifact["path"].startswith("build/lckfb_esp32s3_xiaotai."),
-                artifact["path"],
-            )
+        artifacts = hardware_ir["build_evidence"]["artifacts"]
+        names = {Path(artifact["path"]).name for artifact in artifacts}
+        self.assertTrue({"lckfb_esp32s3_xiaotai.bin",
+                         "lckfb_esp32s3_xiaotai.elf"}.issubset(names))
+        self.assertTrue(names.issubset({"lckfb_esp32s3_xiaotai.bin",
+                                       "lckfb_esp32s3_xiaotai.elf",
+                                       "bootloader.bin", "partition-table.bin"}))
+        for artifact in artifacts:
+            path = Path(artifact["path"])
+            self.assertIn(path.parts[0], ("build", "artifacts"))
+            self.assertNotIn("..", path.parts)
 
     def test_legacy_document_buckets_are_absent(self):
         for relative in (
@@ -366,17 +372,17 @@ class RepositoryLayoutTests(unittest.TestCase):
 
         expected = {
             "alientek-atk-dnesp32s3": (
-                "735507283d5b2f9fb363a1901172dbd9e847945d",
+                "b774170ff46c393eeb5e495ea37936038d3f4f4f",
                 "xtensa-esp-elf-gcc 14.2.0",
                 "7334e846ed4261b5297607c85acafe1d586a22374f7c8e37b102b2742e47c7aa",
             ),
             "lckfb-esp32s3": (
-                "735507283d5b2f9fb363a1901172dbd9e847945d",
+                "b774170ff46c393eeb5e495ea37936038d3f4f4f",
                 "xtensa-esp-elf-gcc 14.2.0",
                 "7334e846ed4261b5297607c85acafe1d586a22374f7c8e37b102b2742e47c7aa",
             ),
             "waveshare-esp32p4-touch-lcd-43c-v10": (
-                "735507283d5b2f9fb363a1901172dbd9e847945d",
+                "b774170ff46c393eeb5e495ea37936038d3f4f4f",
                 "riscv32-esp-elf-gcc 14.2.0",
                 "9b4e35c7a2cb203fc463417739199429057c8b036936faa11f844c726455301f",
             ),

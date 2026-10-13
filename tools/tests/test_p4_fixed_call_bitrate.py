@@ -27,23 +27,23 @@ static media_governor_video_config_t s_rtc_video_config;
 int main(void){
  media_governor_video_config_t c; media_governor_transport_bitrate_range_t r;
  media_governor_build_device_call_video_config(&c);
- assert(c.width==640&&c.height==480&&c.fps==5&&c.bitrate_bps==150000);
+ assert(c.width==640&&c.height==480&&c.fps==8&&c.bitrate_bps==4000000);
  assert(c.weak_network_mode==MEDIA_GOVERNOR_WEAK_NETWORK_OFF);
- assert(camera_pipeline_interval_ms(c.fps)==200);
- assert(camera_pipeline_h264_gop_for_profile(c.width,c.height,c.fps)==10);
- c=media_governor_normalize_video_config(&c);assert(c.bitrate_bps==150000);
+ assert(camera_pipeline_interval_ms(c.fps)==125);
+ c=media_governor_normalize_video_config(&c);assert(c.bitrate_bps==4000000);
  media_governor_build_transport_bitrate_range(&c,&r);
- assert(r.min_bitrate_bps==150000&&r.max_bitrate_bps==150000&&r.start_bitrate_bps==150000);
+ assert(r.min_bitrate_bps==4000000&&r.max_bitrate_bps==4000000&&r.start_bitrate_bps==4000000);
  media_governor_build_h5_video_config(&c);assert(c.bitrate_bps==3000000&&c.fps==20);
  media_governor_build_transport_bitrate_range(&c,&r);assert(r.min_bitrate_bps<r.start_bitrate_bps&&r.start_bitrate_bps<r.max_bitrate_bps);
- media_governor_build_wechat_video_config(&c);assert(c.bitrate_bps==150000&&c.fps==5);
- media_governor_build_transport_bitrate_range(&c,&r);assert(r.min_bitrate_bps==150000&&r.max_bitrate_bps==150000);
+ media_governor_build_wechat_video_config(&c);assert(c.width==320&&c.height==240&&c.bitrate_bps==200000&&c.fps==15);
+ media_governor_build_transport_bitrate_range(&c,&r);assert(r.min_bitrate_bps==200000&&r.max_bitrate_bps==200000);
  for(unsigned voip=0;voip<2;voip++){
  media_governor_build_call_quality_config(voip,true,&c);
  c=media_governor_normalize_video_config(&c);
- assert(c.width==320&&c.height==240&&c.fps==5&&c.bitrate_bps==96000&&c.weak_network_level==1);
+ assert(c.width==(voip?320:640)&&c.height==(voip?240:480)&&c.fps==(voip?15:8)&&c.bitrate_bps==(voip?200000:4000000)&&c.weak_network_level==1);
+ assert(camera_pipeline_interval_ms(c.fps)==(voip?67:125));
  media_governor_build_call_quality_config(voip,false,&c);
- assert(c.width==640&&c.height==480&&c.fps==5&&c.bitrate_bps==150000&&c.weak_network_level==0);
+ assert(c.width==(voip?320:640)&&c.height==(voip?240:480)&&c.fps==(voip?15:8)&&c.bitrate_bps==(voip?200000:4000000)&&c.weak_network_level==0);
  }
  c.bitrate_bps=1;c=media_governor_normalize_video_config(&c);assert(c.bitrate_bps==200000);
 }

@@ -40,6 +40,6 @@ with tempfile.TemporaryDirectory(prefix="video-regions-") as tmp:
     subprocess.run(["cc","-O2","-Wall","-Wextra","-Werror","-fsanitize=undefined",
                     "-fno-sanitize-recover=all",str(p/"test.c"),"-o",str(p/"test")],check=True)
     subprocess.run([str(p/"test")],check=True)
-assert source.count("video_frame_clear_margins(output,") == 2
+assert source.count("video_frame_clear_margins(output,") == 3
 assert source.count("video_frame_swap_region(output,") == 2
 print("PASS: video active-area preservation, black margins and region-only byte swap")

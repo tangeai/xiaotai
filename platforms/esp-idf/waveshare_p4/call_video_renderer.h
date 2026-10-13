@@ -17,6 +17,7 @@ typedef enum {
 typedef struct {
     uint16_t rotation;       /* Additional clockwise receive-side rotation. */
     bool remote_profile;     /* True when supplied by peer/platform metadata. */
+    bool fit_cover;          /* Fill viewport for VoIP; CALL keeps the complete frame. */
 } call_video_presentation_t;
 
 typedef struct {

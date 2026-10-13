@@ -16,6 +16,10 @@ code = r'''
 #define ESP_OK 0
 #define ESP_ERR_INVALID_ARG -1
 #define ESP_ERR_INVALID_SIZE -2
+#define ESP_CACHE_MSYNC_FLAG_DIR_M2C 1
+#define ESP_CACHE_MSYNC_FLAG_DIR_C2M 2
+#define ESP_CACHE_MSYNC_FLAG_UNALIGNED 4
+static int esp_cache_msync(void *p,size_t n,unsigned flags){(void)p;(void)n;(void)flags;assert(!"PPA fallback must not use CPU cache path");return -1;}
 #define VIDEO_YUV420_SCALE_DENOMINATOR 16
 #define PPA_SRM_COLOR_MODE_YUV420 1
 #define PPA_SRM_ROTATION_ANGLE_0 0
@@ -41,11 +45,15 @@ static int ppa_do_scale_rotate_mirror(int client,const ppa_srm_oper_config_t *op
 }
 static size_t video_yuv420_data_size(unsigned w,unsigned h) {return w*h*3/2;}
 '''
+for signature in ("static bool video_yuv420_use_cpu_half_scale(",
+                  "static void video_yuv420_half_scale_ouyy_evyy("):
+    start = source.index(signature)
+    code += source[start:source.index("\n}", start) + 2]
 code += function
 code += r'''
 int main(void) {
  uint8_t input=0,buf=0; const uint8_t *output=NULL; size_t length=0;
- scaler_t scaler={.config={1280,960,720,960,true},.crop_width=1280,.crop_height=960,
+ scaler_t scaler={.config={1280,960,720,960,true,false},.crop_width=1280,.crop_height=960,
  .scale_step=12,.output_buffer=&buf,.output_buffer_size=1036800,.output_data_len=1036800};
  assert(video_yuv420_scaler_process(&scaler,&input,1843200,&output,&length)==0);
  assert(output==&buf && length==1036800);

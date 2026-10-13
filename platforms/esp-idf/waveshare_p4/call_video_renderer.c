@@ -47,7 +47,6 @@ static const char *TAG = "call_video";
     (CALL_VIDEO_MJPEG_MAX_PIXELS * sizeof(uint16_t))
 #define CALL_VIDEO_MJPEG_PPA_STAGING_BYTES \
     (CALL_VIDEO_FRAME_PIXELS * 3U / 2U)
-#define CALL_VIDEO_MJPEG_FIT_MODE           VIDEO_FRAME_FIT_COVER
 #define CALL_VIDEO_MJPEG_PREVENT_UPSCALE    false
 #define CALL_VIDEO_MJPEG_STARTUP_SAMPLE_US  (1LL * 1000LL * 1000LL)
 #define CALL_VIDEO_MJPEG_GEOMETRY_LOG_LIMIT 4U
@@ -1448,6 +1447,14 @@ static void call_video_log_stats_if_due(call_video_log_window_t *window,
     uint64_t swap_time_delta = current.converter.swap_time_us - window->converter.swap_time_us;
     uint64_t software_time_delta =
         current.converter.software_time_us - window->converter.software_time_us;
+    uint32_t qvga_imgfx_delta =
+        current.converter.qvga_imgfx_frames - window->converter.qvga_imgfx_frames;
+    uint64_t qvga_color_delta =
+        current.converter.qvga_color_time_us - window->converter.qvga_color_time_us;
+    uint64_t qvga_clear_delta =
+        current.converter.qvga_clear_time_us - window->converter.qvga_clear_time_us;
+    uint64_t qvga_copy_delta =
+        current.converter.qvga_copy_time_us - window->converter.qvga_copy_time_us;
     uint32_t received_fps_x10 = (uint32_t)(((uint64_t)received_delta * 10000000ULL) /
                                            (uint64_t)elapsed_us);
     uint32_t received_kbps = (uint32_t)((received_bytes_delta * 8ULL * 1000ULL) /
@@ -1610,6 +1617,17 @@ static void call_video_log_stats_if_due(call_video_log_window_t *window,
                  current.convert_max_us / 1000U,
                  current.converter.ppa_max_us / 1000U,
                  video_frame_converter_mode_name(video_frame_converter_get_mode(converter)));
+    }
+    if (qvga_imgfx_delta > 0U &&
+        (CONFIG_APP_MEDIA_PERIODIC_DIAGNOSTICS || CONFIG_APP_MEDIA_COMPACT_HEALTH_LOG)) {
+        ESP_LOGI(TAG, "QVGA phases frames=%u avg-us color/clear/copy=%u/%u/%u max-us=%u/%u/%u",
+                 qvga_imgfx_delta,
+                 (unsigned)(qvga_color_delta / qvga_imgfx_delta),
+                 (unsigned)(qvga_clear_delta / qvga_imgfx_delta),
+                 (unsigned)(qvga_copy_delta / qvga_imgfx_delta),
+                 current.converter.qvga_color_max_us,
+                 current.converter.qvga_clear_max_us,
+                 current.converter.qvga_copy_max_us);
     }
     *window = current;
 }
@@ -2092,7 +2110,7 @@ static void call_video_renderer_task(void *arg)
         .output_width = CALL_VIDEO_RENDER_WIDTH,
         .output_height = CALL_VIDEO_RENDER_HEIGHT,
         /* Panel orientation is owned by display_driver/LVGL. Keep the decoded
-         * landscape picture unrotated and let PPA scale it to the viewport. */
+         * landscape picture unrotated. QVGA stays native size and centered. */
         .source_crop_x = 0,
         .source_crop_y = 0,
         .source_crop_width = 0,
@@ -2101,9 +2119,10 @@ static void call_video_renderer_task(void *arg)
         .source_max_height = CALL_VIDEO_DECODE_MAX_HEIGHT,
         .fit_mode = CALL_VIDEO_H264_FIT_COVER ?
                         VIDEO_FRAME_FIT_COVER : VIDEO_FRAME_FIT_CONTAIN,
-        .prevent_upscale = false,
+        .prevent_upscale = true,
         .require_ppa = true,
         .prefer_direct_i420 = true,
+        .prefer_native_qvga_i420 = true,
         .output_rgb565_byte_swap = true,
     };
 
@@ -2157,12 +2176,11 @@ static void call_video_renderer_task(void *arg)
     }
 
     ESP_LOGI(TAG,
-             "H264 downlink renderer ready: decoder=%s conversion=pipelined-%s direct-vga=imgfx output=%ux%u "
+             "H264 downlink renderer ready: decoder=%s conversion=auto direct-vga=imgfx qvga=imgfx-center output=%ux%u "
              "source=dynamic<=%ux%u fit=%s rotation=%s source=%s input_slots=%u input_cap=%u decoded_slots=%u "
              "decoded_cap=%u presentation=latest-%u priorities=decode:%u ingress:%u helper:%u convert:%u "
              "cores=decode:%d helper:%d convert:%d ui:%d camera:%d",
              CALL_VIDEO_H264_DECODER_MODE,
-             video_frame_converter_mode_name(video_frame_converter_get_mode(converter)),
              CALL_VIDEO_RENDER_WIDTH,
              CALL_VIDEO_RENDER_HEIGHT,
              CALL_VIDEO_DECODE_MAX_WIDTH,
@@ -2548,6 +2566,8 @@ static void call_video_mjpeg_renderer_task(void *arg)
 {
     call_video_presentation_t presentation =
         call_video_renderer_presentation_snapshot();
+    const video_frame_fit_mode_t fit_mode = presentation.fit_cover ?
+        VIDEO_FRAME_FIT_COVER : VIDEO_FRAME_FIT_CONTAIN;
     (void)arg;
     jpeg_decoder_handle_t decoder = NULL;
     video_frame_converter_handle_t converter = NULL;
@@ -2613,7 +2633,7 @@ static void call_video_mjpeg_renderer_task(void *arg)
              presentation.remote_profile ? "profile-contract" : "compat-default",
              video_frame_converter_mode_name(
                  video_frame_converter_get_mode(converter)),
-             video_frame_fit_mode_name(CALL_VIDEO_MJPEG_FIT_MODE),
+             video_frame_fit_mode_name(fit_mode),
              CALL_VIDEO_MJPEG_PREVENT_UPSCALE ? "deny" : "allow",
              CALL_VIDEO_RENDER_WIDTH,
              CALL_VIDEO_RENDER_HEIGHT,
@@ -2832,7 +2852,7 @@ static void call_video_mjpeg_renderer_task(void *arg)
                              (unsigned)aligned_width,
                              video_frame_rotation_name(display_rotation),
                              video_frame_converter_mode_name(convert_mode),
-                             video_frame_fit_mode_name(CALL_VIDEO_MJPEG_FIT_MODE),
+                             video_frame_fit_mode_name(fit_mode),
                              (unsigned)converter_stats.last_crop_width,
                              (unsigned)converter_stats.last_crop_height,
                              (unsigned)converter_stats.last_crop_x,
@@ -2861,7 +2881,7 @@ static void call_video_mjpeg_renderer_task(void *arg)
                              (unsigned)picture.width,
                              (unsigned)picture.height,
                              video_frame_rotation_name(display_rotation),
-                             video_frame_fit_mode_name(CALL_VIDEO_MJPEG_FIT_MODE),
+                             video_frame_fit_mode_name(fit_mode),
                              (unsigned)converter_stats.last_crop_width,
                              (unsigned)converter_stats.last_crop_height,
                              (unsigned)converter_stats.last_crop_x,
@@ -3061,19 +3081,13 @@ static esp_err_t call_video_prepare_persistent_resources(void)
     const video_frame_converter_config_t mjpeg_converter_config = {
         .output_width = CALL_VIDEO_RENDER_WIDTH,
         .output_height = CALL_VIDEO_RENDER_HEIGHT,
-        /*
-         * The cloud may change the JPEG source size, but the display contract
-         * stays fixed at the board-selected viewport. Crop symmetrically and
-         * apply one uniform PPA
-         * scale without a second display-side resize or aspect-ratio
-         * distortion. Adaptive low-resolution renditions are allowed to scale
-         * up so a smaller frame can fill the selected viewport.
-         */
+        /* A session selects contain or cover before its MJPEG worker starts.
+         * The prewarmed converter and its frame buffers are reused. */
         .source_crop_x = 0U,
         .source_crop_y = 0U,
         .source_crop_width = 0U,
         .source_crop_height = 0U,
-        .fit_mode = CALL_VIDEO_MJPEG_FIT_MODE,
+        .fit_mode = VIDEO_FRAME_FIT_CONTAIN,
         .prevent_upscale = CALL_VIDEO_MJPEG_PREVENT_UPSCALE,
         .output_rgb565_byte_swap = true,
     };
@@ -3288,6 +3302,16 @@ esp_err_t call_video_renderer_start_for_codec(call_video_codec_t codec)
     if (s_renderer.task != NULL || s_renderer.ingress_task != NULL) {
         taskEXIT_CRITICAL(&s_renderer.lock);
         return ESP_ERR_INVALID_STATE;
+    }
+    if (codec == CALL_VIDEO_CODEC_MJPEG) {
+        esp_err_t fit_ret = video_frame_converter_set_fit_mode(
+            s_renderer.mjpeg_converter,
+            s_renderer.presentation.fit_cover ?
+                VIDEO_FRAME_FIT_COVER : VIDEO_FRAME_FIT_CONTAIN);
+        if (fit_ret != ESP_OK) {
+            taskEXIT_CRITICAL(&s_renderer.lock);
+            return fit_ret;
+        }
     }
     s_renderer.codec = codec;
     s_renderer.start_pending = true;

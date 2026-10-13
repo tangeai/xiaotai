@@ -238,15 +238,15 @@
   },
   "toolchain": {
     "framework": "esp-idf",
-    "framework_version": "5.5.4",
-    "framework_git_revision": "735507283d5b2f9fb363a1901172dbd9e847945d",
+    "framework_version": "5.5.5",
+    "framework_git_revision": "b774170ff46c393eeb5e495ea37936038d3f4f4f",
     "verification": "build_verified",
     "tirtc": {
       "platform": "espressif-esp32s3",
-      "version": "2.3.0",
-      "sdk_path": "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/third_party/tirtc",
+      "version": "2.5.0",
+      "sdk_path": "third_party/tirtc",
       "build_contract": "manifest/build-contract.env",
-      "archive_sha256": "43b06d1da421c7d24cc7fdb1385d600ecdffbfd2d3801f7faf0c540fb5cdbaa2",
+      "archive_sha256": "7334e846ed4261b5297607c85acafe1d586a22374f7c8e37b102b2742e47c7aa",
       "required_config": {
         "CONFIG_FREERTOS_HZ": "1000",
         "CONFIG_FREERTOS_USE_TRACE_FACILITY": "off",
@@ -366,14 +366,21 @@
     "codecs": [
       {
         "name": "alaw",
-        "sample_rates_hz": [8000],
+        "sample_rates_hz": [
+          8000
+        ],
         "channels": 1,
         "path": "ES7210 MIC1 + MIC3 reference at 16 kHz -> ESP-SR 2.4.6 FD_LOW_COST AEC -> 8 kHz PCM -> espressif/esp_audio_codec G711-A encoder",
         "verification": "build_verified"
       },
       {
         "name": "pcm_s16le",
-        "sample_rates_hz": [8000, 16000, 32000, 48000],
+        "sample_rates_hz": [
+          8000,
+          16000,
+          32000,
+          48000
+        ],
         "channels": 2,
         "verification": "corroborated"
       }
@@ -416,14 +423,19 @@
     "codecs": [
       {
         "name": "alaw",
-        "sample_rates_hz": [8000],
+        "sample_rates_hz": [
+          8000
+        ],
         "channels": 1,
         "path": "espressif/esp_audio_codec G711-A decoder -> linear interpolation 8 kHz to 16 kHz -> ES8311 -> NS4150B; ES7210 MIC3 captures the board playback reference",
         "verification": "build_verified"
       },
       {
         "name": "pcm_s16le",
-        "sample_rates_hz": [8000, 16000],
+        "sample_rates_hz": [
+          8000,
+          16000
+        ],
         "channels": 1,
         "verification": "corroborated"
       }
@@ -472,19 +484,33 @@
     }
   },
   "build_evidence": {
-    "firmware_version": "ui-stack-opt.58",
+    "firmware_version": "1.0.0+build.48",
     "verification": "local_build_only",
-    "note": "The paths below are reproducible build outputs and are intentionally excluded from source control.",
+    "note": "ESP-IDF 5.5.5 compile and semantic gates passed; exact artifacts retained. No serial hardware verification in this run. Previous runtime observations remain historical.",
     "artifacts": [
       {
-        "path": "build/lckfb_esp32s3_xiaotai.bin",
-        "size_bytes": 3967808,
-        "sha256": "8110b4accaa60085cd1f4b3e97204ee347791c1a8922d7f6f9c183adb8af9b6b"
+        "path": "artifacts/1.0.0+build.48/lckfb_esp32s3_xiaotai.bin",
+        "label": "1.0.0+build.48 lckfb_esp32s3_xiaotai.bin",
+        "size_bytes": 4092848,
+        "sha256": "166d4f92b3eb8bb2f6ae17de89a23ae48ccbe9b8e62834473d2231b4d92e42a9"
       },
       {
-        "path": "build/lckfb_esp32s3_xiaotai.elf",
-        "size_bytes": 28530044,
-        "sha256": "f4147786cd1e35294e414de157a4e206f27698f90138cca5150c263ee7a969f6"
+        "path": "artifacts/1.0.0+build.48/lckfb_esp32s3_xiaotai.elf",
+        "label": "1.0.0+build.48 lckfb_esp32s3_xiaotai.elf",
+        "size_bytes": 28968576,
+        "sha256": "141fc84a536399d7a43acb228166234e6a67ac34ef8bf736edcd6b76151e0fd9"
+      },
+      {
+        "path": "artifacts/1.0.0+build.48/bootloader.bin",
+        "label": "1.0.0+build.48 bootloader/bootloader.bin",
+        "size_bytes": 20848,
+        "sha256": "aa3ec2d1d99956d0d56891d5ec0392571d21b94f87924270aaa25461da0ed0b3"
+      },
+      {
+        "path": "artifacts/1.0.0+build.48/partition-table.bin",
+        "label": "1.0.0+build.48 partition_table/partition-table.bin",
+        "size_bytes": 3072,
+        "sha256": "1edad21a69d0791cb6fe8a4f47ea7c64cfd302031f8db2c9f68cdc9568ca124c"
       }
     ]
   },
@@ -522,8 +548,8 @@
     {
       "id": "MEDIA-HIL-001",
       "severity": "post-port-verification",
-    "summary": "An HTTP/256 KiB 5 fps artifact accepted GC2145 and demonstrated H5 MJPEG plus audible Web-to-device and device-to-Web audio. The pre-fix camera-CPU1/8 fps artifact booted and reached online state but failed AI start with a session-task stack overflow. A subsequent 24 KiB session-stack run failed TiRtcStart after esp-aes reported an allocation failure. The exact 7eeda2ed... / eebcaa452... artifact restored the persistent JPEG callback contract, booted with 144599 bytes internal free and 100527-byte recorded minimum after SDK startup, reached H5 active, and produced decodable MJPEG whose pixels were severely fragmented into horizontal lines while direct PSRAM DMA was enabled. The delivered AEC build then reached both h5-active and ai-active, but user logs exposed task-watchdog starvation: H5 involved both software JPEG and AEC load, while AI isolated CPU0 board_audio_tx inside aec_process with CPU1 idle. Artifact 56104cf2... pins AEC/JPEG to CPU1, adds one-tick cooperative blocking and deadline telemetry, and has build evidence only.",
-    "smallest_next_action": "Run artifact 56104cf2... for at least 90 seconds each in H5 and AI, verify no task_wdt or starvation-driven -40008, and capture two status snapshots per mode showing increasing audio/AEC counters, zero AEC errors, max-aec normally below 32000 us, JPEG deadline misses, heap headroom and stack-min-free. Then measure far-end single-talk echo attenuation, intelligible double-talk and AI barge-in."
+      "summary": "An HTTP/256 KiB 5 fps artifact accepted GC2145 and demonstrated H5 MJPEG plus audible Web-to-device and device-to-Web audio. The pre-fix camera-CPU1/8 fps artifact booted and reached online state but failed AI start with a session-task stack overflow. A subsequent 24 KiB session-stack run failed TiRtcStart after esp-aes reported an allocation failure. The exact 7eeda2ed... / eebcaa452... artifact restored the persistent JPEG callback contract, booted with 144599 bytes internal free and 100527-byte recorded minimum after SDK startup, reached H5 active, and produced decodable MJPEG whose pixels were severely fragmented into horizontal lines while direct PSRAM DMA was enabled. The delivered AEC build then reached both h5-active and ai-active, but user logs exposed task-watchdog starvation: H5 involved both software JPEG and AEC load, while AI isolated CPU0 board_audio_tx inside aec_process with CPU1 idle. Artifact 56104cf2... pins AEC/JPEG to CPU1, adds one-tick cooperative blocking and deadline telemetry, and has build evidence only.",
+      "smallest_next_action": "Run artifact 56104cf2... for at least 90 seconds each in H5 and AI, verify no task_wdt or starvation-driven -40008, and capture two status snapshots per mode showing increasing audio/AEC counters, zero AEC errors, max-aec normally below 32000 us, JPEG deadline misses, heap headroom and stack-min-free. Then measure far-end single-talk echo attenuation, intelligible double-talk and AI barge-in."
     },
     {
       "id": "CAM-SENSOR-001",
@@ -555,16 +581,16 @@
     },
     {
       "id": "HTTPS-001",
-    "severity": "resolved-by-user-choice-pending-hil",
-    "summary": "Platform discovery uses HTTP, while the user explicitly selected the TiRTC SDK built-in service endpoint and its default TLS path.",
-    "resolution": "Use http://ep-open.tangeopen.com/services for platform discovery, retain TLS client/TLS 1.2/certificate-bundle support and valid system time, and leave TIRTC_OPT_SERVICE_ENDPOINT unset. Preserve enough internal/DMA memory for the SDK default TLS endpoint and verify it on hardware."
+      "severity": "resolved-by-user-choice-pending-hil",
+      "summary": "Platform discovery uses HTTP, while the user explicitly selected the TiRTC SDK built-in service endpoint and its default TLS path.",
+      "resolution": "Use http://ep-open.tangeopen.com/services for platform discovery, retain TLS client/TLS 1.2/certificate-bundle support and valid system time, and leave TIRTC_OPT_SERVICE_ENDPOINT unset. Preserve enough internal/DMA memory for the SDK default TLS endpoint and verify it on hardware."
     },
     {
       "id": "TIRTC-MEM-001",
-    "severity": "resolved-in-build-pending-hil",
-    "summary": "A 1 MiB send-buffer artifact exhausted TiRTC startup memory. After that was reduced to 256 KiB, a later 24 KiB starter_session stack again starved the SDK default TLS/AES path: esp-aes reported an allocation failure and TiRtcStart returned TIRTC_E_HTTP_SSL with about 35 KiB internal free and an 18 KiB largest block.",
-    "evidence": "The 24 KiB task was created through xTaskCreate before TiRtcStart, so it consumed 12 KiB more internal RAM than the previously booting 12 KiB baseline. The repeated failure held internal free near 35-36 KiB and largest at 18432 bytes, which indicates persistent headroom/capability pressure rather than a growing retry leak.",
-    "resolution": "Keep the 256 KiB TiRTC send buffer and 192 KiB video backpressure and retain the SDK default endpoint. Keep camera framebuffers in PSRAM but use internal staging DMA because direct PSRAM DMA corrupted this board's RGB565 rows; move eligible network BSS, platform requests, downlink audio slots, decode/playback/AEC scratch and the persistent JPEG buffer to PSRAM; reuse starter_start as the deferred HTTP worker after TiRtcStart; keep starter_session at 13 KiB; and log failed allocations plus internal/DMA/PSRAM headroom. The AEC ELF uses 144215 bytes static DIRAM; its runtime AEC allocation is logged separately. Hardware verification remains required."
+      "severity": "resolved-in-build-pending-hil",
+      "summary": "A 1 MiB send-buffer artifact exhausted TiRTC startup memory. After that was reduced to 256 KiB, a later 24 KiB starter_session stack again starved the SDK default TLS/AES path: esp-aes reported an allocation failure and TiRtcStart returned TIRTC_E_HTTP_SSL with about 35 KiB internal free and an 18 KiB largest block.",
+      "evidence": "The 24 KiB task was created through xTaskCreate before TiRtcStart, so it consumed 12 KiB more internal RAM than the previously booting 12 KiB baseline. The repeated failure held internal free near 35-36 KiB and largest at 18432 bytes, which indicates persistent headroom/capability pressure rather than a growing retry leak.",
+      "resolution": "Keep the 256 KiB TiRTC send buffer and 192 KiB video backpressure and retain the SDK default endpoint. Keep camera framebuffers in PSRAM but use internal staging DMA because direct PSRAM DMA corrupted this board's RGB565 rows; move eligible network BSS, platform requests, downlink audio slots, decode/playback/AEC scratch and the persistent JPEG buffer to PSRAM; reuse starter_start as the deferred HTTP worker after TiRtcStart; keep starter_session at 13 KiB; and log failed allocations plus internal/DMA/PSRAM headroom. The AEC ELF uses 144215 bytes static DIRAM; its runtime AEC allocation is logged separately. Hardware verification remains required."
     },
     {
       "id": "WIFI-REALTIME-001",
@@ -585,7 +611,7 @@
       "severity": "resolved-in-build-pending-hil",
       "summary": "The pre-fix 8 fps artifact entered ai-connecting and then overflowed the 12288-byte starter_session stack while submitting TiRtcWhipConnect.",
       "evidence": "The pre-fix ELF had a 2080-byte handle_ai_token frame and an 8272-byte TiRtcWhipConnect frame; the known synchronous chain consumed 10480 bytes before nested SDK/RTOS calls, leaving 1808 bytes. The user runtime log hit vApplicationStackOverflowHook in starter_session.",
-    "resolution": "Move peer_id/token to a short-lived heap object, use a 13312-byte starter_session stack, expose stack-min-free in status, and enforce the final ELF plus pre-TiRTC memory budget with tools/check_ai_stack_policy.sh. The new ELF has an 8432-byte known chain and 4880-byte reserve; the 13 KiB cap also preserves TLS/AES internal RAM. HIL remains required."
+      "resolution": "Move peer_id/token to a short-lived heap object, use a 13312-byte starter_session stack, expose stack-min-free in status, and enforce the final ELF plus pre-TiRTC memory budget with tools/check_ai_stack_policy.sh. The new ELF has an 8432-byte known chain and 4880-byte reserve; the 13 KiB cap also preserves TLS/AES internal RAM. HIL remains required."
     },
     {
       "id": "MEDIA-WDT-001",
@@ -597,8 +623,8 @@
     {
       "id": "SERIAL-001",
       "severity": "non-blocking-this-round",
-    "summary": "The user used /dev/ttyACM0 to flash and monitor predecessor artifacts, while the agent does not own the serial device during this build cycle.",
-    "resolution": "The current artifact remains unflashed by the agent; rerun flash/monitor on /dev/ttyACM0 and bind HIL observations to 56104cf2...."
+      "summary": "The user used /dev/ttyACM0 to flash and monitor predecessor artifacts, while the agent does not own the serial device during this build cycle.",
+      "resolution": "The current artifact remains unflashed by the agent; rerun flash/monitor on /dev/ttyACM0 and bind HIL observations to 56104cf2...."
     }
   ]
 }

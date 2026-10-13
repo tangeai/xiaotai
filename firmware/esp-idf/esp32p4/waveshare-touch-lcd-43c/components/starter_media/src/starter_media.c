@@ -1799,6 +1799,7 @@ esp_err_t starter_media_start(starter_tirtc_mode_t mode, uint32_t generation)
              "media session started mode=%d generation=%lu video=%s",
              (int)mode,
              (unsigned long)generation,
+             mode == STARTER_TIRTC_CALL && atomic_load(&s_call_video) ? "mjpeg" :
              mode == STARTER_TIRTC_H5 || atomic_load(&s_call_video) ? "h264" : "disabled");
     p4_video_set_session(mode, generation, mode == STARTER_TIRTC_H5 ||
                          ((mode == STARTER_TIRTC_CALL || mode == STARTER_TIRTC_VOIP) && atomic_load(&s_call_video)));

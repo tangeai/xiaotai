@@ -12,8 +12,9 @@ required = {
     "app_main", "starter_runtime_start", "starter_product_start", "starter_media_init",
     "starter_voice_start", "starter_voice_feed_pcm16k", "wifi_manager_start",
     "platform_client_start", "p4_video_submit", "camera_pipeline_set_rtc_video_enabled",
-    "call_video_renderer_submit_h264", "call_video_renderer_submit_mjpeg",
-    "starter_tirtc_send_h264", "starter_runtime_call_contact_video",
+    "call_video_renderer_submit_mjpeg",
+    "starter_tirtc_send_h264", "starter_tirtc_send_mjpeg",
+    "starter_runtime_call_contact_video",
 }
 for name in required:
     if name not in names:

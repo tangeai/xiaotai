@@ -13,8 +13,9 @@
 #define CALL_VIDEO_DECODE_MAX_WIDTH         APP_MEDIA_CALL_VIDEO_WIDTH
 #define CALL_VIDEO_DECODE_MAX_HEIGHT        APP_MEDIA_CALL_VIDEO_HEIGHT
 /*
- * Fill the 480px panel height with a centered 4:3 video canvas. Device-call
- * 640x480 frames fit without geometric scaling; rotated frames are contained.
+ * Keep the 640x480 RGB565 canvas for LCD/UI ownership. QVGA H264 downlink
+ * remains 320x240 at its center; no enlargement is needed for a decoded frame
+ * that has no additional detail. Rotated frames are contained at native size.
  * Controls remain in the foreground above the video image.
  */
 #define CALL_VIDEO_RENDER_WIDTH             640U

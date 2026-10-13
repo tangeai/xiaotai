@@ -43,12 +43,21 @@ typedef struct {
     /* Keep sources smaller than the viewport at native size and center them
      * instead of manufacturing detail through upscaling. */
     bool prevent_upscale;
-    /* Reject the scalar software fallback on realtime receive paths.
-     * The explicitly enabled optimized VGA converter is still eligible. */
+    /* Reject the generic software fallback on realtime receive paths.
+     * Explicit native QVGA and optimized VGA paths remain eligible. */
     bool require_ppa;
     /* Opt in to bounded VGA I420 -> RGB565 conversion without transforms.
      * Unsupported geometry or library failure retains the PPA path. */
     bool prefer_direct_i420;
+    /* Keep a QVGA H264 downlink at native size in the RGB565 viewport.
+     * The software color pass avoids competing with the uplink PPA scaler. */
+    bool prefer_native_qvga_i420;
+    /* Full-frame packed YUV420 camera input at exactly twice the JPEG size:
+     * box-filter luma and convert directly to RGB565 without blocking PPA. */
+    bool prefer_packed_half_rgb565;
+    /* The camera already supplies packed O_UYY_E_VYY. Skip the otherwise
+     * unused full-source I420 packing pool for the JPEG uplink converter. */
+    bool packed_input_only;
     bool output_rgb565_byte_swap;
 } video_frame_converter_config_t;
 
@@ -64,6 +73,13 @@ typedef struct {
     uint32_t swap_max_us;
     uint64_t software_time_us;
     uint32_t software_max_us;
+    uint32_t qvga_imgfx_frames;
+    uint64_t qvga_color_time_us;
+    uint32_t qvga_color_max_us;
+    uint64_t qvga_clear_time_us;
+    uint32_t qvga_clear_max_us;
+    uint64_t qvga_copy_time_us;
+    uint32_t qvga_copy_max_us;
     uint16_t last_crop_x;
     uint16_t last_crop_y;
     uint16_t last_crop_width;
@@ -77,6 +93,9 @@ typedef struct {
 esp_err_t video_frame_converter_create(const video_frame_converter_config_t *config,
                                        video_frame_converter_handle_t *out_handle);
 void video_frame_converter_destroy(video_frame_converter_handle_t handle);
+/* Select session geometry while the converter is idle. Persistent buffers are reused. */
+esp_err_t video_frame_converter_set_fit_mode(video_frame_converter_handle_t handle,
+                                             video_frame_fit_mode_t fit_mode);
 
 esp_err_t video_frame_converter_i420_to_rgb565(video_frame_converter_handle_t handle,
                                                const uint8_t *i420,
@@ -96,6 +115,17 @@ esp_err_t video_frame_converter_ouyy_evyy_to_rgb565(
     uint16_t source_height,
     uint16_t *output,
     video_frame_converter_mode_t *mode_used);
+
+/* Half-scale full-window O_UYY_E_VYY to packed UYVY for the P4 JPEG encoder.
+ * Two neighboring output pixels share chroma averaged across their source
+ * blocks. The caller supplies output_width * output_height * 2 bytes. */
+esp_err_t video_frame_converter_ouyy_evyy_half_to_uyvy(
+    const uint8_t *ouyy_evyy,
+    uint16_t source_width,
+    uint16_t source_height,
+    uint8_t *output,
+    uint16_t output_width,
+    uint16_t output_height);
 
 /* Rotates and scales a packed RGB565 source into the configured viewport while
  * preserving aspect ratio. source_stride_pixels may be wider than source_width

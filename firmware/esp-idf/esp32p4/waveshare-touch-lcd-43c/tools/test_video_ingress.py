@@ -21,6 +21,7 @@ code = r'''
 #define pdTRUE 1
 #define ESP_OK 0
 #define ESP_ERR_INVALID_STATE -1
+#define ESP_LOGW(...) ((void)0)
 #define STARTER_TIRTC_CALL 2
 #define STARTER_TIRTC_VOIP 3
 #define TIRTC_VIDEO_JPEG 65
@@ -33,7 +34,7 @@ static atomic_uint s_live_generation=1, s_rx_seen, s_rx_last_media, s_rx_last_st
 static atomic_bool s_need_idr;
 static int64_t s_last_idr_us;
 static struct { uint32_t generation; starter_tirtc_frame_t frame; uint8_t data[64]; } s_ingress[4];
-static int s_free=1, s_pending=2, pending, mode=STARTER_TIRTC_VOIP, jpeg, h264, captured;
+static int s_free=1, s_pending=2, pending, mode=STARTER_TIRTC_VOIP, jpeg, h264, captured, render_fail;
 static int starter_tirtc_mode(void) { return mode; }
 static int xQueueReceive(int q, uint8_t *slot, int timeout) {
     assert(timeout==0); *slot=0;
@@ -44,15 +45,11 @@ static int xQueueSend(int q, const uint8_t *slot, int timeout) {
     assert(*slot==0 && timeout==0); if(q==s_pending) pending=1; return 1;
 }
 static int call_video_renderer_submit_mjpeg(const void *data, unsigned len, unsigned ts) {
-    assert(len==4 && ts==123 && memcmp(data,"JPEG",4)==0); ++jpeg; return 0;
+    assert(len==4 && ts==123 && memcmp(data,"JPEG",4)==0); ++jpeg; return render_fail ? -1 : 0;
 }
 static void p4_video_capture_offer_downlink(const uint8_t *data, size_t len, uint32_t generation) {
     assert(len==4 && generation==1 && memcmp(data,"JPEG",4)==0); ++captured;
 }
-static int call_video_renderer_submit_h264(const void *data, unsigned len, bool key, unsigned ts) {
-    (void)data; (void)len; (void)key; (void)ts; ++h264; return 0;
-}
-static bool call_video_renderer_requires_key_frame(void) { return false; }
 static int64_t esp_timer_get_time(void) { return 0; }
 static int starter_tirtc_request_remote_key_frame(void) { return 0; }
 '''
@@ -66,9 +63,12 @@ int main(void) {
     f.media=TIRTC_VIDEO_H264;
     p4_video_submit(1,&f,"JPEG"); drain_video(); assert(jpeg==1 && h264==0);
     mode=STARTER_TIRTC_CALL; f.stream_id=11;
-    p4_video_submit(1,&f,"JPEG"); drain_video(); assert(h264==1);
+    p4_video_submit(1,&f,"JPEG"); drain_video(); assert(h264==0);
     f.media=TIRTC_VIDEO_JPEG;
-    p4_video_submit(1,&f,"JPEG"); drain_video(); assert(jpeg==1 && captured==1);
+    p4_video_submit(1,&f,"JPEG"); drain_video(); assert(jpeg==2 && captured==1);
+    unsigned dropped_before=s_rx_dropped;
+    render_fail=1;
+    p4_video_submit(1,&f,"JPEG"); drain_video(); assert(s_rx_dropped==dropped_before+1);
     return 0;
 }
 '''

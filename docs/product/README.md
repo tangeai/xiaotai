@@ -68,7 +68,7 @@ H5 音频对讲。
 | 正点原子 ATK-DNESP32S3 | `headless-key` + `none` | 无屏按键、音频、MJPEG 摄像头 |
 | 立创·实战派 ESP32-S3 | `touch-full` + `compact` | 小屏触摸、音频、MJPEG 摄像头 |
 | 立创·实战派 BK7258 | `touch-full` + `compact` | 小屏触摸、音频、H.264 摄像头 |
-| ESP32-P4-WIFI6-Touch-LCD-4.3 | `touch-full` + `large` | 4.3 英寸触摸屏、音频、H.264 摄像头 |
+| ESP32-P4-WIFI6-Touch-LCD-4.3 | `touch-full` + `large` | 4.3 英寸触摸屏、音频、摄像头；当前 H5/微信上行 H.264、设备互呼上行 MJPEG |
 
 仓库已经定义 `display-key`，但当前四块已登记开发板中没有采用这一形态。新增无触摸屏
 设备时，可以直接使用该配置，不需要复制产品状态机。

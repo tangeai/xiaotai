@@ -19,39 +19,46 @@
 #define APP_MEDIA_RTC_H264_MIN_QP                       30U
 #define APP_MEDIA_RTC_H264_MAX_QP                       45U
 
+/* The native VGA raw capture showed color fringes in build.98 and build.99.
+ * Capture through the established full-window 960p mode for CALL/VoIP. */
+#define APP_MEDIA_CALL_NATIVE_VGA_CAPTURE_ENABLE        0
+
 /*
- * Stable full-duplex device-call profile.
+ * Full-duplex device-call MJPEG trial.
  *
- * The encoder bitrate is a rate-control target, not a hard ceiling. Device
- * calls use a VGA 4:3 surface independently from the WeChat profile.
- * The receiver converts it once to the panel viewport through PPA. The P4
- * must encode and decode concurrently. Field logs show that 12 fps can
- * outrun its software H264 decoder and force repeated reference-chain resets.
- * Start at VGA/5 fps and 150 kbit/s. The media owner can select QVGA/5 fps
- * at 96 kbit/s after sustained congestion; recovery is deliberately slower.
- * This is an encoder target, not a hard per-frame or wire-rate limit.
+ * Device calls use VGA MJPEG while WeChat VoIP retains QVGA H.264 below.
+ * The receiver converts each JPEG to the panel viewport. The P4 must encode
+ * and decode concurrently.
+ * Selected target: OV5647 1280x960 binned 4:3 capture, VGA output at 8 fps,
+ * JPEG quality 75. 4 Mbit/s is the send budget, not JPEG rate control:
+ * fixed quality produces scene-dependent frame sizes and excess frames drop.
+ * Sustained congestion can still stop video to preserve audio. Hardware
+ * comparison against build.91 remains required.
+ * Protocol overhead is additional to this JPEG payload budget.
  */
 #define APP_MEDIA_CALL_VIDEO_WIDTH                      640U
 #define APP_MEDIA_CALL_VIDEO_HEIGHT                     480U
-#define APP_MEDIA_CALL_VIDEO_FPS                        5U
-#define APP_MEDIA_CALL_VIDEO_BITRATE_BPS                150000U
+#define APP_MEDIA_CALL_VIDEO_FPS                        8U
+#define APP_MEDIA_CALL_VIDEO_BITRATE_BPS                4000000U
+#define APP_MEDIA_CALL_JPEG_QUALITY                     75U
 #define APP_MEDIA_CALL_FIXED_BITRATE_PROBE              1
 /* Two-tier CALL/VOIP owner: fixed target within each tier. */
-#define APP_MEDIA_CALL_LOW_WIDTH                        320U
-#define APP_MEDIA_CALL_LOW_HEIGHT                       240U
-#define APP_MEDIA_CALL_LOW_BITRATE_BPS                  96000U
+#define APP_MEDIA_CALL_LOW_WIDTH                        640U
+#define APP_MEDIA_CALL_LOW_HEIGHT                       480U
+#define APP_MEDIA_CALL_LOW_FPS                          8U
+#define APP_MEDIA_CALL_LOW_BITRATE_BPS                  4000000U
 #define APP_MEDIA_CALL_VIDEO_MIN_QP                     30U
 #define APP_MEDIA_CALL_VIDEO_MAX_QP                     46U
 
-/* WeChat VoIP uplink only. Field queues grew at 1.5 Mbit/s; start at VGA,
- * 5 fps and 150 kbit/s with the same two-tier protection as device calls. Keep the
+/* WeChat VoIP uplink only. QVGA/15 fps and 200 kbit/s
+ * use the same congestion protection as device calls. Keep the
  * full 4:3 field of view and unrotated pixels; presentation rotation remains
  * governed by the capability contract. Congestion can still pause video to
  * retain audio. The encoder target is not a hard transport ceiling. */
-#define APP_MEDIA_WECHAT_VIDEO_WIDTH                    640U
-#define APP_MEDIA_WECHAT_VIDEO_HEIGHT                   480U
-#define APP_MEDIA_WECHAT_VIDEO_FPS                      5U
-#define APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS              150000U
+#define APP_MEDIA_WECHAT_VIDEO_WIDTH                    320U
+#define APP_MEDIA_WECHAT_VIDEO_HEIGHT                   240U
+#define APP_MEDIA_WECHAT_VIDEO_FPS                      15U
+#define APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS              200000U
 #define APP_MEDIA_WECHAT_VIDEO_MIN_QP                   30U
 #define APP_MEDIA_WECHAT_VIDEO_MAX_QP                   46U
 
@@ -94,7 +101,7 @@
 #define APP_MEDIA_AUTO_SEVERE_QUEUE_DEPTH               4U
 
 /* TGMP bitrate controller hysteresis. */
-#define APP_MEDIA_TGMP_EVENT_MIN_INTERVAL_US            500000ULL
+#define APP_MEDIA_TGMP_EVENT_MIN_INTERVAL_US            512000ULL
 #define APP_MEDIA_TGMP_EVENT_FAST_STEP_BPS              64000U
 /* The lower bound is exposed only after transport feedback reports congestion.
  * Compact VGA calls retain a 96 kbit/s recovery floor. */

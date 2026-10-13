@@ -9,7 +9,7 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 准备修改或编译源码时，需要掌握 C/C++、Git、串口日志和乐鑫 ESP-IDF 的基本
 开发流程。ESP32-P4 的 Wi-Fi 由 ESP32-C6 协同提供，二次开发还需要了解 ESP-Hosted
 （P4 与 C6 的联网方案）的主从机关系。建议先阅读
-[ESP32-P4 ESP-IDF 5.5.4 入门指南](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32p4/get-started/)
+[ESP32-P4 ESP-IDF 5.5.5 入门指南](https://docs.espressif.com/projects/esp-idf/en/v5.5.5/esp32p4/get-started/)
 和[微雪官方板卡文档](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/)。
 
 ## 屏幕布局与字体约束
@@ -80,7 +80,7 @@ idf.py -p <串口> flash monitor
 | 项目 | 内容 |
 | --- | --- |
 | 板卡 ID（仓库中的开发板唯一名称） | `waveshare-esp32p4-touch-lcd-43c-v10` |
-| 芯片与平台 | ESP32-P4 / ESP-IDF 5.5.4 |
+| 芯片与平台 | ESP32-P4 / ESP-IDF 5.5.5 |
 | 存储 | 32 MB Flash、32 MB PSRAM |
 | 显示与触摸 | 4.3 英寸 800×480 横屏产品布局，ST7701 DSI、GT911 |
 | 音频 | ES7210 采集、ES8311 播放，支持 AEC |
@@ -96,9 +96,18 @@ idf.py -p <串口> flash monitor
 H5、设备呼叫、多人对讲和微信通话使用 8 kHz 单声道 A-law，每包 20 毫秒、160 字节。
 AI 使用 16 kHz 单声道 Opus，每包 20 毫秒，目标码率 16 kbit/s。
 
-H5 视频为 H.264 1280×960、20 fps（每秒 20 帧）、目标码率 3 Mbit/s；设备保持传感器方向，H5 接收端按上报的 270° 顺时针角度旋转。
-设备呼叫为 H.264 Annex-B 640×480、5 fps、600 kbit/s、QP 30–46；1280×960 传感器完整画面等比缩到 640×480，不裁切；微信通话为
-960×720、12 fps、1.5 Mbit/s；设备端不旋转，微信接收端按 180° 顺时针角度旋转。
+当前参数由工程 `main/media/media_tuning.h` 定义，均为目标值，实际吞吐以实板日志为准：
+
+| 业务 | 设备上行 | 设备下行 | 采集与呈现 |
+| --- | --- | --- | --- |
+| H5 实时查看 | H.264 1280×960、20 fps、目标 3 Mbit/s | H.264 视频流 15 | 1280×960 全幅采集；H5 按上报的顺时针 270° 旋转 |
+| 设备互呼 | MJPEG 640×480、8 fps、JPEG 质量 75、4 Mbit/s 发送预算 | MJPEG，P4 硬件 JPEG 解码 | 1280×960 全幅采集后等比半缩为 UYVY；640×480 画布用 `contain`，本地默认 0° |
+| 微信 VoIP | H.264 Annex-B 320×240、15 fps、目标 200 kbit/s、GOP30 | MJPEG，P4 硬件 JPEG 解码 | 1280×960 全幅采集后等比缩小；下行本地顺时针 90°、`cover` |
+
+设备互呼和微信通话的高、低拥塞档位分别保持相同的编码参数；持续拥塞可暂停本端视频
+上行，音频与下行继续。4 Mbit/s 是设备互呼 JPEG 净载荷的发送预算，不是固定质量
+JPEG 的编码器目标码率。切档和停发条件见[音视频合同](../../product/MEDIA_CONTRACT.md#视频上行参数)。
+build.102/103 的 H.264 QVGA 设备互呼下行是历史实验，不适用于当前 MJPEG 路径。
 
 音频先在 16 kHz PCM 域完成 AEC（声学回声消除）。AI 上行继续执行激进 NS（噪声抑制）
 和目标 -3 dBFS 的数字 AGC（自动增益控制）后编码 Opus；8 kHz 通话链路降采样后执行
@@ -122,8 +131,8 @@ TODO：下一次实板回归时，重新保存主叫、被叫、上行首包和�
 | 依赖项 | 固定版本或文件 | 来源或下载链接 | SHA-256 |
 | --- | --- | --- | --- |
 | 主机环境 | Linux/WSL2、Git、Python 3 | [Git](https://git-scm.com/downloads)、[Python](https://www.python.org/downloads/) | 无 |
-| ESP-IDF | `v5.5.4`，提交 `735507283d5b2f9fb363a1901172dbd9e847945d` | [Espressif 官方仓库](https://github.com/espressif/esp-idf/tree/735507283d5b2f9fb363a1901172dbd9e847945d) | 无 |
-| C/C++ 编译器 | `riscv32-esp-elf-gcc 14.2.0`，构建标识 `esp-14.2.0_20260121` | [ESP-IDF 工具清单](https://github.com/espressif/esp-idf/blob/735507283d5b2f9fb363a1901172dbd9e847945d/tools/tools.json) | 无，安装器按工具清单校验下载文件 |
+| ESP-IDF | `v5.5.5`，提交 `b774170ff46c393eeb5e495ea37936038d3f4f4f` | [Espressif 官方仓库](https://github.com/espressif/esp-idf/tree/b774170ff46c393eeb5e495ea37936038d3f4f4f) | 无 |
+| C/C++ 编译器 | `riscv32-esp-elf-gcc 14.2.0`，构建标识 `esp-14.2.0_20260121` | [ESP-IDF 工具清单](https://github.com/espressif/esp-idf/blob/b774170ff46c393eeb5e495ea37936038d3f4f4f/tools/tools.json) | 无，安装器按工具清单校验下载文件 |
 | TiRTC | 2.5.0，`lib/libTiRTC.a` | [ESP32-P4 发布目录](https://repo-sdk.tange-ai.com/service/rest/repository/browse/tirtc-sdks/releases/espressif_esp32p4/) | `9b4e35c7a2cb203fc463417739199429057c8b036936faa11f844c726455301f` |
 | ESP-IDF 组件 | ESP-Hosted 1.4.7、ESP-SR 2.4.6、`esp_h264` 1.3.8、`esp_codec_dev` 1.5.10、Waveshare 4.3 BSP v1.0.1 | [工程依赖锁定文件](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/dependencies.lock) | 无 |
 | C6 从机固件 | 与当前主工程匹配的版本 | 无 | 无 |
@@ -219,7 +228,7 @@ VoIP。音视频分别记录实际帧率、码率、丢帧、首包、AEC 参考
 ## 排查
 
 - 无法联网：先检查 C6 slave 固件版本、SDIO 初始化和 ESP-Hosted 状态。
-- 视频方向或比例错误：分别核对 H5 1280×960、设备呼叫 640×480 和微信 960×720 编码配置。设备互呼下行从本地 0 度开始；微信核对“设备到小程序 `camera_rotation=180`”以及“小程序到设备 `down_video_rotation=0`、P4 两种发起方向均使用 `cw90`”，不要混用上下行旋转值。
+- 视频方向或比例错误：分别核对 H5 H.264 1280×960、设备互呼 MJPEG 640×480、微信上行 H.264 320×240 的配置。设备互呼下行从本地 0° 开始；微信核对 `down_video_rotation=0` 和 P4 本地 `cw90`，不要混用上下行旋转值。
 - 单向无声：核对业务类型、音频流编号、订阅状态和首包统计，微信音频固定使用流 0。
 - 会话结束后异常：检查旧 generation（会话代次）回调是否被拒绝，以及相机和音频资源是否释放。
 
@@ -228,9 +237,20 @@ VoIP。音视频分别记录实际帧率、码率、丢帧、首包、AEC 参考
 项目方确认该型号的 PCB V1.0 实板已有跑通记录。“已验证”只适用于记录中的固件和
 测试范围，不代表从任意提交构建的固件已经验收。
 
-设备互呼当前以 640×480、5 fps 为基线；旋转后的实测帧率可能低于目标，8 fps 未作为
-稳定档位验收。双机日志、比较条件和限制见[视频性能记录](../../product/P4_VIDEO_PERFORMANCE.md)。
-发布新固件时应重新覆盖双向发起、四向旋转、挂断重拨、微信通话和弱网恢复。
+设备互呼 build.112（ELF SHA-256 前缀 `a14250e62`）双机日志显示：上行实际约
+6.3–6.6 fps、2.67–3.30 Mbit/s；下行约 8 fps 接收、约 7.2 fps 解码、
+约 4.8 fps 提交显示，解码失败和音频接收缓冲溢出均为零。`presented` 是向显示
+队列交付的计数，不能单凭它证明液晶实际刷新率或端到端延迟。
+
+同版约 15 分钟日志显示，积压约 75 KiB 时本端视频上行因持续拥塞停发，
+音频和下行继续；人工重新打开摄像头后上行恢复。四向旋转的几何日志正常，
+但该版 90°/270° 因 `cover` 策略曾中心裁切；当前代码改为 `contain` 完整显示，
+画面视觉效果仍需实屏确认。
+
+旧版 build.87 与 build.101/103 的 H.264 试验仅作历史对照。双机日志、比较条件和限制见
+[通话诊断记录](../../development/MEDIA_PIPELINE_DIAGNOSTICS.md)及[视频性能记录](../../product/P4_VIDEO_PERFORMANCE.md)。
+build.112 尚未完成画面颜色、四向旋转的视觉效果、微信 VoIP、H5、弱网恢复和长时间稳定性
+验收；发布新固件时须分别覆盖这些项目及双向发起、挂断重拨。
 
 板级配置位于 `boards/waveshare/esp32p4-touch-lcd-43c/`；硬件事实和证据等级见工程
 `hardware-ir.json`。

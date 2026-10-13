@@ -64,42 +64,44 @@ int main(void) {
     assert(memcmp(black, expected_black, sizeof(black)) == 0);
     media_governor_video_config_t config;
     media_governor_build_device_call_video_config(&config);
-    assert(config.width==640 && config.height==480 && config.fps==5 && config.bitrate_bps==150000);
+    assert(config.width==640 && config.height==480 && config.fps==8 && config.bitrate_bps==4000000);
     uint16_t w=APP_MEDIA_CAMERA_CAPTURE_WIDTH,h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
     media_governor_camera_policy_t policy;
     media_governor_build_camera_policy(&config,&policy);
     w=policy.capture_width; h=policy.capture_height;
-    assert(w==640 && h==480);
-    assert(policy.capture_fps==5 && policy.rtc_video_fps==5);
+    assert(w==1280 && h==960);
+    assert(policy.capture_fps==8 && policy.rtc_video_fps==8);
+    assert(policy.capture_width==1280 && policy.capture_height==960);
     assert(policy.rtc_width==640 && policy.rtc_height==480);
-    assert(policy.h264_bitrate_bps==150000);
-    video_yuv420_scaler_config_t scale={w,h,config.width,config.height,false,true};
-    assert(video_yuv420_config_valid(&scale));
+    assert(policy.h264_bitrate_bps==4000000);
     uint16_t cw,ch,x,y,ox,oy; uint8_t step;
+    video_yuv420_scaler_config_t scale={1280,960,640,480,false,true};
+    assert(video_yuv420_config_valid(&scale));
     assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
-    assert(cw==640 && ch==480 && x==0 && y==0 && ox==0 && oy==0 && step==16);
+    assert(cw==1280 && ch==960 && x==0 && y==0 && ox==0 && oy==0 && step==8);
     media_governor_build_wechat_video_config(&config);
-    assert(config.width==640 && config.height==480 && config.fps==5 && config.bitrate_bps==150000);
+    assert(config.width==320 && config.height==240 && config.fps==15 && config.bitrate_bps==200000);
     media_governor_build_camera_policy(&config,&policy);
-    assert(policy.rtc_width==640 && policy.rtc_height==480);
-    assert(policy.capture_fps==5 && policy.rtc_video_fps==5 && policy.h264_bitrate_bps==150000);
+    assert(policy.capture_width==1280 && policy.capture_height==960);
+    assert(policy.rtc_width==320 && policy.rtc_height==240);
+    assert(policy.capture_fps==15 && policy.rtc_video_fps==15 && policy.h264_bitrate_bps==200000);
     w=APP_MEDIA_CAMERA_CAPTURE_WIDTH; h=APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
     media_governor_select_native_capture_size(&config,&w,&h);
-    assert(w==640 && h==480);
-    scale=(video_yuv420_scaler_config_t){w,h,config.width,config.height,false,false};
+    assert(w==1280 && h==960);
+    scale=(video_yuv420_scaler_config_t){w,h,config.width,config.height,false,true};
     assert(video_yuv420_config_valid(&scale));
     assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
-    assert(cw==640 && ch==480 && x==0 && y==0 && step==16);
+    assert(cw==1280 && ch==960 && x==0 && y==0 && step==4);
     for (unsigned voip=0;voip<2;voip++) {
         media_governor_build_call_quality_config(voip,true,&config);
         media_governor_build_camera_policy(&config,&policy);
-        assert(policy.capture_width==640 && policy.capture_height==480);
-        assert(policy.rtc_width==320 && policy.rtc_height==240 && policy.rtc_video_fps==5);
-        assert(policy.h264_bitrate_bps==96000);
-        scale=(video_yuv420_scaler_config_t){640,480,320,240,false,false};
+        assert(policy.capture_width==1280 && policy.capture_height==960);
+        assert(policy.rtc_width==(voip?320:640) && policy.rtc_height==(voip?240:480) && policy.rtc_video_fps==(voip?15:8));
+        assert(policy.h264_bitrate_bps==(voip?200000:4000000));
+        scale=(video_yuv420_scaler_config_t){policy.capture_width,policy.capture_height,policy.rtc_width,policy.rtc_height,false,true};
         assert(video_yuv420_config_valid(&scale));
         assert(video_yuv420_select_geometry(&scale,&cw,&ch,&x,&y,&ox,&oy,&step));
-        assert(cw==640 && ch==480 && x==0 && y==0 && step==8);
+        assert(cw==1280 && ch==960 && x==0 && y==0 && step==(voip?4:8));
     }
     media_governor_build_h5_video_config(&config);
     assert(config.width==1280 && config.height==960 && config.fps==20 && config.bitrate_bps==3000000);
@@ -115,9 +117,9 @@ int main(void) {
         media_governor_build_h5_video_config,
         media_governor_build_device_call_video_config,
     };
-    const uint16_t widths[]={640,1280,640}, heights[]={480,960,480};
-    const uint8_t fps[]={5,20,5};
-    const uint32_t rates[]={150000,3000000,150000};
+    const uint16_t widths[]={320,1280,640}, heights[]={240,960,480};
+    const uint8_t fps[]={15,20,8};
+    const uint32_t rates[]={200000,3000000,4000000};
     assert(media_governor_set_rtc_video_config(NULL)==ESP_ERR_INVALID_ARG);
     for (unsigned round=0; round<100; ++round) {
         for (unsigned mode=0; mode<3; ++mode) {
@@ -127,6 +129,10 @@ int main(void) {
             assert(s_rtc_video_config.width==widths[mode] && s_rtc_video_config.height==heights[mode]);
             assert(s_rtc_video_config.fps==fps[mode] && s_rtc_video_config.bitrate_bps==rates[mode]);
             assert(s_adaptation_base_config.bitrate_bps==rates[mode]);
+            media_governor_build_camera_policy(NULL,&policy);
+            assert(policy.capture_width==1280 && policy.capture_height==960);
+            assert(policy.rtc_width==widths[mode] && policy.rtc_height==heights[mode]);
+            assert(policy.rtc_video_fps==fps[mode] && policy.h264_bitrate_bps==rates[mode]);
             assert(!s_transport_adaptation_active && s_transport_requested_bitrate_bps==0);
             config.bitrate_bps=200000;
             config.weak_network_mode=MEDIA_GOVERNOR_WEAK_NETWORK_FRAMERATE_PRIORITY;
@@ -158,4 +164,4 @@ for config in ("sdkconfig.defaults", "sdkconfig"):
 pipeline=(root/"main/media/camera_pipeline.c").read_text()
 assert "const bool rotate_ccw90 = false;" in pipeline
 assert '"yuv420-ppa-ccw90"' not in pipeline
-print("PASS: public call camera policy uses native VGA for calls and full capture for H5")
+print("PASS: CALL 960p to VGA/8, VoIP 960p to QVGA/15, H5 unchanged")

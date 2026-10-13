@@ -12,7 +12,7 @@
 python3 tools/build.py --board alientek-atk-dnesp32s3
 ```
 
-需要直接操作工程时，先准备 ESP-IDF 5.5.x，再执行：
+需要直接操作工程时，先准备 ESP-IDF 5.5.5，再执行：
 
 ```bash
 idf.py set-target esp32s3

@@ -91,17 +91,19 @@
   },
   "toolchain": {
     "framework": "esp-idf",
-    "framework_version": "5.5.x",
+    "framework_version": "5.5.5",
     "verification": "build_verified",
     "tirtc": {
       "platform": "espressif-esp32s3",
       "version": "2.5.0",
       "sdk_path": "third_party/tirtc",
-      "build_contract": "manifest/build-contract.env"
+      "build_contract": "manifest/build-contract.env",
+      "archive_sha256": "7334e846ed4261b5297607c85acafe1d586a22374f7c8e37b102b2742e47c7aa"
     },
     "source_refs": [
       "vendor-board"
-    ]
+    ],
+    "framework_git_revision": "b774170ff46c393eeb5e495ea37936038d3f4f4f"
   },
   "camera": {
     "present": true,
@@ -259,24 +261,31 @@
     ]
   },
   "build_evidence": {
+    "firmware_version": "1.0.0+build.4",
+    "verification": "local_build_only",
+    "note": "ESP-IDF 5.5.5 compile and semantic gates passed; exact artifacts retained. No serial hardware verification in this run. Previous runtime observations remain historical.",
     "artifacts": [
       {
-        "path": "artifacts/atk-media.11/atk_xiaotai_s3.bin",
-        "size_bytes": 1946640,
-        "sha256": "6bdb92a9b5acf0e2745f22a9bb8a21e31e9ae435f40c9b5019e08c78f3a0f555"
+        "path": "artifacts/1.0.0+build.4/atk_xiaotai_s3.bin",
+        "label": "1.0.0+build.4 atk_xiaotai_s3.bin",
+        "size_bytes": 1959200,
+        "sha256": "7b29de1181b6eeca5d6198f68d0ecad445a6a830fbe2a99d0f2c197c4eb070d2"
       },
       {
-        "path": "artifacts/atk-media.11/atk_xiaotai_s3.elf",
-        "size_bytes": 15286888,
-        "sha256": "c53573a12e9d8769668ca2d4dfb9d45f8db0688e97c8602e342c4e9be228b554"
+        "path": "artifacts/1.0.0+build.4/atk_xiaotai_s3.elf",
+        "label": "1.0.0+build.4 atk_xiaotai_s3.elf",
+        "size_bytes": 15425972,
+        "sha256": "8e6ffa72516e28179c129c0da304025978f140af9431f882a9ec553d1b947dcd"
       },
       {
-        "path": "artifacts/atk-media.11/bootloader.bin",
+        "path": "artifacts/1.0.0+build.4/bootloader.bin",
+        "label": "1.0.0+build.4 bootloader/bootloader.bin",
         "size_bytes": 20832,
-        "sha256": "a84064beb2ad43563a23c5bed761f4e654e02c3f32d20c5ec255cc7a1c4a50e2"
+        "sha256": "d9a47fbc610f804c02e0199049e3464737743fb874ec28fc9af507cbe96132e3"
       },
       {
-        "path": "artifacts/atk-media.11/partition-table.bin",
+        "path": "artifacts/1.0.0+build.4/partition-table.bin",
+        "label": "1.0.0+build.4 partition_table/partition-table.bin",
         "size_bytes": 3072,
         "sha256": "1edad21a69d0791cb6fe8a4f47ea7c64cfd302031f8db2c9f68cdc9568ca124c"
       }

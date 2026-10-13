@@ -1,5 +1,7 @@
 # 已支持开发板
 
+各板当前问题、功能需求和待验证项见[开发板问题与需求清单](ISSUES_AND_REQUIREMENTS.md)。
+
 本页按 `boards/*/*/board.json` 维护。板卡编号是构建、固件包和日志中的永久身份。
 选择板卡时还要核对完整型号和印刷电路板版本；同一芯片的固件也不一定能互换。
 
@@ -9,7 +11,7 @@
 |---|---|---|---|---|---|---|
 | `alientek-atk-dnesp32s3` | ALIENTEK ATK-DNESP32S3 V1.4 | ESP32-S3 / ESP-IDF | 16 MB Flash / 8 MB PSRAM | 音频、按键、MJPEG 摄像头、Wi-Fi | 实板已跑通 | [打开](alientek-atk-dnesp32s3/README.md) |
 | `lckfb-esp32s3` | 立创·实战派 ESP32-S3（ESP32-S3-WROOM-1-N16R8，PCB V1.0.1） | ESP32-S3 / ESP-IDF | 16 MB Flash / 8 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Wi-Fi | 实板已跑通 | [打开](lckfb-esp32s3/README.md) |
-| `waveshare-esp32p4-touch-lcd-43c-v10` | Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 | ESP32-P4 / ESP-IDF | 32 MB Flash / 32 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Hosted Wi-Fi | 实板已跑通 | [打开](waveshare-esp32p4-touch-lcd-43c-v10/README.md) |
+| `waveshare-esp32p4-touch-lcd-43c-v10` | Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 | ESP32-P4 / ESP-IDF | 32 MB Flash / 32 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Hosted Wi-Fi | 基础功能已跑通；当前视频档位待完整验收 | [打开](waveshare-esp32p4-touch-lcd-43c-v10/README.md) |
 | `lckfb-bk7258` | 立创·实战派 BK7258 | BK7258 / Beken AVDK | 8 MiB Flash / 16 MiB PSRAM / 640 KiB SRAM（构建配置） | 音频、屏幕、触摸、H.264 摄像头、Wi-Fi | 实板已跑通 | [打开](lckfb-bk7258/README.md) |
 
 新增板卡时必须同时更新 manifest、板级短 README 和本目录下的完整使用文档；后续会由工具自动生成本表，并在

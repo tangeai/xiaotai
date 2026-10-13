@@ -80,17 +80,19 @@
   },
   "toolchain": {
     "framework": "esp-idf",
-    "framework_version": "5.5.4",
+    "framework_version": "5.5.5",
     "verification": "build_verified",
     "tirtc": {
       "platform": "espressif-esp32p4",
-      "version": "2.3.0-P4-validation-rebuild",
-      "sdk_path": "components/tirtc_sdk",
-      "build_contract": "components/tirtc_sdk/manifest/build-contract.env"
+      "version": "2.5.0",
+      "sdk_path": "third_party/tirtc",
+      "build_contract": "manifest/build-contract.env",
+      "archive_sha256": "6c5c1543f4a099c2f8fdfdff5b50ef728cf181ce09931c2798d34e84d22473b1"
     },
     "source_refs": [
       "kit-src"
-    ]
+    ],
+    "framework_git_revision": "b774170ff46c393eeb5e495ea37936038d3f4f4f"
   },
   "camera": {
     "present": true,
@@ -150,7 +152,9 @@
         "model": "software-opus-voip",
         "role": "AI 16 kHz 单声道上行；AEC、NS、AGC 后编码",
         "channels": 1,
-        "sample_rates_hz": [16000],
+        "sample_rates_hz": [
+          16000
+        ],
         "verification": "build_verified"
       }
     ],
@@ -190,7 +194,9 @@
         "model": "software-opus-voip",
         "role": "AI 16 kHz 单声道下行解码播放",
         "channels": 1,
-        "sample_rates_hz": [16000],
+        "sample_rates_hz": [
+          16000
+        ],
         "verification": "build_verified"
       }
     ],
@@ -287,18 +293,33 @@
     ]
   },
   "build_evidence": {
+    "firmware_version": "1.0.0+build.91",
+    "verification": "local_build_only",
+    "note": "ESP-IDF 5.5.5 compile and semantic gates passed; exact artifacts retained. No serial hardware verification in this run. Previous runtime observations remain historical.",
     "artifacts": [
       {
-        "path": "build/xiaotai_esp32p4.bin",
-        "label": "1.0.0+build.11 application BIN",
-        "size_bytes": 4650592,
-        "sha256": "71f218bc7ec60aea180f353fd9e27afd1702a817034f59dc3e4090b92077bc2c"
+        "path": "artifacts/1.0.0+build.91/xiaotai_esp32p4.bin",
+        "label": "1.0.0+build.91 xiaotai_esp32p4.bin",
+        "size_bytes": 5814784,
+        "sha256": "cd2ebbd4972feba9d113ea4fe8b19a3d1d254704bd2e5734a6f648c6bc507653"
       },
       {
-        "path": "build/xiaotai_esp32p4.elf",
-        "label": "1.0.0+build.11 full ELF",
-        "size_bytes": 36444080,
-        "sha256": "9ed4c413c1ee19102b60220c763d6a2b309d890fd93d811c429d4124160d149f"
+        "path": "artifacts/1.0.0+build.91/xiaotai_esp32p4.elf",
+        "label": "1.0.0+build.91 xiaotai_esp32p4.elf",
+        "size_bytes": 38066932,
+        "sha256": "a7106067dfbd51949d23cd75d329827b6240e3df467911bc990a0ecbb3d3495e"
+      },
+      {
+        "path": "artifacts/1.0.0+build.91/bootloader.bin",
+        "label": "1.0.0+build.91 bootloader.bin",
+        "size_bytes": 21264,
+        "sha256": "2f65a7743e168c94343dcb4a6eaf8786a2605cd8522cf4ef00a86cc070d7076c"
+      },
+      {
+        "path": "artifacts/1.0.0+build.91/partition-table.bin",
+        "label": "1.0.0+build.91 partition-table.bin",
+        "size_bytes": 3072,
+        "sha256": "b13484e793585a199222e1f3675f1d0563bb008e2f5913e5db874726913a3f90"
       }
     ]
   },

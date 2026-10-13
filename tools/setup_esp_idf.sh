@@ -3,11 +3,11 @@ set -euo pipefail
 
 repository_root=$(cd "$(dirname "$0")/.." && pwd)
 tools_dir="$repository_root/.tools"
-idf_dir="$tools_dir/esp-idf-v5.5.4"
-idf_tools_dir="$tools_dir/espressif-v5.5.4"
+idf_dir="$tools_dir/esp-idf-v5.5.5"
+idf_tools_dir="$tools_dir/espressif-v5.5.5"
 idf_repository="https://github.com/espressif/esp-idf.git"
-idf_tag="v5.5.4"
-idf_commit="735507283d5b2f9fb363a1901172dbd9e847945d"
+idf_tag="v5.5.5"
+idf_commit="b774170ff46c393eeb5e495ea37936038d3f4f4f"
 
 target="${1:-}"
 case "$target" in

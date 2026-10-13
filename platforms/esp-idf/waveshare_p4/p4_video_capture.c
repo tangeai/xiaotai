@@ -7,10 +7,14 @@
 #include "esp_console.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
+#include "esp_cache.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "starter_tirtc.h"
 #include "camera_pipeline.h"
+#include "camera_driver.h"
+#include "video_yuv420_scaler.h"
+#include "media_tuning.h"
 
 #define CAPTURE_CAP (512U * 1024U)
 #define DOWNLINK_CAPTURE_CAP (256U * 1024U)
@@ -29,6 +33,10 @@ static uint8_t *s_down_data;
 static size_t s_down_size;
 static uint32_t s_down_generation;
 static const char *s_down_reason = "empty";
+static uint8_t *s_snapshot;
+static size_t s_snapshot_size;
+static uint16_t s_snapshot_width, s_snapshot_height;
+static bool s_snapshot_native;
 
 /* Annex B validation: do not export a clip starting without SPS/PPS/IDR. */
 static bool has_headers_and_idr(const uint8_t *data, size_t len)
@@ -111,6 +119,161 @@ static uint32_t checksum(const uint8_t *data, size_t len)
     uint32_t hash = 2166136261U;
     for (size_t i = 0; i < len; ++i) hash = (hash ^ data[i]) * 16777619U;
     return hash;
+}
+
+static esp_err_t camera_snapshot_capture(uint8_t *destination, size_t capacity, bool native,
+                                         uint16_t *width, uint16_t *height)
+{
+    if (!destination || !width || !height) return ESP_ERR_INVALID_ARG;
+    if (camera_pipeline_is_running() || starter_tirtc_connected()) return ESP_ERR_INVALID_STATE;
+    if (capacity < APP_MEDIA_CALL_VIDEO_WIDTH * APP_MEDIA_CALL_VIDEO_HEIGHT * 3U / 2U)
+        return ESP_ERR_INVALID_SIZE;
+
+    const uint16_t source_width = native ?
+        APP_MEDIA_CALL_VIDEO_WIDTH : APP_MEDIA_CAMERA_CAPTURE_WIDTH;
+    const uint16_t source_height = native ?
+        APP_MEDIA_CALL_VIDEO_HEIGHT : APP_MEDIA_CAMERA_CAPTURE_HEIGHT;
+    esp_err_t ret = camera_driver_set_stream_target(source_width, source_height,
+                                                    APP_MEDIA_CALL_VIDEO_FPS);
+    if (ret != ESP_OK) return ret;
+    ret = camera_driver_acquire();
+    if (ret != ESP_OK) return ret;
+
+    camera_driver_frame_t frame = {0};
+    video_yuv420_scaler_handle_t scaler = NULL;
+    bool captured = false;
+    /* Give the sensor's auto exposure and white balance one second to settle. */
+    for (unsigned int i = 0; i < 4; ++i) {
+        ret = camera_driver_capture(&frame);
+        if (ret != ESP_OK) goto done;
+        captured = true;
+        camera_driver_release(&frame);
+        captured = false;
+        vTaskDelay(pdMS_TO_TICKS(250));
+    }
+    ret = camera_driver_capture(&frame);
+    if (ret != ESP_OK) goto done;
+    captured = true;
+    if (frame.width != source_width || frame.height != source_height ||
+        frame.pixel_format != CAMERA_DRIVER_PIXEL_FORMAT_YUV420_OUYY_EVYY ||
+        frame.data_len < (size_t)source_width * source_height * 3U / 2U) {
+        ret = ESP_ERR_INVALID_SIZE;
+        goto done;
+    }
+
+    const uint8_t *pixels = frame.data;
+    size_t length = (size_t)source_width * source_height * 3U / 2U;
+    if (source_width != APP_MEDIA_CALL_VIDEO_WIDTH ||
+        source_height != APP_MEDIA_CALL_VIDEO_HEIGHT) {
+        const video_yuv420_scaler_config_t config = {
+            .input_width = source_width, .input_height = source_height,
+            .output_width = APP_MEDIA_CALL_VIDEO_WIDTH,
+            .output_height = APP_MEDIA_CALL_VIDEO_HEIGHT,
+            .rotate_ccw90 = false, .fit_contain = true,
+        };
+        ret = video_yuv420_scaler_create(&config, &scaler);
+        if (ret != ESP_OK) goto done;
+        ret = video_yuv420_scaler_process(scaler, frame.data, length,
+                                          &pixels, &length);
+        if (ret != ESP_OK) goto done;
+    } else {
+        ret = esp_cache_msync((void *)frame.data, length, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+        if (ret != ESP_OK) goto done;
+    }
+    const size_t expected = APP_MEDIA_CALL_VIDEO_WIDTH * APP_MEDIA_CALL_VIDEO_HEIGHT * 3U / 2U;
+    if (length < expected) {
+        ret = ESP_ERR_INVALID_SIZE;
+        goto done;
+    }
+    memcpy(destination, pixels, expected);
+    *width = APP_MEDIA_CALL_VIDEO_WIDTH;
+    *height = APP_MEDIA_CALL_VIDEO_HEIGHT;
+
+done:
+    video_yuv420_scaler_destroy(scaler);
+    if (captured) camera_driver_release(&frame);
+    camera_driver_release_device();
+    return ret;
+}
+
+static int camera_snapshot_command(int argc, char **argv)
+{
+    if (argc != 2) {
+        puts("usage: camera-snapshot capture|capture-native|capture-full|dump|clear");
+        return 1;
+    }
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    int rc = 0;
+    if (!strcmp(argv[1], "capture") || !strcmp(argv[1], "capture-native") ||
+        !strcmp(argv[1], "capture-full")) {
+        if (s_snapshot) {
+            puts("CSNAP ERROR clear previous snapshot");
+            rc = 1;
+        } else {
+            const size_t size = APP_MEDIA_CALL_VIDEO_WIDTH * APP_MEDIA_CALL_VIDEO_HEIGHT * 3U / 2U;
+            s_snapshot = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+            if (!s_snapshot) {
+                puts("CSNAP ERROR allocation failed");
+                rc = 1;
+            } else {
+                s_snapshot_native = !strcmp(argv[1], "capture-native") ||
+                    (!strcmp(argv[1], "capture") && APP_MEDIA_CALL_NATIVE_VGA_CAPTURE_ENABLE);
+                esp_err_t ret = camera_snapshot_capture(s_snapshot, size, s_snapshot_native,
+                    &s_snapshot_width, &s_snapshot_height);
+                if (ret != ESP_OK) {
+                    printf("CSNAP ERROR capture failed: %s\n", esp_err_to_name(ret));
+                    free(s_snapshot);
+                    s_snapshot = NULL;
+                    rc = 1;
+                } else {
+                    s_snapshot_size = size;
+                    printf("CSNAP READY bytes=%u width=%u height=%u source=%s\n",
+                           (unsigned)size, s_snapshot_width, s_snapshot_height,
+                           s_snapshot_native ? "native-vga" : "full-scale");
+                }
+            }
+        }
+    } else if (!strcmp(argv[1], "dump")) {
+        if (!s_snapshot || !s_snapshot_size || starter_tirtc_connected() ||
+            camera_pipeline_is_running()) {
+            puts("CSNAP ERROR require completed idle snapshot");
+            rc = 1;
+        } else {
+            static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            printf("CSNAP BEGIN bytes=%u fnv=%08lx width=%u height=%u format=OUYY_EVYY source=%s\n",
+                   (unsigned)s_snapshot_size,
+                   (unsigned long)checksum(s_snapshot, s_snapshot_size),
+                   s_snapshot_width, s_snapshot_height,
+                   s_snapshot_native ? "native-vga" : "full-scale");
+            for (size_t i = 0; i < s_snapshot_size; i += 48) {
+                char encoded[65];
+                size_t n = s_snapshot_size - i < 48 ? s_snapshot_size - i : 48;
+                size_t j = 0;
+                for (size_t k = 0; k < n; k += 3) {
+                    unsigned a = s_snapshot[i + k];
+                    unsigned b = k + 1 < n ? s_snapshot[i + k + 1] : 0;
+                    unsigned c = k + 2 < n ? s_snapshot[i + k + 2] : 0;
+                    encoded[j++] = alphabet[a >> 2];
+                    encoded[j++] = alphabet[((a & 3U) << 4) | (b >> 4)];
+                    encoded[j++] = k + 1 < n ? alphabet[((b & 15U) << 2) | (c >> 6)] : '=';
+                    encoded[j++] = k + 2 < n ? alphabet[c & 63U] : '=';
+                }
+                encoded[j] = 0;
+                printf("CSNAP DATA %08x %s\n", (unsigned)i, encoded);
+            }
+            puts("CSNAP END");
+        }
+    } else if (!strcmp(argv[1], "clear")) {
+        free(s_snapshot);
+        s_snapshot = NULL;
+        s_snapshot_size = 0;
+        s_snapshot_native = false;
+    } else {
+        puts("CSNAP ERROR unknown command");
+        rc = 1;
+    }
+    xSemaphoreGive(s_mutex);
+    return rc;
 }
 
 static int capture_command(int argc, char **argv)
@@ -253,6 +416,12 @@ esp_err_t p4_video_capture_init(void)
             .help = "Temporary pre-render JPEG: start|stop|status|dump|clear",
             .func = downlink_capture_command};
         ret = esp_console_cmd_register(&downlink_cmd);
+    }
+    if (ret == ESP_OK) {
+        const esp_console_cmd_t snapshot_cmd = {.command = "camera-snapshot",
+            .help = "Idle camera frame: capture[-native|-full]|dump|clear",
+            .func = camera_snapshot_command};
+        ret = esp_console_cmd_register(&snapshot_cmd);
     }
     return ret;
 }

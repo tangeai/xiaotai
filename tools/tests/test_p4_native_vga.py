@@ -91,6 +91,7 @@ int main(void) {
  assert(reg_value(retained,0x3808)==2 && reg_value(retained,0x3809)==0x80);
  assert(reg_value(retained,0x380a)==1 && reg_value(retained,0x380b)==0xe0);
  assert(reg_value(retained,0x3814)==0x35 && reg_value(retained,0x3815)==0x35);
+ assert(reg_value(retained,0x3820)==0x01); /* revert unhelpful register trial */
  assert(reg_value(retained,0x3036)==0x6a && reg_value(retained,0x3801)==24);
  assert(regs[1].val==5 && isp.isp_v1_info.hts==1093); /* managed source unchanged */
  assert(((const ov5647_reginfo_t*)retained->regs)[retained->regs_size-1].reg==0xffff);

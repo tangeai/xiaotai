@@ -978,13 +978,25 @@ int starter_tirtc_send_mjpeg(uint32_t timestamp_ms,
 {
     tirtc_conn_t connection = (tirtc_conn_t)atomic_load_explicit(
         &s_connection, memory_order_acquire);
-    if (connection == NULL || starter_tirtc_mode() != STARTER_TIRTC_H5 ||
+    starter_tirtc_mode_t mode = starter_tirtc_mode();
+    if (connection == NULL || (mode != STARTER_TIRTC_H5 && mode != STARTER_TIRTC_CALL) ||
         data == NULL || length == 0U) {
         return TIRTC_E_INVALID_PARAMETER;
     }
+    if (mode == STARTER_TIRTC_CALL) {
+        if (!starter_tirtc_video_ready()) return TIRTC_E_INVALID_PARAMETER;
+        size_t limit = atomic_load(&s_send_buffer_limit);
+        if (limit != 0U) {
+            size_t reserve = limit / 8U;
+            if (reserve > 65536U) reserve = 65536U;
+            size_t budget = limit - reserve;
+            size_t used = TiRtcGetSendBufferUsed(connection);
+            if (used >= budget || length > budget - used) return TIRTC_E_BUSY;
+        }
+    }
     /* 一个 data 缓冲包含一张完整 JPEG；每张图都可独立解码。 */
     TIRTCFRAMEINFO frame = {
-        .stream_id = H5_VIDEO_STREAM,
+        .stream_id = video_stream_for_mode(mode),
         .media = TIRTC_VIDEO_JPEG,
         .flags = TIRTC_FRAME_FLAG_KEY_FRAME,
         .ts = timestamp_ms,

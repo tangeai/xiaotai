@@ -153,6 +153,56 @@ static bool video_yuv420_select_geometry(const video_yuv420_scaler_config_t *con
     return false;
 }
 
+static bool video_yuv420_use_cpu_half_scale(video_yuv420_scaler_handle_t handle)
+{
+    return !handle->config.rotate_ccw90 &&
+           handle->config.output_width > 0U && handle->config.output_height > 0U &&
+           (handle->config.output_width & 1U) == 0U &&
+           (handle->config.output_height & 1U) == 0U &&
+           handle->config.input_width == 2U * handle->config.output_width &&
+           handle->config.input_height == 2U * handle->config.output_height &&
+           handle->crop_width == handle->config.input_width &&
+           handle->crop_height == handle->config.input_height &&
+           handle->crop_x == 0U && handle->crop_y == 0U &&
+           handle->output_x == 0U && handle->output_y == 0U &&
+           handle->scale_step == VIDEO_YUV420_SCALE_DENOMINATOR / 2U;
+}
+
+/* Full-frame 2:1 box filtering in packed OUYY/EVYY. Average luma over 2x2
+ * pixels and each chroma plane over 2x2 chroma samples. Four input rows make
+ * two output rows, retaining the U/V row phase without a planar workspace.
+ * This avoids sharing the blocking PPA/DMA path with the VoIP downlink. */
+static void video_yuv420_half_scale_ouyy_evyy(const uint8_t *input,
+                                             uint8_t *output,
+                                             uint16_t output_width,
+                                             uint16_t output_height)
+{
+    const size_t input_stride = (size_t)output_width * 3U;
+    const size_t output_stride = input_stride / 2U;
+    for (uint32_t y = 0U; y < output_height; y += 2U) {
+        const uint8_t *s0 = input + (size_t)(2U * y) * input_stride;
+        const uint8_t *s1 = s0 + input_stride;
+        const uint8_t *s2 = s1 + input_stride;
+        const uint8_t *s3 = s2 + input_stride;
+        uint8_t *d0 = output + (size_t)y * output_stride;
+        uint8_t *d1 = d0 + output_stride;
+        for (uint32_t x = 0U; x < output_width; x += 2U) {
+            d0[0] = (s0[0] + s0[3] + s2[0] + s2[3] + 2U) / 4U;
+            d1[0] = (s1[0] + s1[3] + s3[0] + s3[3] + 2U) / 4U;
+            d0[1] = (s0[1] + s0[2] + s1[1] + s1[2] + 2U) / 4U;
+            d0[2] = (s0[4] + s0[5] + s1[4] + s1[5] + 2U) / 4U;
+            d1[1] = (s2[1] + s2[2] + s3[1] + s3[2] + 2U) / 4U;
+            d1[2] = (s2[4] + s2[5] + s3[4] + s3[5] + 2U) / 4U;
+            s0 += 6;
+            s1 += 6;
+            s2 += 6;
+            s3 += 6;
+            d0 += 3;
+            d1 += 3;
+        }
+    }
+}
+
 esp_err_t video_yuv420_scaler_create(const video_yuv420_scaler_config_t *config,
                                      video_yuv420_scaler_handle_t *out_handle)
 {
@@ -227,7 +277,8 @@ esp_err_t video_yuv420_scaler_create(const video_yuv420_scaler_config_t *config,
         .max_pending_trans_num = 1,
         .data_burst_length = PPA_DATA_BURST_LENGTH_128,
     };
-    esp_err_t ret = ppa_register_client(&ppa_config, &scaler->ppa_client);
+    esp_err_t ret = video_yuv420_use_cpu_half_scale(scaler) ? ESP_OK :
+        ppa_register_client(&ppa_config, &scaler->ppa_client);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "PPA scaler client registration failed: %s", esp_err_to_name(ret));
         free(scaler->output_buffer);
@@ -236,7 +287,7 @@ esp_err_t video_yuv420_scaler_create(const video_yuv420_scaler_config_t *config,
     }
 
     ESP_LOGI(TAG,
-             "YUV420 scaler ready: input=%ux%u crop=%ux%u+%u+%u scale=%u/16 render=%ux%u+%u+%u output=%ux%u fit=%s buffer=%u",
+             "YUV420 scaler ready: input=%ux%u crop=%ux%u+%u+%u scale=%u/16 render=%ux%u+%u+%u output=%ux%u fit=%s buffer=%u engine=%s",
              config->input_width,
              config->input_height,
              scaler->crop_width,
@@ -251,7 +302,8 @@ esp_err_t video_yuv420_scaler_create(const video_yuv420_scaler_config_t *config,
              config->output_width,
              config->output_height,
              config->fit_contain ? "contain" : "cover",
-             (unsigned)scaler->output_buffer_size);
+             (unsigned)scaler->output_buffer_size,
+             video_yuv420_use_cpu_half_scale(scaler) ? "cpu-half-box" : "ppa");
 
     *out_handle = scaler;
     return ESP_OK;
@@ -334,6 +386,27 @@ esp_err_t video_yuv420_scaler_process(video_yuv420_scaler_handle_t handle,
         video_yuv420_data_size(handle->config.input_width, handle->config.input_height);
     if (input_len < expected_input_len) {
         return ESP_ERR_INVALID_SIZE;
+    }
+
+    if (video_yuv420_use_cpu_half_scale(handle)) {
+        /* The caller retains the capture frame until this synchronous call
+         * returns. Invalidate DMA-produced input before CPU reads; publish
+         * CPU output to memory before the hardware encoder consumes it. */
+        esp_err_t ret = esp_cache_msync((void *)input, expected_input_len,
+            ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+        if (ret != ESP_OK) {
+            return ret;
+        }
+        video_yuv420_half_scale_ouyy_evyy(input, handle->output_buffer,
+            handle->config.output_width, handle->config.output_height);
+        ret = esp_cache_msync(handle->output_buffer, handle->output_data_len,
+            ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
+        if (ret != ESP_OK) {
+            return ret;
+        }
+        *output = handle->output_buffer;
+        *output_len = handle->output_data_len;
+        return ESP_OK;
     }
 
     const float scale = (float)handle->scale_step / (float)VIDEO_YUV420_SCALE_DENOMINATOR;

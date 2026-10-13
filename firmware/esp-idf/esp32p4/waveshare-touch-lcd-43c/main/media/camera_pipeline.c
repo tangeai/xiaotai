@@ -14,6 +14,7 @@
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_h264_enc_single_hw.h"
+#include "driver/jpeg_encode.h"
 #include "esp_log.h"
 #include "esp_memory_utils.h"
 #include "esp_timer.h"
@@ -33,6 +34,8 @@
 #include "media_dma_reserve.h"
 #include "media_governor.h"
 #include "media_tuning.h"
+#include "starter_tirtc.h"
+#include "video_frame_converter.h"
 #include "video_yuv420_scaler.h"
 
 static const char *TAG = "camera_pipeline";
@@ -1997,6 +2000,204 @@ static void camera_pipeline_h264_target_dimensions(uint16_t desired_width,
     *height &= ~1U;
 }
 
+/* Preserve JPEG quality while bounding the average CALL video payload rate.
+ * The one-second credit allows natural JPEG size variation; a large frame or
+ * complex scene may lower delivered fps instead of silently lowering quality. */
+static bool camera_pipeline_mjpeg_budget_accept(uint64_t *credit_bytes,
+                                                uint64_t *last_us,
+                                                uint64_t now_us,
+                                                size_t payload_bytes)
+{
+    const uint64_t capacity = APP_MEDIA_CALL_VIDEO_BITRATE_BPS / 8U;
+    if (*last_us == 0U) {
+        *credit_bytes = capacity;
+    } else if (now_us > *last_us) {
+        uint64_t earned = (now_us - *last_us) *
+                          APP_MEDIA_CALL_VIDEO_BITRATE_BPS / 8000000ULL;
+        *credit_bytes = earned >= capacity - *credit_bytes ?
+                        capacity : *credit_bytes + earned;
+    }
+    *last_us = now_us;
+    if (payload_bytes > *credit_bytes) return false;
+    *credit_bytes -= payload_bytes;
+    return true;
+}
+
+/* The sensor's native VGA mode produced color fringes. Keep 1280x960 binning
+ * capture and half-scale packed YUV420 to VGA UYVY before JPEG encoding. */
+static void camera_pipeline_run_call_mjpeg(void)
+{
+    jpeg_encoder_handle_t encoder = NULL;
+    uint8_t *uyvy = NULL;
+    uint8_t *jpeg = NULL;
+    size_t jpeg_capacity = 0U;
+    bool prepared = false;
+    bool acquired = false;
+    uint32_t sent = 0U, dropped = 0U, budget_dropped = 0U;
+    uint32_t attempted = 0U, encoded = 0U, submitted = 0U;
+    uint64_t sent_bytes = 0U;
+    uint64_t capture_total_us = 0U, convert_total_us = 0U;
+    uint64_t encode_total_us = 0U, submit_total_us = 0U;
+    uint32_t capture_max_us = 0U, convert_max_us = 0U;
+    uint32_t encode_max_us = 0U, submit_max_us = 0U;
+    uint64_t budget_credit_bytes = 0U, budget_last_us = 0U;
+    bool first_sent_logged = false;
+    TickType_t last_frame_tick = 0U;
+    int64_t stats_started_us = esp_timer_get_time();
+    const jpeg_encode_engine_cfg_t engine_config = {
+        .timeout_ms = 100,
+    };
+    const jpeg_encode_cfg_t jpeg_config = {
+        .src_type = JPEG_ENCODE_IN_FORMAT_YUV422,
+        .sub_sample = JPEG_DOWN_SAMPLING_YUV422,
+        .image_quality = APP_MEDIA_CALL_JPEG_QUALITY,
+        .width = APP_MEDIA_CALL_VIDEO_WIDTH,
+        .height = APP_MEDIA_CALL_VIDEO_HEIGHT,
+    };
+    const jpeg_encode_memory_alloc_cfg_t output_alloc = {
+        .buffer_direction = JPEG_ENC_ALLOC_OUTPUT_BUFFER,
+    };
+    const size_t uyvy_bytes = (size_t)APP_MEDIA_CALL_VIDEO_WIDTH *
+                              APP_MEDIA_CALL_VIDEO_HEIGHT * 2U;
+
+    ESP_LOGI(TAG, "camera pipeline starting: mode=call-mjpeg size=%ux%u@%u quality=%u budget=%ukbps",
+             APP_MEDIA_CALL_VIDEO_WIDTH, APP_MEDIA_CALL_VIDEO_HEIGHT,
+             APP_MEDIA_CALL_VIDEO_FPS, APP_MEDIA_CALL_JPEG_QUALITY,
+             APP_MEDIA_CALL_VIDEO_BITRATE_BPS / 1000U);
+    camera_pipeline_reset_metrics();
+    if (camera_driver_prepare_video_subsystem() != ESP_OK) goto done;
+    prepared = true;
+    if (camera_driver_set_stream_target(APP_MEDIA_CAMERA_CAPTURE_WIDTH,
+                                        APP_MEDIA_CAMERA_CAPTURE_HEIGHT,
+                                        APP_MEDIA_CALL_VIDEO_FPS) != ESP_OK) goto done;
+    if (jpeg_new_encoder_engine(&engine_config, &encoder) != ESP_OK) goto done;
+    uyvy = app_memory_aligned_alloc_psram(CAMERA_PIPELINE_CACHE_LINE_SIZE,
+                                          uyvy_bytes, MALLOC_CAP_DMA);
+    jpeg = jpeg_alloc_encoder_mem(256U * 1024U, &output_alloc, &jpeg_capacity);
+    if (uyvy == NULL || jpeg == NULL || jpeg_capacity < 256U * 1024U) goto done;
+    if (camera_driver_acquire() != ESP_OK) goto done;
+    acquired = true;
+
+    while (camera_pipeline_should_run()) {
+        camera_pipeline_runtime_t runtime = camera_pipeline_snapshot();
+        TickType_t now = xTaskGetTickCount();
+        if (!runtime.rtc_enabled || runtime.video_cb == NULL ||
+            media_governor_is_network_backpressured() ||
+            !camera_pipeline_time_due(now, &last_frame_tick,
+                                      camera_pipeline_interval_ms(APP_MEDIA_CALL_VIDEO_FPS))) {
+            vTaskDelay(pdMS_TO_TICKS(2));
+            continue;
+        }
+        camera_driver_frame_t frame = {0};
+        int64_t phase_started_us = esp_timer_get_time();
+        if (camera_driver_capture(&frame) != ESP_OK) {
+            dropped++;
+            vTaskDelay(pdMS_TO_TICKS(CAMERA_PIPELINE_RETRY_DELAY_MS));
+            continue;
+        }
+        uint32_t capture_us = (uint32_t)(esp_timer_get_time() - phase_started_us);
+        attempted++;
+        capture_total_us += capture_us;
+        if (capture_us > capture_max_us) capture_max_us = capture_us;
+        const uint64_t pts_us = (uint64_t)esp_timer_get_time();
+        const uint16_t source_width = frame.width;
+        const uint16_t source_height = frame.height;
+        phase_started_us = esp_timer_get_time();
+        esp_err_t ret = frame.pixel_format == CAMERA_DRIVER_PIXEL_FORMAT_YUV420_OUYY_EVYY ?
+            video_frame_converter_ouyy_evyy_half_to_uyvy(
+                frame.data, frame.width, frame.height, uyvy,
+                APP_MEDIA_CALL_VIDEO_WIDTH, APP_MEDIA_CALL_VIDEO_HEIGHT) : ESP_ERR_NOT_SUPPORTED;
+        camera_driver_release(&frame);
+        uint32_t convert_us = (uint32_t)(esp_timer_get_time() - phase_started_us);
+        convert_total_us += convert_us;
+        if (convert_us > convert_max_us) convert_max_us = convert_us;
+        if (ret != ESP_OK) {
+            dropped++;
+            ESP_LOGW(TAG, "call MJPEG UYVY conversion failed: %s", esp_err_to_name(ret));
+            continue;
+        }
+        uint32_t jpeg_bytes = 0U;
+        phase_started_us = esp_timer_get_time();
+        ret = jpeg_encoder_process(encoder, &jpeg_config, uyvy,
+                                   (uint32_t)uyvy_bytes, jpeg,
+                                   (uint32_t)jpeg_capacity, &jpeg_bytes);
+        uint32_t encode_us = (uint32_t)(esp_timer_get_time() - phase_started_us);
+        encode_total_us += encode_us;
+        if (encode_us > encode_max_us) encode_max_us = encode_us;
+        if (ret != ESP_OK || jpeg_bytes < 4U || jpeg_bytes > jpeg_capacity ||
+            jpeg[0] != 0xffU || jpeg[1] != 0xd8U ||
+            jpeg[jpeg_bytes - 2U] != 0xffU || jpeg[jpeg_bytes - 1U] != 0xd9U) {
+            dropped++;
+            ESP_LOGW(TAG, "call MJPEG encode failed: %s size=%u",
+                     esp_err_to_name(ret), (unsigned)jpeg_bytes);
+            continue;
+        }
+        encoded++;
+        if (!camera_pipeline_mjpeg_budget_accept(&budget_credit_bytes,
+                                                  &budget_last_us,
+                                                  (uint64_t)esp_timer_get_time(),
+                                                  jpeg_bytes)) {
+            dropped++;
+            budget_dropped++;
+            continue;
+        }
+        phase_started_us = esp_timer_get_time();
+        ret = runtime.video_cb(jpeg, jpeg_bytes,
+                               APP_MEDIA_CALL_VIDEO_WIDTH,
+                               APP_MEDIA_CALL_VIDEO_HEIGHT,
+                               pts_us, TIRTC_VIDEO_JPEG, true,
+                               runtime.video_ctx);
+        uint32_t submit_us = (uint32_t)(esp_timer_get_time() - phase_started_us);
+        submitted++;
+        submit_total_us += submit_us;
+        if (submit_us > submit_max_us) submit_max_us = submit_us;
+        if (ret == ESP_OK) {
+            sent++;
+            sent_bytes += jpeg_bytes;
+            if (!first_sent_logged) {
+                first_sent_logged = true;
+                ESP_LOGI(TAG, "camera pipeline first upstream frame: source=%ux%u output=%ux%u@%u media=mjpeg quality=%u payload=%u head=%02X%02X convert=uyvy/%uus",
+                         source_width, source_height,
+                         APP_MEDIA_CALL_VIDEO_WIDTH, APP_MEDIA_CALL_VIDEO_HEIGHT,
+                         APP_MEDIA_CALL_VIDEO_FPS, APP_MEDIA_CALL_JPEG_QUALITY,
+                         (unsigned)jpeg_bytes, jpeg[0], jpeg[1],
+                         (unsigned)convert_us);
+            }
+        } else {
+            dropped++;
+            media_governor_note_network_backpressure();
+        }
+        int64_t now_us = esp_timer_get_time();
+        if (now_us - stats_started_us >= 10000000LL) {
+            uint64_t elapsed_us = (uint64_t)(now_us - stats_started_us);
+            ESP_LOGI(TAG, "CAM MJPEG %ux%u quality=%u attempt=%u encoded=%u sent=%u drop=%u budget-drop=%u fps=%u.%u wire=%ukbps avg-jpeg=%uB phase-us-avg=c/x/e/tx:%u/%u/%u/%u max=%u/%u/%u/%u",
+                     APP_MEDIA_CALL_VIDEO_WIDTH, APP_MEDIA_CALL_VIDEO_HEIGHT,
+                     APP_MEDIA_CALL_JPEG_QUALITY, attempted, encoded,
+                     sent, dropped, budget_dropped,
+                     (unsigned)((uint64_t)sent * 10000000ULL / elapsed_us / 10U),
+                     (unsigned)((uint64_t)sent * 10000000ULL / elapsed_us % 10U),
+                     (unsigned)(sent_bytes * 8000ULL / elapsed_us),
+                     sent ? (unsigned)(sent_bytes / sent) : 0U,
+                     attempted ? (unsigned)(capture_total_us / attempted) : 0U,
+                     attempted ? (unsigned)(convert_total_us / attempted) : 0U,
+                     attempted ? (unsigned)(encode_total_us / attempted) : 0U,
+                     submitted ? (unsigned)(submit_total_us / submitted) : 0U,
+                     capture_max_us, convert_max_us, encode_max_us, submit_max_us);
+            sent = dropped = budget_dropped = attempted = encoded = submitted = 0U;
+            sent_bytes = capture_total_us = convert_total_us = 0U;
+            encode_total_us = submit_total_us = 0U;
+            capture_max_us = convert_max_us = encode_max_us = submit_max_us = 0U;
+            stats_started_us = now_us;
+        }
+    }
+done:
+    if (acquired) camera_driver_release_device();
+    else if (prepared) (void)camera_driver_deinit();
+    if (encoder != NULL) (void)jpeg_del_encoder_engine(encoder);
+    free(uyvy);
+    free(jpeg);
+}
+
 static void camera_pipeline_task(void *arg)
 {
     (void)arg;
@@ -2070,6 +2271,11 @@ static void camera_pipeline_task(void *arg)
     bool backpressure_key_request_pending = false;
     bool backpressure_hold_counted = false;
 
+    if (starter_tirtc_mode() == STARTER_TIRTC_CALL) {
+        camera_pipeline_run_call_mjpeg();
+        goto exit_task;
+    }
+
     ESP_LOGI(TAG, "camera pipeline starting: mode=h264_upstream_only");
     camera_pipeline_reset_metrics();
     vTaskDelay(pdMS_TO_TICKS(CAMERA_PIPELINE_START_DELAY_MS));
@@ -2122,7 +2328,7 @@ static void camera_pipeline_task(void *arg)
                      capture_width,
                      capture_height,
                      capture_width == open_width && capture_height == open_height ?
-                         "yuv420-direct" : "yuv420-ppa-scale",
+                         "yuv420-direct" : "yuv420-scale",
                      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
                      (unsigned)camera_pipeline_h264_ref_internal_estimate(open_width));
         }
@@ -2430,7 +2636,7 @@ static void camera_pipeline_task(void *arg)
             if (convert_us > CAMERA_PIPELINE_FRAME_TRACE_SLOW_STAGE_US) {
                 slow_convert_count++;
             }
-            h264_input_path = "yuv420-ppa-scale";
+            h264_input_path = "yuv420-scale";
             h264_direct_input = false;
         } else {
             camera_driver_release(&frame);
@@ -2812,8 +3018,6 @@ static void camera_pipeline_task(void *arg)
                 camera_pipeline_luma_delta_x10(&source_luma_stats);
             uint32_t encoder_luma_delta_x10 =
                 camera_pipeline_luma_delta_x10(&encoder_luma_stats);
-#endif
-#if CONFIG_APP_MEDIA_PERIODIC_DIAGNOSTICS
             uint32_t avg_h264_sync_in_us = encode_sample_count > 0U ?
                                            (uint32_t)(h264_sync_in_us_total / encode_sample_count) :
                                            0U;
@@ -2823,6 +3027,8 @@ static void camera_pipeline_task(void *arg)
             uint32_t avg_h264_sync_out_us = encode_sample_count > 0U ?
                                             (uint32_t)(h264_sync_out_us_total / encode_sample_count) :
                                             0U;
+#endif
+#if CONFIG_APP_MEDIA_PERIODIC_DIAGNOSTICS
             uint32_t avg_media_timestamp_lag_us =
                 media_timestamp_sample_count > 0U ?
                     (uint32_t)(media_timestamp_lag_us_total / media_timestamp_sample_count) :
@@ -2918,7 +3124,8 @@ static void camera_pipeline_task(void *arg)
                      "CAM %ux%u@%u f=%lu.%lu br=%luk gap=%lu/%llums "
                      "us=c/s/e/cb/l:%lu/%lu/%lu/%lu/%lu "
                      "motion=s/e:%lu.%lu/%lu.%lu chg=%lu/%lu,%lu/%lu "
-                     "drop=%lu/%lu/%lu/%lu drain=%lu fail=%lu/%lu/%lu",
+                     "drop=%lu/%lu/%lu/%lu drain=%lu fail=%lu/%lu/%lu "
+                     "enc-us=in/process/out:%lu/%lu/%lu",
                      (unsigned)h264.width,
                      (unsigned)h264.height,
                      (unsigned)policy.rtc_video_fps,
@@ -2947,7 +3154,10 @@ static void camera_pipeline_task(void *arg)
                      (unsigned long)camera_stale_frame_drain_count,
                      (unsigned long)capture_fail_count,
                      (unsigned long)convert_fail_count,
-                     (unsigned long)encode_fail_count);
+                     (unsigned long)encode_fail_count,
+                     (unsigned long)avg_h264_sync_in_us,
+                     (unsigned long)avg_h264_hw_us,
+                     (unsigned long)avg_h264_sync_out_us);
 #endif
             last_stats_tick = now_tick;
             upstream_count = 0;

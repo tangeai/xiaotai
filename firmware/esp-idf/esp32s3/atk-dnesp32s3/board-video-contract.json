@@ -4,7 +4,7 @@
   "evidence": ["local-v14-schematic", "local-mc2640-schematic", "local-mc5640-schematic", "vendor-board"],
   "dependencies": {
     "espressif/esp32-camera": "2.1.7",
-    "idf": "5.5.4"
+    "idf": "5.5.5"
   },
   "scheduler": {
     "wifi_core": 0,

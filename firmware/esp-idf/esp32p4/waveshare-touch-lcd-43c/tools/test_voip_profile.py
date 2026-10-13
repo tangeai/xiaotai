@@ -37,8 +37,8 @@ assert (stream["up_audio_mt"], stream["up_video_mt"]) == (["alaw"], ["h264"])
 assert (stream["down_audio_mt"], stream["down_video_mt"]) == (["alaw"], ["h264"])
 assert stream["camera_rotation"] == 270
 assert stream["aspect_ratio"] == 720 / 960
-assert (call["up_audio_mt"], call["up_video_mt"]) == (["alaw"], ["h264"])
-assert (call["down_audio_mt"], call["down_video_mt"]) == (["alaw"], ["h264"])
+assert (call["up_audio_mt"], call["up_video_mt"]) == (["alaw"], ["mjpeg"])
+assert (call["down_audio_mt"], call["down_video_mt"]) == (["alaw"], ["mjpeg"])
 assert call["camera_rotation"] == 270
 assert voip["no_video"] is False
 assert (voip["up_video_mt"], voip["down_video_mt"]) == ("h264", "mjpeg")

@@ -6,7 +6,7 @@
   "revision": "V1.0.1",
   "platform": "esp-idf",
   "target": "esp32s3",
-  "sdk": {"name": "ESP-IDF", "version": "5.5.x"},
+  "sdk": {"name": "ESP-IDF", "version": "5.5.5"},
   "project_dir": "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai",
   "capabilities": ["aec", "audio", "buttons", "camera-mjpeg", "display", "touch", "wifi"],
   "resources": {"flash_bytes": 16777216, "psram_bytes": 8388608},

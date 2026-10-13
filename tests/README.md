@@ -32,6 +32,171 @@ bash tools/check.sh
 
 ## 测试驱动开发约定
 
+2026-10-13 P4 设备互呼 MJPEG 旋转裁切修复：`test_p4_mjpeg_fit.py` 已注册
+`tools/check.sh`。测试先因缺少会话级显示策略接口失败；修复后通过真实转换器的
+裁切与布局函数验证设备互呼四向 `contain`、微信 `cover`，并验证预热转换器在
+连续切换会话时重设策略。主机测试不能证明液晶实屏效果，烧录后仍需检查四向画面
+与微信通话。
+
+2026-10-13 build.112 修复 UYVY JPEG 试验的实板 DMA2D 超时：build.111
+的 `JPEG_ENCODE_IN_FORMAT_YUV422` 搭配 `JPEG_DOWN_SAMPLING_YUV420`
+虽通过 IDF 5.5.5 参数验证，但该驱动 `enc_hb_tbl` 对此组合给出 0，
+连续出现 `ESP_ERR_TIMEOUT`，上行无法发送。`test_p4_packed_mjpeg_uyvy.py`
+先在实际设备呼叫 JPEG 配置上失败，再验证输入与输出子采样均为 YUV422；
+build.112 双机日志已确认持续编码发送和下行解码，没有再出现 DMA2D 超时，
+音频接收缓冲溢出为零；画面颜色、液晶实际刷新和长时间稳定性仍待验收。
+
+2026-10-13 build.111 设备互呼 MJPEG UYVY 实验：新增
+`test_p4_packed_mjpeg_uyvy.py` 并注册 `tools/check.sh`。测试先在公开转换
+接口与生产 JPEG 输入格式上失败，修改后验证 1280×960 packed
+O_UYY_E_VYY 半缩为 640×480 UYVY 的色度共享、亮度 2×2 均值、
+缓冲边界、非法尺寸、DMA 输入缓存同步错误，以及设备互呼选择 YUV422
+输入。build.111 曾选择 YUV420 JPEG 子采样，实板超时；见 build.112 记录。
+微信 VoIP 路径未改。主机测试和编译不能证明
+实板颜色、编码器接受输入或转换时间；当前实板结果见上面的 build.112 记录。
+
+2026-10-13 build.110 设备互呼 MJPEG 8 fps 节拍对照：
+`test_p4_fixed_call_bitrate.py`、`test_p4_call_mjpeg.py`、
+`test_p4_video_quality.py` 和工程 `test_full_frame_uplink.py` 先通过生产
+配置、采集策略和拥塞切档入口复现旧 10 fps 配置失败，再验证设备互呼
+VGA/8 fps/4 Mbit/s 预算、125 ms 节拍，微信 VoIP QVGA/15 fps/200 kbit/s
+保持不变。现有测试均已注册 `tools/check.sh`。build.109 实测上行约 7.5 fps，
+所以本次设定只是对齐节拍；实际帧率、双端接收呈现和音频仍需实板验证。
+
+2026-10-13 设备互呼 MJPEG 上行转换对照：build.108 实板在 4 Mbit/s
+预算下 `budget-drop=0`，但 1280×960→640×480 PPA 颜色转换平均
+213–256 ms，整条同步链只有 2.1–2.5 fps。`test_p4_packed_mjpeg_rgb565.py`
+先在公开打包 YUV420→RGB565 接口验证旧实现因必须有 PPA 而失败，
+修改后逐像素验证 2×2 全幅缩小、BT.601 有限范围颜色、RGB565 字节序、
+缓冲边界、相机 DMA 缓存同步失败和非目标尺寸回退。已注册 `tools/check.sh`。
+该 CPU 路径是否快于双向 JPEG 与 PPA 争用，仍需下一版实板阶段耗时验证。
+
+2026-10-13 build.108 设备互呼 MJPEG 预算对照：build.107 实板显示每帧约
+44–50 KiB，1.5 Mbit/s 预算只发送 3.7–4.2 fps，所有上行丢帧均为
+`budget-drop`。`test_p4_call_mjpeg.py` 先在生产预算接口验证 4 Mbit/s 失败，
+修改后验证令牌补充、整帧拒绝、CALL/VoIP 配置隔离；既有公开媒体配置
+测试同步验证设备互呼 4 Mbit/s、微信 VoIP 200 kbit/s。
+新增采集、转换、JPEG 编码和发送阶段耗时日志，用于实板判断 10 fps 的
+本地处理上限；此版仍需硬件回归。
+
+2026-10-13 build.107 设备互呼 MJPEG 黑屏：实板 `rx` 增长但 `decoded=0`，
+追到媒体所有者在设备互呼状态重新启动 H.264 渲染器。
+`test_p4_call_mjpeg.py` 先在生产模式选择入口失败，修复后验证 CALL/VoIP
+选择 MJPEG、H5 原选择不变，并核对设备互呼资源入口；
+`test_video_ingress.py` 先验证旧实现遗漏渲染提交失败计数，再验证错误计数。
+测试已由 `tools/check.sh` 执行；同时硬件编解码、两台设备互呼画质仍需实板验证。
+
+2026-10-13 build.105 QVGA 下行画布写入优化：转换后只清理画面外的黑边，
+不再在复制完整中心区域前先清零该区域。`test_p4_direct_i420.py` 通过公开
+转换入口先验证旧实现没有调用边缘清理而失败，修改后验证脏缓冲仍留黑边、
+中心像素正确、复用和回退行为不变；已在 `tools/check.sh` 注册。主机测试
+和编译不能证明实板双向通话更快，须比较 `QVGA phases` 和两端帧率。
+
+2026-10-13 build.106 设备互呼 MJPEG 对照：`test_p4_fixed_call_bitrate.py`
+通过生产媒体配置入口验证设备呼叫为 VGA/10 fps/1.5 Mbit/s 预算，
+微信 VoIP 仍为 H.264 QVGA/15 fps/200 kbit/s。`test_p4_call_mjpeg.py`
+在生产预算函数上验证超预算整帧丢弃和恢复，并检查 CALL/VoIP
+各自的媒体能力上报；`test_p4_video_submit_probe.py` 通过真实提交入口
+验证 CALL JPEG 与 VoIP H.264 分流。以上测试已注册 `tools/check.sh`；
+JPEG 硬件编解码和双机双向音视频仍需实板验证。
+
+2026-10-13 build.104 QVGA 下行性能分段诊断：`test_p4_direct_i420.py`
+先在公开转换入口断言颜色转换、画布清零、居中拷贝的计数和累计耗时，
+旧实现失败；修改后通过，并继续验证像素布局和失败回退。测试已在
+`tools/check.sh` 注册。实板需比较每 10 秒的 `QVGA phases` 与 `VRX`
+日志，并采集对端 `CAM`，才能区分本机转换、PSRAM 争用和对端送帧不足。
+
+2026-10-13 build.103 设备互呼 QVGA 下行批量颜色转换：
+`test_p4_direct_i420.py` 经生产公开转换入口先因仍使用逐像素软件路径失败，
+修改后验证 `esp_image_effects` 批量 I420→RGB565、原尺寸居中、黑边、
+句柄复用、组件失败回退及不提交 PPA。现有 `test_call_video_fit.py` 保留
+0°/90° 软件回退逐像素几何验证；两项均由 `tools/check.sh` 执行。
+主机测试不能证明 P4 上的颜色转换耗时或 15 fps 呈现，须实板复测。
+
+2026-10-13 build.102 设备互呼下行原尺寸居中：`test_p4_direct_i420.py`
+通过生产转换接口先复现 QVGA 仍走 PPA 的旧行为，修改后验证 0°/90°
+绕开 PPA；`test_call_video_fit.py` 通过生产几何和软件像素路径验证
+320×240/旋转后 240×320 的居中位置、原像素和四周留黑。
+两项均由 `tools/check.sh` 执行。颜色转换仍必需；软件转换耗时、
+双机实际呈现帧率和音频连续性须实板复测。
+
+2026-10-13 build.101 将微信 VoIP 上行也设为 320×240、15 fps、200 kbps，
+与设备互呼一致，仍由 1280×960 全幅采集经 PPA 完整缩小。
+`test_p4_fixed_call_bitrate.py`、`test_p4_video_quality.py`、
+`test_full_frame_uplink.py` 的微信公开配置、切档和采集策略断言在旧实现
+先失败，修改后验证两种通话同参数、67 ms 节拍、GOP30、固定码率，
+H5 不变。`test_release_audio_and_ui.py` 保护显式配置。上述测试已由
+`tools/check.sh` 注册；微信下行仍是既有 MJPEG 路径，实际双向帧率、
+PPA 争用、画质和声音需实板验证。
+
+2026-10-12 build.100 设备互呼 QVGA 对照：build.99 的原生 VGA 寄存器
+试验仍有彩边，撤回 `0x3820=0x41`。设备互呼改为已有 1280×960 全幅
+采集，经 PPA 1/4 倍完整缩到 320×240，设备互呼为 15 fps/200 kbps；微信 VoIP
+保持全幅采集后输出 VGA，H5 参数不变。`test_p4_fixed_call_bitrate.py`、
+`test_full_frame_uplink.py`、`test_p4_native_vga.py`、`test_p4_video_quality.py`
+先在旧实现失败，再验证设备/微信模式隔离、67 ms 采集间隔、GOP30、
+固定码率和会话切换；
+`test_p4_uplink_half_scale.py` 进一步检查 QVGA 走 PPA 而非 CPU box。
+均已在 `tools/check.sh` 注册。真实 PPA 延迟、画质、双方呈现帧率和音频
+连续性须实板验证。
+
+2026-10-12 build.99 原生 VGA 对照：设备互呼与微信 VoIP 恢复 640×480
+传感器采集，保持 8 fps/256 kbps，单独试验 OV5647 `0x3820=0x41`。
+`test_p4_native_vga.py` 先在实际格式协商出口断言该寄存器失败，
+`test_full_frame_uplink.py` 先在设备/微信采集尺寸上失败；修改后验证原生
+VGA 不预热缩放器，H5 仍采集 1280×960。两项已在 `tools/check.sh`。
+这些测试不能判断彩边是否改善，须用实板同场景原始帧及双向通话复测。
+
+2026-10-12 build.96 增加仅在设备空闲时使用的 `camera-snapshot` 本地抓帧命令。
+它通过生产 camera driver 获取一帧，在当前全幅采集档使用生产缩放器生成
+640×480，在原生 VGA 档直接保留该帧；随后释放相机再导出校验过的字节。
+`test_p4_camera_snapshot.py` 对缺少真实抓帧入口先失败，再用驱动/缩放接口桩
+验证两种采集路径、忙时拒绝和帧资源归还；已注册统一检查。后续增加
+`capture-native`/`capture-full` 显式选择，支持同一固件内对照。build.98
+发现第 0 帧曝光未稳定，回归测试先因只抓一帧失败；现在丢弃间隔 250 ms 的
+四帧，约一秒后再保留第五帧，并验证每帧归还。源图像只保存在本机临时文件，
+不加入仓库；实板图像对照记录在媒体诊断文档。
+
+2026-10-12 build.95 修正 build.94 实板启动失败：IDF 5.5.5 的
+`esp_cache_msync()` 拒绝 M2C 与 UNALIGNED 标志同时使用，缩放器预热因此
+返回 `ESP_ERR_INVALID_ARG` 并使媒体初始化中止。`test_p4_uplink_half_scale.py`
+先在生产缩放入口的缓存调用标志上失败，再验证输入使用合法 M2C 标志、
+输出仍正确同步，以及完整 1280×960 像素结果。真实 DMA 采集缓冲按 64 字节
+对齐分配；实板启动和通话画面仍需重新验证。
+
+2026-10-12 build.94 缩放竞争对照：完整 1280×960→640×480 的无旋转 2 倍
+缩小改用 CPU box 平均，绕开上行 PPA；采集/编码沿用 build.93。
+`test_p4_uplink_half_scale.py` 在旧公开缩放入口返回 PPA 故障时先失败，
+修改后逐像素核对 Y/U/V、完整尺寸、缓冲区边界、
+DMA 输入/输出缓存交接和错误、旋转/裁剪/其他倍率仍走 PPA；以 ASan/UBSan
+运行并注册 `tools/check.sh`。CPU 时间、音频溢出与双向帧率仍需实板验证。
+
+2026-10-12 build.93 画质对照：设备/微信视频改为 1280×960 原模式采集，
+完整缩小至 640×480；编码仍为 8 fps、256 kbps、GOP16。
+`test_full_frame_uplink.py` 在 build.92 原生 VGA 选择上先失败，再通过公开
+相机策略验证正常/拥塞状态均选 1280×960，并用生产缩放几何验证完整
+1280×960 输入、零偏移、1/2 缩放及 H5 原参数。入口已注册 `tools/check.sh`。
+VoIP 彩纹、视野、曝光及缩放对音频溢出和视频帧率的影响仍需实板对照。
+
+2026-10-12 build.92 低负载对照：设备/微信视频固定为 640×480、8 fps、256 kbps，
+GOP16。`test_p4_fixed_call_bitrate.py` 先在旧 12 fps/512 kbps 配置上失败，
+再验证实际配置、125 ms 采集间隔、GOP16、固定传输范围以及恢复/新会话仍为
+8 fps/256 kbps；`test_p4_video_quality.py` 保留拥塞停发、恢复和会话边界验证，
+`test_full_frame_uplink.py` 验证原生 VGA 无裁剪与场景切换。入口已注册
+`tools/check.sh`。音频溢出增量、双向视频帧率和转换耗时需两端实板对照。
+
+2026-10-12 P4 两档试验回归：`test_p4_fixed_call_bitrate.py` 执行生产配置、
+规范化、采集间隔与 GOP 入口，先在旧配置失败，再验证高档 VGA/12 fps/512 kbps、
+低档 VGA/8 fps/256 kbps、84/125 ms 和 GOP24/16。`test_p4_video_quality.py`
+先在低档持续拥塞未停发的断言失败，再覆盖持续积压/新发送失败停发、健康恢复、
+停发锁定及新会话复位。工程 `test_p4_video.py` 覆盖停采集、不再提交、
+下行所有权保留、陈旧操作拒绝及手动关闭/开启重试。以上入口已注册 `tools/check.sh`。
+`test_p4_sdk_link.py` 先因 5.5.5 被旧门禁拒绝失败，再验证实际组件接受 5.5.5、
+仍拒绝旧版本，保持原 SDK 哈希/架构/ABI 约束。声学、实际双向帧率及停发后的声音
+与远端画面需要实板验证，步骤见[两档试验](../docs/development/MEDIA_PIPELINE_DIAGNOSTICS.md#两档通话试验2026-10-12)。
+
+以下 build.83～87 段落保留历史回归与实测背景，参数不代表本轮试验目标。
+
 `test_p4_fixed_call_bitrate.py` 回放生产设备通话配置、规范化和码率范围入口，
 确认 build.83 对照版从 150 kbps 起步并固定，保持 VGA/5 fps；H5 和微信的
 自适应范围仍有效。`test_video_congestion.py` 验证固定范围不提交给要求严格

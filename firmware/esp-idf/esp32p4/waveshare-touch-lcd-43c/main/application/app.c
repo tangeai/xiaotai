@@ -3553,9 +3553,9 @@ esp_err_t app_acquire_call_session_resources(bool video)
 		 * its contiguous reference block. Decoder startup may create persistent
 		 * TinyH264/FreeRTOS control objects; placing them outside that block keeps
 		 * the full encoder profile recoverable after a compact call ends. */
-		ret = call_video_renderer_start_for_codec(CALL_VIDEO_CODEC_H264);
+		ret = call_video_renderer_start_for_codec(CALL_VIDEO_CODEC_MJPEG);
 		if (ret != ESP_OK) {
-			ESP_LOGE(TAG, "start H264 call downlink failed: %s", esp_err_to_name(ret));
+			ESP_LOGE(TAG, "start MJPEG call downlink failed: %s", esp_err_to_name(ret));
 			goto fail;
 		}
 		s_call_resources.video_renderer_started = true;

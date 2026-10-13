@@ -25,12 +25,14 @@ class VideoSubmitProbe(unittest.TestCase):
 #define ESP_FAIL -1
 #define ESP_ERR_INVALID_STATE -2
 #define TIRTC_VIDEO_H264 66
+#define TIRTC_VIDEO_JPEG 65
 typedef int esp_err_t;
+typedef int starter_tirtc_mode_t;
 static atomic_uint s_debug_video_submit_state, s_debug_video_submit_skipped;
 static atomic_bool s_audio_subscribed, s_video_subscribed;
 static atomic_uint s_live_generation=1, s_sent, s_tx_failed;
 static atomic_int s_tx_last_error;
-static atomic_bool s_tx_enabled=true, s_camera_enabled=true, s_video_send_blocked;
+static atomic_bool s_tx_enabled=true, s_camera_enabled=true, s_video_send_blocked, s_video_uplink_stopped;
 static unsigned mode=4, captures, submissions, key_requests;
 static bool connected=true;
 static int starter_tirtc_mode(void){return mode;}
@@ -39,6 +41,7 @@ static uint32_t starter_tirtc_generation(void){return 1;}
 static bool starter_tirtc_video_ready(void){return true;}
 static void p4_video_capture_offer(const uint8_t*d,size_t n,uint16_t w,uint16_t h,bool key,uint32_t g){assert(d&&n&&w==640&&h==480&&g==1);captures++;}
 static int starter_tirtc_send_h264(uint32_t ts,const void*d,uint32_t n,bool key){assert(ts==20&&d&&n);submissions++;return 123;}
+static int starter_tirtc_send_mjpeg(uint32_t ts,const void*d,uint32_t n){assert(ts==20&&d&&n);submissions++;return 123;}
 static void camera_pipeline_request_key_frame(void){key_requests++;}
 '''+functions+'\n'+callback+'\n'+console+r'''
 int main(void){
@@ -47,16 +50,15 @@ int main(void){
  assert(command_video_submit(2,show)==0);
  const uint8_t frame[8]={0};
  assert(starter_tirtc_debug_video_submit_state()==0);
- assert(send_video(frame,8,640,480,20000,66,true,0)==0&&submissions==1);
+ assert(send_video(frame,8,640,480,20000,65,true,0)==0&&submissions==1);
  assert(command_video_submit(2,pause)==0);
- for(unsigned i=0;i<50;i++)assert(send_video(frame,8,640,480,20000,66,i%10==0,0)==0);
+ for(unsigned i=0;i<50;i++)assert(send_video(frame,8,640,480,20000,65,true,0)==0);
  assert(captures==51&&submissions==1&&s_sent==1&&!s_tx_failed&&s_tx_enabled&&s_camera_enabled);
  assert(starter_tirtc_debug_video_submit_skipped()==50);
  assert(command_video_submit(2,resume)==0);
  assert(starter_tirtc_debug_video_submit_state()==2);
  assert(starter_tirtc_debug_video_submit_pause(false));
- assert(send_video(frame,8,640,480,20000,66,false,0)==0&&submissions==1);
- assert(send_video(frame,8,640,480,20000,66,true,0)==0&&submissions==2);
+ assert(send_video(frame,8,640,480,20000,65,true,0)==0&&submissions==2);
  assert(starter_tirtc_debug_video_submit_state()==0&&s_sent==2&&!key_requests);
  assert(starter_tirtc_debug_video_submit_pause(false)&&starter_tirtc_debug_video_submit_state()==0);
  assert(starter_tirtc_debug_video_submit_pause(true));
@@ -65,6 +67,7 @@ int main(void){
  connected=false;assert(!starter_tirtc_debug_video_submit_pause(true));
  connected=true;mode=3;assert(!starter_tirtc_debug_video_submit_pause(true));
  assert(starter_tirtc_debug_video_submit_admit(false));
+ assert(send_video(frame,8,640,480,20000,66,true,0)==0&&submissions==3);
 }
 ''')
 

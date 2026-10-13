@@ -266,12 +266,17 @@ class P4ReleaseContractTest(unittest.TestCase):
         self.assertIn("s_prefer_local_expression = true", product)
         self.assertNotIn("if (session_idle) {", refresh)
 
-    def test_device_call_video_uses_fixed_rate_vga_probe_profile(self) -> None:
+    def test_device_call_video_uses_mjpeg_vga_profile(self) -> None:
         tuning = MEDIA_TUNING.read_text()
         self.assertIn("APP_MEDIA_CALL_VIDEO_WIDTH                      640U", tuning)
         self.assertIn("APP_MEDIA_CALL_VIDEO_HEIGHT                     480U", tuning)
-        self.assertIn("APP_MEDIA_CALL_VIDEO_FPS                        5U", tuning)
-        self.assertIn("APP_MEDIA_CALL_VIDEO_BITRATE_BPS                150000U", tuning)
+        self.assertIn("APP_MEDIA_CALL_VIDEO_FPS                        8U", tuning)
+        self.assertIn("APP_MEDIA_CALL_VIDEO_BITRATE_BPS                4000000U", tuning)
+        self.assertIn("APP_MEDIA_CALL_JPEG_QUALITY                     75U", tuning)
+        self.assertIn("APP_MEDIA_WECHAT_VIDEO_WIDTH                    320U", tuning)
+        self.assertIn("APP_MEDIA_WECHAT_VIDEO_HEIGHT                   240U", tuning)
+        self.assertIn("APP_MEDIA_WECHAT_VIDEO_FPS                      15U", tuning)
+        self.assertIn("APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS              200000U", tuning)
         self.assertIn("APP_MEDIA_CALL_VIDEO_MIN_QP                     30U", tuning)
         self.assertIn("APP_MEDIA_CALL_VIDEO_MAX_QP                     46U", tuning)
 

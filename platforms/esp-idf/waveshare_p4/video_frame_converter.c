@@ -23,7 +23,11 @@ struct video_frame_converter {
     int32_t luma_terms[256];
     ppa_client_handle_t ppa_client;
     esp_imgfx_color_convert_handle_t imgfx;
+    esp_imgfx_color_convert_handle_t qvga_imgfx;
     bool imgfx_timing_logged;
+    bool qvga_timing_logged;
+    bool qvga_imgfx_unavailable;
+    uint8_t *qvga_rgb565;
     uint8_t *packed_yuv420;
     size_t packed_yuv420_size;
     video_frame_converter_stats_t stats;
@@ -744,6 +748,17 @@ static esp_err_t video_frame_convert_i420_scaled(video_frame_converter_handle_t 
     return ESP_OK;
 }
 
+esp_err_t video_frame_converter_set_fit_mode(video_frame_converter_handle_t handle,
+                                             video_frame_fit_mode_t fit_mode)
+{
+    ESP_RETURN_ON_FALSE(handle != NULL && video_frame_fit_mode_is_valid(fit_mode),
+                        ESP_ERR_INVALID_ARG,
+                        TAG,
+                        "invalid converter fit mode");
+    handle->config.fit_mode = fit_mode;
+    return ESP_OK;
+}
+
 esp_err_t video_frame_converter_create(const video_frame_converter_config_t *config,
                                        video_frame_converter_handle_t *out_handle)
 {
@@ -782,19 +797,21 @@ esp_err_t video_frame_converter_create(const video_frame_converter_config_t *con
     size_t packed_data_size =
         source_packed_size > output_packed_size ?
             source_packed_size : output_packed_size;
-    handle->packed_yuv420_size = video_frame_align_up(packed_data_size,
-                                                       VIDEO_FRAME_CACHE_LINE_SIZE);
-    handle->packed_yuv420 = app_memory_aligned_calloc_psram(
-        VIDEO_FRAME_CACHE_LINE_SIZE,
-        1,
-        handle->packed_yuv420_size,
-        MALLOC_CAP_DMA | MALLOC_CAP_CACHE_ALIGNED);
+    if (!config->packed_input_only) {
+        handle->packed_yuv420_size = video_frame_align_up(packed_data_size,
+                                                           VIDEO_FRAME_CACHE_LINE_SIZE);
+        handle->packed_yuv420 = app_memory_aligned_calloc_psram(
+            VIDEO_FRAME_CACHE_LINE_SIZE,
+            1,
+            handle->packed_yuv420_size,
+            MALLOC_CAP_DMA | MALLOC_CAP_CACHE_ALIGNED);
+    }
     const ppa_client_config_t ppa_config = {
         .oper_type = PPA_OPERATION_SRM,
         .max_pending_trans_num = 1,
         .data_burst_length = PPA_DATA_BURST_LENGTH_128,
     };
-    if (handle->packed_yuv420 != NULL &&
+    if ((config->packed_input_only || handle->packed_yuv420 != NULL) &&
         ppa_register_client(&ppa_config, &handle->ppa_client) == ESP_OK) {
         handle->last_mode = VIDEO_FRAME_CONVERTER_MODE_PPA;
     } else {
@@ -803,13 +820,23 @@ esp_err_t video_frame_converter_create(const video_frame_converter_config_t *con
         handle->packed_yuv420_size = 0;
         handle->ppa_client = NULL;
     }
+    if (config->prefer_native_qvga_i420) {
+        handle->qvga_rgb565 = app_memory_aligned_calloc_psram(
+            VIDEO_FRAME_CACHE_LINE_SIZE,
+            1,
+            320U * 240U * sizeof(uint16_t),
+            MALLOC_CAP_DMA | MALLOC_CAP_CACHE_ALIGNED);
+        if (handle->qvga_rgb565 == NULL) {
+            ESP_LOGW(TAG, "QVGA optimized staging unavailable; using software fallback");
+        }
+    }
     *out_handle = handle;
 
     ESP_LOGI(TAG,
-             "video converter ready: mode=%s fit=%s upscale=%s "
+             "video converter ready: ppa-client=%s fit=%s upscale=%s "
              "crop=%ux%u+%u+%u "
-             "output=RGB565-%ux%u i420_staging=%u",
-             video_frame_converter_mode_name(handle->last_mode),
+             "output=RGB565-%ux%u i420_staging=%u native_qvga=%s",
+             handle->ppa_client != NULL ? "ready" : "none",
              video_frame_fit_mode_name(config->fit_mode),
              config->prevent_upscale ? "deny" : "allow",
              config->source_crop_width,
@@ -818,7 +845,8 @@ esp_err_t video_frame_converter_create(const video_frame_converter_config_t *con
              config->source_crop_y,
              config->output_width,
              config->output_height,
-             (unsigned)handle->packed_yuv420_size);
+             (unsigned)handle->packed_yuv420_size,
+             config->prefer_native_qvga_i420 ? "center-imgfx-fallback-software" : "off");
     return ESP_OK;
 }
 
@@ -833,6 +861,10 @@ void video_frame_converter_destroy(video_frame_converter_handle_t handle)
     if (handle->imgfx != NULL) {
         (void)esp_imgfx_color_convert_close(handle->imgfx);
     }
+    if (handle->qvga_imgfx != NULL) {
+        (void)esp_imgfx_color_convert_close(handle->qvga_imgfx);
+    }
+    heap_caps_free(handle->qvga_rgb565);
     heap_caps_free(handle->packed_yuv420);
     heap_caps_free(handle);
 }
@@ -873,6 +905,67 @@ static esp_err_t video_frame_convert_i420_direct(video_frame_converter_handle_t 
         handle->imgfx_timing_logged = true;
         ESP_LOGI(TAG, "I420 direct display: engine=esp_image_effects size=640x480 time=%luus byte_swap=%d; pack/PPA/swap bypassed",
                  (unsigned long)elapsed, handle->config.output_rgb565_byte_swap);
+    }
+    return ESP_OK;
+}
+
+/* Convert only the decoded QVGA pixels with the optimized planar converter.
+ * Keep the 640x480 LCD canvas black around the native-size image. */
+static esp_err_t video_frame_convert_i420_qvga_imgfx(video_frame_converter_handle_t handle,
+                                                    const uint8_t *i420,
+                                                    uint16_t *output)
+{
+    if (handle->qvga_rgb565 == NULL) return ESP_ERR_NO_MEM;
+    if (handle->qvga_imgfx_unavailable) return ESP_ERR_NOT_SUPPORTED;
+    if (handle->qvga_imgfx == NULL) {
+        esp_imgfx_color_convert_cfg_t config = {
+            .in_res = {.width = 320, .height = 240},
+            .in_pixel_fmt = ESP_IMGFX_PIXEL_FMT_I420,
+            .out_pixel_fmt = handle->config.output_rgb565_byte_swap ?
+                                ESP_IMGFX_PIXEL_FMT_RGB565_BE : ESP_IMGFX_PIXEL_FMT_RGB565_LE,
+            .color_space_std = ESP_IMGFX_COLOR_SPACE_STD_BT601,
+        };
+        if (esp_imgfx_color_convert_open(&config, &handle->qvga_imgfx) != ESP_IMGFX_ERR_OK) {
+            handle->qvga_imgfx_unavailable = true;
+            return ESP_ERR_NOT_SUPPORTED;
+        }
+    }
+    esp_imgfx_data_t input = {.data = (uint8_t *)i420, .data_len = 320U * 240U * 3U / 2U};
+    esp_imgfx_data_t destination = {.data = handle->qvga_rgb565,
+                                    .data_len = 320U * 240U * sizeof(uint16_t)};
+    int64_t started = esp_timer_get_time();
+    if (esp_imgfx_color_convert_process(handle->qvga_imgfx, &input, &destination) !=
+        ESP_IMGFX_ERR_OK) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    int64_t color_done = esp_timer_get_time();
+    /* The next copy overwrites the complete center. Clear only the margins,
+     * including on recycled slots that held a larger frame previously. */
+    video_frame_clear_margins(output, 640U, 480U, 160U, 120U, 320U, 240U);
+    int64_t clear_done = esp_timer_get_time();
+    for (uint32_t row = 0; row < 240U; ++row) {
+        memcpy(output + (size_t)(row + 120U) * 640U + 160U,
+               handle->qvga_rgb565 + (size_t)row * 320U * sizeof(uint16_t),
+               320U * sizeof(uint16_t));
+    }
+    int64_t copy_done = esp_timer_get_time();
+    uint32_t color_us = (uint32_t)(color_done - started);
+    uint32_t clear_us = (uint32_t)(clear_done - color_done);
+    uint32_t copy_us = (uint32_t)(copy_done - clear_done);
+    taskENTER_CRITICAL(&handle->stats_lock);
+    handle->stats.qvga_imgfx_frames++;
+    handle->stats.qvga_color_time_us += color_us;
+    handle->stats.qvga_clear_time_us += clear_us;
+    handle->stats.qvga_copy_time_us += copy_us;
+    if (color_us > handle->stats.qvga_color_max_us) handle->stats.qvga_color_max_us = color_us;
+    if (clear_us > handle->stats.qvga_clear_max_us) handle->stats.qvga_clear_max_us = clear_us;
+    if (copy_us > handle->stats.qvga_copy_max_us) handle->stats.qvga_copy_max_us = copy_us;
+    taskEXIT_CRITICAL(&handle->stats_lock);
+    video_frame_record_render_layout(handle, 320, 240, 160, 120);
+    if (!handle->qvga_timing_logged) {
+        handle->qvga_timing_logged = true;
+        ESP_LOGI(TAG, "I420 native QVGA: engine=esp_image_effects color=%luus clear=%luus copy=%luus",
+                 (unsigned long)color_us, (unsigned long)clear_us, (unsigned long)copy_us);
     }
     return ESP_OK;
 }
@@ -927,7 +1020,20 @@ esp_err_t video_frame_converter_i420_to_rgb565(video_frame_converter_handle_t ha
         if (mode_used != NULL) *mode_used = VIDEO_FRAME_CONVERTER_MODE_IMGFX;
         return ESP_OK;
     }
-    if (handle->ppa_client != NULL) {
+    const bool native_qvga = handle->config.prefer_native_qvga_i420 &&
+        handle->config.prevent_upscale &&
+        handle->config.fit_mode == VIDEO_FRAME_FIT_CONTAIN &&
+        source_width == 320U && source_height == 240U &&
+        handle->config.output_width == 640U && handle->config.output_height == 480U &&
+        crop_x == 0U && crop_y == 0U &&
+        crop_width == 320U && crop_height == 240U;
+    if (native_qvga && rotation == VIDEO_FRAME_ROTATION_CLOCKWISE_0 &&
+        video_frame_convert_i420_qvga_imgfx(handle, i420, output) == ESP_OK) {
+        handle->last_mode = VIDEO_FRAME_CONVERTER_MODE_IMGFX;
+        if (mode_used != NULL) *mode_used = VIDEO_FRAME_CONVERTER_MODE_IMGFX;
+        return ESP_OK;
+    }
+    if (handle->ppa_client != NULL && !native_qvga) {
         esp_err_t ppa_ret = video_frame_convert_yuv420_ppa(handle,
                                                            i420,
                                                            source_width,
@@ -958,7 +1064,7 @@ esp_err_t video_frame_converter_i420_to_rgb565(video_frame_converter_handle_t ha
                      (unsigned long)ppa_failures);
         }
         if (handle->config.require_ppa) return ppa_ret;
-    } else if (handle->config.require_ppa) {
+    } else if (handle->config.require_ppa && !native_qvga) {
         return ESP_ERR_NOT_SUPPORTED;
     }
 
@@ -1003,6 +1109,80 @@ esp_err_t video_frame_converter_i420_to_rgb565(video_frame_converter_handle_t ha
     return software_ret;
 }
 
+esp_err_t video_frame_converter_ouyy_evyy_half_to_uyvy(
+    const uint8_t *input,
+    uint16_t source_width,
+    uint16_t source_height,
+    uint8_t *output,
+    uint16_t output_width,
+    uint16_t output_height)
+{
+    ESP_RETURN_ON_FALSE(input != NULL && output != NULL &&
+                            output_width >= 2U && output_height != 0U &&
+                            (output_width & 1U) == 0U &&
+                            (uint32_t)source_width == 2U * output_width &&
+                            (uint32_t)source_height == 2U * output_height,
+                        ESP_ERR_INVALID_ARG, TAG, "invalid packed UYVY half-scale geometry");
+    const size_t input_size = (size_t)source_width * source_height * 3U / 2U;
+    const size_t input_stride = (size_t)source_width * 3U / 2U;
+    ESP_RETURN_ON_ERROR(esp_cache_msync((void *)input, input_size,
+                                        ESP_CACHE_MSYNC_FLAG_DIR_M2C),
+                        TAG, "sync packed camera input failed");
+    for (uint32_t y = 0U; y < output_height; ++y) {
+        const uint8_t *even = input + (size_t)(2U * y) * input_stride;
+        const uint8_t *odd = even + input_stride;
+        uint8_t *line = output + (size_t)y * output_width * 2U;
+        for (uint32_t x = 0U; x < output_width; x += 2U) {
+            const size_t source_offset = (size_t)x * 3U;
+            const uint8_t *a = even + source_offset;
+            const uint8_t *b = odd + source_offset;
+            uint8_t *pair = line + (size_t)x * 2U;
+            pair[0] = (uint8_t)(((unsigned)a[0] + a[3] + 1U) / 2U);
+            pair[1] = (uint8_t)(((unsigned)a[1] + a[2] + b[1] + b[2] + 2U) / 4U);
+            pair[2] = (uint8_t)(((unsigned)b[0] + b[3] + 1U) / 2U);
+            pair[3] = (uint8_t)(((unsigned)a[4] + a[5] + b[4] + b[5] + 2U) / 4U);
+        }
+    }
+    return ESP_OK;
+}
+
+static esp_err_t video_frame_convert_ouyy_evyy_half_rgb565(
+    video_frame_converter_handle_t handle,
+    const uint8_t *input,
+    uint16_t source_width,
+    uint16_t source_height,
+    uint16_t *output)
+{
+    const size_t input_size = (size_t)source_width * source_height * 3U / 2U;
+    const size_t input_stride = (size_t)source_width * 3U / 2U;
+    const uint16_t output_width = handle->config.output_width;
+    const uint16_t output_height = handle->config.output_height;
+    const bool byte_swap = handle->config.output_rgb565_byte_swap;
+
+    /* The camera DMA owns the source before this CPU pass. The JPEG driver
+     * synchronizes the RGB565 output before handing it to its DMA engine. */
+    ESP_RETURN_ON_ERROR(esp_cache_msync((void *)input, input_size,
+                                        ESP_CACHE_MSYNC_FLAG_DIR_M2C),
+                        TAG, "sync packed camera input failed");
+    for (uint32_t y = 0U; y < output_height; ++y) {
+        const uint8_t *even = input + (size_t)(2U * y) * input_stride;
+        const uint8_t *odd = even + input_stride;
+        uint16_t *line = output + (size_t)y * output_width;
+        for (uint32_t x = 0U; x < output_width; ++x) {
+            const size_t offset = (size_t)x * 3U;
+            int chroma_u = (int)even[offset] - 128;
+            int chroma_v = (int)odd[offset] - 128;
+            unsigned luma = (even[offset + 1U] + even[offset + 2U] +
+                             odd[offset + 1U] + odd[offset + 2U] + 2U) / 4U;
+            line[x] = video_frame_yuv_terms_to_rgb565(
+                handle->luma_terms[luma], 409 * chroma_v + 128,
+                -100 * chroma_u - 208 * chroma_v + 128,
+                516 * chroma_u + 128, byte_swap);
+        }
+    }
+    return ESP_OK;
+}
+
 esp_err_t video_frame_converter_ouyy_evyy_to_rgb565(
     video_frame_converter_handle_t handle,
     const uint8_t *ouyy_evyy,
@@ -1043,6 +1223,32 @@ esp_err_t video_frame_converter_ouyy_evyy_to_rgb565(
                                                    &crop_height),
                         TAG,
                         "resolve O_UYY_E_VYY fit failed");
+    if (handle->config.prefer_packed_half_rgb565 &&
+        crop_x == 0U && crop_y == 0U &&
+        crop_width == source_width && crop_height == source_height &&
+        (uint32_t)source_width == 2U * handle->config.output_width &&
+        (uint32_t)source_height == 2U * handle->config.output_height) {
+        int64_t started_us = esp_timer_get_time();
+        ESP_RETURN_ON_ERROR(video_frame_convert_ouyy_evyy_half_rgb565(
+                                handle, ouyy_evyy, source_width, source_height,
+                                output),
+                            TAG, "packed camera half-scale conversion failed");
+        uint32_t duration_us = (uint32_t)(esp_timer_get_time() - started_us);
+        taskENTER_CRITICAL(&handle->stats_lock);
+        handle->stats.software_frames++;
+        handle->stats.software_time_us += duration_us;
+        if (duration_us > handle->stats.software_max_us) {
+            handle->stats.software_max_us = duration_us;
+        }
+        taskEXIT_CRITICAL(&handle->stats_lock);
+        video_frame_record_render_layout(handle, handle->config.output_width,
+                                         handle->config.output_height, 0U, 0U);
+        handle->last_mode = VIDEO_FRAME_CONVERTER_MODE_SOFTWARE;
+        if (mode_used != NULL) {
+            *mode_used = VIDEO_FRAME_CONVERTER_MODE_SOFTWARE;
+        }
+        return ESP_OK;
+    }
     ESP_RETURN_ON_FALSE(handle->ppa_client != NULL,
                         ESP_ERR_NOT_SUPPORTED,
                         TAG,
@@ -1330,6 +1536,23 @@ esp_err_t video_frame_converter_rgb565_to_rgb565(
                                                    &crop_height),
                         TAG,
                         "resolve RGB565 fit failed");
+    /* A VGA JPEG already matches the device-call viewport. The JPEG decoder
+     * and LCD both use big-endian RGB565, so a direct copy avoids a second
+     * PPA transaction and shared PSRAM bus contention with camera capture. */
+    if (rotation == VIDEO_FRAME_ROTATION_CLOCKWISE_0 &&
+        source_width == handle->config.output_width &&
+        source_height == handle->config.output_height &&
+        source_stride_pixels == source_width &&
+        crop_x == 0U && crop_y == 0U &&
+        crop_width == source_width && crop_height == source_height &&
+        input_rgb565_byte_swap == handle->config.output_rgb565_byte_swap) {
+        size_t bytes = (size_t)source_width * source_height * sizeof(uint16_t);
+        video_frame_record_render_layout(handle, source_width, source_height, 0U, 0U);
+        memcpy(output, rgb565, bytes);
+        handle->last_mode = VIDEO_FRAME_CONVERTER_MODE_SOFTWARE;
+        if (mode_used != NULL) *mode_used = VIDEO_FRAME_CONVERTER_MODE_SOFTWARE;
+        return ESP_OK;
+    }
     if (handle->ppa_client != NULL) {
         esp_err_t ppa_ret = video_frame_convert_rgb565_ppa(handle,
                                                            rgb565,

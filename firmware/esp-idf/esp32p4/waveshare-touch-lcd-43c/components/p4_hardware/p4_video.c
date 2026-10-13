@@ -5,6 +5,7 @@
 #include "camera_pipeline.h"
 #include "call_video_renderer.h"
 #include "media_governor.h"
+#include "media_tuning.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "esp_log.h"
@@ -74,6 +75,9 @@ static uint32_t s_congestion_generation;
 static bool s_video_paused;
 static int64_t s_video_resume_after_us;
 static atomic_bool s_video_send_blocked;
+/* Independent from camera privacy and receive subscription; reset by explicit
+ * camera off/on or a new session, never by a briefly empty send queue. */
+static atomic_bool s_video_uplink_stopped;
 
 /* Media-owner only. SDK feedback and local pressure share one governor, whose
  * protection/recovery holds prevent encoder oscillation. */
@@ -107,14 +111,24 @@ static bool maintain_call_quality(void)
     int64_t now = esp_timer_get_time();
     bool initialize = s_quality.generation != generation || s_quality.mode != mode;
     if (initialize) {
+        atomic_store(&s_video_uplink_stopped, false);
         s_quality = (call_quality_state_t){.generation = generation, .mode = mode,
                                           .failed = atomic_load(&s_tx_failed)};
         /* Preserve the build.84 transport setup. Configuring the SDK range
          * also changes its controller; it is not a passive bandwidth probe.
          * CALL/VOIP tiers use local backlog/failures without that extra owner. */
-        ESP_LOGI("p4_video", "video quality generation=%lu sdk-feedback=0 control=local high=640x480@5/150k low=320x240@5/96k",
-                 (unsigned long)generation);
+        ESP_LOGI("p4_video", "video quality generation=%lu sdk-feedback=0 control=local mode=%d high=%ux%u@%u/%uk low=%ux%u@%u/%uk",
+                 (unsigned long)generation, mode,
+                 mode == STARTER_TIRTC_CALL ? APP_MEDIA_CALL_VIDEO_WIDTH : APP_MEDIA_WECHAT_VIDEO_WIDTH,
+                 mode == STARTER_TIRTC_CALL ? APP_MEDIA_CALL_VIDEO_HEIGHT : APP_MEDIA_WECHAT_VIDEO_HEIGHT,
+                 mode == STARTER_TIRTC_CALL ? APP_MEDIA_CALL_VIDEO_FPS : APP_MEDIA_WECHAT_VIDEO_FPS,
+                 (unsigned)((mode == STARTER_TIRTC_CALL ? APP_MEDIA_CALL_VIDEO_BITRATE_BPS : APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS) / 1000U),
+                 mode == STARTER_TIRTC_CALL ? APP_MEDIA_CALL_LOW_WIDTH : APP_MEDIA_WECHAT_VIDEO_WIDTH,
+                 mode == STARTER_TIRTC_CALL ? APP_MEDIA_CALL_LOW_HEIGHT : APP_MEDIA_WECHAT_VIDEO_HEIGHT,
+                 mode == STARTER_TIRTC_CALL ? APP_MEDIA_CALL_LOW_FPS : APP_MEDIA_WECHAT_VIDEO_FPS,
+                 (unsigned)((mode == STARTER_TIRTC_CALL ? APP_MEDIA_CALL_LOW_BITRATE_BPS : APP_MEDIA_WECHAT_VIDEO_BITRATE_BPS) / 1000U));
     }
+    if (atomic_load(&s_video_uplink_stopped)) return true;
     if (!initialize && now < s_quality.due_us) return true;
     s_quality.due_us = now + 500000;
     size_t used = starter_tirtc_send_buffer_used();
@@ -127,6 +141,13 @@ static bool maintain_call_quality(void)
     if (pressure) {
         s_quality.healthy_since_us = 0;
         if (!s_quality.pressure_since_us) s_quality.pressure_since_us = now;
+        if (low && (failure || now - s_quality.pressure_since_us >= 3000000)) {
+            atomic_store(&s_video_uplink_stopped, true);
+            atomic_store(&s_tx_enabled, false);
+            ESP_LOGI("p4_video", "video uplink stopped: low-tier congestion generation=%lu backlog=%u failed=%d; audio and downlink retained",
+                     (unsigned long)generation, (unsigned)used, failure);
+            return true;
+        }
         if (failure || now - s_quality.pressure_since_us >= 1500000) low = true;
     } else {
         s_quality.pressure_since_us = 0;
@@ -214,6 +235,8 @@ esp_err_t p4_video_set_camera_enabled(uint32_t generation, bool enabled)
     bool valid = generation != 0 && generation == s_desired_generation && s_desired_video &&
         (s_desired_mode == STARTER_TIRTC_CALL || s_desired_mode == STARTER_TIRTC_VOIP);
     if (valid) {
+        if (enabled && !atomic_load(&s_camera_enabled))
+            atomic_store(&s_video_uplink_stopped, false);
         atomic_store(&s_camera_enabled, enabled);
         if (!enabled) atomic_store(&s_tx_enabled, false);
     }
@@ -250,6 +273,7 @@ static void maintain_camera(void)
         s_video_paused = false;
         s_video_resume_after_us = 0;
         atomic_store(&s_video_send_blocked, false);
+        atomic_store(&s_video_uplink_stopped, false);
     }
     starter_tirtc_mode_t mode = starter_tirtc_mode();
     if (mode == STARTER_TIRTC_CALL || mode == STARTER_TIRTC_VOIP) {
@@ -270,7 +294,8 @@ static void maintain_camera(void)
                      (unsigned long)generation);
         }
     }
-    bool enabled = atomic_load(&s_camera_enabled) && !s_video_paused;
+    bool enabled = atomic_load(&s_camera_enabled) && !s_video_paused &&
+        !atomic_load(&s_video_uplink_stopped);
     if (s_worker_camera && (!enabled || !atomic_load(&s_tx_enabled))) {
         atomic_store(&s_tx_enabled, false);
         (void)camera_pipeline_set_rtc_video_enabled(false);
@@ -301,7 +326,7 @@ static void maintain_subscription(void)
     s_last_subscribe_us = now;
     if (starter_tirtc_subscribe_call_video() >= 0) {
         s_subscribed_generation = generation;
-        atomic_store(&s_need_idr, mode == STARTER_TIRTC_CALL);
+        atomic_store(&s_need_idr, false);
     }
 }
 
@@ -313,21 +338,28 @@ static void drain_video(void)
         const starter_tirtc_frame_t *f = &s_ingress[slot].frame;
         if (s_ingress[slot].generation == atomic_load(&s_live_generation)) {
             esp_err_t ret = ESP_ERR_INVALID_STATE;
-            if (starter_tirtc_mode() == STARTER_TIRTC_CALL && f->media == TIRTC_VIDEO_H264)
-                ret = call_video_renderer_submit_h264(s_ingress[slot].data, f->length,
-                    (f->flags & TIRTC_FRAME_FLAG_KEY_FRAME) != 0, f->timestamp_ms);
+            if (starter_tirtc_mode() == STARTER_TIRTC_CALL && f->media == TIRTC_VIDEO_JPEG)
+                ret = call_video_renderer_submit_mjpeg(s_ingress[slot].data, f->length,
+                                                       f->timestamp_ms);
             else if (starter_tirtc_mode() == STARTER_TIRTC_VOIP && f->media == TIRTC_VIDEO_JPEG)
             {
                 p4_video_capture_offer_downlink(s_ingress[slot].data, f->length,
                                                 s_ingress[slot].generation);
                 ret = call_video_renderer_submit_mjpeg(s_ingress[slot].data, f->length, f->timestamp_ms);
             }
-            if (ret != ESP_OK && f->media == TIRTC_VIDEO_H264) atomic_store(&s_need_idr, true);
+            if (ret != ESP_OK) {
+                unsigned failures = atomic_fetch_add(&s_rx_dropped, 1) + 1U;
+                if (failures == 1U || (failures % 100U) == 0U) {
+                    ESP_LOGW("p4_video", "downlink render submit failed mode=%d media=%u ret=%d dropped=%u",
+                             (int)starter_tirtc_mode(), f->media, (int)ret, failures);
+                }
+                if (f->media == TIRTC_VIDEO_H264) atomic_store(&s_need_idr, true);
+            }
         }
         (void)xQueueSend(s_free, &slot, 0);
     }
     if (atomic_load(&s_live_generation) && starter_tirtc_mode() == STARTER_TIRTC_CALL &&
-        (atomic_load(&s_need_idr) || call_video_renderer_requires_key_frame()) &&
+        atomic_load(&s_need_idr) &&
         esp_timer_get_time() - s_last_idr_us > 1000000) {
         s_last_idr_us = esp_timer_get_time();
         if (starter_tirtc_request_remote_key_frame() >= 0) atomic_store(&s_need_idr, false);
@@ -340,11 +372,17 @@ static esp_err_t send_video(const uint8_t *data, size_t len, uint16_t w, uint16_
     (void)ctx;
     uint32_t generation = atomic_load(&s_live_generation);
     if (!atomic_load(&s_tx_enabled) || !atomic_load(&s_camera_enabled) ||
+        atomic_load(&s_video_uplink_stopped) ||
         !generation || generation != starter_tirtc_generation() ||
-        media != TIRTC_VIDEO_H264 || !starter_tirtc_video_ready()) return ESP_ERR_INVALID_STATE;
+        !starter_tirtc_video_ready()) return ESP_ERR_INVALID_STATE;
+    starter_tirtc_mode_t mode = starter_tirtc_mode();
+    if ((mode == STARTER_TIRTC_CALL && media != TIRTC_VIDEO_JPEG) ||
+        (mode != STARTER_TIRTC_CALL && media != TIRTC_VIDEO_H264)) return ESP_ERR_INVALID_STATE;
     p4_video_capture_offer(data, len, w, h, key, generation);
     if (!starter_tirtc_debug_video_submit_admit(key)) return ESP_OK;
-    int rc = starter_tirtc_send_h264((uint32_t)(pts / 1000), data, len, key);
+    int rc = mode == STARTER_TIRTC_CALL ?
+        starter_tirtc_send_mjpeg((uint32_t)(pts / 1000), data, len) :
+        starter_tirtc_send_h264((uint32_t)(pts / 1000), data, len, key);
     if (rc < 0) {
         atomic_fetch_add(&s_tx_failed, 1);
         atomic_store(&s_tx_last_error, rc);
@@ -353,8 +391,8 @@ static esp_err_t send_video(const uint8_t *data, size_t len, uint16_t w, uint16_
             atomic_store(&s_video_send_blocked, true);
             atomic_store(&s_tx_enabled, false);
         }
-        /* A dropped reference frame makes subsequent P frames unusable. */
-        camera_pipeline_request_key_frame();
+        /* Only H264 has a reference chain that needs an IDR after loss. */
+        if (media == TIRTC_VIDEO_H264) camera_pipeline_request_key_frame();
         return ESP_FAIL;
     }
     atomic_fetch_add(&s_sent, 1);
@@ -394,10 +432,17 @@ void p4_video_set_session(starter_tirtc_mode_t mode, uint32_t generation, bool v
     atomic_store(&s_live_generation, 0); /* invalidate before asynchronous drain */
     atomic_store(&s_tx_enabled, false);
     atomic_store(&s_camera_enabled, true); /* reset per session, never persistent */
+    atomic_store(&s_video_uplink_stopped, false);
     s_desired_mode = mode;
     s_desired_generation = generation;
     s_desired_video = video;
     taskEXIT_CRITICAL(&s_lock);
+}
+
+static call_video_codec_t p4_video_downlink_codec_for_mode(starter_tirtc_mode_t mode)
+{
+    return mode == STARTER_TIRTC_CALL || mode == STARTER_TIRTC_VOIP ?
+           CALL_VIDEO_CODEC_MJPEG : CALL_VIDEO_CODEC_H264;
 }
 
 void p4_video_poll(void)
@@ -464,10 +509,11 @@ void p4_video_poll(void)
             taskENTER_CRITICAL(&s_lock);
             presentation = s_desired_presentation;
             taskEXIT_CRITICAL(&s_lock);
+            presentation.fit_cover = mode == STARTER_TIRTC_VOIP;
             ret = call_video_renderer_set_presentation(&presentation);
             if (ret == ESP_OK) {
-                ret = call_video_renderer_start_for_codec(mode == STARTER_TIRTC_VOIP
-                    ? CALL_VIDEO_CODEC_MJPEG : CALL_VIDEO_CODEC_H264);
+                ret = call_video_renderer_start_for_codec(
+                    p4_video_downlink_codec_for_mode(mode));
             }
         }
         if (ret == ESP_OK) {
@@ -515,19 +561,19 @@ void p4_video_submit(uint32_t generation, const starter_tirtc_frame_t *frame, co
      * admit by session codec, as device-monitor does, not by stream 11. */
     starter_tirtc_mode_t mode = starter_tirtc_mode();
     if (!((mode == STARTER_TIRTC_VOIP && frame->media == TIRTC_VIDEO_JPEG) ||
-          (mode == STARTER_TIRTC_CALL && frame->media == TIRTC_VIDEO_H264))) {
+          (mode == STARTER_TIRTC_CALL && frame->media == TIRTC_VIDEO_JPEG))) {
         atomic_fetch_add(&s_rx_dropped, 1);
         return;
     }
     if (!s_free || frame->length == 0 || frame->length > VIDEO_INGRESS_BYTES) {
         atomic_fetch_add(&s_rx_dropped, 1);
-        atomic_store(&s_need_idr, true);
+        if (frame->media == TIRTC_VIDEO_H264) atomic_store(&s_need_idr, true);
         return;
     }
     uint8_t slot;
     if (xQueueReceive(s_free, &slot, 0) != pdTRUE) {
         atomic_fetch_add(&s_rx_dropped, 1);
-        atomic_store(&s_need_idr, true);
+        if (frame->media == TIRTC_VIDEO_H264) atomic_store(&s_need_idr, true);
         return;
     }
     s_ingress[slot].generation = generation;
@@ -536,7 +582,7 @@ void p4_video_submit(uint32_t generation, const starter_tirtc_frame_t *frame, co
     if (xQueueSend(s_pending, &slot, 0) != pdTRUE) {
         atomic_fetch_add(&s_rx_dropped, 1);
         (void)xQueueSend(s_free, &slot, 0);
-        atomic_store(&s_need_idr, true);
+        if (frame->media == TIRTC_VIDEO_H264) atomic_store(&s_need_idr, true);
     }
 }
 
