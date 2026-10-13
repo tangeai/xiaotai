@@ -27,7 +27,7 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 
 ### 直接烧录发布包
 
-从 [P4 v1.0.0 首版验证固件](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.0)
+从 [P4 v1.0.0 固件发布页](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.0)
 下载名称以 `waveshare-esp32p4-touch-lcd-43c-v10-` 开头的压缩包。该版已有设备互呼
 实板日志，完整功能和长稳验收仍在进行，具体范围见发布说明。解压后先核对 `MANIFEST.json`
 中的板卡 ID、SHA-256 和 `flash_files`（烧录文件及地址列表），再按包内 `README.txt` 的命令烧录。
@@ -255,7 +255,7 @@ VoIP。音视频分别记录实际帧率、码率、丢帧、首包、AEC 参考
 但该版 90°/270° 因 `cover` 策略曾中心裁切；当前代码改为 `contain` 完整显示，
 画面视觉效果仍需实屏确认。
 
-[首版验证固件](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.0)
+[v1.0.0 首版固件](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.0)
 为 build.113（应用 BIN SHA-256 `b46088f12733d76b202e01958392c0989448169b948a896b363a24a85008cd94`）。
 用户提供的该版设备互呼日志中，10 秒窗口上行 7.9 fps、80 帧发送无丢帧，
 音频接收缓冲溢出为零；同期累计下行接收 776 帧、解码 689 帧、提交显示 442 帧。
