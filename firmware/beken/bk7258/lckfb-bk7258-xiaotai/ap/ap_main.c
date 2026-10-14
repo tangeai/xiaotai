@@ -1,4 +1,5 @@
 #include <components/log.h>
+#include <components/system.h>
 #include <media_service.h>
 #include <os/os.h>
 
@@ -15,6 +16,9 @@
 int main(void)
 {
     bk_init();
+    BK_LOGI(TAG,
+            "XIAOTAI_BOOT project=lckfb-bk7258-xiaotai version=%s sdk=bk_avdk_smp/release/v3.1.1.8 reset=%u\n",
+            XIAOTAI_FIRMWARE_VERSION, (unsigned)bk_misc_get_reset_reason());
     BK_LOGI(TAG, "AP boot reached application entry\n");
     BK_LOGI(TAG, "media service initialization starting\n");
     media_service_init();

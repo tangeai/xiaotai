@@ -1139,10 +1139,14 @@ void xiaotai_ui_show_network(int wifi_rssi, const char *ip_address)
     frame_buffer_t *frame = page_frame("网络信息");
     if (frame == NULL) return;
     char value[32];
-    centered_mixed_text(frame, 58, wifi_rssi > -128 ? "WiFi已连接" :
-                        "网络未连接", 2,
-                        wifi_rssi > -128 ? 0x07e0 : 0xf800);
-    snprintf(value, sizeof(value), "信号强度 %d", wifi_rssi);
+    bool connected = ip_address != NULL && ip_address[0] != '\0';
+    centered_mixed_text(frame, 58, connected ? "WiFi已连接" :
+                        "网络未连接", 2, connected ? 0x07e0 : 0xf800);
+    if (wifi_rssi > -128) {
+        snprintf(value, sizeof(value), "信号强度 %d", wifi_rssi);
+    } else {
+        snprintf(value, sizeof(value), "信号强度未知");
+    }
     centered_mixed_text(frame, 112, value, 1, 0xffff);
     snprintf(value, sizeof(value), "地址 %s",
              ip_address == NULL ? "不可用" : ip_address);

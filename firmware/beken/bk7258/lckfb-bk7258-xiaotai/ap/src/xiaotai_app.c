@@ -514,11 +514,11 @@ static void render_expressions(void)
 
 static void render_network(void)
 {
-    wifi_link_status_t link = {0};
-    int rssi = bk_wifi_sta_get_link_status(&link) == BK_OK ?
-               link.rssi : -128;
+    int rssi = xiaotai_metrics_cached_rssi();
     char ip[20] = {0};
-    (void)xiaotai_network_get_ip(ip, sizeof(ip));
+    if (xiaotai_network_ready()) {
+        (void)xiaotai_network_get_ip(ip, sizeof(ip));
+    }
     xiaotai_ui_show_network(rssi, ip[0] == '\0' ? NULL : ip);
 }
 
@@ -2798,9 +2798,7 @@ static void refresh_idle_home(void)
     if (!idle || s_ui_page != UI_PAGE_HOME || !xiaotai_tirtc_ready() ||
         !xiaotai_network_ready()) return;
 
-    wifi_link_status_t link = {0};
-    int rssi = bk_wifi_sta_get_link_status(&link) == BK_OK ?
-               link.rssi : -128;
+    int rssi = xiaotai_metrics_cached_rssi();
     time_t local = xiaotai_time_now() + 8 * 60 * 60;
     struct tm calendar = {0};
     if (gmtime_r(&local, &calendar) == NULL) return;

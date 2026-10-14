@@ -465,8 +465,10 @@ void app_main(void)
     char elf_sha256[65];
     (void)esp_app_get_elf_sha256(elf_sha256, sizeof(elf_sha256));
     ESP_LOGI(TAG,
-             "firmware version=%s built=%s %s elf-sha256=%s",
+             "XIAOTAI_BOOT project=%s version=%s sdk=%s reset=%d built=%s %s elf-sha256=%s",
+             app->project_name,
              app->version,
+             esp_get_idf_version(), (int)esp_reset_reason(),
              app->date,
              app->time,
              elf_sha256);

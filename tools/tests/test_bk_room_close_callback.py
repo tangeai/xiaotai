@@ -6,6 +6,51 @@ from test_s3_product_regressions import ROOT, function, run_c
 
 
 class BKRoomCloseCallback(unittest.TestCase):
+    def test_idle_worker_wait_budget_and_close_delivery(self):
+        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
+        run_c(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdatomic.h>
+#define BK_OK 0
+#define BK_FAIL -1
+typedef struct { int type; unsigned generation; } media_event_t;
+typedef void *beken_queue_t;
+static beken_queue_t s_media_queue;
+static atomic_int s_pending_close_state;
+static media_event_t s_pending_close_event;
+static unsigned elapsed_ms, queue_waits, inject_close_at_ms;
+static int rtos_pop_from_queue(beken_queue_t *queue, media_event_t *event,
+                               unsigned timeout_ms) {
+    (void)queue; (void)event;
+    assert(timeout_ms > 0 && timeout_ms <= 250);
+    queue_waits++;
+    elapsed_ms += timeout_ms;
+    if (inject_close_at_ms && elapsed_ms >= inject_close_at_ms) {
+        s_pending_close_event = (media_event_t){.type=3, .generation=7};
+        atomic_store(&s_pending_close_state, 2);
+        inject_close_at_ms = 0;
+    }
+    return BK_FAIL;
+}
+''' + function(source, 'take_pending_close_event') +
+              function(source, 'media_wait_next_event') + r'''
+int main(void) {
+    media_event_t event = {0};
+    while (elapsed_ms < 8000)
+        assert(!media_wait_next_event(&event));
+    assert(queue_waits <= 40 && "idle worker must not churn the SMP queue during a heartbeat window");
+    elapsed_ms = queue_waits = 0;
+    inject_close_at_ms = 50;
+    assert(media_wait_next_event(&event));
+    assert(event.type == 3 && event.generation == 7);
+    assert(elapsed_ms <= 250 && "close handoff must remain responsive");
+    assert(atomic_load(&s_pending_close_state) == 0);
+    return 0;
+}
+''')
+
     def test_room_close_callback_clears_owner_and_queues_worker_event(self):
         source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
         run_c(r'''

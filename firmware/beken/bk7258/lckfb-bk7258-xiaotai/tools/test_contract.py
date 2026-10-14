@@ -1042,8 +1042,8 @@ require(syntax.returncode == 0,
 require('"METRICS {' in metrics_source and
         "rtos_get_free_heap_size()" in metrics_source and
         "rtos_get_psram_free_heap_size()" in metrics_source and
-        "uxTaskGetSystemState" in metrics_source and
-        "CONFIG_CPU_CNT" in metrics_source and
+        "uxTaskGetNumberOfTasks()" in metrics_source and
+        "uxTaskGetSystemState(" not in metrics_source and
         "lwip_stats.link.recv" in metrics_source and
         '"rx_packets\\":%u' in metrics_source and
         '"largest\\":null' in metrics_source and
@@ -1437,10 +1437,11 @@ require("xiaotai_tirtc_transport_quiet_elapsed" in app_source and
         "service_after_room_pending();" in app_source,
         "room-to-call handoff must wait for the TiRTC socket cleanup window")
 require("xiaotai_ui_show_home" in app_source and
-        "bk_wifi_sta_get_link_status" in app_source and
+        "xiaotai_metrics_cached_rssi()" in app_source and
+        "bk_wifi_sta_get_link_status" not in metrics_source and
         "gmtime_r" in app_source and "wifi_rssi" in ui_source and
         '"短按对话"' in ui_source,
-        "idle home must show synchronized time and real Wi-Fi signal strength")
+        "idle home must show synchronized time without periodic Wi-Fi RPC")
 for marker in (
     "inbound STREAM accepted generation=",
     "audio subscription stream=10 supported=1 active=1",

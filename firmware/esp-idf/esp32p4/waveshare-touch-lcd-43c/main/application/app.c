@@ -3909,12 +3909,6 @@ esp_err_t app_init(void)
 
 	ESP_LOGI(TAG, "system init start");
 	const esp_app_desc_t *app_desc = esp_app_get_description();
-	ESP_LOGI(TAG,
-		 "firmware version: %s project=%s built=%s %s",
-		 app_desc != NULL ? app_desc->version : "unknown",
-		 app_desc != NULL ? app_desc->project_name : "unknown",
-		 app_desc != NULL ? app_desc->date : "unknown",
-		 app_desc != NULL ? app_desc->time : "unknown");
 	if (app_desc != NULL) {
 		char elf_sha256[65];
 		static const char hex[] = "0123456789abcdef";

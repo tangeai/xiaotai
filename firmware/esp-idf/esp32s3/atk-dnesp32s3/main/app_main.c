@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "esp_chip_info.h"
+#include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_idf_version.h"
 #include "esp_log.h"
@@ -259,6 +260,14 @@ void app_main(void)
 {
     /* app_main 保持短小且不等待网络，耗时启动工作交给 starter_start_task。 */
     init_nvs();
+    const esp_app_desc_t *app = esp_app_get_description();
+    ESP_LOGI(TAG,
+             "XIAOTAI_BOOT project=%s version=%s sdk=%s reset=%d built=%s %s",
+             app != NULL ? app->project_name : "unknown",
+             app != NULL ? app->version : "unknown",
+             esp_get_idf_version(), (int)esp_reset_reason(),
+             app != NULL ? app->date : "unknown",
+             app != NULL ? app->time : "unknown");
     esp_chip_info_t chip;
     esp_chip_info(&chip);
     ESP_LOGI(TAG,

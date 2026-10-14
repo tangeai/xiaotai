@@ -11,6 +11,17 @@ endwhile()
 set(XIAOTAI_PRODUCT_ROOT "${XIAOTAI_REPO_ROOT}/product")
 set(XIAOTAI_BOARD_ROOT "${XIAOTAI_REPO_ROOT}/boards/lckfb/bk7258")
 set(XIAOTAI_COMMON_ROOT "${XIAOTAI_REPO_ROOT}/platforms/common")
+set(XIAOTAI_VERSION_FILE "${CMAKE_CURRENT_LIST_DIR}/../VERSION.md")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+             "${XIAOTAI_VERSION_FILE}")
+file(READ "${XIAOTAI_VERSION_FILE}" XIAOTAI_VERSION_TEXT)
+string(REGEX MATCH "`([0-9]+\\.[0-9]+\\.[0-9]+)`"
+       XIAOTAI_VERSION_MATCH "${XIAOTAI_VERSION_TEXT}")
+if(NOT XIAOTAI_VERSION_MATCH)
+    message(FATAL_ERROR "VERSION.md must contain a major.minor.patch version")
+endif()
+set(XIAOTAI_FIRMWARE_VERSION "${CMAKE_MATCH_1}")
+message(STATUS "XiaoTai firmware version: ${XIAOTAI_FIRMWARE_VERSION}")
 
 set(srcs
     ap_main.c
@@ -97,6 +108,8 @@ armino_component_register(
     INCLUDE_DIRS "${incs}"
     PRIV_REQUIRES "${priv_req}"
 )
+target_compile_definitions(${COMPONENT_LIB} PRIVATE
+    XIAOTAI_FIRMWARE_VERSION=\"${XIAOTAI_FIRMWARE_VERSION}\")
 
 add_prebuilt_library(tirtc_bk7258
                      "${TIRTC_ROOT}/lib/libTiRTC.a")

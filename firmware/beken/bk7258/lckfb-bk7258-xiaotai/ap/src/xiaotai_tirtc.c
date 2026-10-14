@@ -487,13 +487,21 @@ static bool take_pending_close_event(media_event_t *event)
     return true;
 }
 
+static bool media_wait_next_event(media_event_t *event)
+{
+    if (take_pending_close_event(event)) return true;
+    /* The close callback cannot enter an RTOS queue. Give it a bounded
+     * handoff while keeping idle queue wakeups below the IPC heartbeat rate. */
+    if (rtos_pop_from_queue(&s_media_queue, event, 250U) == BK_OK) return true;
+    return take_pending_close_event(event);
+}
+
 static void media_worker(beken_thread_arg_t argument)
 {
     (void)argument;
     media_event_t event;
     for (;;) {
-        if (!take_pending_close_event(&event) &&
-            rtos_pop_from_queue(&s_media_queue, &event, 20) != BK_OK) {
+        if (!media_wait_next_event(&event)) {
             continue;
         }
         if (event.type == MEDIA_EVENT_DISCONNECT) {
@@ -1213,7 +1221,9 @@ int xiaotai_tirtc_start(const xiaotai_tirtc_config_t *config)
         rc = TiRtcSetOption(TIRTC_OPT_MAX_SEND_BUFFER, &bytes, sizeof(bytes));
         if (rc != 0) goto fail;
     }
+    bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE tirtc-init-enter\n");
     rc = TiRtcInit();
+    bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE tirtc-init-exit rc=%d\n", rc);
     if (rc != 0) goto fail;
     s_initialized = true;
     BK_LOGI(TAG, "TiRTC initialization completed\n");
@@ -1244,7 +1254,9 @@ int xiaotai_tirtc_start(const xiaotai_tirtc_config_t *config)
     if (rc == 0) rc = set_poll_timeout_option(config->poll_timeout_ms);
     if (rc == 0) {
         BK_LOGI(TAG, "TiRTC options configured; submitting SDK start\n");
+        bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE tirtc-start-enter\n");
         rc = TiRtcStart(config->device_id, &s_callbacks);
+        bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE tirtc-start-exit rc=%d\n", rc);
     }
     if (rc == 0) {
         BK_LOGI(TAG, "TiRTC SDK start submitted\n");

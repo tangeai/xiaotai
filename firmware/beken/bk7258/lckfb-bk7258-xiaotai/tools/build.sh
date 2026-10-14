@@ -31,6 +31,12 @@ export XIAOTAI_TOOLCHAIN_DIR="$toolchain_bin"
 export PATH="$python_bin:$toolchain_bin:$PATH"
 
 build_profile="${XIAOTAI_BUILD_PROFILE:-development}"
+firmware_version=$(sed -nE 's/^`([0-9]+\.[0-9]+\.[0-9]+)`$/\1/p' \
+    "$project_dir/VERSION.md")
+if [[ ! "$firmware_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "VERSION.md must contain one major.minor.patch firmware version" >&2
+    exit 1
+fi
 config_args=()
 artifact_project_name="$(basename "$project_dir")"
 cleanup_release_configs() {
@@ -109,7 +115,8 @@ for cache in "$build_root/bk7258_ap/CMakeCache.txt" \
     fi
 done
 
-make -C "$project_dir" bk7258 SDK_DIR="$sdk_dir" "${config_args[@]}"
+make -C "$project_dir" bk7258 SDK_DIR="$sdk_dir" \
+    APP_VERSION="$firmware_version" "${config_args[@]}"
 
 ap_elf="$project_dir/build/bk7258/$artifact_project_name/bk7258_ap/app.elf"
 ap_map="${ap_elf%.elf}.map"

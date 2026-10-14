@@ -25,6 +25,7 @@ SESSION_STOP = re.compile(
     r".*generation=(?P<generation>\d+).*error=(?P<error>-?\d+)"
 )
 METRICS = re.compile(r"METRICS\s+(?P<payload>\{.*\})")
+HEARTBEAT_TRACE = re.compile(r"HBTRACE\s+(?P<stage>[a-z0-9-]+(?: rc=-?\d+)?)")
 MEDIA_STOP = re.compile(
     r"audio stopped up=(?P<up>\d+) down=(?P<down>\d+) dropped=(?P<dropped>\d+)"
     r"(?: aec=(?P<aec>\d+) ref-under=(?P<under>\d+) ref-over=(?P<over>\d+))?"
@@ -46,6 +47,7 @@ class Summary:
     sessions_stopped: dict[str, int] = field(default_factory=dict)
     nonzero_session_errors: list[dict[str, int | str]] = field(default_factory=list)
     fatal_markers: list[dict[str, int | str]] = field(default_factory=list)
+    heartbeat_timeouts: list[dict[str, int | str | None]] = field(default_factory=list)
     task_return_warnings: int = 0
     uplink_not_ready: int = 0
     connection_errors: int = 0
@@ -64,6 +66,8 @@ class Summary:
         failures: list[str] = []
         if self.fatal_markers:
             failures.append("CPU fault/crash marker present")
+        if self.heartbeat_timeouts:
+            failures.append("AP IPC heartbeat timeout")
         if self.nonzero_session_errors:
             failures.append("session ended with non-zero error")
 
@@ -113,6 +117,7 @@ class Summary:
                 "nonzero_errors": self.nonzero_session_errors,
             },
             "fatal_markers": self.fatal_markers,
+            "heartbeat_timeouts": self.heartbeat_timeouts,
             "lifecycle": {
                 "task_return_warnings": self.task_return_warnings,
                 "uplink_not_ready": self.uplink_not_ready,
@@ -134,7 +139,17 @@ def increment(values: dict[str, int], key: str) -> None:
 
 def analyze(lines: list[str]) -> Summary:
     summary = Summary(lines=len(lines))
+    last_stage = None
     for number, line in enumerate(lines, start=1):
+        if "AP boot reached application entry" in line:
+            last_stage = None
+        trace = HEARTBEAT_TRACE.search(line)
+        if trace:
+            last_stage = trace.group("stage")
+        if "IPC[1]heartbeat timeout" in line:
+            summary.heartbeat_timeouts.append({
+                "line": number, "last_stage": last_stage,
+            })
         start = SESSION_START.search(line)
         if start:
             increment(summary.sessions_started, start.group("mode"))

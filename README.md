@@ -18,7 +18,7 @@
 
 | 对外型号 | 板卡 ID | 下载固件 | 烧录说明 |
 |---|---|---|---|
-| 立创·实战派 BK7258 | `lckfb-bk7258` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.0/lckfb-bk7258-1.0.0%2Bbuild.3-validation.zip) · [仅下载完整烧录镜像](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.0/xiaotai-bk7258-v1.0.0-all-app.bin) | [开发板指南](docs/boards/lckfb-bk7258/README.md) |
+| 立创·实战派 BK7258 | `lckfb-bk7258` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.0/lckfb-bk7258-1.0.0-validation.zip) | [开发板指南](docs/boards/lckfb-bk7258/README.md) |
 
 推荐下载固件包，其中包含完整烧录镜像、OTA（无线升级）镜像、分区表、构建摘要和
 SHA-256 校验清单。只需要首次完整烧录时，也可以直接下载 `all-app.bin`。

@@ -21,5 +21,7 @@ int xiaotai_metrics_start(void);
 void xiaotai_metrics_set_state(const char *state);
 /** Count station link transitions without logging credentials or addresses. */
 void xiaotai_metrics_network_event(bool connected);
+/** Latest telemetry RSSI, or -128 while disconnected/unknown; never calls Wi-Fi IPC. */
+int xiaotai_metrics_cached_rssi(void);
 
 #endif
