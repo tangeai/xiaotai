@@ -32,6 +32,11 @@ bash tools/check.sh
 
 ## 测试驱动开发约定
 
+2026-10-14 BK7258 房间退出心跳回归：`test_bk_room_close_callback.py` 已注册
+`tools/check.sh`。测试先复现 TiRTC 断开回调执行串口日志，再验证正常房间关闭
+只清理连接状态并向媒体工作线程非阻塞投递关闭事件。`bash tools/check.sh` 与 BK
+release 编译已通过；连续进出房间及退出后至少 30 秒无 IPC 心跳超时仍须实板验证。
+
 固件版本由发布负责人指定为 `major.minor.patch`。`test_firmware_versions.py`
 验证所有板卡、设备能力上报和构建调度；实际编译与失败重试都不改版本。
 同版本产物以源码提交号和 SHA-256 区分。

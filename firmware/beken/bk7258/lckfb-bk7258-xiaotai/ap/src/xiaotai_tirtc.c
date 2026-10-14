@@ -842,8 +842,8 @@ static void on_conn_error(tirtc_conn_t connection, int error)
 
 static void on_disconnected(tirtc_conn_t connection)
 {
-    BK_LOGI(TAG, "TiRTC disconnected callback handle=%p\n", connection);
-    BK_LOGI(TAG, "[DEBUG-bk-close] callback-cleanup-claim-begin\n");
+    /* This runs on the SDK transport thread. Serial logging here can stall
+     * the AP and ultimately trip the CP IPC heartbeat during room teardown. */
     uintptr_t cleanup = (uintptr_t)connection;
     if (atomic_compare_exchange_strong_explicit(
             &s_outgoing_cleanup_connection, &cleanup, 0,
@@ -855,17 +855,13 @@ static void on_disconnected(tirtc_conn_t connection)
                 (unsigned)rtos_get_psram_free_heap_size());
         require_recovery_if_heap_low("failed-handle-cleanup");
     }
-    BK_LOGI(TAG, "[DEBUG-bk-close] callback-cleanup-checked\n");
-    BK_LOGI(TAG, "[DEBUG-bk-close] callback-handle-claim-begin\n");
     uintptr_t expected = (uintptr_t)connection;
     if (!atomic_compare_exchange_strong_explicit(&s_connection,
                                                   &expected, 0,
                                                   memory_order_acq_rel,
                                                   memory_order_acquire)) {
-        BK_LOGI(TAG, "[DEBUG-bk-close] callback-stale handle=%p\n", connection);
         return;
     }
-    BK_LOGI(TAG, "[DEBUG-bk-close] callback-handle-cleared\n");
     atomic_store_explicit(&s_active_disconnect_queued, false,
                           memory_order_release);
     uint32_t generation = (uint32_t)atomic_exchange_explicit(
@@ -887,16 +883,14 @@ static void on_disconnected(tirtc_conn_t connection)
     }
     media_event_t event = {
         .type = MEDIA_EVENT_CLOSED,
+        .connection = connection,
         .generation = generation,
         .error = error,
         .mode = mode,
     };
-    BK_LOGI(TAG, "[DEBUG-bk-close] callback-queue-begin mode=%d generation=%u\n",
-            (int)mode, (unsigned)generation);
     if (rtos_push_to_queue(&s_media_queue, &event, 0) != BK_OK) {
         BK_LOGE(TAG, "media close event queue full\n");
     }
-    BK_LOGI(TAG, "[DEBUG-bk-close] callback-queue-returned\n");
 }
 
 static void on_command(tirtc_conn_t connection, uint32_t command,
