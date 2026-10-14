@@ -73,8 +73,9 @@ BKFIL 的界面与参数说明见[Beken BKFIL v4 官方文档](https://docs.beke
 至少三轮 AI 对话以及微信 VoIP（网络语音通话）双向语音。每次会话结束后应回到
 `READY`，且没有 UsageFault（处理器用法异常）、异常重启或持续内存下降。
 
-重新配网执行 `wifi-clear`；只换绑账号执行 `tirtc-clear`。不要使用全片擦除。完整诊断
-命令见[固件工程说明](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/README.md)。
+需要更换网络或重新绑定时，进入“设备设置 → 重置设备”，确认后重新配网并绑定。
+研发/售后串口仍保留 `wifi-clear` 和 `tirtc-clear`，但它们不是用户界面的独立入口。
+不要使用全片擦除。完整诊断命令见[固件工程说明](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/README.md)。
 
 ## 规格
 
@@ -209,6 +210,9 @@ python3 tools/build.py --board lckfb-bk7258
 
 整包产物位于
 `firmware/beken/bk7258/lckfb-bk7258-xiaotai/build/bk7258/lckfb-bk7258-xiaotai/package/all-app.bin`。
+使用 release 配置构建时，产物位于同一 `build/bk7258/` 目录下的
+`lckfb-bk7258-xiaotai_release/package/all-app.bin`。烧录前应核对所选构建配置、
+版本和文件 SHA-256；`app_pack.rbl` 仅用于 OTA。
 
 ## 测试
 

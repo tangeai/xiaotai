@@ -20,11 +20,12 @@ def function(source, name):
         end += 1
     return source[match.start():end]
 
-def run_c(code):
+def run_c(code, include_dirs=()):
     with tempfile.TemporaryDirectory(prefix="s3-product-") as tmp:
         path = Path(tmp)
         (path / "test.c").write_text(code)
         subprocess.run(["cc", "-std=c11", "-Wall", "-Werror", "-Wno-unused-function",
+                        *(f"-I{directory}" for directory in include_dirs),
                         str(path / "test.c"), "-o", str(path / "test")], check=True)
         subprocess.run([str(path / "test")], check=True)
 

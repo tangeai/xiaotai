@@ -71,8 +71,9 @@ idf.py -p <串口> flash monitor
 对话、设备呼叫和微信 VoIP（网络语音通话）。每次会话结束后应回到首页，且无异常重启
 或持续内存下降。
 
-重新配网执行 `wifi-clear`；只换绑账号执行 `tirtc-clear`。不要擦除整片 Flash。完整
-诊断命令见[固件工程说明](../../../firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/README.md)。
+需要更换网络或重新绑定时，进入“设备设置 → 重置设备”，确认后重新配网并绑定。
+研发/售后串口仍保留 `wifi-clear` 和 `tirtc-clear`；不要擦除整片 Flash。完整诊断
+命令见[固件工程说明](../../../firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/README.md)。
 
 ## 规格
 

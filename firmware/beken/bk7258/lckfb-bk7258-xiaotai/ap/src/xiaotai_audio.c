@@ -61,6 +61,8 @@ static atomic_uint s_last_downlink_ms;
 static atomic_uint s_playback_tail_ms;
 static atomic_uint s_opus_received_frames;
 static atomic_uint s_playback_pcm_ms;
+static atomic_uint s_playback_columns;
+static atomic_uint s_playback_columns_at_ms;
 static atomic_uint s_last_opus_rx_ms;
 static atomic_bool s_prompt_run;
 static atomic_bool s_prompt_active;
@@ -68,6 +70,31 @@ static atomic_uint s_volume = 7U;
 static atomic_bool s_speaker_muted;
 static atomic_bool s_microphone_muted;
 static atomic_bool s_uplink_enabled = true;
+
+/* Seven short-time amplitude slices drive the compact dot mouth. This is a
+ * display hint only; the audio worker never waits for the UI. */
+static uint32_t playback_columns_pack(const int16_t *pcm, size_t samples)
+{
+    if (pcm == NULL || samples == 0U) return 0U;
+    static const uint16_t thresholds[7] = {
+        160U, 320U, 640U, 1200U, 2400U, 4800U, 9600U,
+    };
+    uint32_t packed = 0U;
+    for (size_t column = 0U; column < 7U; ++column) {
+        size_t begin = column * samples / 7U;
+        size_t end = (column + 1U) * samples / 7U;
+        uint32_t peak = 0U;
+        for (size_t i = begin; i < end; i += 2U) {
+            int32_t value = pcm[i];
+            uint32_t magnitude = (uint32_t)(value < 0 ? -value : value);
+            if (magnitude > peak) peak = magnitude;
+        }
+        uint32_t height = 0U;
+        while (height < 7U && peak >= thresholds[height]) ++height;
+        packed |= height << (column * 4U);
+    }
+    return packed;
+}
 static xiaotai_audio_codec_t s_codec = XIAOTAI_AUDIO_CODEC_ALAW_8K;
 static size_t s_frame_samples = XIAOTAI_AUDIO_ALAW_FRAME_SAMPLES;
 static xiaotai_audio_agc_t s_uplink_agc;
@@ -686,6 +713,12 @@ static void playback_task(beken_thread_arg_t argument)
         if (rc != BK_OK || bytes_written != samples * sizeof(*pcm)) {
             BK_LOGW(TAG, "speaker write failed rc=%d\n", rc);
         } else {
+            if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
+                atomic_store_explicit(&s_playback_columns,
+                    playback_columns_pack(pcm, samples), memory_order_relaxed);
+                atomic_store_explicit(&s_playback_columns_at_ms,
+                    rtos_get_time(), memory_order_release);
+            }
             /* write_pcm may enqueue into the board DMA path.  Measure the
              * quiet tail from the last successful write, not only from
              * network receipt, so teardown cannot clip that final frame. */
@@ -787,6 +820,8 @@ int xiaotai_audio_start(xiaotai_audio_codec_t codec,
     }
     s_codec = codec;
     s_frame_samples = frame_samples;
+    atomic_store(&s_playback_columns, 0U);
+    atomic_store(&s_playback_columns_at_ms, 0U);
     if (codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
         int opus_error = OPUS_OK;
         s_opus_ring = psram_malloc(OPUS_PACKET_SLOTS * OPUS_MAX_PACKET_BYTES);
@@ -1120,6 +1155,19 @@ void xiaotai_audio_log_playback_status(const char *stage)
             (unsigned)atomic_load(&s_playback_pcm_ms),
             (unsigned)(tail_ms > 0 ? tail_ms : 0),
             (unsigned)(now_ms - atomic_load(&s_last_opus_rx_ms)));
+}
+
+uint32_t xiaotai_audio_playback_columns(void)
+{
+    if (!atomic_load_explicit(&s_running, memory_order_acquire) ||
+        atomic_load_explicit(&s_speaker_muted, memory_order_acquire) ||
+        atomic_load_explicit(&s_volume, memory_order_acquire) == 0U)
+        return 0U;
+    uint32_t at_ms = atomic_load_explicit(&s_playback_columns_at_ms,
+                                           memory_order_acquire);
+    if (at_ms == 0U || (uint32_t)(rtos_get_time() - at_ms) > 200U)
+        return 0U;
+    return atomic_load_explicit(&s_playback_columns, memory_order_relaxed);
 }
 
 void xiaotai_audio_set_volume(unsigned level)

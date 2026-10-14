@@ -25,7 +25,10 @@ void xiaotai_ui_show_home(const char *time_text,
 void xiaotai_ui_show_ai(xiaotai_ai_ui_phase_t phase,
                         const char *emotion,
                         const char *caption,
-                        bool caption_from_ai);
+                        bool caption_from_ai,
+                        bool emotion_tag_present);
+/** Update only the dot mouth for an untagged speaking AI face. */
+void xiaotai_ui_update_ai_mouth(uint32_t columns);
 /** Show the product AP setup page with the actual advertised SSID. */
 void xiaotai_ui_show_network_setup(const char *ssid);
 void xiaotai_ui_show_launcher(unsigned selected);

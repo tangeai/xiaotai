@@ -4,6 +4,7 @@
 #include "xiaotai_platform_client.h"
 #include "xiaotai_ui_copy.h"
 #include "xiaotai_ai_feedback.h"
+#include "xiaotai_ai_face_policy.h"
 #include "board_display.h"
 
 #include <common/bk_err.h>
@@ -12,6 +13,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#include <os/os.h>
 
 #include "frame_buffer.h"
 #include "xiaotai_metrics.h"
@@ -21,9 +23,49 @@
 #define TAG "xiaotai_ui"
 #define LCD_WIDTH XIAOTAI_BOARD_DISPLAY_WIDTH
 #define LCD_HEIGHT XIAOTAI_BOARD_DISPLAY_HEIGHT
+#define AI_MOUTH_X 127U
+#define AI_MOUTH_Y 116U
+#define AI_MOUTH_W 66U
+#define AI_MOUTH_H 36U
 
 static atomic_bool s_verification_voice_error;
 static unsigned s_verification_displayed_seconds = ~0U;
+static uint8_t *s_ai_mouth_pixels;
+static frame_buffer_t *s_ai_mouth_frame;
+static beken_mutex_t s_ai_mouth_mutex;
+static bool s_ai_mouth_mutex_ready;
+static bool s_ai_mouth_enabled;
+static uint32_t s_ai_mouth_generation;
+static uint32_t s_ai_mouth_columns;
+static uint16_t s_ai_mouth_accent;
+
+static void ai_mouth_pixels(uint32_t columns, uint16_t color)
+{
+    if (s_ai_mouth_pixels == NULL) {
+        s_ai_mouth_frame = frame_buffer_display_malloc(
+            AI_MOUTH_W * AI_MOUTH_H * 2U);
+        if (s_ai_mouth_frame != NULL)
+            s_ai_mouth_pixels = s_ai_mouth_frame->frame;
+    }
+    if (s_ai_mouth_pixels == NULL) return;
+    memset(s_ai_mouth_pixels, 0, AI_MOUTH_W * AI_MOUTH_H * 2U);
+    for (unsigned column = 0U; column < 7U; ++column) {
+        unsigned height = (columns >> (column * 4U)) & 15U;
+        if (height > 7U) height = 7U;
+        if (height == 0U) height = 1U;
+        for (unsigned row = 0U; row < height; ++row) {
+            unsigned cx = 6U + column * 9U;
+            unsigned cy = 32U - row * 5U;
+            for (unsigned dy = 0U; dy < 4U; ++dy) {
+                for (unsigned dx = 0U; dx < 4U; ++dx) {
+                    size_t offset = ((cy + dy) * AI_MOUTH_W + cx + dx) * 2U;
+                    s_ai_mouth_pixels[offset] = (uint8_t)(color >> 8);
+                    s_ai_mouth_pixels[offset + 1U] = (uint8_t)color;
+                }
+            }
+        }
+    }
+}
 
 static void centered_text(frame_buffer_t *frame, int y, const char *value,
                           int scale, uint16_t color);
@@ -354,12 +396,27 @@ static bool emotion_is(const char *emotion, const char *value)
 }
 
 static void ai_face(frame_buffer_t *frame, xiaotai_ai_ui_phase_t phase,
-                    const char *emotion, uint16_t accent)
+                    const char *emotion, uint16_t accent, bool dots)
 {
+    if (dots) {
+        rectangle(frame, 108, 89, 36, 5, accent);
+        rectangle(frame, 176, 89, 36, 5, accent);
+        ai_mouth_pixels(0U, accent);
+        if (s_ai_mouth_pixels != NULL) {
+            for (unsigned row = 0U; row < AI_MOUTH_H; ++row) {
+                memcpy(frame->frame + ((AI_MOUTH_Y + row) * LCD_WIDTH +
+                                        AI_MOUTH_X) * 2U,
+                       s_ai_mouth_pixels + row * AI_MOUTH_W * 2U,
+                       AI_MOUTH_W * 2U);
+            }
+        }
+        return;
+    }
     int left_x = 126;
     int right_x = 194;
     int eye_y = 91;
     bool neutral = emotion_is(emotion, "neutral");
+    bool happy = emotion_is(emotion, "happy");
     bool sad = emotion_is(emotion, "sad") || emotion_is(emotion, "crying");
     bool angry = emotion_is(emotion, "angry");
     bool wink = emotion_is(emotion, "winking");
@@ -384,7 +441,7 @@ static void ai_face(frame_buffer_t *frame, xiaotai_ai_ui_phase_t phase,
         rectangle(frame, right_x - 23, eye_y - 9, 46, 14, accent);
         line(frame, left_x + 23, eye_y - 6, right_x - 23, eye_y - 6,
              2, accent);
-    } else if (relaxed || laughing) {
+    } else if (relaxed || laughing || happy) {
         line(frame, left_x - 16, eye_y, left_x, eye_y + 7, 3, accent);
         line(frame, left_x, eye_y + 7, left_x + 16, eye_y, 3, accent);
         line(frame, right_x - 16, eye_y, right_x, eye_y + 7, 3, accent);
@@ -419,6 +476,10 @@ static void ai_face(frame_buffer_t *frame, xiaotai_ai_ui_phase_t phase,
     if (surprised) {
         circle(frame, 160, 132, 13, accent);
         circle(frame, 160, 132, 7, 0x0000);
+    } else if (happy) {
+        line(frame, 139, 127, 150, 138, 3, accent);
+        line(frame, 150, 138, 170, 138, 3, accent);
+        line(frame, 170, 138, 181, 127, 3, accent);
     } else if (laughing) {
         rectangle_outline(frame, 137, 120, 46, 26, 4, accent);
         rectangle(frame, 148, 137, 24, 7, 0xf90a);
@@ -510,13 +571,21 @@ static void caption_text(frame_buffer_t *frame, const char *caption,
 void xiaotai_ui_show_ai(xiaotai_ai_ui_phase_t phase,
                         const char *emotion,
                         const char *caption,
-                        bool caption_from_ai)
+                        bool caption_from_ai,
+                        bool emotion_tag_present)
 {
-    if (!xiaotai_board_display_ready()) return;
+    if (!s_ai_mouth_mutex_ready) return;
+    rtos_lock_mutex(&s_ai_mouth_mutex);
+    s_ai_mouth_enabled = false;
+    if (!xiaotai_board_display_ready()) {
+        rtos_unlock_mutex(&s_ai_mouth_mutex);
+        return;
+    }
     frame_buffer_t *frame = frame_buffer_display_malloc(
         LCD_WIDTH * LCD_HEIGHT * 2U);
     if (frame == NULL) {
         BK_LOGE(TAG, "AI display frame allocation failed\n");
+        rtos_unlock_mutex(&s_ai_mouth_mutex);
         return;
     }
     frame->fmt = PIXEL_FMT_RGB565;
@@ -533,7 +602,9 @@ void xiaotai_ui_show_ai(xiaotai_ai_ui_phase_t phase,
     mixed_text(frame, 12, 8, "小钛", 2, 0xffff);
     int phase_x = 310 - mixed_text_width(phase_text, 1);
     mixed_text(frame, phase_x, 9, phase_text, 1, accent);
-    ai_face(frame, phase, emotion, accent);
+    bool dots = xiaotai_ai_face_mode(phase, emotion_tag_present) ==
+                XIAOTAI_AI_FACE_DOTS;
+    ai_face(frame, phase, emotion, accent, dots);
 
     rectangle(frame, 8, 158, 304, 74, 0x0000);
     if (caption != NULL && *caption != '\0') {
@@ -541,10 +612,18 @@ void xiaotai_ui_show_ai(xiaotai_ai_ui_phase_t phase,
     } else {
         centered_mixed_text(frame, 184, phase_text, 1, 0xbdf7);
     }
-    if (xiaotai_board_display_flush(frame, release_frame) != BK_OK) {
+    uint32_t face_generation = 0U;
+    if (xiaotai_board_display_flush_tagged(frame, release_frame,
+                                           &face_generation) != BK_OK) {
         release_frame(frame);
         BK_LOGE(TAG, "AI display flush failed\n");
+    } else if (dots && s_ai_mouth_pixels != NULL) {
+        s_ai_mouth_enabled = true;
+        s_ai_mouth_generation = face_generation;
+        s_ai_mouth_columns = 0U;
+        s_ai_mouth_accent = accent;
     }
+    rtos_unlock_mutex(&s_ai_mouth_mutex);
 }
 
 void xiaotai_ui_show_home(const char *time_text,
@@ -586,7 +665,7 @@ void xiaotai_ui_show_home(const char *time_text,
         }
     } else {
         ai_face(frame, XIAOTAI_AI_UI_SPEAKING,
-                emotion == NULL ? "happy" : emotion, 0x2d7f);
+                emotion == NULL ? "happy" : emotion, 0x2d7f, false);
         centered_cjk_text(frame, 158, "短按对话", 0x07e0);
         centered_cjk_text(frame, 179, "双击微信呼叫", 0xbdf7);
     }
@@ -812,7 +891,10 @@ static void present(const char *status, const char *code)
 
 int xiaotai_ui_init(void)
 {
-    int rc = xiaotai_board_display_init();
+    int rc = rtos_init_mutex(&s_ai_mouth_mutex);
+    if (rc != BK_OK) return rc;
+    s_ai_mouth_mutex_ready = true;
+    rc = xiaotai_board_display_init();
     if (rc != BK_OK) return rc;
     present("BOOT", NULL);
     return BK_OK;
@@ -874,6 +956,28 @@ void xiaotai_ui_show_network_setup(const char *ssid)
     if (xiaotai_board_display_flush(frame, release_frame) != BK_OK) {
         release_frame(frame);
     }
+}
+
+void xiaotai_ui_update_ai_mouth(uint32_t columns)
+{
+    if (!s_ai_mouth_mutex_ready) return;
+    rtos_lock_mutex(&s_ai_mouth_mutex);
+    if (!s_ai_mouth_enabled || columns == s_ai_mouth_columns) {
+        rtos_unlock_mutex(&s_ai_mouth_mutex);
+        return;
+    }
+    if (s_ai_mouth_generation != xiaotai_board_display_generation()) {
+        s_ai_mouth_enabled = false;
+        rtos_unlock_mutex(&s_ai_mouth_mutex);
+        return;
+    }
+    ai_mouth_pixels(columns, s_ai_mouth_accent);
+    if (xiaotai_board_display_flush_region(AI_MOUTH_X, AI_MOUTH_Y,
+                                            AI_MOUTH_W, AI_MOUTH_H,
+                                            s_ai_mouth_pixels,
+                                            s_ai_mouth_generation) == BK_OK)
+        s_ai_mouth_columns = columns;
+    rtos_unlock_mutex(&s_ai_mouth_mutex);
 }
 
 void xiaotai_ui_show_wechat_qr(void)
@@ -1018,7 +1122,7 @@ void xiaotai_ui_show_expressions(unsigned selected,
     size_t index = count == 0U ? 0U : (size_t)selected % count;
     const char *emotion = xiaotai_ai_emotion_at(index);
     if (emotion == NULL) emotion = "happy";
-    ai_face(frame, XIAOTAI_AI_UI_SPEAKING, emotion, 0x2d7f);
+    ai_face(frame, XIAOTAI_AI_UI_SPEAKING, emotion, 0x2d7f, false);
     centered_mixed_text(frame, 154, xiaotai_ai_emotion_label_zh(emotion),
                         2, 0xffff);
     centered_mixed_text(frame, 188,

@@ -33,6 +33,8 @@ int xiaotai_audio_stop(void);
 bool xiaotai_audio_running(void);
 /** True after queued playback is empty and no downlink arrived during quiet_ms. */
 bool xiaotai_audio_playback_is_drained(uint32_t quiet_ms);
+/** Seven 0..7 dot-column heights from fresh AI playback PCM; zero when idle. */
+uint32_t xiaotai_audio_playback_columns(void);
 /** Log the bounded AI receive queue and estimated playback tail. */
 void xiaotai_audio_log_playback_status(const char *stage);
 

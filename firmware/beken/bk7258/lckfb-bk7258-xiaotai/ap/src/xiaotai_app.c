@@ -42,7 +42,7 @@
 
 #define TAG "xiaotai_app"
 #define CONTROL_QUEUE_DEPTH 10U
-#define CONTROL_POLL_MS 250U
+#define CONTROL_POLL_MS 100U
 #define SESSION_CONNECT_TIMEOUT_MS 15000U
 #define SESSION_INCOMING_TIMEOUT_MS 45000U
 #define SESSION_OUTGOING_TIMEOUT_MS 30000U
@@ -761,7 +761,8 @@ static void request_reject_pending(void)
     } else if (active == XIAOTAI_OWNER_AI) {
         xiaotai_ui_show_ai(s_ai_view.phase, s_ai_view.emotion,
                            s_ai_view.caption,
-                           s_ai_view.caption_type == 1);
+                           s_ai_view.caption_type == 1,
+                           s_ai_view.emotion_tag_present);
     } else if (active == XIAOTAI_OWNER_STREAM) {
         xiaotai_ui_show_status("REMOTE");
     } else {
@@ -1970,7 +1971,8 @@ static void handle_ai_ui(control_event_t *event)
         if (!incoming_waiting) {
             xiaotai_ui_show_ai(s_ai_view.phase, s_ai_view.emotion,
                                s_ai_view.caption,
-                               s_ai_view.caption_type == 1);
+                               s_ai_view.caption_type == 1,
+                               s_ai_view.emotion_tag_present);
         }
     }
 }
@@ -2686,7 +2688,8 @@ static void handle_runtime_timeout(void)
         else if (active_owner == XIAOTAI_OWNER_AI) {
             xiaotai_ui_show_ai(s_ai_view.phase, s_ai_view.emotion,
                                s_ai_view.caption,
-                               s_ai_view.caption_type == 1);
+                               s_ai_view.caption_type == 1,
+                               s_ai_view.emotion_tag_present);
         } else if (active_owner == XIAOTAI_OWNER_STREAM) {
             xiaotai_ui_show_status("REMOTE");
         } else {
@@ -2961,6 +2964,12 @@ static void control_maintenance(void)
     handle_runtime_timeout();
     xiaotai_room_tick(&s_room);
     refresh_idle_home();
+    rtos_lock_mutex(&s_runtime_mutex);
+    bool animate_ai = s_runtime.owner == XIAOTAI_OWNER_AI &&
+                      !xiaotai_runtime_has_incoming(&s_runtime);
+    rtos_unlock_mutex(&s_runtime_mutex);
+    if (animate_ai)
+        xiaotai_ui_update_ai_mouth(xiaotai_audio_playback_columns());
 }
 
 static void control_task(beken_thread_arg_t argument)
@@ -3245,7 +3254,8 @@ static void on_ai_command(uint32_t generation, uint32_t command,
     }
     xiaotai_ai_view_init(&s_ai_view);
     xiaotai_ui_show_ai(s_ai_view.phase, s_ai_view.emotion,
-                       s_ai_view.caption, false);
+                       s_ai_view.caption, false,
+                       s_ai_view.emotion_tag_present);
     BK_LOGI(TAG, "AI talk active generation=%u\n", (unsigned)generation);
 }
 
