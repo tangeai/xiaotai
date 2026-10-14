@@ -1,6 +1,7 @@
 #include "xiaotai_tirtc.h"
 
 #include "xiaotai_log.h"
+#include <components/system.h>
 #include <os/mem.h>
 #include <os/os.h>
 #include <stdatomic.h>
@@ -25,11 +26,9 @@ static int s_log_level = XIAOTAI_TIRTC_LOG_LEVEL_SDK_DEFAULT;
 static xiaotai_tirtc_handlers_t s_handlers;
 
 /* TiRTC passes a byte span, not a NUL-terminated string.  Copy bounded
- * chunks before sending them to Beken's raw console logger so SDK messages
- * reach the UART unchanged and never become a printf format string.  Keep
- * this callback outside the XiaoTai log wrapper: the SDK may invoke it from
- * its transport threads and routing it back through a tagged logger can
- * recurse or add enough buffering to hide the ICE diagnostics we need. */
+ * chunks so SDK messages never become a printf format string.  The SDK can
+ * call this on its transport thread, so console buffer exhaustion must drop
+ * a log instead of waiting for the shell task while transport locks are held. */
 static void tirtc_sdk_log_callback(const char *log, uint32_t length)
 {
     if (log == NULL || length == 0U) return;
@@ -43,7 +42,7 @@ static void tirtc_sdk_log_callback(const char *log, uint32_t length)
         char chunk[TIRTC_SDK_LOG_CHUNK_LEN + 1U];
         memcpy(chunk, log, chunk_length);
         chunk[chunk_length] = '\0';
-        BK_LOG_RAW("%s", chunk);
+        bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "%s", chunk);
 
         log += chunk_length;
         length -= chunk_length;

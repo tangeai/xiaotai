@@ -386,7 +386,7 @@ require("#define TIRTC_LOG_LEVEL_MAX 17" in tirtc_source and
         "#define XIAOTAI_TIRTC_LOG_LEVEL_SDK_DEFAULT (-1)" in
         (ROOT / "ap/include/xiaotai_tirtc.h").read_text() and
         "static void tirtc_sdk_log_callback" in tirtc_source and
-        "BK_LOG_RAW(\"%s\", chunk);" in tirtc_source and
+        "bk_printf_raw_nonblock(BK_LOG_NONE, NULL, \"%s\", chunk);" in tirtc_source and
         "TiRtcLogSetCallback(tirtc_sdk_log_callback);" in tirtc_source and
         "static int s_log_level = XIAOTAI_TIRTC_LOG_LEVEL_SDK_DEFAULT;" in tirtc_source and
         "xiaotai_tirtc_set_log_level(s_log_level)" not in tirtc_source and
