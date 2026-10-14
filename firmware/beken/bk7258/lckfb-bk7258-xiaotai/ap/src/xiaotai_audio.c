@@ -439,7 +439,7 @@ static void echo_diag_accumulate(const int16_t *mic, const int16_t *reference,
                           s_echo_diag_last_underruns;
     uint32_t overruns = s_aec_reference_overruns -
                          s_echo_diag_last_overruns;
-    BK_LOGI(TAG,
+    BK_LOGD(TAG,
             "ECHO_DIAG AEC codec=%s frames=%u mic-abs=%u ref-abs=%u "
             "out-abs=%u residual=%u%% peaks=%u/%u/%u ref-depth=%u "
             "ref-under=%u ref-over=%u\n",
@@ -600,14 +600,14 @@ static void capture_task(beken_thread_arg_t argument)
         if (s_uplink_level_frames == 1U ||
             (s_uplink_level_frames %
              UPLINK_LEVEL_LOG_INTERVAL_FRAMES) == 0U) {
-            BK_LOGI(TAG,
+            BK_LOGD(TAG,
                     "SDK AGC level in=%u out=%u limited=%u failures=%u\n",
                     (unsigned)agc_stats.input_peak,
                     (unsigned)agc_stats.output_peak,
                     (unsigned)agc_stats.limited_samples,
                     (unsigned)s_uplink_agc_failures);
             if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
-                BK_LOGI(TAG,
+                BK_LOGD(TAG,
                         "SDK NS frames speech=%u noise=%u failures=%u suppression=%ddB\n",
                         (unsigned)s_uplink_ns_speech_frames,
                         (unsigned)s_uplink_ns_noise_frames,

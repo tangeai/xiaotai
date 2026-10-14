@@ -91,6 +91,7 @@ int main(void){
 #define BK_LOGI(...) ((void)0)
 #define BK_LOGE(...) ((void)0)
 #define BK_LOGW(tag,...) snprintf(log_text,sizeof(log_text),__VA_ARGS__)
+#define BK_LOGD(tag,...) snprintf(log_text,sizeof(log_text),__VA_ARGS__)
 #define XIAOTAI_OWNER_NONE 0
 #define XIAOTAI_OWNER_AI 1
 #define XIAOTAI_INTENT_PRIMARY 1

@@ -52,7 +52,7 @@ static void button_task(beken_thread_arg_t argument)
                 if (!long_sent) {
                     if (short_pending && now - released_at <= DOUBLE_CLICK_MS) {
                         short_pending = false;
-                        BK_LOGI(TAG, "KEY double click\n");
+                        BK_LOGD(TAG, "KEY double click\n");
                         if (s_callback != NULL) {
                             s_callback(XIAOTAI_BUTTON_DOUBLE, s_context);
                         }
@@ -66,14 +66,14 @@ static void button_task(beken_thread_arg_t argument)
         if (!stable && !long_sent && now - pressed_at >= LONG_PRESS_MS) {
             long_sent = true;
             short_pending = false;
-            BK_LOGI(TAG, "KEY long press\n");
+            BK_LOGD(TAG, "KEY long press\n");
             if (s_callback != NULL) {
                 s_callback(XIAOTAI_BUTTON_LONG, s_context);
             }
         }
         if (stable && short_pending && now - released_at > DOUBLE_CLICK_MS) {
             short_pending = false;
-            BK_LOGI(TAG, "KEY short press\n");
+            BK_LOGD(TAG, "KEY short press\n");
             if (s_callback != NULL) {
                 s_callback(XIAOTAI_BUTTON_SHORT, s_context);
             }

@@ -88,3 +88,19 @@ python3 tools/analyze_runtime_log.py output/device-serial.log \
 
 最大连续 heap 块在当前 BK7258 SDK 中没有已链接的无副作用查询接口，遥测中
 明确输出 `null`。不要用反复试分配大块内存的方式估算，它会改变碎片状态。
+
+## 多人房间退出回归（build.33 待实板验证）
+
+2026-10-14 的串口记录中，设备通话正常退出，前两次房间退出也完成清理；
+第三次房间退出仅打印 `TiRTC disconnected callback`，未打印后续
+`callback-cleanup-checked`，约 16 秒后出现 `IPC[1]heartbeat timeout` 并重启。
+这证明重启真实发生，但日志尚不足以确认回调停在哪条语句。房间退出 HTTP
+任务须等连接句柄释放，因此固定延迟 HTTP 无法修复这个已观察到的停滞。
+
+build.33 在回调的两个连接归属操作前加了定位点。实板连续执行至少十轮
+“加入房间、按住并释放 PTT、退出房间、再次加入”，保存从建连前到退出后
+至少 30 秒的完整 AP/CP 串口日志。若重启，记录最后一个
+`callback-*-begin` 或 `callback-*-checked`，并保留复位前的心跳日志。
+验收需同时满足每轮收到 `connection closed mode=5`、进入 READY、uptime
+持续增长且没有 `IPC[1]heartbeat timeout`。目前 build.33 只完成主机测试和
+编译，不能据此认定该重启已修复。

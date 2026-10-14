@@ -233,7 +233,8 @@ static void echo_diag_audio_rx(connection_mode_t mode,
     if (s_echo_diag_packets == 1U ||
         (unexpected && (s_echo_diag_unexpected_streams <= 3U ||
                         (s_echo_diag_unexpected_streams % 100U) == 0U))) {
-        BK_LOGW(TAG,
+        xiaotai_log_write(unexpected ? XIAOTAI_LOG_WARN : XIAOTAI_LOG_DEBUG,
+                TAG,
                 "ECHO_DIAG RX mode=%s generation=%u packet=%u stream=%u "
                 "expected=%u bytes=%u gap-ms=%u unexpected=%u\n",
                 connection_mode_name(mode), (unsigned)generation,
@@ -247,7 +248,7 @@ static void echo_diag_audio_rx(connection_mode_t mode,
             (uint32_t)(s_echo_diag_gap_sum_ms / gap_count);
         uint32_t gap_min = s_echo_diag_gap_min_ms == UINT32_MAX ? 0U :
                            s_echo_diag_gap_min_ms;
-        BK_LOGI(TAG,
+        BK_LOGD(TAG,
                 "ECHO_DIAG RX-SUM mode=%s generation=%u packets=%u bytes=%u "
                 "stream=%u expected=%u unexpected=%u gap-ms=%u/%u/%u\n",
                 connection_mode_name(mode), (unsigned)generation,
@@ -842,6 +843,7 @@ static void on_conn_error(tirtc_conn_t connection, int error)
 static void on_disconnected(tirtc_conn_t connection)
 {
     BK_LOGI(TAG, "TiRTC disconnected callback handle=%p\n", connection);
+    BK_LOGI(TAG, "[DEBUG-bk-close] callback-cleanup-claim-begin\n");
     uintptr_t cleanup = (uintptr_t)connection;
     if (atomic_compare_exchange_strong_explicit(
             &s_outgoing_cleanup_connection, &cleanup, 0,
@@ -854,6 +856,7 @@ static void on_disconnected(tirtc_conn_t connection)
         require_recovery_if_heap_low("failed-handle-cleanup");
     }
     BK_LOGI(TAG, "[DEBUG-bk-close] callback-cleanup-checked\n");
+    BK_LOGI(TAG, "[DEBUG-bk-close] callback-handle-claim-begin\n");
     uintptr_t expected = (uintptr_t)connection;
     if (!atomic_compare_exchange_strong_explicit(&s_connection,
                                                   &expected, 0,

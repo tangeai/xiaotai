@@ -1,3 +1,3 @@
 # Firmware version
 
-`1.0.0+build.32`
+`1.0.0+build.33`

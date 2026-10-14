@@ -402,7 +402,7 @@ static void button_pressed(xiaotai_button_event_t button_event, void *context)
         .input_event = (uint8_t)intent,
     };
     if (rtos_push_to_queue(&s_control_queue, &event, 0) != BK_OK) {
-        BK_LOGW(TAG, "AI button event dropped\n");
+        BK_LOGW(TAG, "button event dropped intent=%d\n", (int)intent);
     }
 }
 
@@ -619,6 +619,7 @@ static bool open_launcher_item(unsigned item)
         s_contact_page = 0U;
         s_contact_selected = 0U;
         render_contacts();
+        refresh_contacts();
         break;
     case 2:
         navigate_to(UI_PAGE_ROOM);
@@ -828,14 +829,14 @@ static void handle_intent(xiaotai_intent_t intent)
             return;
         }
         if (xiaotai_room_active(&s_room)) {
-            BK_LOGW(TAG, "KEY double click ignored: group room active\n");
+            BK_LOGD(TAG, "KEY double click ignored: group room active\n");
             return;
         }
         rtos_lock_mutex(&s_runtime_mutex);
         bool idle = s_runtime.owner == XIAOTAI_OWNER_NONE;
         rtos_unlock_mutex(&s_runtime_mutex);
         if (!idle) {
-            BK_LOGW(TAG, "KEY double click ignored: media owner busy\n");
+            BK_LOGD(TAG, "KEY double click ignored: media owner busy\n");
             return;
         }
         if (intent == XIAOTAI_INTENT_HOME_WECHAT_CALL) {
@@ -1006,7 +1007,7 @@ static void handle_intent(xiaotai_intent_t intent)
         !xiaotai_runtime_begin(&s_runtime, XIAOTAI_OWNER_AI, false)) {
         xiaotai_session_owner_t owner = s_runtime.owner;
         rtos_unlock_mutex(&s_runtime_mutex);
-        BK_LOGW(TAG, "AI button ignored: runtime not ready owner=%d rtc=%d\n",
+        BK_LOGD(TAG, "AI button ignored: runtime not ready owner=%d rtc=%d\n",
                 owner, xiaotai_tirtc_ready());
         return;
     }
