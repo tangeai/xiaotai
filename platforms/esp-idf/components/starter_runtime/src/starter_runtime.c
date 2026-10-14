@@ -1165,6 +1165,7 @@ static bool response_ok(const cJSON *root)
 }
 
 static void dial_contact(uint8_t index, bool video);
+static bool call_video_for_request(const char *media, bool wechat);
 
 static void refresh_contacts(void)
 {
@@ -1202,7 +1203,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.0.0+build.113\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.0+build.114\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
@@ -1377,7 +1378,7 @@ static void handle_contacts_result(const runtime_event_t *event)
         for (; index < count; ++index) {
             if (parsed[index].source == STARTER_CONTACT_WECHAT) break;
         }
-        if (index < count) dial_contact(index, false);
+        if (index < count) dial_contact(index, call_video_for_request(NULL, true));
     }
 }
 
@@ -2459,9 +2460,10 @@ static bool normalize_contact_name(const char *input,
 static contact_match_t find_contact(const char *target_id,
                                     const char *target_name,
                                     const char *channel,
-                                    uint8_t *index)
+                                    uint8_t *index,
+                                    bool *wechat)
 {
-    if (index == NULL || s_product_mutex == NULL ||
+    if (index == NULL || wechat == NULL || s_product_mutex == NULL ||
         xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
         return CONTACT_MATCH_NOT_FOUND;
     }
@@ -2484,6 +2486,7 @@ static contact_match_t find_contact(const char *target_id,
                       strcmp(normalized_contact, normalized_target) == 0;
         if (matched) {
             *index = i;
+            *wechat = contact->source == STARTER_CONTACT_WECHAT;
             ++matches;
             if (match_by_id && strcmp(contact->id, target_id) == 0) {
                 id_consistent = true;
@@ -2581,6 +2584,20 @@ static void send_device_action_result(const cJSON *request_id,
     cJSON_Delete(root);
 }
 
+/* Default video applies to WeChat VoIP. A device contact may have an audio-only
+ * peer, so its video call still requires an explicit request. */
+static bool call_video_for_request(const char *media, bool wechat)
+{
+#if CONFIG_IDF_TARGET_ESP32P4
+    return (media != NULL && strcmp(media, "video") == 0) ||
+           (wechat && (media == NULL || media[0] == '\0'));
+#else
+    (void)media;
+    (void)wechat;
+    return false;
+#endif
+}
+
 static contact_match_t parse_ai_call_action(const cJSON *params,
                                             bool legacy_call_intent,
                                             char *target_id,
@@ -2591,7 +2608,8 @@ static contact_match_t parse_ai_call_action(const cJSON *params,
                                             size_t channel_capacity,
                                             char *media,
                                             size_t media_capacity,
-                                            uint8_t *contact_index)
+                                            uint8_t *contact_index,
+                                            bool *wechat)
 {
     const cJSON *payload = action_payload(params);
     static const char *const action_names[] = {"action", "name", "tool", "function"};
@@ -2627,10 +2645,11 @@ static contact_match_t parse_ai_call_action(const cJSON *params,
     (void)copy_first_json_string(payload, media_names,
                                  sizeof(media_names) / sizeof(media_names[0]),
                                  media, media_capacity);
-    bool audio_only = media[0] == '\0' || strcmp(media, "audio") == 0 ||
-                      strcmp(media, "voice") == 0;
-    return audio_only ? find_contact(target_id, target_name, channel, contact_index)
-                      : CONTACT_MATCH_NOT_FOUND;
+    bool media_valid = media[0] == '\0' || strcmp(media, "video") == 0 ||
+                       strcmp(media, "audio") == 0 || strcmp(media, "voice") == 0;
+    return media_valid ? find_contact(target_id, target_name, channel, contact_index,
+                                      wechat)
+                       : CONTACT_MATCH_NOT_FOUND;
 }
 
 static void handle_ai_command(const runtime_event_t *event)
@@ -2738,17 +2757,20 @@ static void handle_ai_command(const runtime_event_t *event)
                 char channel[16] = "";
                 char media[16] = "";
                 uint8_t contact_index = 0;
+                bool wechat = false;
                 bool legacy_call_intent = strcmp(method->valuestring, "device_action") != 0;
                 diagnostic_event("call tool received", legacy_call_intent ? 0 : 1);
                 contact_match_t match = parse_ai_call_action(
                     params, legacy_call_intent, target_id, sizeof(target_id),
                     target_name, sizeof(target_name), channel, sizeof(channel),
-                    media, sizeof(media), &contact_index);
+                    media, sizeof(media), &contact_index, &wechat);
                 bool is_device_action = !legacy_call_intent;
                 if (match == CONTACT_MATCH_UNIQUE) {
                     diagnostic_event("call tool accepted", 0);
                     if (is_device_action) {
-                        send_device_action_result(id, true, "accepted", "正在发起语音呼叫。");
+                        send_device_action_result(id, true, "accepted",
+                            call_video_for_request(media, wechat) ? "正在发起视频呼叫。" :
+                                                            "正在发起语音呼叫。");
                     }
                     const char end[] =
                         "{\"jsonrpc\":\"2.0\",\"method\":\"end_session\"}";
@@ -2762,13 +2784,14 @@ static void handle_ai_command(const runtime_event_t *event)
                              (unsigned)contact_index);
                     cJSON_Delete(root);
                     finish_session(0);
-                    dial_contact(contact_index, false);
+                    dial_contact(contact_index, call_video_for_request(media, wechat));
                 } else {
                     diagnostic_event("call tool rejected", (int)match);
                     const char *feedback = media[0] != '\0' &&
                                            strcmp(media, "audio") != 0 &&
-                                           strcmp(media, "voice") != 0
-                        ? "小钛目前只支持语音呼叫。"
+                                           strcmp(media, "voice") != 0 &&
+                                           strcmp(media, "video") != 0
+                        ? "呼叫类型不受支持。"
                         : (match == CONTACT_MATCH_AMBIGUOUS
                                ? "找到多个同名联系人，请说得更具体。"
                                : "通讯录里没有找到这个联系人。");
@@ -3632,7 +3655,7 @@ static void handle_wechat_quick_call(void)
         xSemaphoreGive(s_product_mutex);
     }
     if (index < STARTER_PRODUCT_CONTACTS_MAX) {
-        dial_contact(index, false);
+        dial_contact(index, call_video_for_request(NULL, true));
         return;
     }
     s_wechat_quick_pending = true;
@@ -3646,10 +3669,12 @@ static void dial_first_contact(void)
     if (s_product_mutex == NULL ||
         xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(50)) != pdTRUE) return;
     bool empty = s_product_snapshot.contact_count == 0U;
+    bool wechat = !empty &&
+        s_product_snapshot.contacts[0].source == STARTER_CONTACT_WECHAT;
     if (empty) ++s_product_snapshot.contact_guide_sequence;
     xSemaphoreGive(s_product_mutex);
     if (empty) end_ai_session();
-    else dial_contact(0, false);
+    else dial_contact(0, call_video_for_request(NULL, wechat));
 }
 
 static void handle_main_key(bool double_click)

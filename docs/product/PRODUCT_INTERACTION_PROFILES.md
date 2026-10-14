@@ -177,6 +177,7 @@ BK7258、ESP32-S3、ESP32-P4 是同一产品的硬件适配，不是三个独立
 - 显示字幕的字库须支持 `°` 和 `℃`，保留 AI 回复中的温度表达（例如 `25°C`、`25℃`），不得显示缺字方框。
 - 房间发言、一对一通话和 AI 不能同时占用媒体。房间中的唤醒词不直接抢占媒体，由会话仲裁器按产品优先级处理。
 - AI 返回联系人呼叫工具动作时，设备先按本地通讯录唯一匹配并回送动作结果，再释放 AI 媒体并进入对应的设备呼叫或微信呼叫；未知或同名目标不得误拨。
+- 首页快捷呼叫与 AI 呼叫微信联系人时，在设备实现微信 VoIP 视频能力的前提下默认发起视频呼叫；AI 明确要求语音时使用语音。按键快捷呼叫仍使用平台排序的首个联系人，若目标是设备联系人，默认语音；设备互呼视频须明确选择。仅支持音频的板卡始终发起语音呼叫，不发送视频呼叫信令。
 - 一对一通话页的麦克风按钮显示当前状态“麦克风已开”或“麦克风已关”，点击后切换；状态文案不写成“静音/开麦”动作。
 - 本地表情目录使用 21 个稳定 tag：`neutral`、`happy`、`laughing`、`funny`、`sad`、`angry`、`crying`、`loving`、`embarrassed`、`surprised`、`shocked`、`thinking`、`winking`、`cool`、`relaxed`、`delicious`、`kissy`、`confident`、`sleepy`、`silly`、`confused`。AI 回复和本地表情浏览页共用这一目录。
 - 平台 `caption.params.emotion` 使用中文协议值。设备必须映射：`中性→neutral`、`开心→happy`、`兴奋→laughing`、`温和→relaxed`、`安慰→loving`、`思考→thinking`、`惊讶→surprised`、`严肃→confident`、`困倦→sleepy`、`困惑→confused`。为兼容旧消息，也接受英文 tag、`round_start.params.emotion`、独立 `emotion`/`ai_emotion`/`expression` 消息、`event.params.data.emotion` 以及旧版 `ai_reply.emotion`。设备日志必须记录最终表情切换，平台未下发 emotion 时不得伪造变化。

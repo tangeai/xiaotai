@@ -100,20 +100,24 @@ int main(void) {
     s_product_snapshot.contacts[0] = (starter_product_contact_t){.id="dad", .name="爸爸"};
     s_product_snapshot.contacts[1] = (starter_product_contact_t){.id="mom", .name="妈妈"};
     uint8_t i = 99;
-    assert(find_contact("", "爸爸", "", &i) == CONTACT_MATCH_UNIQUE && i == 0);
-    assert(find_contact("dad", "爸爸", "device", &i) == CONTACT_MATCH_UNIQUE);
-    assert(find_contact("mom", "爸爸", "", &i) == CONTACT_MATCH_NOT_FOUND);
-    assert(find_contact("dad", "", "", &i) == CONTACT_MATCH_NOT_FOUND);
-    assert(find_contact("", "未知", "", &i) == CONTACT_MATCH_NOT_FOUND);
-    assert(find_contact("dad", "爸爸", "wechat", &i) == CONTACT_MATCH_NOT_FOUND);
+    bool wechat = false;
+    assert(find_contact("", "爸爸", "", &i, &wechat) == CONTACT_MATCH_UNIQUE && i == 0 && !wechat);
+    assert(find_contact("dad", "爸爸", "device", &i, &wechat) == CONTACT_MATCH_UNIQUE);
+    assert(find_contact("mom", "爸爸", "", &i, &wechat) == CONTACT_MATCH_NOT_FOUND);
+    assert(find_contact("dad", "", "", &i, &wechat) == CONTACT_MATCH_NOT_FOUND);
+    assert(find_contact("", "未知", "", &i, &wechat) == CONTACT_MATCH_NOT_FOUND);
+    assert(find_contact("dad", "爸爸", "wechat", &i, &wechat) == CONTACT_MATCH_NOT_FOUND);
     strcpy(s_product_snapshot.contacts[1].name, "爸爸");
-    assert(find_contact("dad", "爸爸", "", &i) == CONTACT_MATCH_AMBIGUOUS);
+    assert(find_contact("dad", "爸爸", "", &i, &wechat) == CONTACT_MATCH_AMBIGUOUS);
     strcpy(s_product_snapshot.contacts[0].name, "Dad");
-    assert(find_contact("dad", " DAD ", "", &i) == CONTACT_MATCH_UNIQUE);
+    assert(find_contact("dad", " DAD ", "", &i, &wechat) == CONTACT_MATCH_UNIQUE);
+    strcpy(s_product_snapshot.contacts[1].name, "妈妈");
+    s_product_snapshot.contacts[1].source = STARTER_CONTACT_WECHAT;
+    assert(find_contact("mom", "妈妈", "wechat", &i, &wechat) == CONTACT_MATCH_UNIQUE && wechat);
     return 0;
 }
 '''
-    run("name-first matching: 8 conflict/ambiguity/normalization cases", body)
+    run("name-first matching: 9 conflict/ambiguity/route cases", body)
 
 
 

@@ -1021,6 +1021,13 @@ static bool room_action_submitted(esp_err_t err)
     return false;
 }
 
+static void start_home_wechat_quick_call(void)
+{
+    starter_runtime_product_snapshot_t snapshot = starter_runtime_product_snapshot();
+    if (starter_runtime_wechat_quick_call() != ESP_OK) return;
+    if (snapshot.wechat_contact_count == 0U) s_page = PAGE_WECHAT_QR;
+}
+
 static void on_action(lv_event_t *event)
 {
     product_action_t action = (product_action_t)(uintptr_t)lv_event_get_user_data(event);
@@ -1072,8 +1079,7 @@ static void on_action(lv_event_t *event)
     } else if (action == ACTION_DIAGNOSTICS) {
         (void)enter_page(PAGE_DIAGNOSTICS);
     } else if (action == ACTION_WECHAT_QUICK) {
-        (void)starter_runtime_wechat_quick_call();
-        s_page = PAGE_WECHAT_QR;
+        start_home_wechat_quick_call();
     } else if (action == ACTION_ROOM) {
         s_voice_feedback[0] = '\0';
         s_page = PAGE_ROOM;

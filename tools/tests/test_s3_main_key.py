@@ -17,12 +17,16 @@ class MainKeyRegressions(unittest.TestCase):
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
+#define CONFIG_IDF_TARGET_ESP32P4 0
 #define pdTRUE 1
 #define pdMS_TO_TICKS(x) (x)
 #define PAGE_WECHAT_QR 5
 static void *s_product_mutex=(void *)1;
 static bool lock_ok=true,call_now,binding_required;
-static struct {uint8_t contact_count;uint32_t contact_guide_sequence;} s_product_snapshot,product;
+static struct {uint8_t contact_count;uint32_t contact_guide_sequence;
+               struct {int source;} contacts[1];} s_product_snapshot,product;
+#define STARTER_CONTACT_WECHAT 2
 static int dials,ends,renders,s_page;
 static uint32_t s_contact_guide_sequence;
 static int xSemaphoreTake(void *mutex,int timeout){return lock_ok;}
@@ -30,7 +34,8 @@ static void xSemaphoreGive(void *mutex){}
 static void end_ai_session(void){ends++;}
 static void dial_contact(uint8_t index,bool video){assert(index==0 && !video);dials++;}
 static void render_page(void){renders++;}
-''' + function(source,'dial_first_contact') + '\nstatic void tick(void){\n' + ui[start:end] + r'''
+''' + function(source,'call_video_for_request') +
+              function(source,'dial_first_contact') + '\nstatic void tick(void){\n' + ui[start:end] + r'''
 }
 int main(void){
     s_product_snapshot.contact_count=2;dial_first_contact();
