@@ -1,5 +1,10 @@
 # 立创·实战派 ESP32-S3
 
+build.51 起可通过串口 `ep-show` 查看 TiRTC EP 覆盖项，
+`ep-set http://ep-open.tangeopen.com/pre` 保存新地址并重启，
+`ep-reset` 删除覆盖项并重启。地址可包含端口和路径；这组命令只修改
+TiRTC SDK 入口，平台服务发现地址仍由固件配置决定。
+
 本文中的 H5 指网页端，AI 指人工智能对讲，AEC 指声学回声消除。
 Flash 是闪存，PSRAM 是用于音视频缓冲的大块运行内存。
 

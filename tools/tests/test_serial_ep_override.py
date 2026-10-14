@@ -13,6 +13,9 @@ P4_SDK = ROOT / "platforms/esp-idf/components/starter_tirtc/src/starter_tirtc.c"
 BK_STORAGE = ROOT / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_storage.c"
 BK_CONSOLE = ROOT / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_console.c"
 BK_APP = ROOT / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_app.c"
+S3_CONSOLE_CMAKE = ROOT / "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/components/starter_console/CMakeLists.txt"
+S3_CONFIG_CMAKE = ROOT / "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/components/runtime_config/CMakeLists.txt"
+S3_MAIN_CMAKE = ROOT / "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/main/CMakeLists.txt"
 
 
 class SerialEndpointOverride(unittest.TestCase):
@@ -166,6 +169,13 @@ int main(void) {
         self.assertIn("xiaotai_storage_load_endpoint(endpoint_override", bk_app)
         self.assertIn("snprintf(s_tirtc_endpoint, sizeof(s_tirtc_endpoint)", bk_app)
         self.assertIn("XIAOTAI_ENDPOINT_KEY", BK_STORAGE.read_text())
+
+    def test_lckfb_s3_uses_the_same_console_storage_and_boot_path(self):
+        self.assertIn("platforms/esp-idf/components/starter_console/CMakeLists.txt",
+                      S3_CONSOLE_CMAKE.read_text())
+        self.assertIn("platforms/esp-idf/components/runtime_config/CMakeLists.txt",
+                      S3_CONFIG_CMAKE.read_text())
+        self.assertIn("platforms/esp-idf/main/CMakeLists.txt", S3_MAIN_CMAKE.read_text())
 
 
 if __name__ == "__main__":

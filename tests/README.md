@@ -44,6 +44,8 @@ BK 恢复出厂测试同步检查 EP 键被清除。P4 build.116、BK build.36 �
 原样保存和读取，并检查 `ep-show`、`ep-set`、`ep-reset` 的命令注册；查询参数、
 片段及空白继续拒绝。最终构建号为 P4 build.118、BK build.38；实际连接仍需
 刷入新版固件验证。
+立创 S3 build.51 使用同一 ESP-IDF 串口、持久化和启动覆盖实现，编译已通过，
+实板串口设置与连接仍待验证。
 
 2026-10-14 快捷呼叫与 AI 呼叫媒体选择：`test_default_video_call.py` 已注册
 `tools/check.sh`。测试先因共享 P4/S3 运行时缺少能力选择接口失败，随后验证
