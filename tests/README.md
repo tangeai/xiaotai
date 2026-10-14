@@ -32,6 +32,13 @@ bash tools/check.sh
 
 ## 测试驱动开发约定
 
+2026-10-14 串口 EP 覆盖：`test_serial_ep_override.py` 已注册到 `tools/check.sh`。
+回归测试编译两端公开持久化接口和 URL 校验函数，覆盖设置、读取、恢复默认、
+`http://ep-open.tangeopen.com`、HTTPS、非法协议、空主机、用户信息、路径和非法端口，
+并检查串口命令与启动时覆盖项接入。
+BK 恢复出厂测试同步检查 EP 键被清除。P4 build.116、BK build.36 的串口设置、
+重启持久化、恢复默认和实际连接仍需在对应实板验证。
+
 2026-10-14 快捷呼叫与 AI 呼叫媒体选择：`test_default_video_call.py` 已注册
 `tools/check.sh`。测试先因共享 P4/S3 运行时缺少能力选择接口失败，随后验证
 P4 微信 VoIP 默认视频、设备联系人默认语音、S3 音频回退、显式语音请求，以及首页、实体键、AI 和联系人刷新后

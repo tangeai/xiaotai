@@ -2,12 +2,14 @@
 #define XIAOTAI_STORAGE_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "xiaotai_platform.h"
 
 #define XIAOTAI_WIFI_SSID_MAX 32
 #define XIAOTAI_WIFI_PASSWORD_MAX 64
+#define XIAOTAI_ENDPOINT_MAX 256
 
 typedef struct {
     char ssid[XIAOTAI_WIFI_SSID_MAX + 1];
@@ -31,6 +33,9 @@ int xiaotai_storage_clear_wifi(void);
 int xiaotai_storage_load_device(xiaotai_device_credentials_t *out);
 int xiaotai_storage_save_device(const xiaotai_device_credentials_t *value);
 int xiaotai_storage_clear_device(void);
+int xiaotai_storage_load_endpoint(char *output, size_t capacity);
+int xiaotai_storage_save_endpoint(const char *url);
+int xiaotai_storage_clear_endpoint(void);
 /** Clear only user keys; on success reject later saves until reboot. */
 int xiaotai_storage_reset_user_data(void);
 void xiaotai_product_settings_default(xiaotai_product_settings_t *out);

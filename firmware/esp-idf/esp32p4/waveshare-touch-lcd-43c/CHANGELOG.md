@@ -4,6 +4,11 @@
 [`main/media/media_tuning.h`](main/media/media_tuning.h) 和
 [媒体合同](../../../../docs/product/MEDIA_CONTRACT.md)为准；这里的实板数字只对应所注明的固件。
 
+## 1.0.0+build.116（2026-10-14）
+
+- 新增串口 `ep show|set <URL>|reset`，持久化 TiRTC EP 地址并在重启后生效。
+- 支持 `http://ep-open.tangeopen.com` 这类 HTTP 地址；重置后使用 SDK 默认 EP。
+
 ## 1.0.0+build.114（2026-10-14）
 
 - 首页快捷呼叫首个微信联系人，以及 AI 呼叫微信联系人时，默认申请视频 VoIP；

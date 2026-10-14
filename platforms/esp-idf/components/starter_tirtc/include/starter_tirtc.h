@@ -87,6 +87,7 @@ typedef struct {
     const char *device_id;       /**< 已绑定设备 ID，调用 start 时必须有效。 */
     const char *device_secret;   /**< 设备密钥；模块不会打印其内容。 */
     const char *client_id;       /**< TiRTC 客户端 ID。 */
+    const char *service_endpoint; /**< Optional EP override, NULL uses SDK default. */
     uint32_t max_send_buffer_bytes; /**< SDK 最大发送缓冲，0 使用 SDK 默认值。 */
     int log_level;               /**< TiRTC 日志级别，非正数使用 3。 */
 } starter_tirtc_config_t;

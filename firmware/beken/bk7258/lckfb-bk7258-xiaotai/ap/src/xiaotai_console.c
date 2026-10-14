@@ -160,6 +160,31 @@ static void command_tirtc_clear(char *output, int capacity,
              "usage: tirtc-clear\r\n");
 }
 
+static void command_ep(char *output, int capacity, int argc, char **argv)
+{
+    if (argc == 2 && strcmp(argv[1], "show") == 0) {
+        char url[XIAOTAI_ENDPOINT_MAX] = {0};
+        if (xiaotai_storage_load_endpoint(url, sizeof(url)) != BK_OK) {
+            response(output, capacity, "EP: default (platform discovery)\r\n");
+        } else if (output != NULL && capacity > 0) {
+            snprintf(output, (size_t)capacity, "EP override: %s\r\n", url);
+        }
+        return;
+    }
+    int rc;
+    if (argc == 2 && strcmp(argv[1], "reset") == 0) {
+        rc = xiaotai_storage_clear_endpoint();
+    } else if (argc == 3 && strcmp(argv[1], "set") == 0) {
+        rc = xiaotai_storage_save_endpoint(argv[2]);
+    } else {
+        response(output, capacity, "usage: ep show|set <http(s)://host[:port]>|reset\r\n");
+        return;
+    }
+    if (rc == BK_OK) rc = schedule_reboot();
+    response(output, capacity, rc == BK_OK ?
+             "EP saved; restarting\r\n" : "EP rejected or save failed\r\n");
+}
+
 static void command_wechat_call(char *output, int capacity,
                                 int argc, char **argv)
 {
@@ -407,6 +432,7 @@ static const struct cli_command s_commands[] = {
     {"wificlear", "Compatibility alias for wifi-clear", command_wifi_clear},
     {"wifi-change", "Open provisioning and retain credentials", command_wifi_change},
     {"tirtc-clear", "Clear binding and restart", command_tirtc_clear},
+    {"ep", "ep show|set <http(s)://host[:port]>|reset", command_ep},
     {"wechat-call", "wechat-call [contact name]", command_wechat_call},
     {"device-call", "device-call <contact name>", command_device_call},
     {"call-answer", "Answer the current incoming call", command_call_answer},

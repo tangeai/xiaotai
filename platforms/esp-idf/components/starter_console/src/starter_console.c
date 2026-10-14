@@ -21,6 +21,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "nvs.h"
 #include "platform_client.h"
 #include "runtime_config.h"
 #include "starter_media.h"
@@ -444,6 +445,45 @@ static int command_tirtc_clear(int argc, char **argv)
     return 0;
 }
 
+static int command_ep(int argc, char **argv)
+{
+    if (argc == 2 && strcmp(argv[1], "show") == 0) {
+        char url[RUNTIME_TIRTC_ENDPOINT_MAX] = {0};
+        esp_err_t err = runtime_config_load_endpoint(url, sizeof(url));
+        if (err == ESP_ERR_NVS_NOT_FOUND) {
+            printf("EP: SDK default\n");
+            return 0;
+        }
+        if (err != ESP_OK) {
+            printf("EP read failed: %s\n", esp_err_to_name(err));
+            return 1;
+        }
+        printf("EP override: %s\n", url);
+        return 0;
+    }
+    if (argc == 2 && strcmp(argv[1], "reset") == 0) {
+        esp_err_t err = runtime_config_clear_endpoint();
+        if (err != ESP_OK) {
+            printf("EP reset failed: %s\n", esp_err_to_name(err));
+            return 1;
+        }
+        printf("EP restored to default; restarting...\n");
+    } else if (argc == 3 && strcmp(argv[1], "set") == 0) {
+        esp_err_t err = runtime_config_save_endpoint(argv[2]);
+        if (err != ESP_OK) {
+            printf("EP rejected or save failed: %s\n", esp_err_to_name(err));
+            return 1;
+        }
+        printf("EP saved: %s; restarting...\n", argv[2]);
+    } else {
+        printf("usage: ep show|set <http(s)://host[:port]>|reset\n");
+        return 1;
+    }
+    vTaskDelay(pdMS_TO_TICKS(300));
+    esp_restart();
+    return 0;
+}
+
 static int command_restart(int argc, char **argv)
 {
     (void)argc;
@@ -526,6 +566,8 @@ esp_err_t starter_console_start(void)
                         "starter_console", "register tirtc-set");
     ESP_RETURN_ON_ERROR(register_command("tirtc-clear", "Clear device credentials", command_tirtc_clear),
                         "starter_console", "register tirtc-clear");
+    ESP_RETURN_ON_ERROR(register_command("ep", "ep show|set <http(s)://host[:port]>|reset", command_ep),
+                        "starter_console", "register ep");
     ESP_RETURN_ON_ERROR(register_command("restart", "Restart the device", command_restart),
                         "starter_console", "register restart");
 

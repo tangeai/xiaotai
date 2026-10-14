@@ -24,6 +24,14 @@ typedef struct {
     char client_id[65];      /**< 可选客户端 ID，空值由组合根生成。 */
 } runtime_tirtc_config_t;
 
+#define RUNTIME_TIRTC_ENDPOINT_MAX 256
+
+/** Optional signaling EP override. NOT_FOUND means use SDK/platform default. */
+esp_err_t runtime_config_load_endpoint(char *output, size_t capacity);
+esp_err_t runtime_config_save_endpoint(const char *url);
+esp_err_t runtime_config_clear_endpoint(void);
+bool runtime_config_endpoint_valid(const char *url);
+
 /** 从 tirtc_cfg 命名空间加载凭证；失败时清空输出结构。 */
 esp_err_t runtime_config_load_tirtc(runtime_tirtc_config_t *config);
 

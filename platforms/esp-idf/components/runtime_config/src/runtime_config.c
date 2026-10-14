@@ -17,6 +17,81 @@
 #include "freertos/semphr.h"
 
 #define TIRTC_NVS_NAMESPACE "tirtc_cfg"
+#define TIRTC_ENDPOINT_NVS_NAMESPACE "tirtc_ep"
+#define TIRTC_ENDPOINT_NVS_KEY "url"
+#ifndef RUNTIME_TIRTC_ENDPOINT_MAX
+#define RUNTIME_TIRTC_ENDPOINT_MAX 256
+#endif
+
+bool runtime_config_endpoint_valid(const char *url)
+{
+    if (url == NULL) return false;
+    const char *host = NULL;
+    if (strncmp(url, "http://", 7) == 0) host = url + 7;
+    else if (strncmp(url, "https://", 8) == 0) host = url + 8;
+    else return false;
+    size_t length = 0;
+    while (length < RUNTIME_TIRTC_ENDPOINT_MAX && url[length] != '\0') ++length;
+    if (length >= RUNTIME_TIRTC_ENDPOINT_MAX || *host == '\0') return false;
+    size_t host_length = 0;
+    for (const char *p = host; *p != '\0'; ++p) {
+        char c = *p;
+        if (c == ':') {
+            if (host_length == 0 || p[1] == '\0') return false;
+            unsigned port = 0;
+            for (++p; *p != '\0'; ++p) {
+                if (*p < '0' || *p > '9') return false;
+                port = port * 10U + (unsigned)(*p - '0');
+                if (port > 65535U) return false;
+            }
+            if (port == 0U) return false;
+            break;
+        }
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '.' || c == '-')) return false;
+        ++host_length;
+    }
+    return host_length > 0;
+}
+
+esp_err_t runtime_config_load_endpoint(char *output, size_t capacity)
+{
+    if (output == NULL || capacity == 0) return ESP_ERR_INVALID_ARG;
+    output[0] = '\0';
+    nvs_handle_t nvs = 0;
+    esp_err_t err = nvs_open(TIRTC_ENDPOINT_NVS_NAMESPACE, NVS_READONLY, &nvs);
+    if (err != ESP_OK) return err;
+    size_t size = capacity;
+    err = nvs_get_str(nvs, TIRTC_ENDPOINT_NVS_KEY, output, &size);
+    nvs_close(nvs);
+    if (err != ESP_OK || !runtime_config_endpoint_valid(output)) {
+        output[0] = '\0';
+        return err == ESP_OK ? ESP_ERR_INVALID_ARG : err;
+    }
+    return ESP_OK;
+}
+
+esp_err_t runtime_config_save_endpoint(const char *url)
+{
+    if (!runtime_config_endpoint_valid(url)) return ESP_ERR_INVALID_ARG;
+    nvs_handle_t nvs = 0;
+    esp_err_t err = nvs_open(TIRTC_ENDPOINT_NVS_NAMESPACE, NVS_READWRITE, &nvs);
+    if (err == ESP_OK) err = nvs_set_str(nvs, TIRTC_ENDPOINT_NVS_KEY, url);
+    if (err == ESP_OK) err = nvs_commit(nvs);
+    if (nvs != 0) nvs_close(nvs);
+    return err;
+}
+
+esp_err_t runtime_config_clear_endpoint(void)
+{
+    nvs_handle_t nvs = 0;
+    esp_err_t err = nvs_open(TIRTC_ENDPOINT_NVS_NAMESPACE, NVS_READWRITE, &nvs);
+    if (err == ESP_OK) err = nvs_erase_key(nvs, TIRTC_ENDPOINT_NVS_KEY);
+    if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+    if (err == ESP_OK) err = nvs_commit(nvs);
+    if (nvs != 0) nvs_close(nvs);
+    return err;
+}
 
 static void set_error(char *error, size_t error_size, const char *message)
 {

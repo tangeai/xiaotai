@@ -141,19 +141,20 @@ static atomic_uint s_storage_writers;
 #define XIAOTAI_DEVICE_KEY "xiaotai_device_v1"
 #define XIAOTAI_WIFI_KEY "xiaotai_wifi_v1"
 #define XIAOTAI_SETTINGS_KEY "xiaotai_settings_v1"
+#define XIAOTAI_ENDPOINT_KEY "xiaotai_ep_v1"
 typedef int EfErrCode;
 static int calls, fail_at, missing;
 static EfErrCode ef_del_env(const char *key){
- assert(!strcmp(key,XIAOTAI_DEVICE_KEY) || !strcmp(key,XIAOTAI_WIFI_KEY) || !strcmp(key,XIAOTAI_SETTINGS_KEY));
+ assert(!strcmp(key,XIAOTAI_DEVICE_KEY) || !strcmp(key,XIAOTAI_WIFI_KEY) || !strcmp(key,XIAOTAI_SETTINGS_KEY) || !strcmp(key,XIAOTAI_ENDPOINT_KEY));
  calls++;return fail_at==calls ? -1 : missing ? EF_ENV_NAME_ERR : EF_NO_ERR;
 }
 ''' + function(source, 'xiaotai_storage_reset_user_data') + r'''
 int main(void){
  atomic_store(&s_storage_writers,1);assert(xiaotai_storage_reset_user_data()==BK_FAIL && calls==0);
  atomic_store(&s_storage_writers,0);
- assert(xiaotai_storage_reset_user_data()==BK_OK && calls==3);
- atomic_store(&s_storage_reset_pending,false);calls=0;fail_at=2;assert(xiaotai_storage_reset_user_data()==BK_FAIL && calls==3);
- calls=0;fail_at=0;missing=1;assert(xiaotai_storage_reset_user_data()==BK_OK && calls==3);
+ assert(xiaotai_storage_reset_user_data()==BK_OK && calls==4);
+ atomic_store(&s_storage_reset_pending,false);calls=0;fail_at=2;assert(xiaotai_storage_reset_user_data()==BK_FAIL && calls==4);
+ calls=0;fail_at=0;missing=1;assert(xiaotai_storage_reset_user_data()==BK_OK && calls==4);
 }
 ''')
 

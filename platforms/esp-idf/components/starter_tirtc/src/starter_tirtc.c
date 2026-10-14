@@ -741,6 +741,13 @@ int starter_tirtc_start(const starter_tirtc_config_t *config)
         return rc;
     }
     s_initialized = true;
+    if (config->service_endpoint != NULL && config->service_endpoint[0] != '\0') {
+        rc = set_string_option(TIRTC_OPT_SERVICE_ENDPOINT, config->service_endpoint);
+        if (rc != 0) {
+            return rollback_start("TiRtcSetOption(SERVICE_ENDPOINT)", rc);
+        }
+        ESP_LOGI(TAG, "TiRTC endpoint override=%s", config->service_endpoint);
+    }
     rc = set_string_option(TIRTC_OPT_DEVICE_SECRET_KEY, config->device_secret);
     if (rc != 0) {
         return rollback_start("TiRtcSetOption(DEVICE_SECRET_KEY)", rc);

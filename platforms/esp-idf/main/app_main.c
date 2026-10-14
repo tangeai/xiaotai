@@ -56,6 +56,7 @@
 
 static const char *TAG = "starter_main";
 static runtime_tirtc_config_t s_tirtc_config;
+static char s_tirtc_endpoint_override[RUNTIME_TIRTC_ENDPOINT_MAX];
 static void *s_tirtc_internal_reserve;
 
 static void on_local_voice_result(const starter_voice_result_t *result, void *user_data)
@@ -306,6 +307,11 @@ static void starter_start_task(void *argument)
          * fragment the remaining internal heap.
          */
         if (!tirtc_submitted) {
+            esp_err_t endpoint_err = runtime_config_load_endpoint(s_tirtc_endpoint_override,
+                                                                  sizeof(s_tirtc_endpoint_override));
+            if (endpoint_err != ESP_OK && endpoint_err != ESP_ERR_NVS_NOT_FOUND) {
+                ESP_LOGW(TAG, "TiRTC endpoint override ignored: %s", esp_err_to_name(endpoint_err));
+            }
             log_heap_snapshot("pre-tirtc-bootstrap");
             if (s_tirtc_internal_reserve != NULL) {
                 heap_caps_free(s_tirtc_internal_reserve);
@@ -318,6 +324,7 @@ static void starter_start_task(void *argument)
                 .device_id = s_tirtc_config.device_id,
                 .device_secret = s_tirtc_config.device_secret,
                 .client_id = s_tirtc_config.client_id,
+                .service_endpoint = endpoint_err == ESP_OK ? s_tirtc_endpoint_override : NULL,
                 /* 由板级媒体合同配置：P4 的 H264 访问单元可达 256 KiB，
                  * 全双工音视频需要更大余量，避免一个峰值帧堵住音频。 */
                 .max_send_buffer_bytes = CONFIG_XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES,

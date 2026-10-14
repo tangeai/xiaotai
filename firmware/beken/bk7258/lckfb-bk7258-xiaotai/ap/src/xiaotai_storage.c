@@ -13,6 +13,38 @@
 #define XIAOTAI_WIFI_KEY "xiaotai_wifi_v1"
 #define XIAOTAI_DEVICE_KEY "xiaotai_device_v1"
 #define XIAOTAI_SETTINGS_KEY "xiaotai_settings_v1"
+#define XIAOTAI_ENDPOINT_KEY "xiaotai_ep_v1"
+
+static bool endpoint_valid(const char *url)
+{
+    if (url == NULL) return false;
+    const char *host = NULL;
+    if (strncmp(url, "http://", 7) == 0) host = url + 7;
+    else if (strncmp(url, "https://", 8) == 0) host = url + 8;
+    else return false;
+    size_t length = 0;
+    while (length < XIAOTAI_ENDPOINT_MAX && url[length] != '\0') ++length;
+    if (length >= XIAOTAI_ENDPOINT_MAX || *host == '\0') return false;
+    size_t host_length = 0;
+    for (const char *p = host; *p != '\0'; ++p) {
+        char c = *p;
+        if (c == ':') {
+            if (host_length == 0 || p[1] == '\0') return false;
+            unsigned port = 0;
+            for (++p; *p != '\0'; ++p) {
+                if (*p < '0' || *p > '9') return false;
+                port = port * 10U + (unsigned)(*p - '0');
+                if (port > 65535U) return false;
+            }
+            if (port == 0U) return false;
+            break;
+        }
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '.' || c == '-')) return false;
+        ++host_length;
+    }
+    return host_length > 0;
+}
 
 /* EasyFlash already serializes ordinary writes. Only an explicit reset gates
  * new writers; an in-flight save makes reset fail for a safe user retry. */
@@ -53,7 +85,8 @@ int xiaotai_storage_reset_user_data(void)
         atomic_store(&s_storage_reset_pending, false);
         return BK_FAIL;
     }
-    const char *keys[] = {XIAOTAI_DEVICE_KEY, XIAOTAI_WIFI_KEY, XIAOTAI_SETTINGS_KEY};
+    const char *keys[] = {XIAOTAI_DEVICE_KEY, XIAOTAI_WIFI_KEY, XIAOTAI_SETTINGS_KEY,
+                          XIAOTAI_ENDPOINT_KEY};
     int result = BK_OK;
     for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i) {
         EfErrCode rc = ef_del_env(keys[i]);
@@ -207,6 +240,32 @@ int xiaotai_storage_save_device(const xiaotai_device_credentials_t *value)
 int xiaotai_storage_clear_device(void)
 {
     return storage_delete(XIAOTAI_DEVICE_KEY);
+}
+
+int xiaotai_storage_load_endpoint(char *output, size_t capacity)
+{
+    if (output == NULL || capacity < XIAOTAI_ENDPOINT_MAX) return BK_ERR_PARAM;
+    output[0] = '\0';
+    size_t saved = 0;
+    size_t read = ef_get_env_blob(XIAOTAI_ENDPOINT_KEY, output,
+                                  XIAOTAI_ENDPOINT_MAX, &saved);
+    if (read == 0 || saved != read || read >= XIAOTAI_ENDPOINT_MAX ||
+        output[read - 1] != '\0' || !endpoint_valid(output)) {
+        output[0] = '\0';
+        return BK_FAIL;
+    }
+    return BK_OK;
+}
+
+int xiaotai_storage_save_endpoint(const char *url)
+{
+    if (!endpoint_valid(url)) return BK_ERR_PARAM;
+    return storage_write_blob(XIAOTAI_ENDPOINT_KEY, url, strlen(url) + 1U);
+}
+
+int xiaotai_storage_clear_endpoint(void)
+{
+    return storage_delete(XIAOTAI_ENDPOINT_KEY);
 }
 
 void xiaotai_product_settings_default(xiaotai_product_settings_t *out)
