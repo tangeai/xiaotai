@@ -1,4 +1,4 @@
-"""The TiRTC close callback must finish without serial logging in room mode."""
+"""The TiRTC room close callback must avoid RTOS queues and serial logging."""
 
 import unittest
 
@@ -22,26 +22,26 @@ typedef enum { CONNECTION_NONE=0, CONNECTION_CALL=3, CONNECTION_VOIP=4, CONNECTI
 typedef enum { MEDIA_EVENT_CLOSED=3 } media_event_type_t;
 typedef struct { media_event_type_t type; tirtc_conn_t connection; uint32_t generation;
                  int error; connection_mode_t mode; } media_event_t;
-static void *s_media_queue;
 static atomic_uintptr_t s_connection, s_outgoing_cleanup_connection;
 static atomic_uint_fast32_t s_active_generation;
 static atomic_int s_connection_error, s_connection_mode;
 static atomic_bool s_active_disconnect_queued, s_audio_subscribed, s_video_subscribed;
 static atomic_bool s_call_is_caller, s_call_accept_seen, s_voip_accept_seen;
+static atomic_bool s_recovery_required;
+static atomic_int s_pending_close_state;
+static media_event_t s_pending_close_event;
 static char s_active_call_room[128];
-static media_event_t queued;
-static int queue_count;
 static void release_outgoing_connect(void) { assert(!"unexpected cleanup"); }
 static unsigned rtos_get_free_heap_size(void) { assert(!"heap query in callback"); return 0; }
 static unsigned rtos_get_psram_free_heap_size(void) { assert(!"heap query in callback"); return 0; }
 static void require_recovery_if_heap_low(const char *reason) { (void)reason; assert(!"recovery in callback"); }
 static int rtos_push_to_queue(void **queue, const media_event_t *event, unsigned timeout) {
-    assert(queue == &s_media_queue && timeout == 0);
-    queued = *event;
-    queue_count++;
+    (void)queue; (void)event; (void)timeout;
+    assert(!"RTOS queue in TiRTC close callback");
     return BK_OK;
 }
-''' + function(source, 'on_disconnected') + r'''
+''' + function(source, 'take_pending_close_event') +
+              function(source, 'on_disconnected') + r'''
 int main(void) {
     tirtc_conn_t handle = (void *)0x1234;
     atomic_store(&s_connection, (uintptr_t)handle);
@@ -51,11 +51,21 @@ int main(void) {
     atomic_store(&s_active_disconnect_queued, true);
     atomic_store(&s_audio_subscribed, true);
     on_disconnected(handle);
-    assert(queue_count == 1 && queued.type == MEDIA_EVENT_CLOSED);
-    assert(queued.mode == CONNECTION_ROOM && queued.generation == 7 && queued.error == 0);
+    assert(atomic_load(&s_pending_close_state) == 2);
+    assert(s_pending_close_event.type == MEDIA_EVENT_CLOSED);
+    assert(s_pending_close_event.connection == handle);
+    assert(s_pending_close_event.mode == CONNECTION_ROOM &&
+           s_pending_close_event.generation == 7 && s_pending_close_event.error == 0);
     assert(atomic_load(&s_connection) == 0 && atomic_load(&s_active_generation) == 0);
     assert(!atomic_load(&s_active_disconnect_queued));
     assert(!atomic_load(&s_audio_subscribed));
+    assert(!atomic_load(&s_recovery_required));
+    media_event_t delivered = {0};
+    assert(take_pending_close_event(&delivered));
+    assert(atomic_load(&s_pending_close_state) == 0);
+    assert(delivered.connection == handle && delivered.mode == CONNECTION_ROOM);
+    assert(delivered.generation == 7 && delivered.error == 0);
+    assert(!take_pending_close_event(&delivered));
     return 0;
 }
 ''')

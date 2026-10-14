@@ -34,7 +34,8 @@ bash tools/check.sh
 
 2026-10-14 BK7258 房间退出心跳回归：`test_bk_room_close_callback.py` 已注册
 `tools/check.sh`。测试先复现 TiRTC 断开回调执行串口日志，再验证正常房间关闭
-只清理连接状态并向媒体工作线程非阻塞投递关闭事件。`bash tools/check.sh` 与 BK
+只清理连接状态并用原子槽向媒体工作线程投递关闭事件；工作线程定时取走事件，
+断开回调不再调用 RTOS 队列 API。`bash tools/check.sh` 与 BK
 release 编译已通过；连续进出房间及退出后至少 30 秒无 IPC 心跳超时仍须实板验证。
 
 固件版本由发布负责人指定为 `major.minor.patch`。`test_firmware_versions.py`

@@ -123,6 +123,11 @@ static atomic_bool s_active_disconnect_queued;
 static atomic_bool s_outgoing_connect_inflight;
 static atomic_uintptr_t s_outgoing_cleanup_connection;
 static atomic_bool s_recovery_required;
+/* The SDK destroy callback may run while its transport holds SMP locks.
+ * Publish one completed close to the media worker without entering an RTOS
+ * queue from that callback. 0=empty, 1=being written/read, 2=ready. */
+static atomic_int s_pending_close_state;
+static media_event_t s_pending_close_event;
 static atomic_bool s_cleanup_probe_active;
 static atomic_uint_fast32_t s_cleanup_probe_started_ms;
 static atomic_uint_fast32_t s_outgoing_heap_baseline;
@@ -470,13 +475,26 @@ static int send_h264(const uint8_t *annexb,
     return TiRtcSendVideoStream(connection, &frame, annexb);
 }
 
+static bool take_pending_close_event(media_event_t *event)
+{
+    int ready = 2;
+    if (!atomic_compare_exchange_strong_explicit(
+            &s_pending_close_state, &ready, 1,
+            memory_order_acq_rel, memory_order_acquire)) {
+        return false;
+    }
+    *event = s_pending_close_event;
+    atomic_store_explicit(&s_pending_close_state, 0, memory_order_release);
+    return true;
+}
+
 static void media_worker(beken_thread_arg_t argument)
 {
     (void)argument;
     media_event_t event;
     for (;;) {
-        if (rtos_pop_from_queue(&s_media_queue, &event,
-                                BEKEN_WAIT_FOREVER) != BK_OK) {
+        if (!take_pending_close_event(&event) &&
+            rtos_pop_from_queue(&s_media_queue, &event, 20) != BK_OK) {
             continue;
         }
         if (event.type == MEDIA_EVENT_DISCONNECT) {
@@ -888,9 +906,16 @@ static void on_disconnected(tirtc_conn_t connection)
         .error = error,
         .mode = mode,
     };
-    if (rtos_push_to_queue(&s_media_queue, &event, 0) != BK_OK) {
-        BK_LOGE(TAG, "media close event queue full\n");
+    int empty = 0;
+    if (!atomic_compare_exchange_strong_explicit(
+            &s_pending_close_state, &empty, 1,
+            memory_order_acq_rel, memory_order_acquire)) {
+        atomic_store_explicit(&s_recovery_required, true,
+                              memory_order_release);
+        return;
     }
+    s_pending_close_event = event;
+    atomic_store_explicit(&s_pending_close_state, 2, memory_order_release);
 }
 
 static void on_command(tirtc_conn_t connection, uint32_t command,
@@ -1851,6 +1876,8 @@ int xiaotai_tirtc_finalize_stop(void)
     atomic_store_explicit(&s_cleanup_probe_active, false,
                           memory_order_release);
     atomic_store_explicit(&s_recovery_required, false,
+                          memory_order_release);
+    atomic_store_explicit(&s_pending_close_state, 0,
                           memory_order_release);
     atomic_store_explicit(&s_audio_subscribed, false, memory_order_release);
     atomic_store_explicit(&s_video_subscribed, false, memory_order_release);
