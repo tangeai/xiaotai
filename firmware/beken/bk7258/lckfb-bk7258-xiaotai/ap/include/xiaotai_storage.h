@@ -36,6 +36,7 @@ int xiaotai_storage_clear_device(void);
 int xiaotai_storage_load_endpoint(char *output, size_t capacity);
 int xiaotai_storage_save_endpoint(const char *url);
 int xiaotai_storage_clear_endpoint(void);
+bool xiaotai_storage_format_discovery_url(const char *base, char *output, size_t capacity);
 /** Clear only user keys; on success reject later saves until reboot. */
 int xiaotai_storage_reset_user_data(void);
 void xiaotai_product_settings_default(xiaotai_product_settings_t *out);

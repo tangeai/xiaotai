@@ -126,6 +126,7 @@ typedef int esp_err_t;
 static atomic_bool s_verification_prompt_cancelled;
 typedef struct {char device_id[65],device_secret[257];} runtime_tirtc_config_t;
 static runtime_tirtc_config_t s_tirtc_config;
+static char s_discovery_url[]="test";
 typedef struct {char device_id[65],device_secret[257];} platform_provision_result_t;
 typedef struct {const char *mac_address,*existing_device_id,*existing_device_secret,*discovery_url;unsigned timeout_seconds;esp_err_t(*prompt_callback)(const int16_t*,size_t,void*);void(*prompt_cancel_callback)(void*);void*prompt_user_data;} platform_provision_config_t;
 static unsigned grant_error,save_error,saved,feedback;

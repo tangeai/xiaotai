@@ -455,14 +455,14 @@ static int command_ep_show(int argc, char **argv)
     char url[RUNTIME_TIRTC_ENDPOINT_MAX] = {0};
     esp_err_t err = runtime_config_load_endpoint(url, sizeof(url));
     if (err == ESP_ERR_NVS_NOT_FOUND) {
-        printf("EP: SDK default\n");
+        printf("Platform discovery: default\n");
         return 0;
     }
     if (err != ESP_OK) {
         printf("EP read failed: %s\n", esp_err_to_name(err));
         return 1;
     }
-    printf("EP override: %s\n", url);
+    printf("Platform discovery base: %s\n", url);
     return 0;
 }
 
@@ -477,7 +477,7 @@ static int command_ep_set(int argc, char **argv)
         printf("EP rejected or save failed: %s\n", esp_err_to_name(err));
         return 1;
     }
-    printf("EP saved: %s; restarting...\n", argv[1]);
+    printf("Platform discovery base saved: %s; restarting...\n", argv[1]);
     vTaskDelay(pdMS_TO_TICKS(300));
     esp_restart();
     return 0;
@@ -495,7 +495,7 @@ static int command_ep_reset(int argc, char **argv)
         printf("EP reset failed: %s\n", esp_err_to_name(err));
         return 1;
     }
-    printf("EP restored to default; restarting...\n");
+    printf("Platform discovery restored to default; restarting...\n");
     vTaskDelay(pdMS_TO_TICKS(300));
     esp_restart();
     return 0;
@@ -583,11 +583,11 @@ esp_err_t starter_console_start(void)
                         "starter_console", "register tirtc-set");
     ESP_RETURN_ON_ERROR(register_command("tirtc-clear", "Clear device credentials", command_tirtc_clear),
                         "starter_console", "register tirtc-clear");
-    ESP_RETURN_ON_ERROR(register_command("ep-show", "Show TiRTC EP override", command_ep_show),
+    ESP_RETURN_ON_ERROR(register_command("ep-show", "Show platform discovery base", command_ep_show),
                         "starter_console", "register ep-show");
     ESP_RETURN_ON_ERROR(register_command("ep-set", "ep-set <http(s)://host[:port][/path]", command_ep_set),
                         "starter_console", "register ep-set");
-    ESP_RETURN_ON_ERROR(register_command("ep-reset", "Clear TiRTC EP override", command_ep_reset),
+    ESP_RETURN_ON_ERROR(register_command("ep-reset", "Clear platform discovery override", command_ep_reset),
                         "starter_console", "register ep-reset");
     ESP_RETURN_ON_ERROR(register_command("restart", "Restart the device", command_restart),
                         "starter_console", "register restart");

@@ -3406,12 +3406,6 @@ static void supervisor_task(beken_thread_arg_t argument)
         rtos_delete_thread(NULL);
         return;
     }
-    char endpoint_override[XIAOTAI_ENDPOINT_MAX] = {0};
-    if (xiaotai_storage_load_endpoint(endpoint_override,
-                                      sizeof(endpoint_override)) == BK_OK) {
-        snprintf(tirtc_endpoint, sizeof(tirtc_endpoint), "%s", endpoint_override);
-        BK_LOGI(TAG, "TiRTC endpoint override=%s\n", tirtc_endpoint);
-    }
     char tirtc_client_id[18];
     if (xiaotai_platform_client_id(tirtc_client_id,
                                    sizeof(tirtc_client_id)) != BK_OK) {

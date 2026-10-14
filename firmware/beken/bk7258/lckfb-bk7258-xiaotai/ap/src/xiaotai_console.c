@@ -169,9 +169,9 @@ static void command_ep_show(char *output, int capacity, int argc, char **argv)
     }
     char url[XIAOTAI_ENDPOINT_MAX] = {0};
     if (xiaotai_storage_load_endpoint(url, sizeof(url)) != BK_OK) {
-        response(output, capacity, "EP: default (platform discovery)\r\n");
+        response(output, capacity, "Platform discovery: default\r\n");
     } else if (output != NULL && capacity > 0) {
-        snprintf(output, (size_t)capacity, "EP override: %s\r\n", url);
+        snprintf(output, (size_t)capacity, "Platform discovery base: %s\r\n", url);
     }
 }
 
@@ -184,7 +184,7 @@ static void command_ep_set(char *output, int capacity, int argc, char **argv)
     int rc = xiaotai_storage_save_endpoint(argv[1]);
     if (rc == BK_OK) rc = schedule_reboot();
     response(output, capacity, rc == BK_OK ?
-             "EP saved; restarting\r\n" : "EP rejected or save failed\r\n");
+             "Platform discovery base saved; restarting\r\n" : "EP rejected or save failed\r\n");
 }
 
 static void command_ep_reset(char *output, int capacity, int argc, char **argv)
@@ -197,7 +197,7 @@ static void command_ep_reset(char *output, int capacity, int argc, char **argv)
     int rc = xiaotai_storage_clear_endpoint();
     if (rc == BK_OK) rc = schedule_reboot();
     response(output, capacity, rc == BK_OK ?
-             "EP restored to default; restarting\r\n" : "EP reset failed\r\n");
+             "Platform discovery restored to default; restarting\r\n" : "EP reset failed\r\n");
 }
 
 static void command_wechat_call(char *output, int capacity,
@@ -447,9 +447,9 @@ static const struct cli_command s_commands[] = {
     {"wificlear", "Compatibility alias for wifi-clear", command_wifi_clear},
     {"wifi-change", "Open provisioning and retain credentials", command_wifi_change},
     {"tirtc-clear", "Clear binding and restart", command_tirtc_clear},
-    {"ep-show", "Show TiRTC EP override", command_ep_show},
+    {"ep-show", "Show platform discovery base", command_ep_show},
     {"ep-set", "ep-set <http(s)://host[:port][/path]>", command_ep_set},
-    {"ep-reset", "Clear TiRTC EP override", command_ep_reset},
+    {"ep-reset", "Clear platform discovery override", command_ep_reset},
     {"wechat-call", "wechat-call [contact name]", command_wechat_call},
     {"device-call", "device-call <contact name>", command_device_call},
     {"call-answer", "Answer the current incoming call", command_call_answer},

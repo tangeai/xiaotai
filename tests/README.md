@@ -35,7 +35,10 @@ bash tools/check.sh
 2026-10-14 串口 EP 覆盖：`test_serial_ep_override.py` 已注册到 `tools/check.sh`。
 回归测试编译两端公开持久化接口和 URL 校验函数，覆盖设置、读取、恢复默认、
 `http://ep-open.tangeopen.com/pre`、HTTPS、非法协议、空主机、用户信息、路径保留和非法端口，
-并检查串口命令与启动时覆盖项接入。
+并检查串口命令与启动时覆盖项接入。build.119（P4）、build.39（BK）、
+build.52（S3）修正后该值只作为服务发现基址，自动追加
+`/services`；TiRTC 地址由发现响应的 `tirtc-srv` 提供。回归测试先复现旧版将
+保存值直传 TiRTC 的错误，再验证 P4/S3、BK 的启动接线。
 BK 恢复出厂测试同步检查 EP 键被清除。P4 build.116、BK build.36 的串口设置、
 重启持久化、恢复默认和实际连接仍需在对应实板验证。
 

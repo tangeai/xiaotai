@@ -127,6 +127,7 @@ static void *s_online_user_data;
 static volatile bool s_provisioning;
 static volatile bool s_binding_required;
 static bool s_services_ready;
+static esp_err_t sync_clock(void);
 /* Startup/provision retries share one SNTP service owned by the startup task. */
 static bool s_sntp_initialized;
 static char s_verification_code[17];
@@ -346,11 +347,9 @@ static esp_err_t discover_services(const char *url)
               json_copy_string(root, "call-srv", s_services.call,
                                sizeof(s_services.call)) &&
               json_copy_string(root, "voip-srv", s_services.voip,
-                               sizeof(s_services.voip));
-    if (root != NULL) {
-        (void)json_copy_string(root, "tirtc-srv", s_services.tirtc,
+                               sizeof(s_services.voip)) &&
+              json_copy_string(root, "tirtc-srv", s_services.tirtc,
                                sizeof(s_services.tirtc));
-    }
     cJSON_Delete(root);
     if (!ok) {
         ESP_LOGE(TAG, "service discovery response is incomplete");
@@ -358,6 +357,25 @@ static esp_err_t discover_services(const char *url)
     }
     s_services_ready = true;
     ESP_LOGI(TAG, "service discovery complete (credentials and token hidden)");
+    return ESP_OK;
+}
+
+esp_err_t platform_client_discover_tirtc_endpoint(const char *discovery_url,
+                                                   char *output, size_t capacity)
+{
+    if (output == NULL || capacity == 0) return ESP_ERR_INVALID_ARG;
+    output[0] = '\0';
+    esp_err_t err = sync_clock();
+    if (err != ESP_OK) return err;
+    if (!s_services_ready) {
+        const char *url = discovery_url != NULL && discovery_url[0] != '\0'
+                              ? discovery_url : PLATFORM_DEFAULT_DISCOVERY;
+        err = discover_services(url);
+        if (err != ESP_OK) return err;
+    }
+    size_t length = strlen(s_services.tirtc);
+    if (length == 0 || length >= capacity) return ESP_ERR_INVALID_RESPONSE;
+    memcpy(output, s_services.tirtc, length + 1);
     return ESP_OK;
 }
 

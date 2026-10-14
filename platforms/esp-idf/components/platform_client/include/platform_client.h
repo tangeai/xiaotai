@@ -63,6 +63,10 @@ typedef struct {
     char device_secret[257];
 } platform_provision_result_t;
 
+/** Discover services before TiRTC bootstrap and copy the returned tirtc-srv. */
+esp_err_t platform_client_discover_tirtc_endpoint(const char *discovery_url,
+                                                   char *output, size_t capacity);
+
 /**
  * 异步 HTTP 结果；传输失败时 body 为 NULL，其他情况下只在回调期间有效。
  */

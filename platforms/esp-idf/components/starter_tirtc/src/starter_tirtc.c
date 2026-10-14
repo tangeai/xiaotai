@@ -746,7 +746,7 @@ int starter_tirtc_start(const starter_tirtc_config_t *config)
         if (rc != 0) {
             return rollback_start("TiRtcSetOption(SERVICE_ENDPOINT)", rc);
         }
-        ESP_LOGI(TAG, "TiRTC endpoint override=%s", config->service_endpoint);
+        ESP_LOGI(TAG, "TiRTC endpoint from service discovery=%s", config->service_endpoint);
     }
     rc = set_string_option(TIRTC_OPT_DEVICE_SECRET_KEY, config->device_secret);
     if (rc != 0) {

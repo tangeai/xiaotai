@@ -32,7 +32,7 @@ bool runtime_config_endpoint_valid(const char *url)
     else return false;
     size_t length = 0;
     while (length < RUNTIME_TIRTC_ENDPOINT_MAX && url[length] != '\0') ++length;
-    if (length >= RUNTIME_TIRTC_ENDPOINT_MAX || *host == '\0') return false;
+    if (length >= RUNTIME_TIRTC_ENDPOINT_MAX - sizeof("/services") || *host == '\0') return false;
     const char *p = host;
     while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
            (*p >= '0' && *p <= '9') || *p == '.' || *p == '-') ++p;
@@ -53,6 +53,18 @@ bool runtime_config_endpoint_valid(const char *url)
         }
     }
     return *p == '\0';
+}
+
+bool runtime_config_format_discovery_url(const char *base, char *output, size_t capacity)
+{
+    if (base == NULL || output == NULL || capacity == 0) return false;
+    size_t length = strlen(base);
+    while (length > 0 && base[length - 1] == '/') --length;
+    static const char suffix[] = "/services";
+    if (length == 0 || length + sizeof(suffix) > capacity) return false;
+    memcpy(output, base, length);
+    memcpy(output + length, suffix, sizeof(suffix));
+    return true;
 }
 
 esp_err_t runtime_config_load_endpoint(char *output, size_t capacity)

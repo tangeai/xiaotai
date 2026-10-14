@@ -56,7 +56,9 @@
 
 static const char *TAG = "starter_main";
 static runtime_tirtc_config_t s_tirtc_config;
-static char s_tirtc_endpoint_override[RUNTIME_TIRTC_ENDPOINT_MAX];
+static char s_discovery_base[RUNTIME_TIRTC_ENDPOINT_MAX];
+static char s_discovery_url[RUNTIME_TIRTC_ENDPOINT_MAX];
+static char s_tirtc_endpoint[RUNTIME_TIRTC_ENDPOINT_MAX];
 static void *s_tirtc_internal_reserve;
 
 static void on_local_voice_result(const starter_voice_result_t *result, void *user_data)
@@ -192,7 +194,7 @@ static esp_err_t provision_and_save(const char *mac_address, bool signed_rebind)
         .existing_device_secret = signed_rebind
                                       ? s_tirtc_config.device_secret
                                       : NULL,
-        .discovery_url = DISCOVERY_URL,
+        .discovery_url = s_discovery_url,
         .timeout_seconds = 190,
         .prompt_callback = play_verification_prompt,
         .prompt_cancel_callback = cancel_verification_prompt,
@@ -230,6 +232,19 @@ static void starter_start_task(void *argument)
     while (station_identity(mac_address, default_client_id) != ESP_OK) {
         ESP_LOGW(TAG, "station identity unavailable; retrying");
         vTaskDelay(pdMS_TO_TICKS(START_RETRY_DELAY_MS));
+    }
+
+    esp_err_t discovery_err = runtime_config_load_endpoint(s_discovery_base,
+                                                           sizeof(s_discovery_base));
+    if (discovery_err == ESP_OK &&
+        runtime_config_format_discovery_url(s_discovery_base, s_discovery_url,
+                                            sizeof(s_discovery_url))) {
+        ESP_LOGI(TAG, "platform discovery URL=%s", s_discovery_url);
+    } else {
+        if (discovery_err != ESP_OK && discovery_err != ESP_ERR_NVS_NOT_FOUND)
+            ESP_LOGW(TAG, "platform discovery override ignored: %s",
+                     esp_err_to_name(discovery_err));
+        (void)snprintf(s_discovery_url, sizeof(s_discovery_url), "%s", DISCOVERY_URL);
     }
 
     /* NVS 没有有效凭证时进入验证码绑定，成功后再继续正常启动。 */
@@ -287,7 +302,7 @@ static void starter_start_task(void *argument)
         .device_secret = s_tirtc_config.device_secret,
         .client_id = s_tirtc_config.client_id,
         .mac_address = mac_address,
-        .discovery_url = DISCOVERY_URL,
+        .discovery_url = s_discovery_url,
     };
     /*
      * 平台信令和 SDK 独立重试。platform_client_start() 返回 NOT_FOUND 表示
@@ -307,10 +322,13 @@ static void starter_start_task(void *argument)
          * fragment the remaining internal heap.
          */
         if (!tirtc_submitted) {
-            esp_err_t endpoint_err = runtime_config_load_endpoint(s_tirtc_endpoint_override,
-                                                                  sizeof(s_tirtc_endpoint_override));
-            if (endpoint_err != ESP_OK && endpoint_err != ESP_ERR_NVS_NOT_FOUND) {
-                ESP_LOGW(TAG, "TiRTC endpoint override ignored: %s", esp_err_to_name(endpoint_err));
+            esp_err_t endpoint_err = platform_client_discover_tirtc_endpoint(
+                s_discovery_url, s_tirtc_endpoint, sizeof(s_tirtc_endpoint));
+            if (endpoint_err != ESP_OK) {
+                ESP_LOGE(TAG, "TiRTC service discovery unavailable: %s",
+                         esp_err_to_name(endpoint_err));
+                vTaskDelay(pdMS_TO_TICKS(START_RETRY_DELAY_MS));
+                continue;
             }
             log_heap_snapshot("pre-tirtc-bootstrap");
             if (s_tirtc_internal_reserve != NULL) {
@@ -324,7 +342,7 @@ static void starter_start_task(void *argument)
                 .device_id = s_tirtc_config.device_id,
                 .device_secret = s_tirtc_config.device_secret,
                 .client_id = s_tirtc_config.client_id,
-                .service_endpoint = endpoint_err == ESP_OK ? s_tirtc_endpoint_override : NULL,
+                .service_endpoint = s_tirtc_endpoint,
                 /* 由板级媒体合同配置：P4 的 H264 访问单元可达 256 KiB，
                  * 全双工音视频需要更大余量，避免一个峰值帧堵住音频。 */
                 .max_send_buffer_bytes = CONFIG_XIAOTAI_TIRTC_MAX_SEND_BUFFER_BYTES,

@@ -26,11 +26,13 @@ typedef struct {
 
 #define RUNTIME_TIRTC_ENDPOINT_MAX 256
 
-/** Optional signaling EP override. NOT_FOUND means use SDK/platform default. */
+/** Optional platform discovery base. NOT_FOUND means use compiled discovery URL. */
 esp_err_t runtime_config_load_endpoint(char *output, size_t capacity);
 esp_err_t runtime_config_save_endpoint(const char *url);
 esp_err_t runtime_config_clear_endpoint(void);
 bool runtime_config_endpoint_valid(const char *url);
+/** Append /services to a saved base, accepting a trailing slash. */
+bool runtime_config_format_discovery_url(const char *base, char *output, size_t capacity);
 
 /** 从 tirtc_cfg 命名空间加载凭证；失败时清空输出结构。 */
 esp_err_t runtime_config_load_tirtc(runtime_tirtc_config_t *config);

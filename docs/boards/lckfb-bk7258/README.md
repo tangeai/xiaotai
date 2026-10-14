@@ -1,7 +1,8 @@
 # 立创·实战派 BK7258
 
-串口修改 TiRTC EP：`ep-show` 查看覆盖项，`ep-set http://ep-open.tangeopen.com/pre`
-保存新地址并重启，`ep-reset` 删除覆盖项并重启，恢复平台服务发现下发的地址。
+串口修改平台服务发现基址：`ep-show` 查看覆盖项，`ep-set http://ep-open.tangeopen.com/pre`
+保存后重启并请求 `/pre/services`，`ep-reset` 删除覆盖项并重启。
+TiRTC 地址始终取自 `/services` 响应的 `tirtc-srv`。
 命令接受带 `http://` 或 `https://` 的主机地址，可附端口和路径；不接受查询参数或片段。
 
 本文中的 H5 指网页端，AI 指人工智能对讲，AEC 指声学回声消除，

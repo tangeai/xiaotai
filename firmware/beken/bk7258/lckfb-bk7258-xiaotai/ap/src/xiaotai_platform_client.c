@@ -25,6 +25,7 @@
 #include "xiaotai_audio.h"
 #include "xiaotai_network.h"
 #include "xiaotai_pcm_stream.h"
+#include "xiaotai_storage.h"
 #include "xiaotai_time.h"
 #include "xiaotai_ui.h"
 
@@ -98,7 +99,7 @@ static char s_service_token[MQTT_TOKEN_MAX];
 static const char s_device_profile[] =
     "{\"hardware\":{\"chip_model\":\"BK7258\","
     "\"board_model\":\"lckfb-bk7258\"},"
-    "\"firmware_version\":\"1.0.0+build.38\","
+    "\"firmware_version\":\"1.0.0+build.39\","
     "\"profiles\":{\"stream\":{\"up_audio_streamid\":10,"
     "\"up_video_streamid\":11,\"down_audio_streamid\":14,"
     "\"down_video_streamid\":15,\"up_audio_mt\":[\"alaw\"],"
@@ -287,9 +288,19 @@ static int http_json_request(const char *url, const char *body,
 
 static int discover_services(platform_services_t *services)
 {
+    char discovery_base[XIAOTAI_ENDPOINT_MAX] = {0};
+    char discovery_url[XIAOTAI_ENDPOINT_MAX] = {0};
+    if (xiaotai_storage_load_endpoint(discovery_base, sizeof(discovery_base)) == BK_OK) {
+        if (!xiaotai_storage_format_discovery_url(discovery_base, discovery_url,
+                                                  sizeof(discovery_url))) return BK_FAIL;
+        BK_LOGI(TAG, "platform discovery URL=%s\n", discovery_url);
+    } else {
+        snprintf(discovery_url, sizeof(discovery_url), "%s",
+                 XIAOTAI_PLATFORM_DISCOVERY_URL);
+    }
     char *response = NULL;
     size_t response_size = 0;
-    int rc = http_json_request(XIAOTAI_PLATFORM_DISCOVERY_URL, NULL,
+    int rc = http_json_request(discovery_url, NULL,
                                &response, &response_size);
     if (rc != BK_OK) return rc;
     (void)response_size;

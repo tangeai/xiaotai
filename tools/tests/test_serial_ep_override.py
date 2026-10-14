@@ -13,6 +13,8 @@ P4_SDK = ROOT / "platforms/esp-idf/components/starter_tirtc/src/starter_tirtc.c"
 BK_STORAGE = ROOT / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_storage.c"
 BK_CONSOLE = ROOT / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_console.c"
 BK_APP = ROOT / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_app.c"
+P4_PLATFORM = ROOT / "platforms/esp-idf/components/platform_client/src/platform_client.c"
+BK_PLATFORM = ROOT / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_platform_client.c"
 S3_CONSOLE_CMAKE = ROOT / "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/components/starter_console/CMakeLists.txt"
 S3_CONFIG_CMAKE = ROOT / "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/components/runtime_config/CMakeLists.txt"
 S3_MAIN_CMAKE = ROOT / "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/main/CMakeLists.txt"
@@ -159,14 +161,44 @@ int main(void) {
         self.assertIn("runtime_config_clear_endpoint()", p4)
         self.assertIn("xiaotai_storage_save_endpoint(argv[1])", bk)
         self.assertIn("xiaotai_storage_clear_endpoint()", bk)
+        self.assertIn("Platform discovery base:", p4)
+        self.assertIn("Platform discovery base:", bk)
 
-    def test_boot_override_reaches_sdk_and_reset_restores_default(self):
+    def test_saved_base_forms_services_url(self):
+        for path, name in ((P4_CONFIG, "runtime_config_format_discovery_url"),
+                           (BK_STORAGE, "xiaotai_storage_format_discovery_url")):
+            with self.subTest(board=path.name):
+                run_c('''
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+''' + function(path.read_text(), name) + f'''
+int main(void) {{
+    char url[256];
+    assert({name}("http://ep-open.tangeopen.com/pre", url, sizeof(url)));
+    assert(!strcmp(url, "http://ep-open.tangeopen.com/pre/services"));
+    assert({name}("http://ep-open.tangeopen.com/pre/", url, sizeof(url)));
+    assert(!strcmp(url, "http://ep-open.tangeopen.com/pre/services"));
+    assert(!{name}("http://host", url, 8));
+}}
+''')
+
+    def test_boot_override_selects_discovery_and_tirtc_uses_response(self):
         p4_start = P4_START.read_text()
-        self.assertIn("runtime_config_load_endpoint(s_tirtc_endpoint_override", p4_start)
-        self.assertIn(".service_endpoint = endpoint_err == ESP_OK ? s_tirtc_endpoint_override : NULL", p4_start)
+        self.assertIn("runtime_config_load_endpoint(s_discovery_base", p4_start)
+        self.assertIn(".discovery_url = s_discovery_url", p4_start)
+        self.assertIn("platform_client_discover_tirtc_endpoint", p4_start)
+        self.assertLess(p4_start.index("platform_client_discover_tirtc_endpoint"),
+                        p4_start.index("starter_tirtc_start(&tirtc)"))
+        self.assertIn(".service_endpoint = s_tirtc_endpoint", p4_start)
+        self.assertNotIn(".service_endpoint = endpoint_err", p4_start)
+        self.assertIn('"tirtc-srv", s_services.tirtc', P4_PLATFORM.read_text())
         self.assertIn("TIRTC_OPT_SERVICE_ENDPOINT, config->service_endpoint", P4_SDK.read_text())
         bk_app = BK_APP.read_text()
-        self.assertIn("xiaotai_storage_load_endpoint(endpoint_override", bk_app)
+        self.assertNotIn("xiaotai_storage_load_endpoint(endpoint_override", bk_app)
+        self.assertIn("xiaotai_storage_load_endpoint(discovery_base", BK_PLATFORM.read_text())
+        self.assertIn("http_json_request(discovery_url", BK_PLATFORM.read_text())
         self.assertIn("snprintf(s_tirtc_endpoint, sizeof(s_tirtc_endpoint)", bk_app)
         self.assertIn("XIAOTAI_ENDPOINT_KEY", BK_STORAGE.read_text())
 

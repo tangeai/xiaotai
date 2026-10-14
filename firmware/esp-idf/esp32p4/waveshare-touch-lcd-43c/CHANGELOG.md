@@ -4,6 +4,12 @@
 [`main/media/media_tuning.h`](main/media/media_tuning.h) 和
 [媒体合同](../../../../docs/product/MEDIA_CONTRACT.md)为准；这里的实板数字只对应所注明的固件。
 
+## 1.0.0+build.119（2026-10-14）
+
+- 修正 `ep-set` 的作用层级：保存平台服务发现基址，启动时追加 `/services`。
+- TiRTC 地址从发现响应的 `tirtc-srv` 读取，不再使用保存的基址作为信令地址。
+- P4/S3 共享启动实现；主机回归与三板编译通过，实板连接待验证。
+
 ## 1.0.0+build.118（2026-10-14）
 
 - EP 串口命令统一为 `ep-show`、`ep-set <URL>`、`ep-reset`，与 `wifi-set` 风格一致。
