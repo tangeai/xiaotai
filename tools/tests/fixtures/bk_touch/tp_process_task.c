@@ -60,7 +60,7 @@ void tp_process_task(beken_thread_arg_t arg)
 			{
 				if (attempt > 1U)
 				{
-					LOGI("%s read recovered after attempt=%u.\r\n",
+					LOGD("%s read recovered after attempt=%u.\r\n",
 						__func__, (unsigned)attempt);
 				}
 				consecutive_read_failures = 0;

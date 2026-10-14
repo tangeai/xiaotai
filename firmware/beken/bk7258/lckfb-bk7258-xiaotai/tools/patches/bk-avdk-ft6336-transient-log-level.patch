@@ -1,0 +1,27 @@
+diff --git a/ap/components/bk_peripheral/src/tp/tp_ft6336.c b/ap/components/bk_peripheral/src/tp/tp_ft6336.c
+--- a/ap/components/bk_peripheral/src/tp/tp_ft6336.c
++++ b/ap/components/bk_peripheral/src/tp/tp_ft6336.c
+@@ -128,5 +128,5 @@ int ft6336_read_status(const tp_i2c_callback_t *cb, uint8_t *status)
+ 	if (BK_OK != SENSOR_I2C_READ(FT6336_STATUS, (uint8_t *)(status), 1))
+ 	{
+-		LOGE("%s, read status reg fail!\r\n", __func__);
++		LOGD("%s, read status reg fail!\r\n", __func__);
+ 		return BK_FAIL;
+ 	}
+@@ -235,6 +235,6 @@ int ft6336_read_tp_info(const tp_i2c_callback_t *cb, uint8_t max_num, uint8_t *
+ 	if (BK_OK != ft6336_read_status(cb, &temp_status) )
+ 	{
+-		LOGE("%s, read tp info fail!\r\n", __func__);
++		LOGD("%s, read tp info fail!\r\n", __func__);
+ 		ret = BK_FAIL;
+ 		goto exit_;
+ 	}
+@@ -244,6 +244,6 @@ int ft6336_read_tp_info(const tp_i2c_callback_t *cb, uint8_t max_num, uint8_t *
+ 	os_memset(read_buff, 0x00, sizeof(read_buff));
+ 	if (BK_OK != SENSOR_I2C_READ(FT6336_POINT1_REG, (uint8_t *)read_buff, sizeof(read_buff)))
+ 	{
+-		LOGE("%s, read tp info fail!\r\n", __func__);
++		LOGD("%s, read tp info fail!\r\n", __func__);
+ 		ret = BK_FAIL;
+ 		goto exit_;
+ 	}

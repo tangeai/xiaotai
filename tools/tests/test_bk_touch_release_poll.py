@@ -40,6 +40,7 @@ class BkTouchReleasePoll(unittest.TestCase):
 #define LOGE(...) printf(__VA_ARGS__)
 #define LOGW(...) printf(__VA_ARGS__)
 #define LOGI(...) printf(__VA_ARGS__)
+#define LOGD(...) ((void)0)
 #define LOGV(...) ((void)0)
 #define BK_LOG_ON_ERR(...) ((void)0)
 #define os_memset memset
