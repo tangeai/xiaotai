@@ -4,6 +4,17 @@
 [`main/media/media_tuning.h`](main/media/media_tuning.h) 和
 [媒体合同](../../../../docs/product/MEDIA_CONTRACT.md)为准；这里的实板数字只对应所注明的固件。
 
+## 1.0.0+build.118（2026-10-14）
+
+- EP 串口命令统一为 `ep-show`、`ep-set <URL>`、`ep-reset`，与 `wifi-set` 风格一致。
+- 保留含路径的 EP 地址支持；`ep-set http://ep-open.tangeopen.com/pre` 可以保存，
+  重启后按原样传给 TiRTC SDK。
+
+## 1.0.0+build.117（2026-10-14，未发布）
+
+- 修复串口 EP 地址校验拒绝 `/pre` 路径。
+- P4 与 BK7258 的公开持久化接口增加路径往返回归；实际服务连接仍待实板验证。
+
 ## 1.0.0+build.116（2026-10-14）
 
 - 新增串口 `ep show|set <URL>|reset`，持久化 TiRTC EP 地址并在重启后生效。

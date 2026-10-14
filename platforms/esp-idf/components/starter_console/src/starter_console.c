@@ -445,40 +445,57 @@ static int command_tirtc_clear(int argc, char **argv)
     return 0;
 }
 
-static int command_ep(int argc, char **argv)
+static int command_ep_show(int argc, char **argv)
 {
-    if (argc == 2 && strcmp(argv[1], "show") == 0) {
-        char url[RUNTIME_TIRTC_ENDPOINT_MAX] = {0};
-        esp_err_t err = runtime_config_load_endpoint(url, sizeof(url));
-        if (err == ESP_ERR_NVS_NOT_FOUND) {
-            printf("EP: SDK default\n");
-            return 0;
-        }
-        if (err != ESP_OK) {
-            printf("EP read failed: %s\n", esp_err_to_name(err));
-            return 1;
-        }
-        printf("EP override: %s\n", url);
-        return 0;
-    }
-    if (argc == 2 && strcmp(argv[1], "reset") == 0) {
-        esp_err_t err = runtime_config_clear_endpoint();
-        if (err != ESP_OK) {
-            printf("EP reset failed: %s\n", esp_err_to_name(err));
-            return 1;
-        }
-        printf("EP restored to default; restarting...\n");
-    } else if (argc == 3 && strcmp(argv[1], "set") == 0) {
-        esp_err_t err = runtime_config_save_endpoint(argv[2]);
-        if (err != ESP_OK) {
-            printf("EP rejected or save failed: %s\n", esp_err_to_name(err));
-            return 1;
-        }
-        printf("EP saved: %s; restarting...\n", argv[2]);
-    } else {
-        printf("usage: ep show|set <http(s)://host[:port]>|reset\n");
+    (void)argv;
+    if (argc != 1) {
+        printf("usage: ep-show\n");
         return 1;
     }
+    char url[RUNTIME_TIRTC_ENDPOINT_MAX] = {0};
+    esp_err_t err = runtime_config_load_endpoint(url, sizeof(url));
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        printf("EP: SDK default\n");
+        return 0;
+    }
+    if (err != ESP_OK) {
+        printf("EP read failed: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("EP override: %s\n", url);
+    return 0;
+}
+
+static int command_ep_set(int argc, char **argv)
+{
+    if (argc != 2) {
+        printf("usage: ep-set <http(s)://host[:port][/path]>\n");
+        return 1;
+    }
+    esp_err_t err = runtime_config_save_endpoint(argv[1]);
+    if (err != ESP_OK) {
+        printf("EP rejected or save failed: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("EP saved: %s; restarting...\n", argv[1]);
+    vTaskDelay(pdMS_TO_TICKS(300));
+    esp_restart();
+    return 0;
+}
+
+static int command_ep_reset(int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) {
+        printf("usage: ep-reset\n");
+        return 1;
+    }
+    esp_err_t err = runtime_config_clear_endpoint();
+    if (err != ESP_OK) {
+        printf("EP reset failed: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("EP restored to default; restarting...\n");
     vTaskDelay(pdMS_TO_TICKS(300));
     esp_restart();
     return 0;
@@ -566,8 +583,12 @@ esp_err_t starter_console_start(void)
                         "starter_console", "register tirtc-set");
     ESP_RETURN_ON_ERROR(register_command("tirtc-clear", "Clear device credentials", command_tirtc_clear),
                         "starter_console", "register tirtc-clear");
-    ESP_RETURN_ON_ERROR(register_command("ep", "ep show|set <http(s)://host[:port]>|reset", command_ep),
-                        "starter_console", "register ep");
+    ESP_RETURN_ON_ERROR(register_command("ep-show", "Show TiRTC EP override", command_ep_show),
+                        "starter_console", "register ep-show");
+    ESP_RETURN_ON_ERROR(register_command("ep-set", "ep-set <http(s)://host[:port][/path]", command_ep_set),
+                        "starter_console", "register ep-set");
+    ESP_RETURN_ON_ERROR(register_command("ep-reset", "Clear TiRTC EP override", command_ep_reset),
+                        "starter_console", "register ep-reset");
     ESP_RETURN_ON_ERROR(register_command("restart", "Restart the device", command_restart),
                         "starter_console", "register restart");
 

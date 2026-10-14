@@ -33,25 +33,26 @@ bool runtime_config_endpoint_valid(const char *url)
     size_t length = 0;
     while (length < RUNTIME_TIRTC_ENDPOINT_MAX && url[length] != '\0') ++length;
     if (length >= RUNTIME_TIRTC_ENDPOINT_MAX || *host == '\0') return false;
-    size_t host_length = 0;
-    for (const char *p = host; *p != '\0'; ++p) {
-        char c = *p;
-        if (c == ':') {
-            if (host_length == 0 || p[1] == '\0') return false;
-            unsigned port = 0;
-            for (++p; *p != '\0'; ++p) {
-                if (*p < '0' || *p > '9') return false;
-                port = port * 10U + (unsigned)(*p - '0');
-                if (port > 65535U) return false;
-            }
-            if (port == 0U) return false;
-            break;
+    const char *p = host;
+    while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+           (*p >= '0' && *p <= '9') || *p == '.' || *p == '-') ++p;
+    if (p == host) return false;
+    if (*p == ':') {
+        unsigned port = 0;
+        if (*++p < '0' || *p > '9') return false;
+        while (*p >= '0' && *p <= '9') {
+            port = port * 10U + (unsigned)(*p++ - '0');
+            if (port > 65535U) return false;
         }
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-              (c >= '0' && c <= '9') || c == '.' || c == '-')) return false;
-        ++host_length;
+        if (port == 0U) return false;
     }
-    return host_length > 0;
+    if (*p == '/') {
+        for (; *p != '\0'; ++p) {
+            unsigned char c = (unsigned char)*p;
+            if (c <= 0x20 || c >= 0x7f || c == '?' || c == '#' || c == '\\') return false;
+        }
+    }
+    return *p == '\0';
 }
 
 esp_err_t runtime_config_load_endpoint(char *output, size_t capacity)

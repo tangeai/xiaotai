@@ -1,8 +1,8 @@
 # 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3
 
-串口修改 TiRTC EP：`ep show` 查看覆盖项，`ep set http://ep-open.tangeopen.com`
-保存新地址并重启，`ep reset` 删除覆盖项并重启，恢复 SDK 默认地址。
-命令仅接受带 `http://` 或 `https://` 的主机地址，可附端口，不接受路径。
+串口修改 TiRTC EP：`ep-show` 查看覆盖项，`ep-set http://ep-open.tangeopen.com/pre`
+保存新地址并重启，`ep-reset` 删除覆盖项并重启，恢复 SDK 默认地址。
+命令接受带 `http://` 或 `https://` 的主机地址，可附端口和路径；不接受查询参数或片段。
 
 本文中的 H5 指网页端，AI 指人工智能对讲，AEC 指声学回声消除，
 VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的大块运行内存。

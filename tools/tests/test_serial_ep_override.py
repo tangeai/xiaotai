@@ -16,7 +16,7 @@ BK_APP = ROOT / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_app.c
 
 
 class SerialEndpointOverride(unittest.TestCase):
-    def test_both_validators_accept_http_example_and_reject_malformed_urls(self):
+    def test_both_validators_accept_path_and_reject_malformed_urls(self):
         p4 = function(P4_CONFIG.read_text(), "runtime_config_endpoint_valid")
         bk = function(BK_STORAGE.read_text(), "endpoint_valid")
         for name, source, limit in (("p4", p4, "RUNTIME_TIRTC_ENDPOINT_MAX"),
@@ -31,12 +31,16 @@ class SerialEndpointOverride(unittest.TestCase):
 {source}
 int main(void) {{
     assert({name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("http://ep-open.tangeopen.com"));
+    assert({name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("http://ep-open.tangeopen.com/pre"));
     assert({name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("https://ep.example.com:8443"));
+    assert({name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("https://ep.example.com:8443/pre/v1"));
     assert(!{name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}(""));
     assert(!{name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("ftp://ep.example.com"));
     assert(!{name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("http://"));
     assert(!{name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("http://user@host"));
-    assert(!{name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("http://host/path"));
+    assert(!{name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("http://host/pre?token=x"));
+    assert(!{name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("http://host/pre#fragment"));
+    assert(!{name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("http://host/pre path"));
     assert(!{name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("http://host:bad"));
     assert(!{name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("http://host:0"));
     assert(!{name == 'p4' and 'runtime_config_endpoint_valid' or 'endpoint_valid'}("http://host:65536"));
@@ -89,10 +93,10 @@ static void nvs_close(nvs_handle_t h) {}
 int main(void) {
     char out[256];
     assert(runtime_config_load_endpoint(out,sizeof(out))==ESP_ERR_NVS_NOT_FOUND && !out[0]);
-    assert(runtime_config_save_endpoint("http://ep-open.tangeopen.com")==ESP_OK);
+    assert(runtime_config_save_endpoint("http://ep-open.tangeopen.com/pre")==ESP_OK);
     assert(commits==1);
     assert(runtime_config_load_endpoint(out,sizeof(out))==ESP_OK);
-    assert(!strcmp(out,"http://ep-open.tangeopen.com"));
+    assert(!strcmp(out,"http://ep-open.tangeopen.com/pre"));
     assert(runtime_config_save_endpoint("ftp://bad")==ESP_ERR_INVALID_ARG);
     assert(runtime_config_clear_endpoint()==ESP_OK && commits==2);
     assert(runtime_config_load_endpoint(out,sizeof(out))==ESP_ERR_NVS_NOT_FOUND && !out[0]);
@@ -131,9 +135,9 @@ static size_t ef_get_env_blob(const char *key,void *out,size_t capacity,size_t *
 int main(void) {
     char out[256];
     assert(xiaotai_storage_load_endpoint(out,sizeof(out))==BK_FAIL && !out[0]);
-    assert(xiaotai_storage_save_endpoint("http://ep-open.tangeopen.com")==BK_OK && saves==1);
+    assert(xiaotai_storage_save_endpoint("http://ep-open.tangeopen.com/pre")==BK_OK && saves==1);
     assert(xiaotai_storage_load_endpoint(out,sizeof(out))==BK_OK);
-    assert(!strcmp(out,"http://ep-open.tangeopen.com"));
+    assert(!strcmp(out,"http://ep-open.tangeopen.com/pre"));
     assert(xiaotai_storage_save_endpoint("ftp://bad")==BK_ERR_PARAM && saves==1);
     assert(xiaotai_storage_clear_endpoint()==BK_OK && clears==1);
     assert(xiaotai_storage_load_endpoint(out,sizeof(out))==BK_FAIL && !out[0]);
@@ -141,15 +145,17 @@ int main(void) {
 ''')
 
     def test_serial_commands_persist_and_reboot(self):
-        for source in (P4_CONSOLE.read_text(), BK_CONSOLE.read_text()):
-            self.assertIn('"ep"', source)
-            self.assertIn('"show"', source)
-            self.assertIn('"set"', source)
-            self.assertIn('"reset"', source)
-        self.assertIn("runtime_config_save_endpoint(argv[2])", P4_CONSOLE.read_text())
-        self.assertIn("runtime_config_clear_endpoint()", P4_CONSOLE.read_text())
-        self.assertIn("xiaotai_storage_save_endpoint(argv[2])", BK_CONSOLE.read_text())
-        self.assertIn("xiaotai_storage_clear_endpoint()", BK_CONSOLE.read_text())
+        p4 = P4_CONSOLE.read_text()
+        bk = BK_CONSOLE.read_text()
+        for name in ("ep-show", "ep-set", "ep-reset"):
+            self.assertIn(f'register_command("{name}"', p4)
+            self.assertIn(f'{{"{name}",', bk)
+        self.assertNotIn('register_command("ep",', p4)
+        self.assertNotIn('{"ep",', bk)
+        self.assertIn("runtime_config_save_endpoint(argv[1])", p4)
+        self.assertIn("runtime_config_clear_endpoint()", p4)
+        self.assertIn("xiaotai_storage_save_endpoint(argv[1])", bk)
+        self.assertIn("xiaotai_storage_clear_endpoint()", bk)
 
     def test_boot_override_reaches_sdk_and_reset_restores_default(self):
         p4_start = P4_START.read_text()
