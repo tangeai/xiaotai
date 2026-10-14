@@ -39,8 +39,8 @@ bash tools/check.sh
 ```
 
 普通构建保留 DEBUG 日志，便于开发联调。正式发布时使用
-`python3 tools/build.py --board lckfb-bk7258 --release`；该命令会按版本规则递增
-`+build.n`，并将 AP、CP 和小钛应用日志统一限制到 INFO，仍保留 INFO、WARN 和 ERROR，
+`python3 tools/build.py --board lckfb-bk7258 --release`；该命令不修改版本号，
+并将 AP、CP 和小钛应用日志统一限制到 INFO，仍保留 INFO、WARN 和 ERROR，
 但不输出 DEBUG 载荷。WARN 仅适合故障定位非常有限的特殊固件，不作为默认发布级别。
 
 生成物由构建脚本统一复制到 `output/`。工程内的 `build/`、日志和自动化测试报告不提交。

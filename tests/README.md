@@ -32,6 +32,10 @@ bash tools/check.sh
 
 ## 测试驱动开发约定
 
+固件版本由发布负责人指定为 `major.minor.patch`。`test_firmware_versions.py`
+验证所有板卡、设备能力上报和构建调度；实际编译与失败重试都不改版本。
+同版本产物以源码提交号和 SHA-256 区分。
+
 2026-10-14 串口 EP 覆盖：`test_serial_ep_override.py` 已注册到 `tools/check.sh`。
 回归测试编译两端公开持久化接口和 URL 校验函数，覆盖设置、读取、恢复默认、
 `http://ep-open.tangeopen.com/pre`、HTTPS、非法协议、空主机、用户信息、路径保留和非法端口，

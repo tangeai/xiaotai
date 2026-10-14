@@ -21,7 +21,7 @@ def project_version(project_dir):
     match = re.search(r'set\(PROJECT_VER\s+"([^"]+)"\)',
                       (project_dir / "CMakeLists.txt").read_text())
     assert match is not None
-    assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+\+build\.[1-9][0-9]*",
+    assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+",
                         match.group(1))
     return match.group(1)
 assert p4["hardware"] == {

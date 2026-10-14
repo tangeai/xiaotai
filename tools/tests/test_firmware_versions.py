@@ -12,22 +12,21 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 from build import build_environment
 import build
-from firmware_version import FirmwareVersion, bump_board_build
+from firmware_version import FirmwareVersion, read_board_version
 
 
-SEMVER = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+\+build\.[1-9][0-9]*")
+SEMVER = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 
 
 class FirmwareVersionTests(unittest.TestCase):
-    def test_build_metadata_increments_without_changing_product_version(self) -> None:
-        version = FirmwareVersion.parse("1.2.3+build.9")
-        self.assertEqual(str(version.bump_build()), "1.2.3+build.10")
+    def test_release_version_has_no_automatic_build_suffix(self) -> None:
+        self.assertEqual(str(FirmwareVersion.parse("1.2.3")), "1.2.3")
         with self.assertRaises(ValueError):
-            FirmwareVersion.parse("1.2.3")
+            FirmwareVersion.parse("1.2.3+build.9")
         with self.assertRaises(ValueError):
             FirmwareVersion.parse("1.2.4-rc.1")
 
-    def test_all_board_firmware_versions_use_semver_build_metadata(self) -> None:
+    def test_all_board_firmware_versions_use_user_selected_semver(self) -> None:
         projects = (
             "firmware/esp-idf/esp32s3/atk-dnesp32s3/CMakeLists.txt",
             "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/CMakeLists.txt",
@@ -55,9 +54,9 @@ class FirmwareVersionTests(unittest.TestCase):
         def command(*unused):
             events.append("validate-selection")
             return ["idf.py", "build"], REPO_ROOT
-        def bump(*unused):
-            events.append("bump")
-            return FirmwareVersion.parse("1.0.0+build.2")
+        def read(*unused):
+            events.append("read")
+            return FirmwareVersion.parse("1.0.0")
         def compile(*unused, **kwargs):
             events.append("compile")
             return SimpleNamespace(returncode=return_code)
@@ -65,7 +64,7 @@ class FirmwareVersionTests(unittest.TestCase):
              mock.patch.object(build, "load_boards", return_value=[board]), \
              mock.patch.object(build, "find_board", return_value=board), \
              mock.patch.object(build, "print_build", side_effect=command), \
-             mock.patch.object(build, "bump_board_build", side_effect=bump), \
+             mock.patch.object(build, "read_board_version", side_effect=read), \
              mock.patch.object(build, "prepare_dependency_lock"), \
              mock.patch.object(build, "normalize_dependency_lock", return_value=False), \
              mock.patch.object(build.subprocess, "run", side_effect=compile), \
@@ -73,18 +72,18 @@ class FirmwareVersionTests(unittest.TestCase):
             result = build.main()
         return result, events
 
-    def test_every_real_build_bumps_once_before_compiling(self) -> None:
+    def test_every_real_build_reads_version_without_changing_it(self) -> None:
         for release in (False, True):
             with self.subTest(release=release):
                 self.assertEqual(self.dispatch(release=release),
-                                 (0, ["validate-selection", "bump", "compile"]))
+                                 (0, ["validate-selection", "read", "compile"]))
 
     def test_dry_run_does_not_change_version(self) -> None:
         self.assertEqual(self.dispatch(dry_run=True), (0, ["validate-selection"]))
 
-    def test_failed_build_keeps_its_unique_attempt_number(self) -> None:
+    def test_failed_build_does_not_change_version(self) -> None:
         self.assertEqual(self.dispatch(return_code=1),
-                         (1, ["validate-selection", "bump", "compile"]))
+                         (1, ["validate-selection", "read", "compile"]))
 
     def test_release_build_exports_release_profile(self) -> None:
         self.assertEqual(
@@ -98,7 +97,7 @@ class FirmwareVersionTests(unittest.TestCase):
             {"KEEP": "yes"},
         )
 
-    def test_bump_updates_only_the_selected_shared_profile(self) -> None:
+    def test_read_board_version_does_not_edit_project_or_profile(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             project = root / "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai"
@@ -106,29 +105,29 @@ class FirmwareVersionTests(unittest.TestCase):
             project.mkdir(parents=True)
             profile.mkdir(parents=True)
             (project / "CMakeLists.txt").write_text(
-                'set(PROJECT_VER "1.0.0+build.1")\n', encoding="utf-8"
+                'set(PROJECT_VER "1.0.0")\n', encoding="utf-8"
             )
             profile_file = profile / "starter_runtime.c"
             profile_file.write_text(
                 '"board_model":"waveshare-esp32p4-touch-lcd-43c-v10"},'
-                '"firmware_version":"1.0.0+build.1"\n'
+                '"firmware_version":"1.0.0"\n'
                 '"board_model":"lckfb-esp32s3"},'
-                '"firmware_version":"1.0.0+build.1"\n',
+                '"firmware_version":"1.0.0"\n',
                 encoding="utf-8",
             )
 
             self.assertEqual(
-                str(bump_board_build(root, "lckfb-esp32s3")),
-                "1.0.0+build.2",
+                str(read_board_version(root, "lckfb-esp32s3")),
+                "1.0.0",
             )
             updated = profile_file.read_text(encoding="utf-8")
             self.assertIn(
                 '"board_model":"waveshare-esp32p4-touch-lcd-43c-v10"},'
-                '"firmware_version":"1.0.0+build.1"', updated
+                '"firmware_version":"1.0.0"', updated
             )
             self.assertIn(
                 '"board_model":"lckfb-esp32s3"},'
-                '"firmware_version":"1.0.0+build.2"', updated
+                '"firmware_version":"1.0.0"', updated
             )
 
 

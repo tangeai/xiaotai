@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 from board_registry import ManifestError, build_command, find_board, load_boards
-from firmware_version import bump_board_build
+from firmware_version import read_board_version
 
 
 def build_environment(release: bool,
@@ -74,7 +74,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--release",
         action="store_true",
-        help="use the release profile; every real build increments +build.n",
+        help="use the release profile; the configured firmware version is unchanged",
     )
     parser.add_argument(
         "--keep-going",
@@ -130,7 +130,7 @@ def main() -> int:
             command, cwd = print_build(root, board, variant)
             if args.dry_run:
                 continue
-            version = bump_board_build(root, board.id)
+            version = read_board_version(root, board.id)
             print(f"firmware-version: {version}")
             if board.data["platform"] == "esp-idf":
                 prepare_dependency_lock(cwd)

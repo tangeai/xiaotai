@@ -1201,9 +1201,9 @@ board_manifest = json.loads(
 )
 version_match = re.search(r"`([^`]+)`", (ROOT / "VERSION.md").read_text())
 require(version_match is not None, "VERSION.md must contain the firmware version")
-require(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+\+build\.[1-9][0-9]*",
+require(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+",
                      version_match.group(1)) is not None,
-        "BK7258 firmware version must use major.minor.patch+build.n")
+        "BK7258 firmware version must use major.minor.patch")
 require(profile["hardware"] == {
             "chip_model": "BK7258",
             "board_model": board_manifest["id"],
