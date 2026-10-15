@@ -2976,6 +2976,7 @@ static void control_task(beken_thread_arg_t argument)
     (void)argument;
     control_event_t event;
     for (;;) {
+        xiaotai_tirtc_service_close_wakeup();
         service_room_touch_release();
         if (rtos_pop_from_queue(&s_control_queue, &event,
                                 CONTROL_POLL_MS) != BK_OK) {

@@ -68,6 +68,9 @@ bool xiaotai_tirtc_ready(void);
 bool xiaotai_tirtc_connected(void);
 /** True while connected, connecting, or draining a failed connection. */
 bool xiaotai_tirtc_busy(void);
+/** Wake the media worker for a close published by an SDK callback. Call from
+ * the product control task, outside the SDK callback stack. */
+void xiaotai_tirtc_service_close_wakeup(void);
 /**
  * Poll null-handle cleanup and report a poisoned TiRTC runtime. The
  * state-owning Coordinator calls this periodically; true requires a bounded

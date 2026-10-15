@@ -6,47 +6,76 @@ from test_s3_product_regressions import ROOT, function, run_c
 
 
 class BKRoomCloseCallback(unittest.TestCase):
-    def test_idle_worker_wait_budget_and_close_delivery(self):
+    def test_control_task_services_close_even_when_events_keep_arriving(self):
+        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_app.c').read_text()
+        control = function(source, 'control_task')
+        self.assertLess(control.index('xiaotai_tirtc_service_close_wakeup();'),
+                        control.index('rtos_pop_from_queue(&s_control_queue'))
+
+    def test_idle_worker_blocks_and_control_wakes_close(self):
         source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdatomic.h>
+#include <stddef.h>
 #define BK_OK 0
 #define BK_FAIL -1
+#define BEKEN_WAIT_FOREVER 0xffffffffU
+enum { MEDIA_EVENT_WAKE = 15, MEDIA_EVENT_CLOSED = 3 };
 typedef struct { int type; unsigned generation; } media_event_t;
 typedef void *beken_queue_t;
-static beken_queue_t s_media_queue;
+static beken_queue_t s_media_queue = (void *)1;
 static atomic_int s_pending_close_state;
 static media_event_t s_pending_close_event;
-static unsigned elapsed_ms, queue_waits, inject_close_at_ms;
+static media_event_t queued_event;
+static unsigned queue_waits, queue_pushes;
+static bool fail_next_push;
 static int rtos_pop_from_queue(beken_queue_t *queue, media_event_t *event,
                                unsigned timeout_ms) {
-    (void)queue; (void)event;
-    assert(timeout_ms > 0 && timeout_ms <= 250);
+    assert(queue == &s_media_queue && timeout_ms == BEKEN_WAIT_FOREVER);
     queue_waits++;
-    elapsed_ms += timeout_ms;
-    if (inject_close_at_ms && elapsed_ms >= inject_close_at_ms) {
-        s_pending_close_event = (media_event_t){.type=3, .generation=7};
-        atomic_store(&s_pending_close_state, 2);
-        inject_close_at_ms = 0;
+    if (!queued_event.type) return BK_FAIL;
+    *event = queued_event;
+    queued_event.type = 0;
+    return BK_OK;
+}
+static int rtos_push_to_queue(beken_queue_t *queue, const media_event_t *event,
+                              unsigned timeout_ms) {
+    assert(queue == &s_media_queue && timeout_ms == 0);
+    queued_event = *event;
+    queue_pushes++;
+    if (fail_next_push) {
+        fail_next_push = false;
+        queued_event.type = 0;
+        return BK_FAIL;
     }
-    return BK_FAIL;
+    return BK_OK;
 }
 ''' + function(source, 'take_pending_close_event') +
-              function(source, 'media_wait_next_event') + r'''
+              function(source, 'media_wait_next_event') +
+              function(source, 'xiaotai_tirtc_service_close_wakeup') + r'''
 int main(void) {
     media_event_t event = {0};
-    while (elapsed_ms < 8000)
-        assert(!media_wait_next_event(&event));
-    assert(queue_waits <= 40 && "idle worker must not churn the SMP queue during a heartbeat window");
-    elapsed_ms = queue_waits = 0;
-    inject_close_at_ms = 50;
+    assert(!media_wait_next_event(&event));
+    assert(queue_waits == 1 && queue_pushes == 0);
+    s_pending_close_event = (media_event_t){.type=MEDIA_EVENT_CLOSED, .generation=7};
+    atomic_store(&s_pending_close_state, 2);
+    xiaotai_tirtc_service_close_wakeup();
+    xiaotai_tirtc_service_close_wakeup();
+    assert(queue_pushes == 1 && atomic_load(&s_pending_close_state) == 3);
     assert(media_wait_next_event(&event));
-    assert(event.type == 3 && event.generation == 7);
-    assert(elapsed_ms <= 250 && "close handoff must remain responsive");
+    assert(event.type == MEDIA_EVENT_CLOSED && event.generation == 7);
     assert(atomic_load(&s_pending_close_state) == 0);
+    s_pending_close_event = (media_event_t){.type=MEDIA_EVENT_CLOSED, .generation=8};
+    atomic_store(&s_pending_close_state, 2);
+    fail_next_push = true;
+    xiaotai_tirtc_service_close_wakeup();
+    assert(atomic_load(&s_pending_close_state) == 2);
+    xiaotai_tirtc_service_close_wakeup();
+    assert(media_wait_next_event(&event));
+    assert(event.generation == 8 && atomic_load(&s_pending_close_state) == 0);
     return 0;
 }
 ''')
@@ -106,6 +135,7 @@ int main(void) {
     assert(!atomic_load(&s_audio_subscribed));
     assert(!atomic_load(&s_recovery_required));
     media_event_t delivered = {0};
+    atomic_store(&s_pending_close_state, 3);
     assert(take_pending_close_event(&delivered));
     assert(atomic_load(&s_pending_close_state) == 0);
     assert(delivered.connection == handle && delivered.mode == CONNECTION_ROOM);

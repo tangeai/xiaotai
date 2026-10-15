@@ -87,6 +87,7 @@ typedef enum {
     MEDIA_EVENT_VOIP_ACCEPT,
     MEDIA_EVENT_ROOM_CONNECTED,
     MEDIA_EVENT_ROOM_COMMAND,
+    MEDIA_EVENT_WAKE,
 } media_event_type_t;
 
 typedef struct {
@@ -124,7 +125,8 @@ static atomic_uintptr_t s_outgoing_cleanup_connection;
 static atomic_bool s_recovery_required;
 /* The SDK destroy callback may run while its transport holds SMP locks.
  * Publish one completed close to the media worker without entering an RTOS
- * queue from that callback. 0=empty, 1=being written/read, 2=ready. */
+ * queue from that callback. 0=empty, 1=being written/read, 2=ready,
+ * 3=worker wake queued by the control task. */
 static atomic_int s_pending_close_state;
 static media_event_t s_pending_close_event;
 static atomic_bool s_cleanup_probe_active;
@@ -476,7 +478,7 @@ static int send_h264(const uint8_t *annexb,
 
 static bool take_pending_close_event(media_event_t *event)
 {
-    int ready = 2;
+    int ready = 3;
     if (!atomic_compare_exchange_strong_explicit(
             &s_pending_close_state, &ready, 1,
             memory_order_acq_rel, memory_order_acquire)) {
@@ -489,11 +491,23 @@ static bool take_pending_close_event(media_event_t *event)
 
 static bool media_wait_next_event(media_event_t *event)
 {
-    if (take_pending_close_event(event)) return true;
-    /* The close callback cannot enter an RTOS queue. Give it a bounded
-     * handoff while keeping idle queue wakeups below the IPC heartbeat rate. */
-    if (rtos_pop_from_queue(&s_media_queue, event, 250U) == BK_OK) return true;
+    if (rtos_pop_from_queue(&s_media_queue, event,
+                            BEKEN_WAIT_FOREVER) != BK_OK) return false;
+    if (event->type != MEDIA_EVENT_WAKE) return true;
     return take_pending_close_event(event);
+}
+
+void xiaotai_tirtc_service_close_wakeup(void)
+{
+    int ready = 2;
+    if (s_media_queue == NULL ||
+        !atomic_compare_exchange_strong_explicit(
+            &s_pending_close_state, &ready, 3,
+            memory_order_acq_rel, memory_order_acquire)) return;
+    media_event_t wake = {.type = MEDIA_EVENT_WAKE};
+    if (rtos_push_to_queue(&s_media_queue, &wake, 0) != BK_OK)
+        atomic_store_explicit(&s_pending_close_state, 2,
+                              memory_order_release);
 }
 
 static void media_worker(beken_thread_arg_t argument)
