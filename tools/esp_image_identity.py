@@ -10,7 +10,7 @@ from pathlib import Path
 import re
 import struct
 
-from firmware_version import FirmwareVersion
+from firmware_version import esp_build_version
 
 CHIP_IDS = {'esp32s3': 9, 'esp32p4': 18}
 
@@ -21,7 +21,7 @@ def validate_application(project: Path, app: Path, elf: Path,
                       (project / 'CMakeLists.txt').read_text())
     if match is None:
         raise ValueError('missing project firmware version')
-    version = str(FirmwareVersion.parse(match.group(1)))
+    version = esp_build_version(project, match.group(1))
     if version != description['project_version']:
         raise ValueError('stale build: project and build versions differ')
     if chip not in CHIP_IDS or chip != description.get('target'):

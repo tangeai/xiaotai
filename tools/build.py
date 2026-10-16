@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import os
 from pathlib import Path
 import shlex
@@ -11,7 +12,7 @@ import subprocess
 import sys
 
 from board_registry import ManifestError, build_command, find_board, load_boards
-from firmware_version import read_board_version
+from firmware_version import read_board_version, reserve_esp_build
 
 
 def build_environment(release: bool,
@@ -133,18 +134,22 @@ def main() -> int:
             version = read_board_version(root, board.id)
             label = "product-version" if board.data["platform"] == "beken" else "firmware-version"
             print(f"{label}: {version}")
-            if board.data["platform"] == "esp-idf":
-                prepare_dependency_lock(cwd)
-            try:
-                return_code = subprocess.run(
-                    command,
-                    cwd=cwd,
-                    check=False,
-                    env=build_environment(args.release),
-                ).returncode
-            finally:
-                if board.data["platform"] == "esp-idf" and normalize_dependency_lock(cwd):
-                    print(f"normalized: {cwd.relative_to(root) / 'dependencies.lock'}")
+            is_esp = board.data["platform"] == "esp-idf"
+            reservation = reserve_esp_build(cwd, str(version)) if is_esp else nullcontext()
+            with reservation as identity:
+                if is_esp:
+                    print(f"build-version: {identity}")
+                    prepare_dependency_lock(cwd)
+                try:
+                    return_code = subprocess.run(
+                        command,
+                        cwd=cwd,
+                        check=False,
+                        env=build_environment(args.release),
+                    ).returncode
+                finally:
+                    if is_esp and normalize_dependency_lock(cwd):
+                        print(f"normalized: {cwd.relative_to(root) / 'dependencies.lock'}")
             if return_code:
                 failures.append((board.id, return_code))
                 if not args.keep_going:
@@ -156,7 +161,7 @@ def main() -> int:
                 print(f"  {board_id}: exit {return_code}", file=sys.stderr)
             return 1
         return 0
-    except ManifestError as exc:
+    except (ManifestError, ValueError) as exc:
         print(f"build selection failed: {exc}", file=sys.stderr)
         return 2
     except FileNotFoundError as exc:

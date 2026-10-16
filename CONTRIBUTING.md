@@ -159,21 +159,28 @@ bash tools/check.sh
 
 产品版本由发布负责人指定为 `major.minor.patch`，构建、失败和重试均不修改它。
 ESP-IDF 从工程 `PROJECT_VER` 读取，BK7258 从工程 `VERSION.md` 读取。
-BK 原生脚本另行递增 `BUILD_NUMBER`，生成 `1.0.0+build.N` 用于启动身份和取证；
-这是构建身份，不改变产品版本或稳定 Release 标签。构建号从本次产物读取，不能猜测。
+BK、立创 ESP32-S3、微雪 ESP32-P4 各自维护 `BUILD_NUMBER`，生成
+`1.0.1+build.N` 用于启动身份和取证。BK 由原生脚本递增；S3/P4 由
+`tools/build.py` 在实际编译前递增，原生 CMake 重配置复用本次编号。
+失败的构建消耗编号，重试递增；查询、校验、dry-run 和打包不递增。
+
+这是构建身份，不改变产品版本或正式 Release 标签。各板编号独立递增，
+S3/P4 首次启用从 1 开始，BK 延续原有计数。构建号从本次产物读取，不能猜测。
 
 当前三类线上 Release 按下表命名。型号、厂商、功能描述写入正文；标题只能使用表中
 格式，不能自行添加描述后缀。新平台的发布名称先由发布负责人确定。
 
 | 平台 | 稳定 GitHub 标签 | Release 标题 |
 |---|---|---|
-| ESP32-S3 | `esp32s3-v<产品版本>` | `ESP32-S3 v<产品版本>` |
-| ESP32-P4 | `esp32p4-v<产品版本>` | `ESP32-P4 v<产品版本>` |
+| ESP32-S3 | `esp32s3-v<产品版本>` | `ESP32-S3 v<产品版本> · build.<本次构建号>` |
+| ESP32-P4 | `esp32p4-v<产品版本>` | `ESP32-P4 v<产品版本> · build.<本次构建号>` |
 | BK7258 | `bk7258-v<产品版本>` | `BK7258 v<产品版本> · build.<本次构建号>` |
 
-包名以永久板卡 ID 开头，由现有打包工具生成。现有 BK 线上下载使用
-`lckfb-bk7258-<产品版本>-validation.zip` 稳定名称；打包器生成的带构建身份文件
-作为该下载名的副本上传，清单保留真实身份。替换同一版本时保留公开下载名和地址。
+包名以永久板卡 ID 开头，由现有打包工具生成，统一为
+`<board-id>-<产品版本>+build.<构建号>-validation.zip`。固件内部使用 `+build.N`，
+标题使用 ` · build.N`，不能用 `v1.0.1.build.N` 冒充 SemVer。
+正式发布后的修改使用新产品版本和新 Release，保留旧标签及附件，由维护者手动清理。
+历史 1.0.0 下载名保持原样。发布操作不隐含授权 git push；遵守用户明确的推送限制。
 
 ### 编译与打包
 
@@ -188,6 +195,7 @@ BK 原生脚本另行递增 `BUILD_NUMBER`，生成 `1.0.0+build.N` 用于启动
 bash tools/check.sh
 python3 tools/build.py --board <board-id> --release
 python3 tools/package_validation_firmware.py --board <board-id>
+python3 tools/release_firmware.py --package <实际生成的验证包路径>
 ```
 
 BK7258 打包命令必须再加 `--beken-build-profile release`，否则工具默认选择开发
@@ -206,8 +214,10 @@ BK7258 打包命令必须再加 `--beken-build-profile release`，否则工具�
 4. 发布后重新读取 GitHub 的实际标题、标签和资产名称，核对远端校验值并确认公开
    下载可用。全部一致后才能报告“已发布”；名称不符时先修正再完成交付。
 
-以上是执行出口检查。现有 CI 校验版本和产物合同，尚未自动拦截 GitHub 自定义标题；
-不能把 `tools/check.sh` 通过当作线上名称已合规。
+`tools/release_firmware.py` 校验包内文件的尺寸及 SHA-256，并从清单生成唯一的
+标签、标题和资产名称。上传必须使用它的输出；它只读本地产物，不操作 GitHub。
+现有 CI 覆盖三板名称生成和错误产物拒绝，但不能把 `tools/check.sh` 通过当作
+线上名称已合规，仍须执行发布后的远端核对。
 
 ## 提交前检查
 

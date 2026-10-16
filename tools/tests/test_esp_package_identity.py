@@ -67,6 +67,22 @@ class EspPackageIdentity(unittest.TestCase):
         (self.project/'CMakeLists.txt').write_text('set(PROJECT_VER "2.0.0")\n')
         with self.assertRaises(ValueError): self.package()
 
+    def test_build_number_is_checked_against_actual_image(self):
+        (self.project/'BUILD_NUMBER').write_text('7\n')
+        version = '1.0.0+build.7'
+        desc_path = self.build/'project_description.json'
+        desc = json.loads(desc_path.read_text())
+        desc['project_version'] = version
+        desc_path.write_text(json.dumps(desc))
+        (self.build/'demo.bin').write_bytes(image(self.elf, version=version))
+        archive = self.package()
+        self.assertEqual(archive.name, 'demo-board-1.0.0+build.7-validation.zip')
+        with zipfile.ZipFile(archive) as z:
+            self.assertEqual(json.loads(z.read('MANIFEST.json'))['image_identity']['version'], version)
+        (self.project/'BUILD_NUMBER').write_text('8\n')
+        with self.assertRaisesRegex(ValueError, 'stale build'):
+            self.package()
+
     def test_packaging_head_is_not_claimed_as_build_commit(self):
         archive=self.package()
         with zipfile.ZipFile(archive) as z:

@@ -1205,7 +1205,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.0.0\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.1\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
@@ -1232,7 +1232,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-S3\","
         "\"board_model\":\"lckfb-esp32s3\"},"
-        "\"firmware_version\":\"1.0.0\",\"profiles\":{"
+        "\"firmware_version\":\"1.0.1\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,\"up_video_mt\":[\"mjpeg\"],"
         "\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"

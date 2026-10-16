@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import contextmanager
+import fcntl
 from pathlib import Path
 import re
 
@@ -12,6 +14,51 @@ VERSION_PATTERN = re.compile(
     r"(?P<minor>0|[1-9][0-9]*)\."
     r"(?P<patch>0|[1-9][0-9]*)"
 )
+
+
+def read_build_number(project: Path) -> int | None:
+    path = project / "BUILD_NUMBER"
+    if not path.is_file():
+        return None
+    value = path.read_text(encoding="utf-8").strip()
+    if not re.fullmatch(r"0|[1-9][0-9]*", value):
+        raise ValueError(f"invalid build number in {path}")
+    return int(value)
+
+
+def esp_build_version(project: Path, product_version: str) -> str:
+    version = str(FirmwareVersion.parse(product_version))
+    number = read_build_number(project)
+    if number is not None:
+        if number < 1:
+            raise ValueError("build number has not been allocated; use tools/build.py")
+        version += f"+build.{number}"
+    if len(version.encode()) > 31:
+        raise ValueError("firmware identity exceeds ESP-IDF app descriptor capacity")
+    return version
+
+
+@contextmanager
+def reserve_esp_build(project: Path, product_version: str):
+    """Hold a project lock through compilation; a failed attempt consumes its ID."""
+    if not (project / "BUILD_NUMBER").is_file():
+        yield product_version
+        return
+    build_dir = project / "build"
+    build_dir.mkdir(exist_ok=True)
+    with (build_dir / ".xiaotai-build.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise ValueError(f"another build owns {project}") from exc
+        number = read_build_number(project) + 1
+        version = f"{FirmwareVersion.parse(product_version)}+build.{number}"
+        if len(version.encode()) > 31:
+            raise ValueError("firmware identity exceeds ESP-IDF app descriptor capacity")
+        temporary = project / "BUILD_NUMBER.tmp"
+        temporary.write_text(f"{number}\n", encoding="utf-8")
+        temporary.replace(project / "BUILD_NUMBER")
+        yield version
 
 
 @dataclass(frozen=True)

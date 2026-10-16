@@ -32,6 +32,12 @@ bash tools/check.sh
 
 ## 测试驱动开发约定
 
+三板发布身份：`test_firmware_versions.py` 从构建入口验证编号分配、失败重试、
+dry-run 不修改编号、并行构建互斥及原生 CMake 嵌入和依赖重配置。
+`test_esp_package_identity.py` 验证实际 BIN 描述符、ELF 与构建号一致，拒绝旧包。
+`test_release_identity.py` 从验证包生成三板统一标题，拒绝缺少构建号或校验损坏的包；
+均由 `tools/check.sh` 执行。版本命名不替代音频、UI 等实板验收。
+
 2026-10-16 BK 音频争锁与发布日志：`test_bk_ai_playback.py` 通过实际 Opus
 入队入口复现短暂锁占用直接丢包；现在最多等待一个 SDK tick（本工程 1 ms），
 超时仍返回 BUSY，累计 `busy` 单独记录，不再用 overflow=0 推断无丢包。
