@@ -14,28 +14,28 @@
 
 优先从 [GitHub Releases](https://github.com/tangeai/xiaotai/releases) 下载已经打包的验证固件。压缩包名称以板卡 ID（开发板在本仓库中的唯一名称，用于选择编译目标和核对固件包）开头，不要只按芯片名称选择固件。
 
-以下三款开发板均提供 v1.0.0 固件包，下载时请核对完整型号：
+以下为截至 2026-10-17 的最新发布包，均为 v1.0.1；各开发板的 build 编号独立计数。下载时请核对完整型号：
 
 | 开发板图片 | 对外型号 | 板卡 ID | 下载固件 | 烧录说明 |
 |---|---|---|---|---|
-| <img src="https://xiaotai.chat/v1/board-images/2898163c894f078cbf4ca9010ceab36558ba8d1a6f8c17ec749ab95dd0150bb0.jpg" alt="立创·实战派 BK7258 开发板" width="180"> | 立创·实战派 BK7258 | `lckfb-bk7258` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.0/lckfb-bk7258-1.0.0-validation.zip) | [开发板指南](docs/boards/lckfb-bk7258/README.md) |
-| <img src="https://xiaotai.chat/v1/board-images/2b74eed62b57852dff00fe9a04b14748bfcca4bbba3b4d79e891f9299f9a0c59.png" alt="立创·实战派 ESP32-S3 开发板" width="180"> | 立创·实战派 ESP32-S3（PCB V1.0.1） | `lckfb-esp32s3` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.0/lckfb-esp32s3-1.0.0-validation.zip) | [开发板指南](docs/boards/lckfb-esp32s3/README.md) |
-| <img src="https://xiaotai.chat/v1/board-images/eb94bd88265ac488dc8fbc20fcb3896438439aa513529429bfb8ae2792be9aa4.jpg" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="180"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3（V1.0） | `waveshare-esp32p4-touch-lcd-43c-v10` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.0/waveshare-esp32p4-touch-lcd-43c-v10-1.0.0-validation.zip) | [开发板指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md) |
+| <img src="https://xiaotai.chat/v1/board-images/2898163c894f078cbf4ca9010ceab36558ba8d1a6f8c17ec749ab95dd0150bb0.jpg" alt="立创·实战派 BK7258 开发板" width="180"> | 立创·实战派 BK7258 | `lckfb-bk7258` | [下载 v1.0.1 · build.56](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.1/lckfb-bk7258-1.0.1%2Bbuild.56-validation.zip)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.1) · [SHA256SUMS](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.1/SHA256SUMS) | [开发板指南](docs/boards/lckfb-bk7258/README.md) |
+| <img src="https://xiaotai.chat/v1/board-images/2b74eed62b57852dff00fe9a04b14748bfcca4bbba3b4d79e891f9299f9a0c59.png" alt="立创·实战派 ESP32-S3 开发板" width="180"> | 立创·实战派 ESP32-S3（PCB V1.0.1） | `lckfb-esp32s3` | [下载 v1.0.1 · build.2](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.2-validation.zip)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.1) · [SHA256SUMS](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.1/SHA256SUMS) | [开发板指南](docs/boards/lckfb-esp32s3/README.md) |
+| <img src="https://xiaotai.chat/v1/board-images/eb94bd88265ac488dc8fbc20fcb3896438439aa513529429bfb8ae2792be9aa4.jpg" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="180"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3（V1.0） | `waveshare-esp32p4-touch-lcd-43c-v10` | [下载 v1.0.1 · build.2](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.2-validation.zip)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1) · [SHA256SUMS](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/SHA256SUMS) | [开发板指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md) |
 
 固件包包含对应板卡的烧录文件、烧录配置和校验信息。ESP32 按清单完整烧录多个文件；
-BK7258 首次烧录使用包内 `all-app.bin`，`app_pack.rbl` 用于 OTA（无线升级）。
+BK7258 首次烧录使用包内以 `-all-app.bin` 结尾的文件，以 `-app_pack.rbl` 结尾的文件用于 OTA（无线升级）。
 
 其他已经适配的开发板及其型号、固件名称和使用说明统一收录在
 [完整开发板目录](docs/boards/README.md)。
 
-发布包内的 `MANIFEST.json` 记录板卡、源码版本、文件校验值和烧录信息；解压后先核对
+发布包内的 `MANIFEST.json` 记录板卡、固件版本、文件校验值和烧录信息；解压后先核对
 清单，再连接设备。
 
 没有对应发布包时，可以从源码编译。不要使用其他板卡的固件，也不要把“芯片相同”理解为 GPIO（通用输入输出引脚）、屏幕、音频和烧录布局相同。
 
 ## 烧录
 
-先打开 [GitHub Releases](https://github.com/tangeai/xiaotai/releases)，下载名称以目标板卡 ID 开头的最新发布包。不要下载其他开发板的包，即使它们使用相同芯片。解压后检查 `MANIFEST.json`（发布包清单）中的开发板型号、源码版本、SHA-256 校验值和烧录地址，再按下面的方法写入。
+先打开 [GitHub Releases](https://github.com/tangeai/xiaotai/releases)，下载名称以目标板卡 ID 开头的最新发布包。不要下载其他开发板的包，即使它们使用相同芯片。解压后检查 `MANIFEST.json`（发布包清单）中的开发板型号、固件版本、SHA-256 校验值和烧录地址，再按下面的方法写入。
 
 ### ESP32 开发板
 
@@ -45,7 +45,7 @@ ESP32 发布包包含多个烧录文件。使用 Chrome 或 Edge 打开[乐鑫�
 
 ### BK7258 开发板
 
-下载 `lckfb-bk7258-` 开头的发布包，使用包内的 `all-app.bin`，从地址 `0x0` 完整烧录。`app_pack.rbl` 是 OTA（无线升级）镜像，不能代替首次完整烧录。烧录工具、下载模式和串口设置见[立创·实战派 BK7258 烧录指南](docs/boards/lckfb-bk7258/README.md#烧录)。
+下载 `lckfb-bk7258-` 开头的发布包，使用包内以 `-all-app.bin` 结尾的文件，从地址 `0x0` 完整烧录。以 `-app_pack.rbl` 结尾的文件是 OTA（无线升级）镜像，不能代替首次完整烧录。烧录工具、下载模式和串口设置见[立创·实战派 BK7258 烧录指南](docs/boards/lckfb-bk7258/README.md#烧录)。
 
 量产或升级前，再次核对板卡 ID、PCB（印刷电路板）版本和 SHA-256。校准区、密钥区和设备身份数据不能被通用固件覆盖。
 
