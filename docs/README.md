@@ -32,7 +32,7 @@
 - [约束规则索引](../CONTRIBUTING.md#约束规则索引)：命名、目录、开发、编译、测试和发布规则的权威出处。
 - [固件版本与发布](../CONTRIBUTING.md#固件版本与发布)：产品版本、构建身份、Release 名称及发布出口检查。
 - [测试与硬件验证](../tests/README.md)：主机测试、驱动 probe（探针测试）和产品业务 HIL（硬件在环测试）。
-- [二次开发易错点](development/pitfalls.md)：界面动作编号、提示布局、AI 音频排空的约束和回归入口。
+- [二次开发易错点](development/pitfalls.md)：界面、音频、BK 重启、异步房间、MQTT 与固件打包的问题证据和回归入口。
 - [音视频参数](product/MEDIA_CONTRACT.md)：媒体流编号、设备能力和编解码约定。
 - [P4 媒体架构](../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/docs/P4_MEDIA_ARCHITECTURE.md)：当前 P4 媒体模块、帧所有权和性能边界。
 - [仓库布局](../ARCHITECTURE.md#目录导览)：产品、平台、板卡和固件工程的目录边界。

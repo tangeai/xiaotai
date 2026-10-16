@@ -11,6 +11,28 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from esp_image_identity import validate_application
+
+VERIFICATION_STATUSES = (
+    "BUILD_VERIFIED_HIL_PENDING",
+    "HIL_VERIFIED",
+)
+
+
+def verification_readme_status(status: str) -> str:
+    descriptions = {
+        "BUILD_VERIFIED_HIL_PENDING":
+            "build verified; this exact artifact still requires HIL.",
+        "HIL_VERIFIED":
+            "build and hardware-in-the-loop verification passed.",
+    }
+    try:
+        return descriptions[status]
+    except KeyError as exc:
+        raise ValueError(f"unsupported verification status: {status}") from exc
+
+
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -47,7 +69,9 @@ def package_board(
     project_dir: Path,
     output_dir: Path,
     board_id: str | None = None,
+    verification_status: str = "BUILD_VERIFIED_HIL_PENDING",
 ) -> Path:
+    status_text = verification_readme_status(verification_status)
     build_dir = project_dir / "build"
     flasher_path = build_dir / "flasher_args.json"
     description_path = build_dir / "project_description.json"
@@ -57,6 +81,10 @@ def package_board(
     version = description["project_version"]
     app_path = build_dir / flasher["app"]["file"]
     elf_path = build_dir / description["app_elf"]
+    chip = flasher["extra_esptool_args"]["chip"]
+    identity = validate_application(project_dir, app_path, elf_path, description, chip)
+    if flasher["app"]["file"] not in flasher["flash_files"].values():
+        raise ValueError("validated application is missing from flash files")
     zip_path = output_dir / f"{board_id}-{version}-validation.zip"
     files: list[dict[str, object]] = []
 
@@ -85,9 +113,14 @@ def package_board(
             "schema_version": 1,
             "board_id": board_id,
             "project_version": version,
-            "verification_status": "BUILD_VERIFIED_HIL_PENDING",
-            "source_commit": source_commit,
-            "source_worktree_dirty": source_dirty,
+            "verification_status": verification_status,
+            "image_identity": identity,
+            # ESP-IDF does not record a build commit in its image. The current
+            # checkout is packaging context, never evidence of build provenance.
+            "source_commit": None,
+            "source_worktree_dirty": None,
+            "packaging_source_commit": source_commit,
+            "packaging_worktree_dirty": source_dirty,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "application": {
                 "path": flasher["app"]["file"],
@@ -106,7 +139,8 @@ def package_board(
             "README.txt",
             "XiaoTai ESP-IDF validation firmware\n"
             f"Board: {board_id}\nVersion: {version}\n"
-            "Status: build verified; hardware validation pending.\n\n"
+            f"Status: {status_text}\n"
+            "Build source commit: not recorded by the native ESP-IDF image.\n\n"
             "Run from this extracted directory:\n"
             f"  {flash_command}\n\n"
             "The ELF is included for crash-address symbolization.\n",
@@ -120,13 +154,16 @@ def main() -> int:
         "projects", nargs="+", help="ESP-IDF project directories relative to repo root"
     )
     parser.add_argument("--output", default="output/validation")
+    parser.add_argument("--verification-status", choices=VERIFICATION_STATUSES,
+                        default="BUILD_VERIFIED_HIL_PENDING")
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
     output_dir = (root / args.output).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     archives = [
-        package_board(root, (root / project).resolve(), output_dir)
+        package_board(root, (root / project).resolve(), output_dir,
+                      verification_status=args.verification_status)
         for project in args.projects
     ]
     sums = "".join(f"{sha256(path)}  {path.name}\n" for path in archives)

@@ -10,12 +10,17 @@
 #define PREROLL_HISTORY_SAMPLES 12000U
 #define PREROLL_CAPACITY_SAMPLES (PREROLL_RATE * 20U)
 #define PREROLL_TIMEOUT_MS 19000
+#define PREROLL_ACK_QUEUE_TIMEOUT_MS 2000
+#define PREROLL_ACK_PLAY_TIMEOUT_MS 5000
+#define PREROLL_ACK_TAIL_MS 160
 typedef struct {
     int16_t *pcm;
     size_t capacity, head, count;
     uint32_t next_token, token, generation;
     int64_t end_ms, expires_ms, timestamp_ms;
     bool failed;
+    bool ack_pending, ack_playing;
+    int64_t ack_deadline_ms, listen_after_ms;
 } starter_preroll_t;
 
 void starter_preroll_init(starter_preroll_t *q, int16_t *pcm, size_t capacity);
@@ -23,6 +28,12 @@ void starter_preroll_clear(starter_preroll_t *q);
 void starter_preroll_append(starter_preroll_t *q, const int16_t *pcm,
                            size_t samples, int64_t end_ms);
 uint32_t starter_preroll_prepare(starter_preroll_t *q, int64_t wake_ms, int64_t now_ms);
+/* Acoustic acknowledgement gate; caller keeps capture/AEC running but drops PCM.
+ * A missing/stuck worker expires instead of opening the microphone by timeout. */
+void starter_preroll_hold_ack(starter_preroll_t *q, uint32_t token, int64_t now_ms);
+bool starter_preroll_begin_ack(starter_preroll_t *q, uint32_t token, int64_t now_ms);
+void starter_preroll_finish_ack(starter_preroll_t *q, uint32_t token, int64_t now_ms);
+bool starter_preroll_input_ready(const starter_preroll_t *q);
 bool starter_preroll_valid(const starter_preroll_t *q, uint32_t token, int64_t now_ms);
 bool starter_preroll_bind(starter_preroll_t *q, uint32_t token,
                          uint32_t generation, int64_t now_ms);

@@ -8,6 +8,7 @@
 typedef struct {
     bool active;
     int8_t points[STARTER_PLAYBACK_WAVEFORM_POINTS]; /* signed pixel offset, -16..16 */
+    uint32_t columns; /* compact mouth: seven 4-bit amplitude levels, 0..7 */
 } starter_playback_waveform_t;
 
 #endif

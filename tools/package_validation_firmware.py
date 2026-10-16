@@ -13,26 +13,9 @@ from pathlib import Path
 
 from board_registry import Board, find_board, load_boards
 from firmware_version import FirmwareVersion
-from package_esp_validation import add_file, git_output, package_board, sha256
+from package_esp_validation import (add_file, git_output, package_board, sha256,
+                                    VERIFICATION_STATUSES, verification_readme_status)
 
-
-VERIFICATION_STATUSES = (
-    "BUILD_VERIFIED_HIL_PENDING",
-    "HIL_VERIFIED",
-)
-
-
-def verification_readme_status(status: str) -> str:
-    descriptions = {
-        "BUILD_VERIFIED_HIL_PENDING":
-            "build verified; this exact artifact still requires HIL.",
-        "HIL_VERIFIED":
-            "build and hardware-in-the-loop verification passed.",
-    }
-    try:
-        return descriptions[status]
-    except KeyError as exc:
-        raise ValueError(f"unsupported verification status: {status}") from exc
 
 
 def beken_build_root(project_dir: Path, target: str, profile: str) -> Path:
@@ -207,7 +190,8 @@ def main() -> int:
         output_dir.mkdir(parents=True, exist_ok=True)
         if board.data["platform"] == "esp-idf":
             archives.append(
-                package_board(root, board.project_path(root), output_dir, board.id)
+                package_board(root, board.project_path(root), output_dir, board.id,
+                              verification_status=args.verification_status)
             )
         elif board.data["platform"] == "beken":
             archives.append(

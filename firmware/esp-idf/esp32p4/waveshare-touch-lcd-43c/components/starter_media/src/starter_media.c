@@ -916,8 +916,10 @@ static void audio_capture_task(void *argument)
                 starter_preroll_clear(&s_preroll);
             }
             if (atomic_exchange(&s_preroll_gap, false)) {
-                if (s_preroll.token != 0) s_preroll.failed = true;
-                else starter_preroll_clear(&s_preroll);
+                if (starter_preroll_input_ready(&s_preroll)) {
+                    if (s_preroll.token != 0) s_preroll.failed = true;
+                    else starter_preroll_clear(&s_preroll);
+                }
             }
             bool muted = atomic_load(&s_microphone_muted);
             if (muted) {
@@ -1565,6 +1567,7 @@ uint32_t starter_media_prepare_ai_preroll(int64_t captured_ms)
     if (!atomic_load(&s_microphone_muted) && !atomic_load(&s_active) &&
         atomic_load(&s_wake_allowed)) {
         token = starter_preroll_prepare(&s_preroll, captured_ms, esp_timer_get_time() / 1000);
+        starter_preroll_hold_ack(&s_preroll, token, esp_timer_get_time() / 1000);
     }
     xSemaphoreGive(s_preroll_mutex);
     return token;
@@ -1577,6 +1580,33 @@ void starter_media_cancel_ai_preroll(uint32_t token)
     if (s_preroll.token == token && s_preroll.generation == 0 &&
         s_expected_wake_token != token) starter_preroll_clear(&s_preroll);
     xSemaphoreGive(s_preroll_mutex);
+}
+
+bool starter_media_begin_ai_ack(uint32_t token)
+{
+    if (!token || s_preroll_mutex == NULL) return false;
+    xSemaphoreTake(s_preroll_mutex, portMAX_DELAY);
+    bool accepted = starter_preroll_begin_ack(&s_preroll, token, esp_timer_get_time() / 1000);
+    xSemaphoreGive(s_preroll_mutex);
+    return accepted;
+}
+
+void starter_media_finish_ai_ack(uint32_t token)
+{
+    if (!token || s_preroll_mutex == NULL) return;
+    xSemaphoreTake(s_preroll_mutex, portMAX_DELAY);
+    starter_preroll_finish_ack(&s_preroll, token, esp_timer_get_time() / 1000);
+    xSemaphoreGive(s_preroll_mutex);
+}
+
+bool starter_media_ai_input_ready(void)
+{
+    if (s_preroll_mutex == NULL || xSemaphoreTake(s_preroll_mutex, 0) != pdTRUE) return false;
+    bool ready = s_expected_wake_token == 0 ||
+        (starter_preroll_valid(&s_preroll, s_expected_wake_token, esp_timer_get_time() / 1000) &&
+         starter_preroll_input_ready(&s_preroll));
+    xSemaphoreGive(s_preroll_mutex);
+    return ready;
 }
 
 bool starter_media_ai_preroll_failed(void)
@@ -1910,6 +1940,13 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
 
 starter_media_status_t starter_media_status(void)
 {
+    /* Read software ownership before DMA. The sink publishes the new DMA
+     * deadline before releasing its final pending frame; mixing an old DMA
+     * deadline with a new empty queue would truncate the last audio packet. */
+    uint32_t playback_pending = (uint32_t)atomic_load_explicit(
+        &s_audio_playback_pending, memory_order_acquire);
+    bool playback_active = atomic_load_explicit(
+        &s_audio_playback_active, memory_order_acquire);
     int64_t dma_remaining_us = atomic_load_explicit(&s_audio_dma_until_us,
                                                     memory_order_acquire) -
                                esp_timer_get_time();
@@ -1966,10 +2003,8 @@ starter_media_status_t starter_media_status(void)
             &s_audio_playback_blocked, memory_order_acquire),
         .audio_write_failed = (uint32_t)atomic_load_explicit(
             &s_audio_write_failed, memory_order_acquire),
-        .audio_playback_pending = (uint32_t)atomic_load_explicit(
-            &s_audio_playback_pending, memory_order_acquire),
-        .audio_playback_active = atomic_load_explicit(
-            &s_audio_playback_active, memory_order_acquire) ||
+        .audio_playback_pending = playback_pending,
+        .audio_playback_active = playback_active ||
             dma_remaining_us > 0 ||
             (s_audio_rx_ready_queue != NULL &&
              uxQueueMessagesWaiting(s_audio_rx_ready_queue) > 0U),

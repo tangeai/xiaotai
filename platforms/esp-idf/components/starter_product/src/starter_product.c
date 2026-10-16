@@ -261,6 +261,7 @@ typedef struct {
     bool male;
     uint32_t expected_session;
     uint32_t playback_epoch;
+    uint32_t wake_token;
 } ai_ack_t;
 static QueueHandle_t s_ai_ack_queue;
 static ai_ack_t s_pending_ai_ack; /* UI task only; queue publishes to audio task */
@@ -835,6 +836,7 @@ static void handle_voice_result(const starter_voice_result_t *result,
                     s_pending_ai_ack = (ai_ack_t){
                         .expires_ms = now + 1000,
                         .male = s_preferences.acknowledgement_male,
+                        .wake_token = result->wake_token,
                         .expected_session = status.session_generation + 1U,
                     };
                     if (s_pending_ai_ack.expected_session == 0) s_pending_ai_ack.expected_session = 1;
@@ -1312,6 +1314,10 @@ static lv_obj_t *make_button(lv_obj_t *parent,
     lv_obj_t *button = lv_btn_create(parent);
     lv_obj_set_pos(button, x, y);
     lv_obj_set_size(button, width, height);
+#if CONFIG_IDF_TARGET_ESP32S3
+    /* Compact layout gaps reserve two pixels per side for touch tolerance. */
+    lv_obj_set_ext_click_area(button, 2);
+#endif
     lv_obj_set_style_radius(button, 12, 0);
     lv_obj_set_style_bg_color(button, lv_color_hex(0x17313D), 0);
     lv_obj_set_style_bg_color(button, lv_color_hex(0x205064), LV_STATE_PRESSED);
@@ -1403,10 +1409,15 @@ static void refresh_settings_controls(void)
 
 static lv_obj_t *make_home_menu_button(lv_obj_t *parent)
 {
-    /* HOME_MENU_FLOATING_DOTS: 40x40 hit target with quiet visual chrome. */
+    /* HOME_MENU_FLOATING_DOTS: enlarged S3 target with quiet visual chrome. */
     lv_obj_t *button = lv_btn_create(parent);
+#if CONFIG_IDF_TARGET_ESP32S3
+    lv_obj_set_pos(button, 264, 186);
+    lv_obj_set_size(button, 48, 48);
+#else
     lv_obj_set_pos(button, 268, 188);
     lv_obj_set_size(button, 40, 40);
+#endif
     lv_obj_set_style_radius(button, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_pad_all(button, 0, 0);
     lv_obj_set_style_border_width(button, 0, 0);
@@ -1418,7 +1429,11 @@ static lv_obj_t *make_home_menu_button(lv_obj_t *parent)
                         (void *)(uintptr_t)ACTION_MENU);
     for (uint8_t i = 0; i < 3U; ++i) {
         lv_obj_t *dot = lv_obj_create(button);
+#if CONFIG_IDF_TARGET_ESP32S3
+        lv_obj_set_pos(dot, (lv_coord_t)(11 + i * 10), 21);
+#else
         lv_obj_set_pos(dot, (lv_coord_t)(7 + i * 10), 17);
+#endif
         lv_obj_set_size(dot, 5, 5);
         set_bg(dot, lv_color_hex(0x72DEF8));
         lv_obj_set_style_bg_opa(dot, LV_OPA_80, 0);
@@ -1454,8 +1469,13 @@ static lv_obj_t *make_home_wechat_button(lv_obj_t *parent)
     /* HOME_WECHAT_CALL_ICON / HOME_WECHAT_COMPOSITE_BITMAP: a single image
      * communicates WeChat calling without clipped text or layered glyphs. */
     lv_obj_t *button = lv_btn_create(parent);
+#if CONFIG_IDF_TARGET_ESP32S3
+    lv_obj_set_pos(button, 264, 134);
+    lv_obj_set_size(button, 48, 48);
+#else
     lv_obj_set_pos(button, 268, 137);
     lv_obj_set_size(button, 40, 40);
+#endif
     lv_obj_set_style_radius(button, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_pad_all(button, 0, 0);
     lv_obj_set_style_border_width(button, 1, 0);
@@ -1486,8 +1506,14 @@ static lv_obj_t *make_header_back_button(lv_obj_t *parent,
     /* HEADER_BACK_NATIVE_CHEVRON: built-in LVGL symbol, never a CJK tofu box. */
     s_header_has_back = true;
     lv_obj_t *button = lv_btn_create(parent);
+#if CONFIG_IDF_TARGET_ESP32S3
+    lv_obj_set_pos(button, 2, 0);
+    lv_obj_set_size(button, 48, 36);
+    lv_obj_set_ext_click_area(button, 2);
+#else
     lv_obj_set_pos(button, 4, 2);
     lv_obj_set_size(button, 40, 34);
+#endif
     lv_obj_set_style_radius(button, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_pad_all(button, 0, 0);
     lv_obj_set_style_border_width(button, 0, 0);
@@ -1576,7 +1602,10 @@ static void call_ring_task(void *argument)
             if (esp_timer_get_time() / 1000 <= ack.expires_ms &&
                 status.state == STARTER_RUNTIME_AI_CONNECTING &&
                 status.session_generation == ack.expected_session) {
-                ring_kind = CALL_RING_AI_ACK;
+                if (ack.wake_token == 0 || starter_media_begin_ai_ack(ack.wake_token))
+                    ring_kind = CALL_RING_AI_ACK;
+            } else {
+                starter_media_finish_ai_ack(ack.wake_token);
             }
         }
         if (ring_kind != logged_kind) {
@@ -1608,6 +1637,7 @@ static void call_ring_task(void *argument)
         size_t bytes = (size_t)(end - start);
         if (bytes <= WAV_PCM_OFFSET || ((bytes - WAV_PCM_OFFSET) & 1U) != 0U) {
             ESP_LOGE(TAG, "invalid call ringtone asset");
+            if (ring_kind == CALL_RING_AI_ACK) starter_media_finish_ai_ack(ack.wake_token);
             s_call_ring_kind = CALL_RING_NONE;
             continue;
         }
@@ -1619,6 +1649,11 @@ static void call_ring_task(void *argument)
             starter_media_play_pcm8k(
             (const int16_t *)(start + WAV_PCM_OFFSET),
             (bytes - WAV_PCM_OFFSET) / sizeof(int16_t));
+        if (ring_kind == CALL_RING_AI_ACK) {
+            starter_media_finish_ai_ack(ack.wake_token);
+            ESP_LOGI(TAG, "AI acknowledgement complete token=%lu rc=%d",
+                     (unsigned long)ack.wake_token, (int)err);
+        }
         ringtone_report_result(err);
         /* One-shot acknowledgement was consumed before playback. Cancellation,
          * silence or a busy output never leaves it pending for another session. */
@@ -1792,7 +1827,12 @@ static void render_home(lv_obj_t *screen)
 
     lv_obj_t *tap = lv_obj_create(screen);
     lv_obj_set_pos(tap, 12, 32);
+#if CONFIG_IDF_TARGET_ESP32S3
+    /* This overlay is created last: keep it clear of enlarged shortcuts. */
+    lv_obj_set_size(tap, 248, 160);
+#else
     lv_obj_set_size(tap, 256, 160);
+#endif
     lv_obj_set_style_bg_opa(tap, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(tap, 0, 0);
     lv_obj_add_event_cb(tap, on_home_tap, LV_EVENT_CLICKED, NULL);
@@ -2024,14 +2064,24 @@ static void render_room_input(lv_obj_t *screen)
                                  lv_color_hex(0xFFFFFF));
     lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_CENTER, 0);
     static const char *digits[10] = {"0","1","2","3","4","5","6","7","8","9"};
+#if CONFIG_IDF_TARGET_ESP32S3
+    const int key_x = 14, key_y = 59, step_x = 98, step_y = 40;
+    const int key_w = 92, key_h = 36;
+#else
+    const int key_x = 58, key_y = 61, step_x = 70, step_y = 42;
+    const int key_w = 62, key_h = 34;
+#endif
     for (unsigned i = 1; i <= 9U; ++i) {
         unsigned col = (i - 1U) % 3U, row = (i - 1U) / 3U;
-        (void)make_button(screen, digits[i], 58 + col * 70, 61 + row * 42,
-                          62, 34, (product_action_t)(ACTION_ROOM_DIGIT_BASE + i));
+        (void)make_button(screen, digits[i], key_x + col * step_x, key_y + row * step_y,
+                          key_w, key_h, (product_action_t)(ACTION_ROOM_DIGIT_BASE + i));
     }
-    (void)make_button(screen, "删除", 58, 187, 62, 34, ACTION_ROOM_INPUT_DELETE);
-    (void)make_button(screen, "0", 128, 187, 62, 34, ACTION_ROOM_DIGIT_BASE);
-    (void)make_button(screen, "确定", 198, 187, 62, 34, ACTION_ROOM_INPUT_SUBMIT);
+    (void)make_button(screen, "删除", key_x, key_y + 3 * step_y,
+                      key_w, key_h, ACTION_ROOM_INPUT_DELETE);
+    (void)make_button(screen, "0", key_x + step_x, key_y + 3 * step_y,
+                      key_w, key_h, ACTION_ROOM_DIGIT_BASE);
+    (void)make_button(screen, "确定", key_x + 2 * step_x, key_y + 3 * step_y,
+                      key_w, key_h, ACTION_ROOM_INPUT_SUBMIT);
     if (s_voice_feedback[0] != '\0')
         (void)make_label(screen, s_voice_feedback, 24, 223, 272, lv_color_hex(0xFF9D9D));
     else if (!code && !s_room_input_create) {
@@ -2575,9 +2625,14 @@ static void render_diagnostics(lv_obj_t *screen)
 {
     (void)make_header_back_button(screen, ACTION_MENU);
     render_header(screen, "运行状态");
-    (void)make_button(screen, "资源", 14, 36, 90, 32, ACTION_DIAG_SYSTEM);
-    (void)make_button(screen, "音频", 115, 36, 90, 32, ACTION_DIAG_AUDIO);
-    (void)make_button(screen, "事件", 216, 36, 90, 32, ACTION_DIAG_EVENTS);
+#if CONFIG_IDF_TARGET_ESP32S3
+    const int tabs_y = 40; /* Clear the enlarged back target, including tolerance. */
+#else
+    const int tabs_y = 36;
+#endif
+    (void)make_button(screen, "资源", 14, tabs_y, 90, 32, ACTION_DIAG_SYSTEM);
+    (void)make_button(screen, "音频", 115, tabs_y, 90, 32, ACTION_DIAG_AUDIO);
+    (void)make_button(screen, "事件", 216, tabs_y, 90, 32, ACTION_DIAG_EVENTS);
     lv_obj_t *panel = lv_obj_create(screen);
     s_diagnostics_panel = panel;
     lv_obj_set_pos(panel, 8, 74);
@@ -2895,6 +2950,36 @@ static void clear_expression_part(const expression_geometry_t *geometry,
     lv_canvas_draw_rect(s_face, x, y, width, height, clear_dsc);
 }
 
+#if CONFIG_IDF_TARGET_ESP32S3
+/* Called with the LVGL lock held. Write native lv_color_t pixels so byte order
+ * stays owned by LVGL; no per-dot objects, antialiasing or audio-thread work. */
+static void draw_dot_mouth(uint32_t columns, lv_coord_t x, lv_coord_t y)
+{
+    static lv_color_t palette[7];
+    static bool palette_ready;
+    if (!palette_ready) {
+        for (unsigned row = 0; row < 7U; ++row)
+            palette[row] = lv_color_hex(row < 3U ? 0x55B8C4 :
+                                        row < 5U ? 0x72C79B : 0xD8B66A);
+        palette_ready = true;
+    }
+    lv_color_t background = lv_color_hex(HOME_BACKGROUND_COLOR);
+    for (unsigned row = 0; row < 36U; ++row)
+        for (unsigned col = 0; col < 66U; ++col)
+            s_face_canvas_buffer[(y + row) * FACE_CANVAS_W + x + col] = background;
+    for (unsigned col = 0; col < 7U; ++col) {
+        unsigned height = (columns >> (col * 4U)) & 15U;
+        if (height > 7U) height = 7U;
+        if (height == 0U) height = 1U;
+        for (unsigned row = 0; row < height; ++row)
+            for (unsigned dy = 0; dy < 4U; ++dy)
+                for (unsigned dx = 0; dx < 4U; ++dx)
+                    s_face_canvas_buffer[(y + 32U - row * 5U + dy) * FACE_CANVAS_W +
+                                         x + 6U + col * 9U + dx] = palette[row];
+    }
+}
+#endif
+
 static void apply_expression(const char *emotion,
                              starter_ai_ui_phase_t phase,
                              uint8_t activity_level)
@@ -2903,6 +2988,8 @@ static void apply_expression(const char *emotion,
     static expression_geometry_t previous_geometry;
     static bool previous_geometry_valid;
     static starter_playback_waveform_t previous_waveform;
+    static bool previous_dots;
+    static uint32_t previous_columns;
     if (s_face == NULL || s_face_canvas_buffer == NULL) {
         return;
     }
@@ -3154,9 +3241,19 @@ static void apply_expression(const char *emotion,
         geometry.right_w = 64; geometry.right_h = 6;
         geometry.eye_radius = 3;
     }
-    bool waveform = s_page == PAGE_HOME_FACE && !s_face_tag_active &&
+    bool dots = false;
+#if CONFIG_IDF_TARGET_ESP32S3
+    dots = s_page == PAGE_HOME_FACE && s_face_default_ai && !s_face_tag_active;
+    if (dots) geometry.color = 0xF4FCFF;
+#endif
+    uint32_t columns = dots && s_playback_waveform.active ? s_playback_waveform.columns : 0U;
+    bool waveform = !dots && s_page == PAGE_HOME_FACE && !s_face_tag_active &&
                     s_playback_waveform.active;
-    if (waveform) {
+    if (dots) {
+        geometry.mouth_x = 77; geometry.mouth_y = 70;
+        geometry.mouth_w = 66; geometry.mouth_h = 36;
+        geometry.mouth_radius = 0;
+    } else if (waveform) {
         /* Keep a fixed clearing box below every emotion's eyes. */
         geometry.mouth_x = 68; geometry.mouth_y = 78;
         geometry.mouth_w = 84; geometry.mouth_h = 28;
@@ -3175,6 +3272,7 @@ static void apply_expression(const char *emotion,
         geometry.mouth_radius != previous_geometry.mouth_radius ||
         geometry.mouth_x != previous_geometry.mouth_x || geometry.mouth_y != previous_geometry.mouth_y ||
         geometry.mouth_w != previous_geometry.mouth_w || geometry.mouth_h != previous_geometry.mouth_h ||
+        dots != previous_dots || (dots && columns != previous_columns) ||
         waveform != previous_waveform.active ||
         (waveform && memcmp(s_playback_waveform.points, previous_waveform.points,
                             sizeof(previous_waveform.points)) != 0);
@@ -3207,7 +3305,8 @@ static void apply_expression(const char *emotion,
             clear_expression_part(&previous_geometry, true, false, &clear_dsc);
             clear_expression_part(&previous_geometry, false, false, &clear_dsc);
         }
-        if (mouth_changed) clear_expression_part(&previous_geometry, false, true, &clear_dsc);
+        if (mouth_changed && !(dots && previous_dots))
+            clear_expression_part(&previous_geometry, false, true, &clear_dsc);
     }
     if (eyes_changed) {
         lv_canvas_draw_rect(s_face, geometry.left_x, geometry.left_y,
@@ -3215,7 +3314,11 @@ static void apply_expression(const char *emotion,
         lv_canvas_draw_rect(s_face, geometry.right_x, geometry.right_y,
                             geometry.right_w, geometry.right_h, &eye_dsc);
     }
-    if (mouth_changed && waveform) {
+    if (mouth_changed && dots) {
+#if CONFIG_IDF_TARGET_ESP32S3
+        draw_dot_mouth(columns, geometry.mouth_x, geometry.mouth_y);
+#endif
+    } else if (mouth_changed && waveform) {
         lv_point_t points[STARTER_PLAYBACK_WAVEFORM_POINTS];
         for (size_t i = 0; i < STARTER_PLAYBACK_WAVEFORM_POINTS; ++i) {
             points[i].x = (lv_coord_t)(70 + i * 80 /
@@ -3266,6 +3369,8 @@ static void apply_expression(const char *emotion,
     previous_geometry_valid = true;
     previous_waveform = s_playback_waveform;
     previous_waveform.active = waveform;
+    previous_dots = dots;
+    previous_columns = columns;
 }
 
 static void append_ai_history(const char *subtitle)
@@ -3365,11 +3470,13 @@ static void product_tick(lv_timer_t *timer)
     if (s_pending_ai_ack.expires_ms != 0) {
         if (now > s_pending_ai_ack.expires_ms || call_now ||
             runtime.state == STARTER_RUNTIME_AI_ACTIVE) {
+            starter_media_finish_ai_ack(s_pending_ai_ack.wake_token);
             s_pending_ai_ack.expires_ms = 0;
         } else if (runtime.state == STARTER_RUNTIME_AI_CONNECTING &&
                    runtime.session_generation == s_pending_ai_ack.expected_session) {
             s_pending_ai_ack.playback_epoch = starter_media_playback_epoch();
-            (void)xQueueOverwrite(s_ai_ack_queue, &s_pending_ai_ack);
+            if (xQueueOverwrite(s_ai_ack_queue, &s_pending_ai_ack) != pdTRUE)
+                starter_media_finish_ai_ack(s_pending_ai_ack.wake_token);
             s_pending_ai_ack.expires_ms = 0;
         }
     }

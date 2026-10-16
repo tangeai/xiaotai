@@ -1677,20 +1677,20 @@ static void post(xiaotai_room_response_t type, uint32_t generation,
 }
 static int service_request(const char *path, const char *json,
                            xiaotai_room_service_response_fn callback,
-                           void *callback_context, void *context) {
+                           void *callback_context, uint32_t request_id, void *context) {
     (void)context;
     (void)json;
     if (strstr(path, "assignment") != 0) {
         ++g_assignment_requests;
         callback("{\"code\":0,\"data\":{\"desired_state\":\"joined\","
                  "\"assignment_version\":1,\"room_id\":\"room-1\","
-                 "\"room_code\":\"123456\"}}", callback_context);
+                 "\"room_code\":\"123456\"}}", request_id, callback_context);
     } else if (strstr(path, "connect-token") != 0) {
         callback("{\"code\":0,\"data\":{\"peer_id\":\"peer\","
                  "\"token\":\"token\",\"heartbeat_seconds\":15,"
-                 "\"lease_seconds\":45}}", callback_context);
+                 "\"lease_seconds\":45}}", request_id, callback_context);
     } else if (strstr(path, "presence") != 0) {
-        callback("{\"code\":0,\"data\":{}}", callback_context);
+        callback("{\"code\":0,\"data\":{}}", request_id, callback_context);
     }
     return 0;
 }

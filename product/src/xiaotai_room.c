@@ -22,9 +22,20 @@ static int service_request(xiaotai_room_t *room, const char *path,
                            const char *body,
                            xiaotai_room_service_response_fn callback)
 {
-    return room->port.service_request == NULL ? ROOM_FAIL :
-        room->port.service_request(path, body, callback, room,
+    /* Set before submission: adapters may complete synchronously. Every
+     * response carries this immutable ticket, even after timeout/cancellation. */
+    if (++room->request_id == 0U) ++room->request_id;
+    uint32_t request_id = room->request_id;
+    room->request_generation = room->generation;
+    room->request_pending = true;
+    room->request_deadline_ms = now_ms(room) + 30000U;
+    int rc = room->port.service_request == NULL ? ROOM_FAIL :
+        room->port.service_request(path, body, callback, room, request_id,
                                    room->port.context);
+    if (rc != ROOM_OK && room->request_id == request_id) {
+        room->request_pending = false;
+    }
+    return rc;
 }
 
 static int transport_send(xiaotai_room_t *room, const void *data,
@@ -113,31 +124,31 @@ static void diagnostic(xiaotai_room_t *room,
     }
 }
 
-static void response_callback(const char *body, void *context)
+static void response_callback(const char *body, uint32_t request_id, void *context)
 {
     xiaotai_room_t *room = context;
     if (room->port.post_response != NULL) {
-        room->port.post_response(XIAOTAI_ROOM_RESPONSE_ASSIGNMENT, 0U, body,
+        room->port.post_response(XIAOTAI_ROOM_RESPONSE_ASSIGNMENT, request_id, body,
             body == NULL ? 0U : strlen(body), room->port.context);
     }
 }
 
-static void token_callback(const char *body, void *context)
+static void token_callback(const char *body, uint32_t request_id, void *context)
 {
     xiaotai_room_t *room = context;
     if (room->port.post_response != NULL) {
         room->port.post_response(XIAOTAI_ROOM_RESPONSE_TOKEN,
-            room->generation, body, body == NULL ? 0U : strlen(body),
+            request_id, body, body == NULL ? 0U : strlen(body),
             room->port.context);
     }
 }
 
-static void presence_callback(const char *body, void *context)
+static void presence_callback(const char *body, uint32_t request_id, void *context)
 {
     xiaotai_room_t *room = context;
     if (room->port.post_response != NULL) {
         room->port.post_response(XIAOTAI_ROOM_RESPONSE_PRESENCE,
-            room->generation, body, body == NULL ? 0U : strlen(body),
+            request_id, body, body == NULL ? 0U : strlen(body),
             room->port.context);
     }
 }
@@ -155,7 +166,6 @@ static int presence(xiaotai_room_t *room, const char *state)
     int rc = length > 0 && (size_t)length < sizeof(request) ?
         service_request(room, "/v1/call/group/device/presence", request,
                         presence_callback) : ROOM_FAIL;
-    if (rc == 0) room->request_pending = true;
     return rc;
 }
 
@@ -273,7 +283,8 @@ void xiaotai_room_snapshot(const xiaotai_room_t *room,
 
 void xiaotai_room_disconnect(xiaotai_room_t *room, const char *state)
 {
-    if (room == NULL || !xiaotai_room_active(room)) return;
+    if (room == NULL || !xiaotai_room_active(room) || room->disconnecting) return;
+    room->disconnecting = true;
     set_ptt(room, false);
     if (room->port.transport_connected != NULL &&
         room->port.transport_connected(room->port.context)) {
@@ -300,7 +311,10 @@ static void handle_assignment(xiaotai_room_t *room, const char *text)
     const char *room_code = json_string(data, "room_code");
     bool desired = strcmp(json_string(data, "desired_state"), "joined") == 0;
     bool valid = data != NULL && cJSON_IsNumber(version) &&
-                 version->valuedouble >= 0 && strlen(room_id) < 65U &&
+                 version->valuedouble >= 0 &&
+                 version->valuedouble <= 9007199254740991.0 &&
+                 (double)(int64_t)version->valuedouble == version->valuedouble &&
+                 strlen(room_id) < 65U &&
                  strlen(room_code) < 7U &&
                  (!desired || (room_id[0] != '\0' && strlen(room_code) == 6U));
     if (!valid) {
@@ -314,6 +328,12 @@ static void handle_assignment(xiaotai_room_t *room, const char *text)
     }
     room->leave_pending = false;
     int64_t new_version = (int64_t)version->valuedouble;
+    if (new_version < room->assignment_version ||
+        (new_version == room->assignment_version && new_version > 0 &&
+         !room->assigned && room->room_id[0] == '\0' && desired)) {
+        cJSON_Delete(root);
+        return;
+    }
     bool assignment_changed = new_version != room->assignment_version ||
                               strcmp(room_id, room->room_id) != 0;
     if ((!desired || assignment_changed) && xiaotai_room_active(room)) {
@@ -376,6 +396,8 @@ static void handle_token(xiaotai_room_t *room, uint32_t generation,
     cJSON_Delete(root);
     if (rc == 0) {
         room->connecting = true;
+        room->disconnecting = false;
+        room->connect_deadline_ms = now_ms(room) + 10000U;
         changed(room);
     } else {
         if (acquired && room->port.media_release != NULL) {
@@ -408,9 +430,12 @@ static void handle_presence(xiaotai_room_t *room, uint32_t generation,
 
 void xiaotai_room_handle_response(xiaotai_room_t *room,
                                   xiaotai_room_response_t type,
-                                  uint32_t generation, const char *text)
+                                  uint32_t request_id, const char *text)
 {
-    if (room == NULL) return;
+    if (room == NULL || !room->request_pending ||
+        request_id != room->request_id) return;
+    uint32_t generation = room->request_generation;
+    room->request_pending = false;
     if (type == XIAOTAI_ROOM_RESPONSE_ASSIGNMENT) {
         handle_assignment(room, text);
     } else if (type == XIAOTAI_ROOM_RESPONSE_TOKEN) {
@@ -429,6 +454,7 @@ void xiaotai_room_handle_connected(xiaotai_room_t *room, uint32_t generation)
         (void)transport_disconnect(room);
         return;
     }
+    if (!room->foreground || room->disconnecting || room->joined) return;
     char command[384];
     int length = snprintf(command, sizeof(command),
         "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"join_room\","
@@ -443,7 +469,7 @@ void xiaotai_room_handle_connected(xiaotai_room_t *room, uint32_t generation)
         return;
     }
     room->connecting = true;
-    room->lease_deadline_ms = now_ms(room) + 10000U;
+    room->connect_deadline_ms = now_ms(room) + 10000U;
 }
 
 void xiaotai_room_handle_command(xiaotai_room_t *room, uint32_t generation,
@@ -462,6 +488,12 @@ void xiaotai_room_handle_command(xiaotai_room_t *room, uint32_t generation,
         cJSON_GetObjectItemCaseSensitive(result, "input_audio") : NULL;
     const cJSON *output = cJSON_IsObject(result) ?
         cJSON_GetObjectItemCaseSensitive(result, "output_audio") : NULL;
+    if (cJSON_IsNumber(id) && id->valueint == 1 &&
+        (!room->connecting || room->joined || !room->foreground ||
+         room->disconnecting)) {
+        cJSON_Delete(root);
+        return;
+    }
     bool join_accepted = cJSON_IsNumber(id) && id->valueint == 1 &&
         cJSON_IsObject(result) && json_string(result, "session_id")[0] != '\0' &&
         audio_profile_valid(input) && audio_profile_valid(output);
@@ -537,8 +569,7 @@ void xiaotai_room_handle_command(xiaotai_room_t *room, uint32_t generation,
             "{\"jsonrpc\":\"2.0\",\"method\":\"get_room_snapshot\"}";
         (void)transport_send(room, snapshot, sizeof(snapshot) - 1U);
     } else if (strcmp(method, "room_closed") == 0) {
-        xiaotai_room_disconnect(room, "left");
-        room->assigned = false;
+        xiaotai_room_closed(room);
     }
     cJSON_Delete(root);
     changed(room);
@@ -555,8 +586,9 @@ void xiaotai_room_handle_disconnected(xiaotai_room_t *room,
     }
     diagnostic(room, XIAOTAI_ROOM_DIAG_DISCONNECTED, error);
     room->connecting = false;
+    room->disconnecting = false;
     room->joined = false;
-    room->request_pending = room->leave_pending;
+    /* A transport callback must not complete an unrelated HTTP request. */
     room->ptt = false;
     clear_participants(room);
     if (room->port.set_uplink_enabled != NULL) {
@@ -589,6 +621,8 @@ int xiaotai_room_action(xiaotai_room_t *room, xiaotai_room_action_t action,
     }
     if (action == XIAOTAI_ROOM_ACTION_END) {
         room->foreground = false;
+        room->request_pending = false;
+        room->leave_pending = false;
         xiaotai_room_disconnect(room, "suspended");
         return ROOM_OK;
     }
@@ -638,15 +672,51 @@ void xiaotai_room_assignment_changed(xiaotai_room_t *room)
 
 void xiaotai_room_closed(xiaotai_room_t *room)
 {
-    if (room == NULL) return;
+    if (room == NULL || !room->assigned) return;
     xiaotai_room_disconnect(room, "left");
+    room->request_pending = false;
+    room->leave_pending = false;
     room->assigned = false;
+    room->room_id[0] = '\0';
+    room->room_code[0] = '\0';
     changed(room);
+}
+
+void xiaotai_room_handle_closed(xiaotai_room_t *room, const char *room_id,
+                                int64_t assignment_version)
+{
+    if (room == NULL || room_id == NULL || room_id[0] == '\0' ||
+        strcmp(room_id, room->room_id) != 0 ||
+        assignment_version < room->assignment_version) return;
+    room->assignment_version = assignment_version;
+    xiaotai_room_closed(room);
 }
 
 void xiaotai_room_tick(xiaotai_room_t *room)
 {
-    if (room == NULL || room->port.service_ready == NULL ||
+    if (room == NULL) return;
+    uint32_t now = now_ms(room);
+    /* Deadlines run even while offline, outside the menu, or transport busy. */
+    if (room->request_pending &&
+        (int32_t)(now - room->request_deadline_ms) >= 0) {
+        room->request_pending = false;
+        room->leave_pending = false;
+        diagnostic(room, XIAOTAI_ROOM_DIAG_REQUEST_TIMEOUT, 0);
+        changed(room);
+    }
+    if (room->disconnecting) return;
+    if (room->connecting &&
+        (int32_t)(now - room->connect_deadline_ms) >= 0) {
+        diagnostic(room, XIAOTAI_ROOM_DIAG_CONNECT_TIMEOUT, 0);
+        xiaotai_room_disconnect(room, "connect_failed");
+        return;
+    }
+    if (room->joined && (int32_t)(now - room->lease_deadline_ms) >= 0) {
+        diagnostic(room, XIAOTAI_ROOM_DIAG_LEASE_EXPIRED, 0);
+        xiaotai_room_disconnect(room, "connect_failed");
+        return;
+    }
+    if (room->port.service_ready == NULL ||
         !room->port.service_ready(room->port.context)) return;
     /* Assignment reconciliation is background work. Do not overlap its TLS
      * handshake with an unrelated STREAM/AI/call connection or with the
@@ -654,7 +724,6 @@ void xiaotai_room_tick(xiaotai_room_t *room)
      * room still needs its own presence and assignment traffic. */
     if (!xiaotai_room_active(room) && room->port.transport_busy != NULL &&
         room->port.transport_busy(room->port.context)) return;
-    uint32_t now = now_ms(room);
     bool available = room->foreground &&
                      room->port.media_available != NULL &&
                      room->port.media_available(room->port.context);
@@ -666,10 +735,6 @@ void xiaotai_room_tick(xiaotai_room_t *room)
     }
     if (room->joined) {
         if (!room->request_pending &&
-            (int32_t)(now - room->lease_deadline_ms) >= 0) {
-            diagnostic(room, XIAOTAI_ROOM_DIAG_LEASE_EXPIRED, 0);
-            xiaotai_room_disconnect(room, "connect_failed");
-        } else if (!room->request_pending &&
                    (int32_t)(now - room->next_heartbeat_ms) >= 0) {
             if (presence(room, "joined") == 0) {
                 room->next_heartbeat_ms = now +

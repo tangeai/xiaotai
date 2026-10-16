@@ -63,7 +63,7 @@ static void set_uplink(bool enabled, void *context)
 }
 static int request(const char *path, const char *body,
                    xiaotai_room_service_response_fn callback,
-                   void *callback_context, void *context)
+                   void *callback_context, uint32_t request_id, void *context)
 {
     (void)context;
     if (strstr(path, "/create") != NULL) {
@@ -71,18 +71,18 @@ static int request(const char *path, const char *body,
         ++create_requests;
         callback("{\"code\":0,\"data\":{\"desired_state\":\"joined\","
                  "\"assignment_version\":1,\"room_id\":\"room-new\","
-                 "\"room_code\":\"654321\"}}", callback_context);
+                 "\"room_code\":\"654321\"}}", request_id, callback_context);
     } else if (strstr(path, "assignment") != NULL) {
         ++assignment_requests;
         callback("{\"code\":0,\"data\":{\"desired_state\":\"joined\","
                  "\"assignment_version\":1,\"room_id\":\"room-1\","
-                 "\"room_code\":\"123456\"}}", callback_context);
+                 "\"room_code\":\"123456\"}}", request_id, callback_context);
     } else if (strstr(path, "connect-token") != NULL) {
         callback("{\"code\":0,\"data\":{\"peer_id\":\"peer\","
                  "\"token\":\"token\",\"heartbeat_seconds\":15,"
-                 "\"lease_seconds\":45}}", callback_context);
+                 "\"lease_seconds\":45}}", request_id, callback_context);
     } else if (strstr(path, "presence") != NULL) {
-        callback("{\"code\":0,\"data\":{}}", callback_context);
+        callback("{\"code\":0,\"data\":{}}", request_id, callback_context);
     }
     return 0;
 }
@@ -177,7 +177,8 @@ int main(void)
     assert(!room.joined && uplink);
     assert(diagnostic_events == 1U);
     assert(last_diagnostic == XIAOTAI_ROOM_DIAG_DISCONNECTED);
-    xiaotai_room_handle_response(&room, XIAOTAI_ROOM_RESPONSE_ASSIGNMENT, 0U,
+    room.request_pending = true;
+    xiaotai_room_handle_response(&room, XIAOTAI_ROOM_RESPONSE_ASSIGNMENT, room.request_id,
                                  "{}");
     assert(diagnostic_events == 2U);
     assert(last_diagnostic == XIAOTAI_ROOM_DIAG_ASSIGNMENT_INVALID);

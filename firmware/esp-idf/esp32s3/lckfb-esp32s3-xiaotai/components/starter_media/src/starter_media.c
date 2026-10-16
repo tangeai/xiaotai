@@ -131,6 +131,51 @@ static atomic_uint_fast32_t s_generation;
 static atomic_uint_fast32_t s_audio_sent;
 static atomic_uint_fast32_t s_video_sent;
 static atomic_uint_fast32_t s_audio_received;
+/* Includes the slot held by the sink, even during prefill. Never reset this
+ * counter on session start: an old worker may still own its final slot. */
+static atomic_uint_fast32_t s_audio_playback_pending;
+static atomic_bool s_audio_playback_active;
+static atomic_uint_fast32_t s_audio_rx_last_ms;
+/* Xtensa has no lock-free 64-bit atomics. Hold this lock only for bounded
+ * scalar updates, never across decoding, I2S writes or output-mutex waits. */
+static portMUX_TYPE s_playback_timing_lock = portMUX_INITIALIZER_UNLOCKED;
+static uint64_t s_audio_pcm_frames;
+static int64_t s_audio_dma_until_us;
+
+/* Caller holds the output mutex, excluding an old in-flight PCM write. */
+static void audio_playback_timing_reset(bool reset_total)
+{
+    portENTER_CRITICAL(&s_playback_timing_lock);
+    s_audio_dma_until_us = 0;
+    if (reset_total) s_audio_pcm_frames = 0;
+    portEXIT_CRITICAL(&s_playback_timing_lock);
+}
+
+static void audio_playback_track_write(size_t frames)
+{
+    int64_t now_us = esp_timer_get_time();
+    /* A blocking codec write has copied all PCM into the TX ring. Its whole
+     * capacity is a conservative tail bound, not a measured DMA fill level.
+     * Rebase after each write: adding frame durations would accumulate error
+     * during scheduler stalls. No pacing or sample-rate changes here. */
+    int64_t tail_us = (int64_t)AUDIO_I2S_DMA_DESC_NUM *
+        AUDIO_I2S_DMA_FRAME_NUM * 1000000 / AUDIO_HW_SAMPLE_RATE_HZ;
+    portENTER_CRITICAL(&s_playback_timing_lock);
+    s_audio_pcm_frames += frames;
+    s_audio_dma_until_us = now_us + tail_us;
+    portEXIT_CRITICAL(&s_playback_timing_lock);
+}
+
+static void audio_playback_timing(uint32_t *pcm_ms, uint32_t *dma_ms)
+{
+    int64_t now_us = esp_timer_get_time();
+    portENTER_CRITICAL(&s_playback_timing_lock);
+    uint64_t frames = s_audio_pcm_frames;
+    int64_t remaining_us = s_audio_dma_until_us - now_us;
+    portEXIT_CRITICAL(&s_playback_timing_lock);
+    *pcm_ms = (uint32_t)(frames * 1000 / AUDIO_HW_SAMPLE_RATE_HZ);
+    *dma_ms = remaining_us > 0 ? (uint32_t)((remaining_us + 999) / 1000) : 0;
+}
 static atomic_uint_fast32_t s_audio_dropped;
 static atomic_uint_fast32_t s_audio_rx_overflow;
 static atomic_uint_fast32_t s_audio_rx_prefill_waits;
@@ -557,8 +602,10 @@ static void audio_capture_task(void *argument)
                 starter_preroll_clear(&s_preroll);
             }
             if (atomic_exchange(&s_preroll_gap, false)) {
-                if (s_preroll.token != 0) s_preroll.failed = true;
-                else starter_preroll_clear(&s_preroll);
+                if (starter_preroll_input_ready(&s_preroll)) {
+                    if (s_preroll.token != 0) s_preroll.failed = true;
+                    else starter_preroll_clear(&s_preroll);
+                }
             }
             bool muted = atomic_load(&s_microphone_muted);
             if (muted) {
@@ -772,8 +819,9 @@ static bool play_audio_item(const audio_rx_item_t *item)
         update_timing_average(&s_write_average, item->generation,
                               &s_audio_write_avg_us, write_us);
         if (played) {
+            audio_playback_track_write(frames);
             if (item->mode == STARTER_TIRTC_AI) {
-                starter_playback_scope_publish(&s_playback_scope, s_decode_pcm,
+                starter_playback_scope_publish_dots(&s_playback_scope, s_decode_pcm,
                     mono_samples, (uint32_t)(esp_timer_get_time() / 1000),
                     item->generation);
             }
@@ -824,6 +872,7 @@ static void audio_sink_task(void *argument)
         bool admitted = false;
         do {
             audio_rx_item_t *item = &s_audio_rx_pool[slot];
+            atomic_store(&s_audio_playback_active, true);
             if (item->generation != buffered_generation) {
                 admitted = audio_rx_prefill(item);
                 buffered_generation = item->generation;
@@ -831,6 +880,8 @@ static void audio_sink_task(void *argument)
             if (admitted) {
                 (void)play_audio_item(item);
             }
+            atomic_store(&s_audio_playback_active, false);
+            atomic_fetch_sub(&s_audio_playback_pending, 1);
             memset(item, 0, sizeof(*item));
             if (xQueueSend(s_audio_rx_free_queue, &slot, 0) != pdTRUE) {
                 ESP_LOGE(TAG, "audio RX slot %u could not be returned",
@@ -945,6 +996,7 @@ static void drain_audio_rx_ready_queue(void)
     uint8_t slot = 0;
     while (xQueueReceive(s_audio_rx_ready_queue, &slot, 0) == pdTRUE) {
         if (slot < AUDIO_RX_QUEUE_DEPTH) {
+            atomic_fetch_sub(&s_audio_playback_pending, 1);
             memset(&s_audio_rx_pool[slot], 0, sizeof(s_audio_rx_pool[slot]));
             (void)xQueueSend(s_audio_rx_free_queue, &slot, 0);
         }
@@ -1199,6 +1251,7 @@ uint32_t starter_media_prepare_ai_preroll(int64_t captured_ms)
     if (!atomic_load(&s_microphone_muted) && !atomic_load(&s_active) &&
         atomic_load(&s_wake_allowed)) {
         token = starter_preroll_prepare(&s_preroll, captured_ms, esp_timer_get_time() / 1000);
+        starter_preroll_hold_ack(&s_preroll, token, esp_timer_get_time() / 1000);
     }
     xSemaphoreGive(s_preroll_mutex);
     return token;
@@ -1211,6 +1264,33 @@ void starter_media_cancel_ai_preroll(uint32_t token)
     if (s_preroll.token == token && s_preroll.generation == 0 &&
         s_expected_wake_token != token) starter_preroll_clear(&s_preroll);
     xSemaphoreGive(s_preroll_mutex);
+}
+
+bool starter_media_begin_ai_ack(uint32_t token)
+{
+    if (!token || s_preroll_mutex == NULL) return false;
+    xSemaphoreTake(s_preroll_mutex, portMAX_DELAY);
+    bool accepted = starter_preroll_begin_ack(&s_preroll, token, esp_timer_get_time() / 1000);
+    xSemaphoreGive(s_preroll_mutex);
+    return accepted;
+}
+
+void starter_media_finish_ai_ack(uint32_t token)
+{
+    if (!token || s_preroll_mutex == NULL) return;
+    xSemaphoreTake(s_preroll_mutex, portMAX_DELAY);
+    starter_preroll_finish_ack(&s_preroll, token, esp_timer_get_time() / 1000);
+    xSemaphoreGive(s_preroll_mutex);
+}
+
+bool starter_media_ai_input_ready(void)
+{
+    if (s_preroll_mutex == NULL || xSemaphoreTake(s_preroll_mutex, 0) != pdTRUE) return false;
+    bool ready = s_expected_wake_token == 0 ||
+        (starter_preroll_valid(&s_preroll, s_expected_wake_token, esp_timer_get_time() / 1000) &&
+         starter_preroll_input_ready(&s_preroll));
+    xSemaphoreGive(s_preroll_mutex);
+    return ready;
 }
 
 bool starter_media_ai_preroll_failed(void)
@@ -1360,6 +1440,7 @@ esp_err_t starter_media_start(starter_tirtc_mode_t mode, uint32_t generation)
     atomic_store_explicit(&s_audio_sent, 0, memory_order_release);
     atomic_store_explicit(&s_video_sent, 0, memory_order_release);
     atomic_store_explicit(&s_audio_received, 0, memory_order_release);
+    atomic_store(&s_audio_rx_last_ms, 0);
     atomic_store_explicit(&s_audio_dropped, 0, memory_order_release);
     atomic_store_explicit(&s_audio_rx_overflow, 0, memory_order_release);
     atomic_store_explicit(&s_audio_rx_prefill_waits, 0, memory_order_release);
@@ -1394,7 +1475,6 @@ esp_err_t starter_media_start(starter_tirtc_mode_t mode, uint32_t generation)
     atomic_store_explicit(&s_generation, generation, memory_order_release);
     atomic_store_explicit(&s_video_refresh_requested, mode == STARTER_TIRTC_H5,
                           memory_order_release);
-    atomic_store_explicit(&s_active, true, memory_order_release);
     if (xSemaphoreTake(s_audio_output_mutex, pdMS_TO_TICKS(500)) != pdTRUE) {
         ESP_LOGE(TAG, "media start output lock timeout mode=%d generation=%lu",
                  (int)mode, (unsigned long)generation);
@@ -1404,6 +1484,7 @@ esp_err_t starter_media_start(starter_tirtc_mode_t mode, uint32_t generation)
     }
     esp_err_t err = audio_output_set_locked(
         !atomic_load_explicit(&s_speaker_muted, memory_order_acquire));
+    audio_playback_timing_reset(true);
     xSemaphoreGive(s_audio_output_mutex);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "media start output enable failed mode=%d generation=%lu err=%s",
@@ -1413,6 +1494,8 @@ esp_err_t starter_media_start(starter_tirtc_mode_t mode, uint32_t generation)
         drain_audio_rx_ready_queue();
         return err;
     }
+    /* Publish admission only after output and drain accounting are ready. */
+    atomic_store_explicit(&s_active, true, memory_order_release);
     ESP_LOGI(TAG,
              "media session started mode=%d generation=%lu video=%s",
              (int)mode,
@@ -1442,6 +1525,7 @@ static esp_err_t stop_media(uint32_t preserve_token)
     if (s_audio_output_mutex != NULL &&
         xSemaphoreTake(s_audio_output_mutex, pdMS_TO_TICKS(600)) == pdTRUE) {
         (void)audio_output_set_locked(false);
+        audio_playback_timing_reset(false);
         xSemaphoreGive(s_audio_output_mutex);
     }
     return preserved ? ESP_OK : ESP_ERR_INVALID_STATE;
@@ -1515,11 +1599,15 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
         .frame = *frame,
     };
     memcpy(item->payload, data, frame->length);
+    /* Publish ownership before the queue can wake the consumer. */
+    atomic_fetch_add(&s_audio_playback_pending, 1);
     if (xQueueSend(s_audio_rx_ready_queue, &slot, 0) == pdTRUE) {
+        atomic_store(&s_audio_rx_last_ms, (uint32_t)(esp_timer_get_time() / 1000));
         update_max_counter(&s_audio_rx_queue_peak,
                            uxQueueMessagesWaiting(s_audio_rx_ready_queue));
         atomic_fetch_add_explicit(&s_audio_received, 1, memory_order_relaxed);
     } else {
+        atomic_fetch_sub(&s_audio_playback_pending, 1);
         memset(item, 0, sizeof(*item));
         atomic_fetch_add_explicit(&s_audio_rx_overflow, 1, memory_order_relaxed);
         (void)xQueueSend(s_audio_rx_free_queue, &slot, 0);
@@ -1529,7 +1617,19 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
 
 starter_media_status_t starter_media_status(void)
 {
+    /* Read ownership before the tail snapshot. Otherwise the final writer
+     * could publish a new DMA tail and release its slot between these reads,
+     * producing a false-empty combination of two different instants. */
+    uint32_t pending = (uint32_t)atomic_load(&s_audio_playback_pending);
+    bool playing = atomic_load(&s_audio_playback_active);
+    uint32_t pcm_ms, dma_ms;
+    audio_playback_timing(&pcm_ms, &dma_ms);
     return (starter_media_status_t) {
+        .audio_playback_pending = pending,
+        .audio_playback_active = playing || dma_ms > 0,
+        .audio_rx_last_ms = (uint32_t)atomic_load(&s_audio_rx_last_ms),
+        .audio_playback_pcm_ms = pcm_ms,
+        .audio_playback_dma_ms = dma_ms,
         .active = atomic_load_explicit(&s_active, memory_order_acquire),
         .mode = (starter_tirtc_mode_t)atomic_load_explicit(&s_mode,
                                                             memory_order_acquire),

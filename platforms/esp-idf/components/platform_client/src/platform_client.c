@@ -122,6 +122,11 @@ static SemaphoreHandle_t s_mqtt_lifecycle;
 static volatile bool s_ready;
 static volatile bool s_request_worker_ready;
 static atomic_bool s_mqtt_connected;
+/* Only the MQTT event task owns subscription IDs and acknowledgement flags. */
+static int s_mqtt_command_subscription = -1;
+static int s_mqtt_notify_subscription = -1;
+static bool s_mqtt_command_subscribed;
+static bool s_mqtt_notify_subscribed;
 static platform_online_callback_t s_online_callback;
 static void *s_online_user_data;
 static volatile bool s_provisioning;
@@ -612,13 +617,43 @@ static void mqtt_event(void *handler_args,
                        "device/sn_%s/cmd", s_device_id);
         (void)snprintf(notify_topic, sizeof(notify_topic),
                        "device/sn_%s/notify", s_device_id);
-        (void)esp_mqtt_client_subscribe(event->client, command_topic, 1);
-        (void)esp_mqtt_client_subscribe(event->client, notify_topic, 1);
-        s_mqtt_connected = true;
-        ESP_LOGI(TAG, "MQTT connected and device topics subscribed");
-        notify_platform_online();
+        s_mqtt_connected = false;
+        s_mqtt_command_subscribed = false;
+        s_mqtt_notify_subscribed = false;
+        s_mqtt_command_subscription = esp_mqtt_client_subscribe(event->client, command_topic, 1);
+        s_mqtt_notify_subscription = esp_mqtt_client_subscribe(event->client, notify_topic, 1);
+        if (s_mqtt_command_subscription < 0 || s_mqtt_notify_subscription < 0) {
+            s_mqtt_command_subscription = s_mqtt_notify_subscription = -1;
+            ESP_LOGW(TAG, "MQTT subscription submission failed; reconnecting");
+            /* This schedules disconnect in the MQTT task. Its configured
+             * auto-reconnect retries both subscriptions after the backoff. */
+            (void)esp_mqtt_client_disconnect(event->client);
+        }
+    } else if (event_id == MQTT_EVENT_SUBSCRIBED) {
+        if (event->msg_id < 0 ||
+            (event->msg_id != s_mqtt_command_subscription &&
+             event->msg_id != s_mqtt_notify_subscription)) return;
+        if (event->error_handle != NULL &&
+            event->error_handle->error_type == MQTT_ERROR_TYPE_SUBSCRIBE_FAILED) {
+            s_mqtt_connected = false;
+            s_mqtt_command_subscription = s_mqtt_notify_subscription = -1;
+            ESP_LOGW(TAG, "MQTT subscription rejected; reconnecting");
+            (void)esp_mqtt_client_disconnect(event->client);
+            return;
+        }
+        if (event->msg_id == s_mqtt_command_subscription) s_mqtt_command_subscribed = true;
+        if (event->msg_id == s_mqtt_notify_subscription) s_mqtt_notify_subscribed = true;
+        if (!s_mqtt_connected && s_mqtt_command_subscribed && s_mqtt_notify_subscribed) {
+            s_mqtt_connected = true;
+            ESP_LOGI(TAG, "MQTT device topic subscriptions acknowledged");
+            notify_platform_online();
+        }
     } else if (event_id == MQTT_EVENT_DISCONNECTED) {
         s_mqtt_connected = false;
+        s_mqtt_command_subscription = s_mqtt_notify_subscription = -1;
+        s_mqtt_command_subscribed = s_mqtt_notify_subscribed = false;
+        s_mqtt_message_size = 0;
+        s_mqtt_message_id = -1;
         ESP_LOGW(TAG, "MQTT disconnected; client will reconnect");
     } else if (event_id == MQTT_EVENT_DATA) {
         if (event->current_data_offset == 0) {

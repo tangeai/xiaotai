@@ -111,6 +111,11 @@ void starter_media_set_wake_allowed(bool allowed);
 /** Prepare only for an acoustic wake; returns zero if stale, muted or busy. */
 uint32_t starter_media_prepare_ai_preroll(int64_t captured_ms);
 void starter_media_cancel_ai_preroll(uint32_t token);
+/** Token-scoped local wake response. Begin rejects cancelled/expired responses. */
+bool starter_media_begin_ai_ack(uint32_t token);
+void starter_media_finish_ai_ack(uint32_t token);
+/** Runtime admission: remote setup may proceed while the local response plays. */
+bool starter_media_ai_input_ready(void);
 /** Runtime-only transition: retain exactly this wake token while stopping H5. */
 esp_err_t starter_media_stop_for_ai(uint32_t token);
 /** Runtime polls overflow/discontinuity so a damaged utterance fails explicitly. */

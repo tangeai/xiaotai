@@ -2,6 +2,7 @@
 #define XIAOTAI_SIGNAL_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef enum {
     XIAOTAI_SIGNAL_UNBIND = 1,
@@ -20,6 +21,8 @@ typedef struct {
     xiaotai_signal_type_t type;
     const char *name;
     const char *room_id;
+    bool assignment_version_valid;
+    int64_t assignment_version;
     const char *caller_id;
     const char *call_type;
     const char *peer_id;

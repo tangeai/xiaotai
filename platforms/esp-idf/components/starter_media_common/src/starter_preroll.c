@@ -12,12 +12,23 @@ void starter_preroll_clear(starter_preroll_t *q)
     q->token = q->generation = 0;
     q->end_ms = q->expires_ms = q->timestamp_ms = 0;
     q->failed = false;
+    q->ack_pending = q->ack_playing = false;
+    q->ack_deadline_ms = q->listen_after_ms = 0;
 }
 
 void starter_preroll_append(starter_preroll_t *q, const int16_t *pcm,
                            size_t samples, int64_t end_ms)
 {
     if (q->failed || q->capacity == 0 || samples == 0) return;
+    /* Drop complete frames overlapping the local prompt and its acoustic tail.
+     * First admitted frame establishes a fresh timestamp/continuity boundary. */
+    if (q->ack_pending) return;
+    if (q->listen_after_ms != 0) {
+        if (end_ms - (int64_t)samples / 8 < q->listen_after_ms) return;
+        q->listen_after_ms = 0;
+        q->timestamp_ms = end_ms - (int64_t)samples / 8;
+        q->end_ms = 0;
+    }
     /* An input discontinuity invalidates a pending utterance, never splices it. */
     int64_t duration_ms = (int64_t)samples / 8;
     if (q->end_ms != 0 &&
@@ -48,12 +59,12 @@ uint32_t starter_preroll_prepare(starter_preroll_t *q, int64_t wake_ms, int64_t 
 {
     if (q->token != 0 || q->failed || q->count == 0 || wake_ms <= 0 ||
         now_ms < wake_ms || now_ms - wake_ms > 1000 ||
-        now_ms - q->end_ms > 150) return 0;
-    /* Retain 800 ms before the detection frame, including a suffix that may
-     * have begun before MultiNet reported DETECTED. Idle history is never sent
-     * by a manual AI start. */
-    int64_t keep_ms = q->end_ms - wake_ms + 800;
-    if (keep_ms <= 0) return 0;
+        now_ms - q->end_ms > 150 || wake_ms > q->end_ms) return 0;
+    /* The detector reports the end of its acoustic input, not the time the
+     * inference callback ran. Keep subsequent speech through inference and
+     * connection setup, but never deliberately replay the detector's window.
+     * Empty post-wake audio is valid: future capture belongs to this token. */
+    int64_t keep_ms = q->end_ms - wake_ms;
     size_t keep = (size_t)keep_ms * 8U;
     if (keep < q->count) {
         size_t drop = q->count - keep;
@@ -67,17 +78,49 @@ uint32_t starter_preroll_prepare(starter_preroll_t *q, int64_t wake_ms, int64_t 
     return q->token;
 }
 
+void starter_preroll_hold_ack(starter_preroll_t *q, uint32_t token, int64_t now_ms)
+{
+    if (!token || q->token != token || q->generation) return;
+    q->head = q->count = 0;
+    q->ack_pending = true;
+    q->ack_playing = false;
+    q->ack_deadline_ms = now_ms + PREROLL_ACK_QUEUE_TIMEOUT_MS;
+}
+
+bool starter_preroll_begin_ack(starter_preroll_t *q, uint32_t token, int64_t now_ms)
+{
+    if (!starter_preroll_valid(q, token, now_ms) || !q->ack_pending ||
+        q->ack_playing || q->generation) return false;
+    q->ack_playing = true;
+    q->ack_deadline_ms = now_ms + PREROLL_ACK_PLAY_TIMEOUT_MS;
+    return true;
+}
+
+void starter_preroll_finish_ack(starter_preroll_t *q, uint32_t token, int64_t now_ms)
+{
+    if (!starter_preroll_valid(q, token, now_ms) || !q->ack_pending || q->generation) return;
+    q->ack_pending = q->ack_playing = false;
+    q->ack_deadline_ms = 0;
+    q->listen_after_ms = now_ms + PREROLL_ACK_TAIL_MS;
+}
+
+bool starter_preroll_input_ready(const starter_preroll_t *q)
+{
+    return !q->ack_pending && q->listen_after_ms == 0;
+}
+
 bool starter_preroll_valid(const starter_preroll_t *q, uint32_t token, int64_t now_ms)
 {
     return token != 0 && q->token == token && !q->failed &&
-           (q->generation != 0 || now_ms <= q->expires_ms);
+           (q->generation != 0 || now_ms <= q->expires_ms) &&
+           (!q->ack_pending || now_ms <= q->ack_deadline_ms);
 }
 
 bool starter_preroll_bind(starter_preroll_t *q, uint32_t token,
                          uint32_t generation, int64_t now_ms)
 {
     if (generation == 0 || !starter_preroll_valid(q, token, now_ms) ||
-        q->generation != 0) return false;
+        q->generation != 0 || !starter_preroll_input_ready(q)) return false;
     q->generation = generation;
     return true;
 }

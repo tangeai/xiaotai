@@ -276,7 +276,23 @@ static int write_pcm(void *context,const int16_t *pcm,size_t frames,size_t *writ
     return write_fails ? -1 : 0;
 }
 static struct {void *context;int (*write_pcm)(void *,const int16_t *,size_t,size_t *);} adapter={NULL,write_pcm},*s_audio_adapter=&adapter;
-''' + helpers + function(source, 'play_audio_item') + status + r'''
+''' + helpers + function(source, 'play_audio_item') + r'''
+/* Finish the sink immediately after the status reader observes the old DMA
+ * deadline. This is a legal task interleaving, with no new network arrivals. */
+static bool finish_during_snapshot;
+#undef atomic_load_explicit
+#define atomic_load_explicit(ptr, order) ({ \
+    __auto_type p = (ptr); \
+    __auto_type value = __atomic_load_n(p, order); \
+    if ((void *)p == (void *)&s_audio_dma_until_us && finish_during_snapshot) { \
+        finish_during_snapshot = false; \
+        atomic_store(&s_audio_dma_until_us, clock_us + 90000); \
+        atomic_store(&s_audio_playback_active, false); \
+        atomic_store(&s_audio_playback_pending, 0); \
+    } \
+    value; \
+})
+''' + status + r'''
 int main(void){
     audio_rx_item_t item={.mode=STARTER_TIRTC_AI,.generation=7,.frame.length=37};
     (void)s_audio_dma_until_us;
@@ -338,6 +354,14 @@ int main(void){
     item.generation=6;
     assert(!play_audio_item(&item)); /* stale owner must not create DMA debt */
     assert(!starter_media_status().audio_playback_active);
+    s_audio_playback_pending=1;s_audio_playback_active=true;
+    s_audio_dma_until_us=0;finish_during_snapshot=true;
+    media=starter_media_status();
+    assert(!finish_during_snapshot);
+    assert((media.audio_playback_pending>0 || media.audio_playback_active) &&
+           "final write racing status must not report playback drained");
+    assert(starter_media_status().audio_playback_active);
+    clock_us+=90000;assert(!starter_media_status().audio_playback_active);
 }
 ''')
 

@@ -125,12 +125,14 @@ def test_ack():
     body = r'''
 #define ESP_ERR_INVALID_STATE -1
 typedef enum { CALL_RING_NONE, CALL_RING_OUTGOING, CALL_RING_INCOMING, CALL_RING_AI_ACK } call_ring_kind_t;
-typedef struct { int64_t expires_ms; bool male; uint32_t expected_session, playback_epoch; } ai_ack_t;
+typedef struct { int64_t expires_ms; bool male; uint32_t expected_session, playback_epoch, wake_token; } ai_ack_t;
 static atomic_uint s_call_ring_kind;
 static void *s_ai_ack_queue = (void *)1;
 static bool pending;
 static ai_ack_t request;
-static unsigned plays, delays;
+static unsigned plays, delays, finishes;
+static bool starter_media_begin_ai_ack(uint32_t token){assert(token==42);return true;}
+static void starter_media_finish_ai_ack(uint32_t token){assert(token==42);finishes++;}
 static int64_t now_ms;
 static starter_runtime_status_t status;
 static jmp_buf done;
@@ -167,10 +169,10 @@ static void vTaskDelay(unsigned ms) {
     body += function("../platforms/esp-idf/components/starter_product/src/starter_product.c", "call_ring_task")
     body += r'''
 static void scenario(int state, int64_t expires, unsigned expected) {
-    status.state = state; status.session_generation = 7; now_ms = 1000; plays = delays = 0;
-    pending = true; request = (ai_ack_t){.expires_ms=expires,.expected_session=7,.playback_epoch=4};
+    status.state = state; status.session_generation = 7; now_ms = 1000; plays = delays = finishes = 0;
+    pending = true; request = (ai_ack_t){.expires_ms=expires,.expected_session=7,.playback_epoch=4,.wake_token=42};
     if (setjmp(done) == 0) call_ring_task(NULL);
-    assert(!pending && plays == expected);
+    assert(!pending && plays == expected && finishes == 1);
 }
 int main(void) {
     scenario(STARTER_RUNTIME_AI_CONNECTING, 2000, 1);
@@ -202,7 +204,7 @@ int main(void) {
     for (unsigned i=0; i<100; ++i) append();
     assert(q.count == 12000);
     uint32_t token=starter_preroll_prepare(&q, tick, tick);
-    assert(token && q.count == 6400);
+    assert(token && q.count == 0);
     assert(starter_preroll_prepare(&q, tick, tick) == 0);
     for (unsigned i=0; i<100; ++i) append();
     assert(!starter_preroll_bind(&q, token+1, 7, tick));
@@ -210,9 +212,9 @@ int main(void) {
     assert(!starter_preroll_bind(&q, token, 8, tick));
     uint32_t timestamp;
     assert(!starter_preroll_peek(&q, 8, output, 160, &timestamp));
-    unsigned expected=9600, packets=0;
+    unsigned expected=16000, packets=0;
     while (starter_preroll_peek(&q, 7, output, 160, &timestamp)) {
-        assert(timestamp == 1200 + packets*20);
+        assert(timestamp == 2000 + packets*20);
         assert(output[0] == (int16_t)expected);
         assert(starter_preroll_peek(&q, 7, output, 160, &timestamp)); /* no consume on backpressure */
         for (unsigned i=0;i<160;++i) assert(output[i] == (int16_t)expected++);
@@ -235,7 +237,7 @@ int main(void) {
     assert(q.failed && !starter_preroll_valid(&q,next,tick));
     starter_preroll_init(&q,memory,320);
     append(); next=starter_preroll_prepare(&q,tick,tick);
-    append(); append();
+    append(); append(); append();
     assert(q.failed && !starter_preroll_valid(&q,next,tick));
     return 0;
 }
@@ -251,7 +253,7 @@ int main(void) {
     starter_preroll_t q; starter_preroll_init(&q,memory,PREROLL_CAPACITY_SAMPLES);
     for(int i=0;i<256;++i) pcm[i]=i;
     starter_preroll_append(&q,pcm,256,1000);
-    unsigned token=starter_preroll_prepare(&q,1000,1000);
+    unsigned token=starter_preroll_prepare(&q,968,1000);
     assert(starter_preroll_bind(&q,token,1,1000));
     size_t count=99; uint32_t timestamp=0;
     assert(!starter_preroll_finish_replay(&q,1,tail,160,&count,&timestamp));
@@ -827,6 +829,7 @@ int main(void) {
 def test_finish_pending_connect():
     body = r'''
 static uint32_t s_connection_generation;
+static bool s_ai_media_pending;
 static int64_t s_ai_start_at_ms, s_room_start_at_ms;
 static xiaotai_runtime_t s_session;
 static char s_ai_role_id[2], s_ai_request_id[2], s_call_room_id[2], s_call_peer_id[2];
@@ -863,8 +866,9 @@ int main(void) {
     (void)starter_tirtc_connected();
     xiaotai_runtime_init(&s_session);
     assert(xiaotai_runtime_begin(&s_session, XIAOTAI_OWNER_AI, false));
+    s_ai_media_pending=true;
     finish_session(0);
-    assert(!pending && disconnects==1);
+    assert(!pending && !s_ai_media_pending && disconnects==1);
     pending=true;connected=true;
     assert(xiaotai_runtime_begin(&s_session, XIAOTAI_OWNER_AI, false));
     finish_session(0);

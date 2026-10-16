@@ -56,6 +56,14 @@ bool xiaotai_signal_decode(const char *json, xiaotai_signal_visitor_fn visitor,
         signal.type = XIAOTAI_SIGNAL_ROOM_ASSIGNMENT_CHANGED;
     } else if (strcmp(name, "room_closed") == 0) {
         signal.type = XIAOTAI_SIGNAL_ROOM_CLOSED;
+        signal.room_id = json_string(root, "room_id");
+        const cJSON *version = cJSON_GetObjectItemCaseSensitive(root, "assignment_version");
+        if (cJSON_IsNumber(version) && version->valuedouble >= 0 &&
+            version->valuedouble <= 9007199254740991.0 &&
+            (double)(int64_t)version->valuedouble == version->valuedouble) {
+            signal.assignment_version_valid = true;
+            signal.assignment_version = (int64_t)version->valuedouble;
+        }
     } else if (strcmp(name, "call_cancel") == 0 ||
                strcmp(name, "room_cancel") == 0 ||
                strcmp(name, "call_reject") == 0) {

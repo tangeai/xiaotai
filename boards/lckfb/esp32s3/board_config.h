@@ -44,6 +44,9 @@
 #define I2S_AUDIO_PORT I2S_NUM_0
 #define AUDIO_TDM_SLOTS 4U
 #define AUDIO_HW_SAMPLE_RATE_HZ 16000U
+/* Match ESP-IDF's existing channel defaults; also bound playback drain. */
+#define AUDIO_I2S_DMA_DESC_NUM 6U
+#define AUDIO_I2S_DMA_FRAME_NUM 240U
 #define AUDIO_MCLK_MULTIPLE 256U
 #define NS4150B_STARTUP_MS 120U
 

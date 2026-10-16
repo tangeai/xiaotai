@@ -1634,9 +1634,22 @@ static void room_post_response(xiaotai_room_response_t type,
 }
 
 typedef struct {
+    xiaotai_room_service_response_fn callback;
+    void *context;
+    uint32_t request_id;
+} room_response_work_t;
+
+static void room_service_response(const char *body, void *context)
+{
+    room_response_work_t *response = context;
+    response->callback(body, response->request_id, response->context);
+    psram_free(response);
+}
+
+typedef struct {
     char *path;
     char *body;
-    xiaotai_room_service_response_fn callback;
+    xiaotai_platform_response_fn callback;
     void *callback_context;
 } room_service_work_t;
 
@@ -1693,22 +1706,26 @@ static bool room_service_defer_until_transport_closed(const char *path,
 
 static int room_service_request(const char *path, const char *body,
                                 xiaotai_room_service_response_fn callback,
-                                void *callback_context, void *context)
+                                void *callback_context, uint32_t request_id, void *context)
 {
     (void)context;
     if (path == NULL || callback == NULL) return BK_ERR_PARAM;
+    room_response_work_t *response = psram_malloc(sizeof(*response));
+    if (response == NULL) return BK_ERR_NO_MEM;
+    *response = (room_response_work_t){callback, callback_context, request_id};
     if (room_service_defer_until_transport_closed(path, body)) {
         room_service_work_t *work = psram_malloc(sizeof(*work));
-        if (work == NULL) return BK_ERR_NO_MEM;
+        if (work == NULL) { psram_free(response); return BK_ERR_NO_MEM; }
         memset(work, 0, sizeof(*work));
         work->path = room_service_copy(path);
         work->body = room_service_copy(body);
-        work->callback = callback;
-        work->callback_context = callback_context;
+        work->callback = room_service_response;
+        work->callback_context = response;
         if (work->path == NULL || (body != NULL && work->body == NULL)) {
             psram_free(work->body);
             psram_free(work->path);
             psram_free(work);
+            psram_free(response);
             return BK_ERR_NO_MEM;
         }
         int rc = rtos_create_psram_thread(NULL, 4, "xiaotai_room_http",
@@ -1718,11 +1735,14 @@ static int room_service_request(const char *path, const char *body,
             psram_free(work->body);
             psram_free(work->path);
             psram_free(work);
+            psram_free(response);
         }
         return rc;
     }
-    return xiaotai_platform_service_request(path, body, callback,
-                                             callback_context);
+    int rc = xiaotai_platform_service_request(path, body, room_service_response,
+                                              response);
+    if (rc != BK_OK) psram_free(response);
+    return rc;
 }
 
 static uint32_t room_now_ms(void *context)
@@ -2610,7 +2630,10 @@ static void handle_decoded_platform_signal(const xiaotai_signal_view_t *signal,
         xiaotai_room_assignment_changed(&s_room);
         BK_LOGI(TAG, "room assignment refresh scheduled by platform\n");
     } else if (signal->type == XIAOTAI_SIGNAL_ROOM_CLOSED) {
-        xiaotai_room_closed(&s_room);
+        if (signal->assignment_version_valid) {
+            xiaotai_room_handle_closed(&s_room, signal->room_id,
+                                       signal->assignment_version);
+        }
         BK_LOGI(TAG, "room closed by platform\n");
     } else if (signal->type == XIAOTAI_SIGNAL_CALL_ENDED) {
         const char *room_id = signal->room_id;

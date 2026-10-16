@@ -255,6 +255,8 @@ static esp_err_t audio_i2s_init(void)
     i2s_chan_config_t audio_channel =
         I2S_CHANNEL_DEFAULT_CONFIG(I2S_AUDIO_PORT, I2S_ROLE_MASTER);
     audio_channel.auto_clear = true;
+    audio_channel.dma_desc_num = AUDIO_I2S_DMA_DESC_NUM;
+    audio_channel.dma_frame_num = AUDIO_I2S_DMA_FRAME_NUM;
     esp_err_t err = i2s_new_channel(&audio_channel, &s_i2s_tx, &s_i2s_rx);
     if (err != ESP_OK) {
         return err;

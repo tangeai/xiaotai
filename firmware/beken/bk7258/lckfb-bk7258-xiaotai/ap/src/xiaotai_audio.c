@@ -1128,11 +1128,15 @@ bool xiaotai_audio_playback_is_drained(uint32_t quiet_ms)
     size_t queued = s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ?
                     s_opus_count : s_ring_count;
     rtos_unlock_mutex(&s_ring_mutex);
+    /* The worker publishes the new hardware tail before releasing ownership.
+     * Snapshot in this order: C does not order function argument evaluation,
+     * so inline loads could combine an old tail with a newly idle worker. */
+    bool in_progress = atomic_load_explicit(&s_playback_in_progress,
+                                            memory_order_acquire);
+    uint32_t tail_ms = atomic_load_explicit(&s_playback_tail_ms,
+                                           memory_order_acquire);
     return xiaotai_audio_playback_drained(
-        running, queued,
-        atomic_load_explicit(&s_playback_in_progress, memory_order_acquire),
-        atomic_load_explicit(&s_playback_tail_ms, memory_order_acquire),
-        rtos_get_time(), quiet_ms);
+        running, queued, in_progress, tail_ms, rtos_get_time(), quiet_ms);
 }
 
 void xiaotai_audio_log_playback_status(const char *stage)

@@ -1,6 +1,7 @@
 """Exercise S3 media workers at the codec, TiRTC and board PCM boundaries."""
 import unittest
 from test_s3_product_regressions import MEDIA, ROOT, function, run_c
+from test_s3_playback_drain import playback_fixture
 
 COMMON = f'#include "{ROOT / "platforms/esp-idf/components/starter_media_common/include/starter_playback_scope.h"}"\n' + r'''
 starter_playback_scope_t s_playback_scope = {.lock=ATOMIC_FLAG_INIT};
@@ -142,7 +143,7 @@ int main(void){
     for(int i=0;i<294;i++)live[i]=1000+i;
     starter_preroll_init(&s_preroll,memory,1000);
     starter_preroll_append(&s_preroll,history,173,1000);
-    s_expected_wake_token=starter_preroll_prepare(&s_preroll,1000,1000);
+    s_expected_wake_token=starter_preroll_prepare(&s_preroll,978,1000);
     assert(starter_preroll_bind(&s_preroll,s_expected_wake_token,7,1000));
     capture_step();
     assert(packets==1 && packet_samples==26 && s_expected_wake_token==0);
@@ -193,7 +194,7 @@ static int starter_tirtc_send_opus(uint32_t ts,const void *data,uint32_t size){
     clock_us+=25000;
     assert(mode==STARTER_TIRTC_AI && ts==100 && size==encoded_size);opus_send++;return 0;
 }
-''' + function(MEDIA.read_text(), 'update_max_counter') + function(MEDIA.read_text(), 'update_timing_average') + function(MEDIA.read_text(), 'uplink_allowed') + function(MEDIA.read_text(), 'audio_uplink_task') + r'''
+''' + playback_fixture(MEDIA.read_text()) + function(MEDIA.read_text(), 'update_max_counter') + function(MEDIA.read_text(), 'update_timing_average') + function(MEDIA.read_text(), 'uplink_allowed') + function(MEDIA.read_text(), 'audio_uplink_task') + r'''
 static void replay(void){
     reads=0;pool[0]=(audio_tx_item_t){.mode=mode,.generation=active_generation,.timestamp_ms=100,
         .sample_count=mode==STARTER_TIRTC_AI ? 320 : 160};pool[0].pcm[0]=42;
@@ -252,7 +253,7 @@ static int write_pcm(void *context,const int16_t *pcm,size_t frames,size_t *writ
     *written=frames*4;writes++;return 0;
 }
 static struct {void *context;int (*write_pcm)(void *,const int16_t *,size_t,size_t *);} adapter={NULL,write_pcm},*s_audio_adapter=&adapter;
-''' + function(MEDIA.read_text(), 'update_max_counter') + function(MEDIA.read_text(), 'update_timing_average') + function(MEDIA.read_text(), 'play_audio_item') + r'''
+''' + playback_fixture(MEDIA.read_text()) + function(MEDIA.read_text(), 'update_max_counter') + function(MEDIA.read_text(), 'update_timing_average') + function(MEDIA.read_text(), 'play_audio_item') + r'''
 static bool play(audio_rx_item_t *item){memset(s_play_stereo,0x55,sizeof(s_play_stereo));return play_audio_item(item);}
 int main(void){
     audio_rx_item_t item={.generation=7,.frame.length=37};
@@ -260,6 +261,9 @@ int main(void){
         item.generation=active_generation=7+i;
         mode=item.mode=STARTER_TIRTC_AI;assert(play(&item));
         assert(s_playback_scope.valid && s_playback_scope.generation==item.generation);
+        uint32_t pcm_ms,dma_ms;audio_playback_timing(&pcm_ms,&dma_ms);
+        assert(pcm_ms==(unsigned)i*40+20 && "written PCM duration must be reported");
+        assert(dma_ms==90 && "a successful write is not an empty DMA ring");
         uint32_t published_ms=s_playback_scope.at_ms;
         mode=item.mode=STARTER_TIRTC_H5;assert(play(&item));
         assert(s_playback_scope.at_ms==published_ms); /* non-AI audio leaves scope alone */
@@ -272,6 +276,9 @@ int main(void){
     assert(atomic_load(&s_audio_decode_avg_us)==4000);
     assert(atomic_load(&s_audio_lock_avg_us)==1000);
     assert(atomic_load(&s_audio_write_avg_us)==20000);
+    clock_us+=5000000;
+    uint32_t pcm_ms,dma_ms;audio_playback_timing(&pcm_ms,&dma_ms);
+    assert(pcm_ms==4000 && dma_ms==0); /* tail expires, never grows with session age */
     mode=item.mode=STARTER_TIRTC_AI;codec_error=-1;
     assert(!play(&item) && writes==200);
     codec_error=0;s_speaker_muted=true;assert(!play(&item) && writes==200);

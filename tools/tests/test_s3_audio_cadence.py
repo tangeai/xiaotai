@@ -45,6 +45,8 @@ static queue_t ready,free_slots;
 static queue_t *s_audio_rx_ready_queue=&ready,*s_audio_rx_free_queue=&free_slots;
 static audio_rx_item_t pool[AUDIO_RX_QUEUE_DEPTH],*s_audio_rx_pool=pool;
 static atomic_uint s_audio_dropped,s_audio_received;
+static atomic_uint s_audio_playback_pending,s_audio_rx_last_ms;
+static atomic_bool s_audio_playback_active;
 static atomic_uint s_audio_rx_overflow,s_audio_rx_prefill_waits;
 static atomic_uint_fast32_t s_audio_rx_burst_window,s_audio_rx_burst_max,
     s_audio_rx_queue_peak;
@@ -150,6 +152,8 @@ static queue_t *s_audio_rx_ready_queue=&ready,*s_audio_rx_free_queue=&free_slots
 static audio_rx_item_t pool[AUDIO_RX_QUEUE_DEPTH],*s_audio_rx_pool=pool;
 static atomic_uint s_audio_dropped,s_audio_received,s_audio_rx_overflow,
     s_audio_rx_queue_peak;
+static atomic_uint s_audio_playback_pending,s_audio_rx_last_ms;
+static int64_t esp_timer_get_time(void){return 1000000;}
 static int active_mode=2;
 static uint32_t active_generation=7;
 static bool same_session(int m,uint32_t g){return m==active_mode && g==active_generation;}

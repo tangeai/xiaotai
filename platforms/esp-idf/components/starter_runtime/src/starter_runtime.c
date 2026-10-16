@@ -168,6 +168,7 @@ static char s_device_id[65];
 static char s_ai_role_id[65];
 static char s_ai_request_id[24];
 static int64_t s_ai_start_at_ms;
+static bool s_ai_media_pending;
 static bool s_ai_start_pending;
 static int64_t s_ai_ready_deadline_ms;
 static xiaotai_ai_end_drain_t s_ai_end_drain;
@@ -693,6 +694,7 @@ static void finish_session(int error)
         (void)xiaotai_runtime_finish(&s_session, generation);
     }
     s_ai_start_at_ms = 0;
+    s_ai_media_pending = false;
     s_room_start_at_ms = 0;
     s_ai_role_id[0] = '\0';
     s_ai_request_id[0] = '\0';
@@ -2652,6 +2654,28 @@ static contact_match_t parse_ai_call_action(const cJSON *params,
                        : CONTACT_MATCH_NOT_FOUND;
 }
 
+/* Only the runtime opens a remotely accepted session. Local acknowledgement
+ * playback overlaps token/transport/start_session setup without blocking it. */
+static void service_ai_media_admission(void)
+{
+    if (!s_ai_media_pending) return;
+    if (session_state() != STARTER_RUNTIME_AI_CONNECTING) {
+        s_ai_media_pending = false;
+        return;
+    }
+    if (!starter_media_ai_input_ready()) return;
+    s_ai_media_pending = false;
+    if (starter_media_start(STARTER_TIRTC_AI,
+                            s_connection_generation) != ESP_OK) {
+        finish_session(ESP_ERR_INVALID_STATE);
+        return;
+    }
+    (void)xiaotai_runtime_media_started(&s_session, session_generation());
+    product_set_phase(STARTER_AI_UI_LISTENING);
+    publish_state();
+    diagnostic_event("AI ready ms", (int)(now_ms() - s_diagnostic_ai_started_ms));
+}
+
 static void handle_ai_command(const runtime_event_t *event)
 {
     /* 当前 AI 连接上的 start_session 响应与 UI 通知都在状态任务串行处理。 */
@@ -2703,15 +2727,10 @@ static void handle_ai_command(const runtime_event_t *event)
         cJSON_Delete(root);
         xiaotai_ai_view_init(&s_ai_view);
         product_set_emotion(s_ai_view.emotion, false);
-        if (starter_media_start(STARTER_TIRTC_AI,
-                                s_connection_generation) != ESP_OK) {
-            finish_session(ESP_ERR_INVALID_STATE);
-            return;
-        }
-        (void)xiaotai_runtime_media_started(&s_session, session_generation());
-        product_set_phase(STARTER_AI_UI_LISTENING);
-        publish_state();
-        diagnostic_event("AI ready ms", (int)(now_ms() - s_diagnostic_ai_started_ms));
+        s_ai_media_pending = true;
+        if (!starter_media_ai_input_ready())
+            ESP_LOGI(TAG, "AI accepted; waiting for local acknowledgement audio boundary");
+        service_ai_media_admission();
     } else if (state == STARTER_RUNTIME_AI_ACTIVE) {
         if (xiaotai_ai_view_apply(&s_ai_view, event->text,
                                   (uint32_t)now_ms())) {
@@ -2874,6 +2893,29 @@ static void handle_platform_signal(const runtime_event_t *event)
     }
     if (strcmp(signal, "room_assignment_changed") == 0) {
         s_room_sync_due_ms = now_ms();
+        cJSON_Delete(root);
+        return;
+    }
+    if (strcmp(signal, "room_closed") == 0) {
+        const cJSON *id = cJSON_GetObjectItemCaseSensitive(root, "room_id");
+        const cJSON *version = cJSON_GetObjectItemCaseSensitive(root, "assignment_version");
+        bool current = s_room_desired && cJSON_IsString(id) &&
+            id->valuestring != NULL && s_room_id[0] != '\0' &&
+            strcmp(id->valuestring, s_room_id) == 0 &&
+            cJSON_IsNumber(version) && version->valuedouble >= 0 &&
+            version->valuedouble <= 9007199254740991.0 &&
+            (double)(int64_t)version->valuedouble == version->valuedouble &&
+            (int64_t)version->valuedouble >= s_room_assignment_version;
+        if (current) {
+            s_room_assignment_version = (int64_t)version->valuedouble;
+            s_room_desired = false;
+            s_room_resume_pending = false;
+            ++s_room_page_epoch; /* invalidate an already submitted token */
+            room_stop_connection(NULL, 0);
+            s_room_id[0] = '\0';
+            s_room_code[0] = '\0';
+            product_set_room(STARTER_ROOM_NONE, "");
+        }
         cJSON_Delete(root);
         return;
     }
@@ -3344,6 +3386,12 @@ static void handle_room_http(const runtime_event_t *event)
         int64_t version = cJSON_IsNumber(version_item)
                               ? (int64_t)version_item->valuedouble : 0;
         bool desired_join = strcmp(desired, "joined") == 0;
+        if (version < s_room_assignment_version ||
+            (version == s_room_assignment_version && version > 0 &&
+             !s_room_desired && s_room_id[0] == '\0' && desired_join)) {
+            cJSON_Delete(root);
+            return;
+        }
         bool changed = version != s_room_assignment_version ||
                        strcmp(room_id, s_room_id) != 0;
         if (!valid || version < 0 || (desired_join &&
@@ -3927,6 +3975,7 @@ static void runtime_task(void *argument)
         if (s_ai_start_at_ms != 0 && current_ms >= s_ai_start_at_ms) {
             send_ai_start();
         }
+        service_ai_media_admission();
         if (s_room_start_at_ms != 0 && current_ms >= s_room_start_at_ms) {
             send_room_join();
         }
@@ -3936,7 +3985,7 @@ static void runtime_task(void *argument)
             request_device_profile();
         }
         if (starter_media_ai_preroll_failed()) {
-            ESP_LOGW(TAG, "AI wake audio discontinuity/overflow/timeout; retry required");
+            ESP_LOGW(TAG, "AI wake audio/ack discontinuity/overflow/timeout; retry required");
             finish_session(ESP_ERR_TIMEOUT);
         }
         if (session_incoming_pending() && s_session.pending_deadline_ms != 0U &&

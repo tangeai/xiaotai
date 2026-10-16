@@ -71,6 +71,14 @@ static int TiRtcDisconnect(tirtc_conn_t c){
     assert(clock_ms==AI_CLOSE_DRAIN_TIMEOUT_MS && stops==1 && disconnects==1);
 ''')
 
+    def test_remote_closed_callback_without_end_session_drains(self):
+        self.replay(r'''
+    written=242;pending=7;
+    closed_event((media_event_t){.type=MEDIA_EVENT_CLOSED,.mode=2,.error=0});
+    assert(written==249 && "normal transport close must finish received audio");
+    assert(stops==1 && clock_ms==140 && !running && !uplink);
+''')
+
     def test_user_hangup_and_room_close_are_immediate(self):
         self.replay(r'''
     pending=46;
