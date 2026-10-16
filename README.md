@@ -16,11 +16,11 @@
 
 以下三款开发板均提供 v1.0.0 固件包，下载时请核对完整型号：
 
-| 对外型号 | 板卡 ID | 下载固件 | 烧录说明 |
-|---|---|---|---|
-| 立创·实战派 BK7258 | `lckfb-bk7258` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.0/lckfb-bk7258-1.0.0-validation.zip) | [开发板指南](docs/boards/lckfb-bk7258/README.md) |
-| 立创·实战派 ESP32-S3（PCB V1.0.1） | `lckfb-esp32s3` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.0/lckfb-esp32s3-1.0.0-validation.zip) | [开发板指南](docs/boards/lckfb-esp32s3/README.md) |
-| 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3（V1.0） | `waveshare-esp32p4-touch-lcd-43c-v10` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.0/waveshare-esp32p4-touch-lcd-43c-v10-1.0.0-validation.zip) | [开发板指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md) |
+| 开发板图片 | 对外型号 | 板卡 ID | 下载固件 | 烧录说明 |
+|---|---|---|---|---|
+| <img src="https://xiaotai.chat/v1/board-images/2898163c894f078cbf4ca9010ceab36558ba8d1a6f8c17ec749ab95dd0150bb0.jpg" alt="立创·实战派 BK7258 开发板" width="180"> | 立创·实战派 BK7258 | `lckfb-bk7258` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.0/lckfb-bk7258-1.0.0-validation.zip) | [开发板指南](docs/boards/lckfb-bk7258/README.md) |
+| <img src="https://xiaotai.chat/v1/board-images/2b74eed62b57852dff00fe9a04b14748bfcca4bbba3b4d79e891f9299f9a0c59.png" alt="立创·实战派 ESP32-S3 开发板" width="180"> | 立创·实战派 ESP32-S3（PCB V1.0.1） | `lckfb-esp32s3` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.0/lckfb-esp32s3-1.0.0-validation.zip) | [开发板指南](docs/boards/lckfb-esp32s3/README.md) |
+| <img src="https://xiaotai.chat/v1/board-images/eb94bd88265ac488dc8fbc20fcb3896438439aa513529429bfb8ae2792be9aa4.jpg" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="180"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3（V1.0） | `waveshare-esp32p4-touch-lcd-43c-v10` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.0/waveshare-esp32p4-touch-lcd-43c-v10-1.0.0-validation.zip) | [开发板指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md) |
 
 固件包包含对应板卡的烧录文件、烧录配置和校验信息。ESP32 按清单完整烧录多个文件；
 BK7258 首次烧录使用包内 `all-app.bin`，`app_pack.rbl` 用于 OTA（无线升级）。
