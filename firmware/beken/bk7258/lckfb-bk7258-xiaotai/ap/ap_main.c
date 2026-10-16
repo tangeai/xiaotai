@@ -10,16 +10,18 @@
 #include "xiaotai_ui.h"
 #include "xiaotai_video.h"
 #include "tirtc_bk_probe.h"
+#include "xiaotai_build_identity.h"
 
 #define TAG "xiaotai_main"
 
 int main(void)
 {
     bk_init();
-    BK_LOGI(TAG,
-            "XIAOTAI_BOOT project=lckfb-bk7258-xiaotai version=%s sdk=bk_avdk_smp/release/v3.1.1.8 reset=%u\n",
-            XIAOTAI_FIRMWARE_VERSION, (unsigned)bk_misc_get_reset_reason());
     BK_LOGI(TAG, "AP boot reached application entry\n");
+    bk_printf_raw(BK_LOG_NONE, NULL,
+            "XIAOTAI_BOOT project=lckfb-bk7258-xiaotai version=%s build=%s sdk=bk_avdk_smp/release/v3.1.1.10 reset=%u\n",
+            XIAOTAI_BUILD_VERSION, XIAOTAI_BUILD_ID,
+            (unsigned)bk_misc_get_reset_reason());
     BK_LOGI(TAG, "media service initialization starting\n");
     media_service_init();
     BK_LOGI(TAG, "media service initialization complete\n");

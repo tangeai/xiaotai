@@ -1,0 +1,10 @@
+diff --git a/cp/middleware/driver/mailbox/mb_ipc_heartbeat.c b/cp/middleware/driver/mailbox/mb_ipc_heartbeat.c
+--- a/cp/middleware/driver/mailbox/mb_ipc_heartbeat.c
++++ b/cp/middleware/driver/mailbox/mb_ipc_heartbeat.c
+@@ -29,5 +29,5 @@
+ #if CONFIG_WDT_EN
+ #define HB_TIMEOUT_MS               CONFIG_INT_WDT_PERIOD_MS
+ #else
+-#define HB_TIMEOUT_MS               (MB_IPC_HEARTBEAT_TIME * 3)  /* 6s: allow 3 missed heartbeats */
++#define HB_TIMEOUT_MS               (MB_IPC_HEARTBEAT_TIME * 4)  /* 8s: allow 4 missed heartbeats */
+ #endif

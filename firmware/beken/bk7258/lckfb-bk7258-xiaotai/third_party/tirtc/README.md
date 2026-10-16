@@ -1,27 +1,33 @@
 <!-- tirtc-package-readme: static-v1 -->
 # TiRTC Nano SDK：BK7258 Mini
 
-## 包类型与能力
+本包为官方 Beken BK AVDK SMP `release/v3.1.1.10` 提供 TiRTC 头文件和预编译静态库
+`lib/libTiRTC.a`，用于在 BK7258 固件中接入 TiRTC 设备通信能力。
 
-本包适用于官方 Beken BK AVDK SMP `release/v3.1.1.8`，目标为 Arm hard-float ABI。
+## 使用前确认
 
-- 传输模式：KCP-only
-- KCP：支持
-- HTTPS：不支持
-- SCTP：不支持
-- DTLS：不支持
-- 密码学实现：官方 AVDK `psa_mbedtls` 3.5.2
-- mbedTLS 静态库：不随包交付
+- 平台与版本：官方 Beken BK AVDK SMP `release/v3.1.1.10`。
+- 目标与 ABI：Arm hard-float；应用工程的 CPU、浮点 ABI 和 libc 配置必须与
+  `manifest/build-info.env` 一致。
+- `TiRtcConnect(remote_id, ...)` 中的 `remote_id` 表示要连接的目标设备；
+  `TiRtcWhipConnect(service_desc, ...)` 中的 `service_desc` 表示要连接的 WHIP
+  服务。本包使用 TiRTC/TGTRP 的 KCP 通信方式，因此目标设备或目标 WHIP 服务
+  必须支持同一方式；不能直接连接浏览器或只支持标准 WebRTC（DTLS/SCTP）的
+  第三方实现。
 
-当前包的完整构建事实见 `manifest/build-info.env`。
+本包不支持 HTTPS。如果应用通过 `TIRTC_OPT_SERVICE_ENDPOINT` 配置 TiRTC 服务
+入口，必须在 `TiRtcStart()` 前传入 `http://` 地址：
 
-## 包内容
+```c
+static const char endpoint[] = "http://example.invalid";
+TiRtcSetOption(TIRTC_OPT_SERVICE_ENDPOINT, endpoint, sizeof(endpoint) - 1);
+```
 
-- `include/tirtc/`：TiRTC 公共头文件
-- `lib/libTiRTC.a`：最终 Arm 静态库
-- `manifest/build-info.env`：目标架构、ABI、工具链、平台 SDK 和功能开关
+传入 `https://` 地址会返回 `TIRTC_E_INVALID_PARAMETER`。调用
+`TiRtcWhipConnect(...)` 后，如果平台服务为本次连接返回 WHIP 地址，该地址也必须
+能通过 HTTP 访问。
 
-## 接入方法
+## 工程集成
 
 将解压后的 `include/` 和 `lib/` 放入同一个 Armino 组件目录，例如：
 
@@ -33,7 +39,7 @@ components/tirtc_sdk/
 └── lib/libTiRTC.a
 ```
 
-在该组件的 `CMakeLists.txt` 中注册头文件、平台组件和预编译库：
+在该组件的 `CMakeLists.txt` 中完成组件声明、预编译库注册和最终链接：
 
 ```cmake
 armino_component_register(
@@ -52,13 +58,31 @@ target_link_libraries(
 )
 ```
 
-`psa_mbedtls` 必须保留在 `PRIV_REQUIRES` 中，`libTiRTC.a` 必须按上例使用 whole-archive 链接。只添加 `libTiRTC.a`、但不声明 `psa_mbedtls` 组件依赖，会产生 mbedTLS 未解析符号。
+`psa_mbedtls` 由上述官方 AVDK 提供，本包没有重复交付。`libTiRTC.a` 使用其
+mbedTLS 3.5.2 头文件和实现满足 AES、DES、SHA、MD5 等密码算法依赖；这项依赖
+不表示本包支持 HTTPS 或 DTLS。请保留 `PRIV_REQUIRES` 中的 `psa_mbedtls`，并按
+示例对 `libTiRTC.a` 使用 whole-archive。不要混用旧版 mbedTLS 2.25.0 兼容头或库。
 
-## 兼容要求
+## 包内容
 
-- 使用官方 AVDK `psa_mbedtls` 3.5.2 提供的头文件、配置和实现。
-- 不要混用旧版 mbedTLS 2.25.0 兼容头。
-- 本包不支持 HTTPS 或 DTLS；`PRIV_REQUIRES` 中的官方 `psa_mbedtls`
-  组件用于满足 AES、DES、SHA、MD5 等密码学接口依赖，不需要额外引入
-  TLS/DTLS 库。
-- 应用工程的 CPU 架构、hard-float ABI 和 libc 配置必须与 `manifest/build-info.env` 兼容。
+- `include/tirtc/`：TiRTC 公共头文件
+- `lib/libTiRTC.a`：BK7258 Arm hard-float 静态库
+- `manifest/build-info.env`：目标架构、ABI、工具链、平台 SDK 和功能开关
+
+## 常见集成问题
+
+### 链接时报 mbedTLS 未解析符号
+
+确认当前组件的 `PRIV_REQUIRES` 中包含 `psa_mbedtls`，且使用的是官方 AVDK
+`release/v3.1.1.10` 所带的 mbedTLS 3.5.2 组件；仅链接 `libTiRTC.a` 不足以提供
+这些密码算法符号。
+
+### `TIRTC_OPT_SERVICE_ENDPOINT` 返回 `TIRTC_E_INVALID_PARAMETER`
+
+检查传入的 TiRTC 服务入口。当前包只接受 `http://` 地址，不接受 `https://`。
+
+### 已创建连接，但目标设备或 WHIP 服务无法完成协商
+
+确认 `TiRtcConnect(remote_id, ...)` 指定的目标设备，或
+`TiRtcWhipConnect(service_desc, ...)` 指定的 WHIP 服务支持 TiRTC/TGTRP KCP
+通信。浏览器和只支持标准 WebRTC DTLS/SCTP 协商的第三方实现不兼容本包。

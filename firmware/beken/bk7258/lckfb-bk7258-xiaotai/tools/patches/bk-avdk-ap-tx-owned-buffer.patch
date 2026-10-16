@@ -1,0 +1,37 @@
+diff --git a/ap/components/lwip_intf_v2_1/lwip-2.1.2/port/wlanif.c b/ap/components/lwip_intf_v2_1/lwip-2.1.2/port/wlanif.c
+--- a/ap/components/lwip_intf_v2_1/lwip-2.1.2/port/wlanif.c
++++ b/ap/components/lwip_intf_v2_1/lwip-2.1.2/port/wlanif.c
+@@ -228,7 +228,8 @@
+         struct netif* go_netif = net_get_p2p_go_handle();
+         struct netif* gc_netif = net_get_p2p_gc_handle();
+ #endif
+-        cpdu_t* cpdu = (cpdu_t*)(p + 1);
++        struct pbuf *tx;
++        cpdu_t *cpdu;
+         // Sanity check
+         if(netif == sta_netif){
+             vif_idx = 0;
+@@ -247,10 +248,22 @@
+             BK_LOGD(NULL, "%s,%d,netif err!\n",__func__,__LINE__);
+             return ERR_ARG;
+         }
++        /* lwIP may retain or reuse p, and reference pbufs need not reserve a
++         * descriptor after their header. Give each deferred IPC send its own
++         * contiguous TX buffer and descriptor; CP returns that buffer to AP. */
++        tx = pbuf_clone(PBUF_RAW_TX, PBUF_RAM, p);
++        if (tx == NULL) {
++            return ERR_MEM;
++        }
++        cpdu = (cpdu_t *)(tx + 1);
++        memset(cpdu, 0, sizeof(*cpdu));
+         cpdu->co_hdr.vif_idx = vif_idx;
+         cpdu->co_hdr.need_free = 0;
+ 
+-        ret = wdrv_txdata_sender(p,vif_idx);
++        ret = wdrv_txdata_sender(tx,vif_idx);
++        /* The sender keeps one reference on success and unwinds it on queue
++         * failure. Release our allocation reference in every case. */
++        pbuf_free(tx);
+ 
+         if(0 != ret)
+         {

@@ -1,6 +1,7 @@
 #include <stdatomic.h>
 #include "xiaotai_binding_countdown.h"
 #include "xiaotai_platform_client.h"
+#include "xiaotai_build_identity.h"
 
 #include <common/bk_err.h>
 #include "xiaotai_log.h"
@@ -99,7 +100,7 @@ static char s_service_token[MQTT_TOKEN_MAX];
 static const char s_device_profile[] =
     "{\"hardware\":{\"chip_model\":\"BK7258\","
     "\"board_model\":\"lckfb-bk7258\"},"
-    "\"firmware_version\":\"1.0.0\","
+    "\"firmware_version\":\"" XIAOTAI_BUILD_VERSION "\","
     "\"profiles\":{\"stream\":{\"up_audio_streamid\":10,"
     "\"up_video_streamid\":11,\"down_audio_streamid\":14,"
     "\"down_video_streamid\":15,\"up_audio_mt\":[\"alaw\"],"
@@ -662,16 +663,12 @@ static int mqtt_send_frame(int socket_fd, uint8_t header,
 static int recv_exact(int socket_fd, void *data, size_t size)
 {
     uint8_t *cursor = data;
-    uint32_t started_ms = rtos_get_time();
     while (size > 0U) {
         int received = transport_read(socket_fd, cursor, size);
         if (received < 0) return received;
-        if (received == 0) {
-            if ((uint32_t)(rtos_get_time() - started_ms) >= 10000U) {
-                return BK_FAIL;
-            }
-            continue;
-        }
+        /* recv() returning zero is peer EOF. Retrying a closed socket spins
+         * without blocking, including when closure truncates an MQTT frame. */
+        if (received == 0) return BK_FAIL;
         cursor += received;
         size -= (size_t)received;
     }
@@ -686,7 +683,7 @@ static int mqtt_read_frame(int socket_fd, uint8_t *header,
                    errno == ETIMEDOUT)) {
         return 0;
     }
-    if (rc == 0) return 0;
+    if (rc == 0) return BK_FAIL;
     if (rc != 1) return BK_FAIL;
     size_t remaining = 0;
     size_t multiplier = 1;

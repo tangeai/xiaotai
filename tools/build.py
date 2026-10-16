@@ -74,7 +74,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--release",
         action="store_true",
-        help="use the release profile; the configured firmware version is unchanged",
+        help="build an online release candidate; use the default profile for local debugging",
     )
     parser.add_argument(
         "--keep-going",
@@ -131,7 +131,8 @@ def main() -> int:
             if args.dry_run:
                 continue
             version = read_board_version(root, board.id)
-            print(f"firmware-version: {version}")
+            label = "product-version" if board.data["platform"] == "beken" else "firmware-version"
+            print(f"{label}: {version}")
             if board.data["platform"] == "esp-idf":
                 prepare_dependency_lock(cwd)
             try:

@@ -26,6 +26,37 @@ SESSION_STOP = re.compile(
 )
 METRICS = re.compile(r"METRICS\s+(?P<payload>\{.*\})")
 HEARTBEAT_TRACE = re.compile(r"HBTRACE\s+(?P<stage>[a-z0-9-]+(?: rc=-?\d+)?)")
+HEARTBEAT_TX = re.compile(
+    r"\[DEBUG-bk-hb\] (?P<phase>tx-enter|tx-exit) "
+    r"seq=(?P<seq>\d+)(?: rc=(?P<rc>-?\d+))? ms=(?P<ms>\d+)"
+)
+HEARTBEAT_RX_TIMEOUT = re.compile(
+    r"\[DEBUG-bk-hb\] rx-timeout count=(?P<count>\d+)"
+)
+AP_HARDWARE = re.compile(
+    r"\[DEBUG-bk-hb\] ap-hw run=(?P<run>0x[0-9a-fA-F]{8}) "
+    r"cpu1=(?P<cpu1>0x[0-9a-fA-F]{8}) "
+    r"cpu2=(?P<cpu2>0x[0-9a-fA-F]{8})"
+)
+AP_STATE = re.compile(
+    r"\[DEBUG-bk-hb\] ap-state sample=(?P<sample>[01]) "
+    r"tick=(?P<tick>\d+) "
+    r"shell=(?P<shell_owner>0x[0-9a-fA-F]{8})/(?P<shell_count>\d+) "
+    r"mb=(?P<mb_owner>0x[0-9a-fA-F]{8})/(?P<mb_count>\d+) "
+    r"kernel=(?P<kernel_owner>0x[0-9a-fA-F]{8})/(?P<kernel_count>\d+) "
+    r"tcb0=(?P<tcb0>0x[0-9a-fA-F]{8}) "
+    r"tcb1=(?P<tcb1>0x[0-9a-fA-F]{8})"
+)
+INVALID_FREE = re.compile(
+    r"\[DEBUG-bk-lwip-free\] ptr=(?P<ptr>0x[0-9a-fA-F]+) "
+    r"caller=(?P<caller>0x[0-9a-fA-F]+) "
+    r"cp_heap=(?P<cp_heap>0x[0-9a-fA-F]+)"
+)
+RTOS_ASSERT = re.compile(
+    r"\[DEBUG-bk-rtos\] api=(?P<api>delay|mutex) "
+    r"caller=(?P<caller>0x[0-9a-fA-F]+) "
+    r"irq=(?P<irq>[01]) isr=(?P<isr>[01])"
+)
 MEDIA_STOP = re.compile(
     r"audio stopped up=(?P<up>\d+) down=(?P<down>\d+) dropped=(?P<dropped>\d+)"
     r"(?: aec=(?P<aec>\d+) ref-under=(?P<under>\d+) ref-over=(?P<over>\d+))?"
@@ -48,6 +79,8 @@ class Summary:
     nonzero_session_errors: list[dict[str, int | str]] = field(default_factory=list)
     fatal_markers: list[dict[str, int | str]] = field(default_factory=list)
     heartbeat_timeouts: list[dict[str, int | str | None]] = field(default_factory=list)
+    invalid_frees: list[dict[str, int | str]] = field(default_factory=list)
+    rtos_asserts: list[dict[str, int | str]] = field(default_factory=list)
     task_return_warnings: int = 0
     uplink_not_ready: int = 0
     connection_errors: int = 0
@@ -68,6 +101,10 @@ class Summary:
             failures.append("CPU fault/crash marker present")
         if self.heartbeat_timeouts:
             failures.append("AP IPC heartbeat timeout")
+        if self.invalid_frees:
+            failures.append("CP lwIP invalid free")
+        if self.rtos_asserts:
+            failures.append("AP RTOS context assertion")
         if self.nonzero_session_errors:
             failures.append("session ended with non-zero error")
 
@@ -118,6 +155,8 @@ class Summary:
             },
             "fatal_markers": self.fatal_markers,
             "heartbeat_timeouts": self.heartbeat_timeouts,
+            "invalid_frees": self.invalid_frees,
+            "rtos_asserts": self.rtos_asserts,
             "lifecycle": {
                 "task_return_warnings": self.task_return_warnings,
                 "uplink_not_ready": self.uplink_not_ready,
@@ -140,15 +179,88 @@ def increment(values: dict[str, int], key: str) -> None:
 def analyze(lines: list[str]) -> Summary:
     summary = Summary(lines=len(lines))
     last_stage = None
+    last_tx = None
+    last_cp_rx = None
+    last_ap_hardware = None
+    last_ap_state = []
     for number, line in enumerate(lines, start=1):
         if "AP boot reached application entry" in line:
             last_stage = None
+            last_tx = None
+            last_cp_rx = None
+            last_ap_hardware = None
+            last_ap_state = []
         trace = HEARTBEAT_TRACE.search(line)
         if trace:
             last_stage = trace.group("stage")
+        tx = HEARTBEAT_TX.search(line)
+        if tx:
+            last_tx = {
+                "phase": tx.group("phase"),
+                "seq": int(tx.group("seq")),
+                "ms": int(tx.group("ms")),
+            }
+            if tx.group("rc") is not None:
+                last_tx["rc"] = int(tx.group("rc"))
+        rx_timeout = HEARTBEAT_RX_TIMEOUT.search(line)
+        if rx_timeout:
+            last_cp_rx = {
+                "count": int(rx_timeout.group("count")),
+            }
+        ap_hardware = AP_HARDWARE.search(line)
+        if ap_hardware:
+            registers = ap_hardware.groupdict()
+            run_status = int(registers["run"], 16)
+            last_ap_hardware = {
+                **registers,
+                "core1_halted": bool(run_status & (1 << 1)),
+                "core2_halted": bool(run_status & (1 << 2)),
+                "core1_powered_down": bool(run_status & (1 << 9)),
+                "core2_powered_down": bool(run_status & (1 << 10)),
+            }
+        ap_state = AP_STATE.search(line)
+        if ap_state:
+            fields = ap_state.groupdict()
+            sample = {
+                "sample": int(fields["sample"]),
+                "tick": int(fields["tick"]),
+                "tcb0": fields["tcb0"],
+                "tcb1": fields["tcb1"],
+            }
+            for lock in ("shell", "mb", "kernel"):
+                sample[lock] = {
+                    "owner": fields[f"{lock}_owner"],
+                    "count": int(fields[f"{lock}_count"]),
+                }
+            if sample["sample"] == 0:
+                last_ap_state = [sample]
+            elif last_ap_state and last_ap_state[0]["sample"] == 0:
+                last_ap_state = [last_ap_state[0], sample]
         if "IPC[1]heartbeat timeout" in line:
-            summary.heartbeat_timeouts.append({
+            timeout = {
                 "line": number, "last_stage": last_stage,
+            }
+            if last_tx is not None:
+                timeout["heartbeat_tx"] = last_tx.copy()
+            if last_cp_rx is not None:
+                timeout["cp_rx"] = last_cp_rx.copy()
+            if last_ap_hardware is not None:
+                timeout["ap_hardware"] = last_ap_hardware.copy()
+            if last_ap_state:
+                timeout["ap_state"] = last_ap_state.copy()
+            summary.heartbeat_timeouts.append(timeout)
+        invalid_free = INVALID_FREE.search(line)
+        if invalid_free:
+            summary.invalid_frees.append({
+                "line": number, **invalid_free.groupdict(),
+            })
+        rtos_assert = RTOS_ASSERT.search(line)
+        if rtos_assert:
+            fields = rtos_assert.groupdict()
+            summary.rtos_asserts.append({
+                "line": number, "api": fields["api"],
+                "caller": fields["caller"], "irq": int(fields["irq"]),
+                "isr": int(fields["isr"]),
             })
         start = SESSION_START.search(line)
         if start:

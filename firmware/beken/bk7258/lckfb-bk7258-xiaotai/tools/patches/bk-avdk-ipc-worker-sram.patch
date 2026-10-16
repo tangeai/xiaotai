@@ -1,0 +1,13 @@
+diff --git a/ap/middleware/driver/mailbox/bk_api_ipc.c b/ap/middleware/driver/mailbox/bk_api_ipc.c
+index a5178c2..f9b4338 100755
+--- a/ap/middleware/driver/mailbox/bk_api_ipc.c
++++ b/ap/middleware/driver/mailbox/bk_api_ipc.c
+@@ -965,7 +965,7 @@ bk_ipc_info_t *bk_ipc_core_init(uint8_t channel)
+         LOGD("channel: %s\n", cfg->name);
+     }
+ 
+-    ret = rtos_create_thread(&ipc_info->thread,
++    ret = rtos_create_sram_thread(&ipc_info->thread,
+                              4,
+                              "ipc thread",
+                              (beken_thread_function_t)bk_ipc_thread_entry,

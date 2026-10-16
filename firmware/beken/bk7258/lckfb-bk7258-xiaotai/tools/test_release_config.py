@@ -6,6 +6,16 @@ from prepare_release_config import prepare_release_config
 
 
 class ReleaseConfigTest(unittest.TestCase):
+    def test_release_disables_development_critical_lr_recording(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / 'config'
+            output = Path(temporary) / 'release.config'
+            contents = 'CONFIG_LOG_LEVEL=4\nCONFIG_CRITICAL_LR_RECORD=y\n'
+            source.write_text(contents)
+            prepare_release_config(source, output)
+            self.assertIn('# CONFIG_CRITICAL_LR_RECORD is not set', output.read_text())
+            self.assertEqual(source.read_text(), contents)
+
     def test_release_uses_info_and_preserves_other_options(self):
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "config"

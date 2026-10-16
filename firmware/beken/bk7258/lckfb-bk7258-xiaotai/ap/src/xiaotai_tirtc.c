@@ -125,9 +125,14 @@ static atomic_uintptr_t s_outgoing_cleanup_connection;
 static atomic_bool s_recovery_required;
 /* The SDK destroy callback may run while its transport holds SMP locks.
  * Publish one completed close to the media worker without entering an RTOS
- * queue from that callback. 0=empty, 1=being written/read, 2=ready,
+ * queue from that callback. 0=empty, 1=publishing/cleaning media, 2=ready,
  * 3=worker wake queued by the control task. */
-static atomic_int s_pending_close_state;
+/* The control task performs CAS on every poll, including the empty case.
+ * Target GCC leaves that case after LDAEX without STLEX. Keep this exclusive
+ * access in the SDK's reserved SRAM section, away from kernel/DMA data; see
+ * middleware/driver/spinlock/spinlock.c's SRAM monitor restriction. */
+static atomic_int s_pending_close_state
+    __attribute__((used, section(".sram_spinlock_section")));
 static media_event_t s_pending_close_event;
 static atomic_bool s_cleanup_probe_active;
 static atomic_uint_fast32_t s_cleanup_probe_started_ms;
@@ -485,7 +490,7 @@ static bool take_pending_close_event(media_event_t *event)
         return false;
     }
     *event = s_pending_close_event;
-    atomic_store_explicit(&s_pending_close_state, 0, memory_order_release);
+    /* Keep admission closed until the worker has stopped the old media. */
     return true;
 }
 
@@ -731,6 +736,18 @@ static void media_worker(beken_thread_arg_t argument)
             }
             (void)xiaotai_audio_stop();
             BK_LOGI(TAG, "[DEBUG-bk-close] worker-audio-stopped\n");
+            if (event.mode == CONNECTION_ROOM || event.mode == CONNECTION_STREAM) {
+                xiaotai_audio_set_uplink_enabled(true);
+            }
+            /* Notifications can immediately schedule an answer or an AI
+             * requested call on the control core. Release admission after
+             * all old media changes, before publishing that notification. */
+            if (event.connection != NULL &&
+                event.connection == s_pending_close_event.connection &&
+                event.generation == s_pending_close_event.generation) {
+                atomic_store_explicit(&s_pending_close_state, 0,
+                                      memory_order_release);
+            }
             if (event.mode == CONNECTION_AI &&
                 s_handlers.on_ai_disconnected != NULL) {
                 s_handlers.on_ai_disconnected(event.generation, event.error,
@@ -754,11 +771,6 @@ static void media_worker(beken_thread_arg_t argument)
                                                 s_handlers.context);
             }
             BK_LOGI(TAG, "[DEBUG-bk-close] worker-handler-returned\n");
-            if (event.mode == CONNECTION_ROOM) {
-                xiaotai_audio_set_uplink_enabled(true);
-            } else if (event.mode == CONNECTION_STREAM) {
-                xiaotai_audio_set_uplink_enabled(true);
-            }
             BK_LOGI(TAG, "connection closed mode=%d generation=%u error=%d\n",
                     event.mode, (unsigned)event.generation, event.error);
         }
@@ -771,8 +783,8 @@ static int start_media_worker(void)
     int rc = rtos_init_queue(&s_media_queue, "xiaotai_tirtc_media",
                              sizeof(media_event_t), MEDIA_QUEUE_DEPTH);
     if (rc != BK_OK) return rc;
-    rc = rtos_create_psram_thread(&s_media_thread, 5, "xiaotai_rtc_media",
-                                  media_worker, 4096, NULL);
+    rc = rtos_create_sram_thread(&s_media_thread, 5, "xiaotai_rtc_media",
+                                 media_worker, 4096, NULL);
     if (rc != BK_OK) {
         rtos_deinit_queue(&s_media_queue);
         s_media_queue = NULL;
@@ -796,8 +808,9 @@ static void on_event(int event, const void *data, int len)
 static void on_conn_accepted(tirtc_conn_t connection)
 {
     if (atomic_load_explicit(&s_outgoing_connect_inflight,
-                             memory_order_acquire)) {
-        BK_LOGW(TAG, "inbound connection rejected during outgoing cleanup\n");
+                             memory_order_acquire) ||
+        atomic_load_explicit(&s_pending_close_state, memory_order_acquire) != 0) {
+        BK_LOGW(TAG, "inbound connection rejected during media cleanup\n");
         (void)queue_media_event(MEDIA_EVENT_DISCONNECT, connection, 0,
                                 TIRTC_E_BUSY);
         return;
@@ -809,6 +822,17 @@ static void on_conn_accepted(tirtc_conn_t connection)
                                                   memory_order_acq_rel,
                                                   memory_order_acquire)) {
         BK_LOGW(TAG, "additional inbound connection rejected\n");
+        (void)queue_media_event(MEDIA_EVENT_DISCONNECT, connection, 0,
+                                TIRTC_E_BUSY);
+        return;
+    }
+    /* Close may have published after the first check, before this CAS took
+     * the now-empty handle. Do not initialize a new session in that window. */
+    if (atomic_load_explicit(&s_pending_close_state, memory_order_acquire) != 0) {
+        uintptr_t rejected = (uintptr_t)connection;
+        (void)atomic_compare_exchange_strong_explicit(
+            &s_connection, &rejected, 0, memory_order_acq_rel,
+            memory_order_acquire);
         (void)queue_media_event(MEDIA_EVENT_DISCONNECT, connection, 0,
                                 TIRTC_E_BUSY);
         return;
@@ -894,11 +918,25 @@ static void on_disconnected(tirtc_conn_t connection)
                 (unsigned)rtos_get_psram_free_heap_size());
         require_recovery_if_heap_low("failed-handle-cleanup");
     }
+    if (atomic_load_explicit(&s_connection, memory_order_acquire) !=
+        (uintptr_t)connection || connection == NULL) return;
+    /* Publish the admission barrier before releasing the transport handle.
+     * connected() can then report transport closure while busy() continues
+     * to protect the old audio/video until the worker finishes cleanup. */
+    int empty = 0;
+    if (!atomic_compare_exchange_strong_explicit(
+            &s_pending_close_state, &empty, 1,
+            memory_order_acq_rel, memory_order_acquire)) {
+        atomic_store_explicit(&s_recovery_required, true,
+                              memory_order_release);
+        return;
+    }
     uintptr_t expected = (uintptr_t)connection;
     if (!atomic_compare_exchange_strong_explicit(&s_connection,
                                                   &expected, 0,
                                                   memory_order_acq_rel,
                                                   memory_order_acquire)) {
+        atomic_store_explicit(&s_pending_close_state, 0, memory_order_release);
         return;
     }
     atomic_store_explicit(&s_active_disconnect_queued, false,
@@ -927,14 +965,6 @@ static void on_disconnected(tirtc_conn_t connection)
         .error = error,
         .mode = mode,
     };
-    int empty = 0;
-    if (!atomic_compare_exchange_strong_explicit(
-            &s_pending_close_state, &empty, 1,
-            memory_order_acq_rel, memory_order_acquire)) {
-        atomic_store_explicit(&s_recovery_required, true,
-                              memory_order_release);
-        return;
-    }
     s_pending_close_event = event;
     atomic_store_explicit(&s_pending_close_state, 2, memory_order_release);
 }
@@ -1928,7 +1958,9 @@ bool xiaotai_tirtc_busy(void)
 {
     return xiaotai_tirtc_connected() ||
            atomic_load_explicit(&s_outgoing_connect_inflight,
-                                memory_order_acquire);
+                                memory_order_acquire) ||
+           atomic_load_explicit(&s_pending_close_state,
+                                memory_order_acquire) != 0;
 }
 
 bool xiaotai_tirtc_recovery_required(void)

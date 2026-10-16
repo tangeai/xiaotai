@@ -66,7 +66,8 @@ int xiaotai_tirtc_finalize_stop(void);
 xiaotai_tirtc_state_t xiaotai_tirtc_state(void);
 bool xiaotai_tirtc_ready(void);
 bool xiaotai_tirtc_connected(void);
-/** True while connected, connecting, or draining a failed connection. */
+/** True while connected, connecting, draining a failed connection, or stopping
+ * media after transport closure. */
 bool xiaotai_tirtc_busy(void);
 /** Wake the media worker for a close published by an SDK callback. Call from
  * the product control task, outside the SDK callback stack. */

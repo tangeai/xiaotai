@@ -1,6 +1,7 @@
 #include "xiaotai_log.h"
 
 #include <stdarg.h>
+#include <stdio.h>
 
 #include <common/bk_err.h>
 #include <components/system.h>
@@ -28,8 +29,14 @@ int xiaotai_log_get_level(void)
 void xiaotai_log_write(int level, const char *tag, const char *format, ...)
 {
     if (level > s_app_log_level) return;
+    /* SDK callbacks, telemetry and UI workers share this logger. The SDK's
+     * common log mode waits for a shell buffer when UART output falls behind;
+     * that wait can prevent the AP from servicing the CP IPC heartbeat. */
+    char message[512];
     va_list arguments;
     va_start(arguments, format);
-    bk_vprintf_ext(level, (char *)tag, format, arguments);
+    int length = vsnprintf(message, sizeof(message), format, arguments);
     va_end(arguments);
+    if (length < 0) return;
+    bk_printf_nonblock(level, (char *)tag, "%s", message);
 }

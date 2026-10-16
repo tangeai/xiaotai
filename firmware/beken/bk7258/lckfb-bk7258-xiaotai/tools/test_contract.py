@@ -24,12 +24,12 @@ for fact in (
     "VARIANT=mini",
     "ABI=eabi-hard-float",
     "BUILD_TOOLCHAIN_VERSION=10.3.1",
-    "BUILD_PLATFORM_SDK_VERSION=3.1.1.8-official-1cfd56af",
+    "BUILD_PLATFORM_SDK_VERSION=3.1.1.10-official-398cab28",
     "SSL=disabled",
     "DTLS=disabled",
-    "TLS_PROVIDER=platform-sdk",
-    "TLS_COMPONENT=psa_mbedtls",
-    "MBEDTLS_VERSION=3.5.2",
+    "CRYPTO_PROVIDER=platform-sdk",
+    "CRYPTO_COMPONENT=psa_mbedtls",
+    "CRYPTO_VERSION=3.5.2",
     "BUNDLED_MBEDTLS=no",
 ):
     require(fact in manifest, f"missing locked TiRTC fact: {fact}")
@@ -38,7 +38,7 @@ archive = ROOT / "third_party/tirtc/lib/libTiRTC.a"
 require(archive.stat().st_size > 100_000,
         "TiRTC archive is missing or unexpectedly small")
 require(hashlib.sha256(archive.read_bytes()).hexdigest() ==
-        "47e26827ca2419084163e3656dca4d6e508e433381784e9c03f232d3dbaa4171",
+        "1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9",
         "TiRTC archive identity changed")
 
 config = (ROOT / "ap/config/bk7258_ap/config").read_text()
@@ -83,17 +83,17 @@ setup_script = (ROOT / "tools/setup_build_env.sh").read_text()
 doctor_script = (ROOT / "tools/doctor.py").read_text()
 identity_doc = (ROOT / "BUILD_IDENTITY.md").read_text()
 provenance_doc = (ROOT / "SOURCE_PROVENANCE.md").read_text()
-official_sdk_commit = "1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7"
+official_sdk_commit = "398cab28b938e69ba2071a597daf00845dd080b6"
 require(all(official_sdk_commit in text for text in
             (setup_script, doctor_script, identity_doc, provenance_doc)) and
-        "bk_avdk_smp-release-v3.1.1.8" in makefile and
-        "bk_avdk_smp-release-v3.1.1.8" in build_script and
+        "bk_avdk_smp-release-v3.1.1.10" in makefile and
+        "bk_avdk_smp-release-v3.1.1.10" in build_script and
         "Refusing mixed-SDK build" in build_script and
         "CMAKE_TOOLCHAIN_FILE:FILEPATH=$sdk_dir/" in build_script and
         "beken-armino_SOURCE_DIR:STATIC=$sdk_dir/" in build_script and
         "3.1.1.8-20260605" not in makefile and
         "3.1.1.8-20260605" not in build_script,
-        "build entry points must pin the official Gitee release/v3.1.1.8 commit")
+        "build entry points must pin the official GitHub release/v3.1.1.10 commit")
 require("97dbb4f019ad1650b732faffcc881689cedc14e2b7ee863d390e0a41ef16c9a3" in
         setup_script and
         "Refusing unverified toolchain archive" in setup_script,
@@ -1193,7 +1193,9 @@ profile_match = re.search(
 require(profile_match is not None, "unified device profile JSON is missing")
 profile_text = "".join(
     ast.literal_eval(token)
-    for token in re.findall(r'"(?:\\.|[^"\\])*"', profile_match.group(1))
+    for token in re.findall(r'"(?:\\.|[^"\\])*"',
+                            profile_match.group(1).replace('XIAOTAI_BUILD_VERSION',
+                                                         '"0.0.0+build.0"'))
 )
 profile = json.loads(profile_text)
 board_manifest = json.loads(
@@ -1209,8 +1211,9 @@ require(profile["hardware"] == {
             "board_model": board_manifest["id"],
         },
         "device profile must report the BK7258 board ID")
-require(profile["firmware_version"] == version_match.group(1),
-        "device profile firmware version must match VERSION.md")
+require('XIAOTAI_BUILD_VERSION' in profile_match.group(1) and
+        profile["firmware_version"] == '0.0.0+build.0',
+        "device profile firmware version must use the generated full build version")
 require(set(profile["profiles"]) == {"stream", "call", "voip"},
         "capability report must contain stream/call/voip")
 stream_fields = {

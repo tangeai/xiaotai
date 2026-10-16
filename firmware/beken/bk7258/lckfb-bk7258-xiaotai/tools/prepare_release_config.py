@@ -20,6 +20,9 @@ def prepare_release_config(source: Path, output: Path) -> None:
         raise ValueError(
             f"expected exactly one CONFIG_LOG_LEVEL in {source}, found {count}"
         )
+    updated = re.sub(r'^CONFIG_CRITICAL_LR_RECORD=y$',
+                     '# CONFIG_CRITICAL_LR_RECORD is not set', updated,
+                     flags=re.MULTILINE)
     output.write_text(updated, encoding="utf-8")
 
 

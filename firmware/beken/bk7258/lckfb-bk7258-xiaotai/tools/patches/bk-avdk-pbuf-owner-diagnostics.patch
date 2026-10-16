@@ -1,0 +1,26 @@
+diff --git a/cp/components/lwip_intf_v2_1/lwip-2.1.2/src/core/pbuf.c b/cp/components/lwip_intf_v2_1/lwip-2.1.2/src/core/pbuf.c
+--- a/cp/components/lwip_intf_v2_1/lwip-2.1.2/src/core/pbuf.c
++++ b/cp/components/lwip_intf_v2_1/lwip-2.1.2/src/core/pbuf.c
+@@ -86,6 +86,10 @@
+ #endif
+ 
+ #include <string.h>
++#include <stdint.h>
++#include <common/bk_include.h>
++
++extern unsigned char _heap_start;
+ 
+ #define SIZEOF_STRUCT_PBUF        LWIP_MEM_ALIGN_SIZE(sizeof(struct pbuf))
+ /* Since the pool is created in memp, PBUF_POOL_BUFSIZE will be automatically
+@@ -819,6 +823,11 @@
+           memp_free(MEMP_PBUF, p);
+           /* type == PBUF_RAM */
+         } else if (alloc_src == PBUF_TYPE_ALLOC_SRC_MASK_STD_HEAP) {
++          if ((uintptr_t)p < (uintptr_t)&_heap_start) {
++            BK_DUMP_OUT("[DEBUG-bk-pbuf-owner] ptr=%p caller=%p next=%p type=%u flags=%u\r\n",
++                        p, __builtin_return_address(0), q,
++                        (unsigned)p->type_internal, (unsigned)p->flags);
++          }
+           mem_free(p);
+         } else {
+           /* @todo: support freeing other types */

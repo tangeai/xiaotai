@@ -1,0 +1,115 @@
+diff --git a/ap/middleware/driver/mailbox/mb_ipc_heartbeat.c b/ap/middleware/driver/mailbox/mb_ipc_heartbeat.c
+index 5165e9fa..fc43c9bd 100755
+--- a/ap/middleware/driver/mailbox/mb_ipc_heartbeat.c
++++ b/ap/middleware/driver/mailbox/mb_ipc_heartbeat.c
+@@ -16,6 +16,8 @@
+ #include <string.h>
+ 
+ #include <os/os.h>
++#include <components/log.h>
++#include <components/system.h>
+ #include "mb_ipc_cmd.h"
+ 
+ #define MOD_TAG		"hrt"
+@@ -340,12 +342,22 @@ int mb_ipc_cpu_is_power_off(u32 cpu_id)
+ 
+ static void mb_ipc_task( void *para )
+ {
++	u32 seq = 0;
++	bk_err_t send_rc;
++
+ 	ipc_send_power_up();
+ 
+ 	while(1)
+ 	{
+ 		rtos_delay_milliseconds(MB_IPC_HEARTBEAT_TIME);
+-		ipc_send_heart_beat(0);
++		seq++;
++		bk_printf_raw_nonblock(BK_LOG_INFO, MOD_TAG,
++			"[DEBUG-bk-hb] tx-enter seq=%u ms=%u\r\n",
++			seq, (u32)rtos_get_time());
++		send_rc = ipc_send_heart_beat(0);
++		bk_printf_raw_nonblock(BK_LOG_INFO, MOD_TAG,
++			"[DEBUG-bk-hb] tx-exit seq=%u rc=%d ms=%u\r\n",
++			seq, send_rc, (u32)rtos_get_time());
+ 	}
+ }
+ 
+@@ -356,7 +368,7 @@ bk_err_t mb_ipc_heartbeat_init(void)
+ 	bk_err_t	ret_val = BK_FAIL;
+ 
+ #if defined(MASTER_HB_TASK) || defined(SLAVE_HB_TASK)
+-	ret_val = rtos_smp_create_thread(NULL, BEKEN_HEARTBEAT_PRIORITY, "heartbeat", mb_ipc_task, 512, 0);
++	ret_val = rtos_create_sram_thread(NULL, BEKEN_HEARTBEAT_PRIORITY, "heartbeat", mb_ipc_task, 1024, 0);
+ #endif
+ 
+ 	if(ret_val != BK_OK)
+diff --git a/cp/components/lwip_intf_v2_1/lwip-2.1.2/src/core/mem.c b/cp/components/lwip_intf_v2_1/lwip-2.1.2/src/core/mem.c
+index 9e4c54d8..36444092 100755
+--- a/cp/components/lwip_intf_v2_1/lwip-2.1.2/src/core/mem.c
++++ b/cp/components/lwip_intf_v2_1/lwip-2.1.2/src/core/mem.c
+@@ -61,6 +61,10 @@
+ #include "lwip/err.h"
+ 
+ #include <string.h>
++#include <stdint.h>
++#include <common/bk_include.h>
++
++extern unsigned char _heap_start;
+ 
+ #if MEM_LIBC_MALLOC
+ #include <stdlib.h> /* for malloc()/free() */
+@@ -302,6 +306,10 @@ mem_free(void *rmem)
+ {
+   LWIP_ASSERT("rmem != NULL", (rmem != NULL));
+   LWIP_ASSERT("rmem == MEM_ALIGN(rmem)", (rmem == LWIP_MEM_ALIGN(rmem)));
++  if ((uintptr_t)rmem < (uintptr_t)&_heap_start) {
++    BK_DUMP_OUT("[DEBUG-bk-lwip-free] ptr=%p caller=%p cp_heap=%p\r\n",
++                rmem, __builtin_return_address(0), &_heap_start);
++  }
+ #if LWIP_STATS && MEM_STATS
+   #if MEM_TRX_DYNAMIC_EN
+   struct mem_with_limit_t *mem_lmt = NULL;
+diff --git a/cp/middleware/driver/mailbox/mb_ipc_heartbeat.c b/cp/middleware/driver/mailbox/mb_ipc_heartbeat.c
+index f7b45415..4ed0c3ef 100755
+--- a/cp/middleware/driver/mailbox/mb_ipc_heartbeat.c
++++ b/cp/middleware/driver/mailbox/mb_ipc_heartbeat.c
+@@ -16,6 +16,7 @@
+ #include <string.h>
+ 
+ #include <os/os.h>
++#include <soc/soc.h>
+ #include "mb_ipc_cmd.h"
+ #include <modules/pm.h>
+ 
+@@ -85,6 +86,7 @@ static volatile u8                  cpu_x_state = CORE_POWER_OFF;
+ static volatile u8                  cpu_x_id = 0xFF;   /* invalid ID, */
+ static volatile u8                  cpu_x_dump = 0;
+ static volatile u8                  cpu_x_heartbeat_timeout = 0;
++static volatile u32                 s_heartbeat_rx_count = 0;
+ static volatile mb_ipc_work_state_e s_mb_ipc_work_state = MB_IPC_WORKING;
+ 
+ void mb_ipc_heartbeat_notify(u32 cpu_id);
+@@ -289,6 +291,14 @@ static void mb_ipc_task( void *para )
+ 		{
+ 			if(ipc_heartbeat_timeout())
+ 			{
++				/* These read-only SYS registers remain accessible from CP when AP
++				 * stops responding. Capture halt/power state before the reset. */
++				BK_DUMP_OUT("[DEBUG-bk-hb] ap-hw run=0x%08x cpu1=0x%08x cpu2=0x%08x\r\n",
++					REG_READ(SOC_SYS_REG_BASE + (0x3 << 2)),
++					REG_READ(SOC_SYS_REG_BASE + (0x5 << 2)),
++					REG_READ(SOC_SYS_REG_BASE + (0x6 << 2)));
++				BK_DUMP_OUT("[DEBUG-bk-hb] rx-timeout count=%u\r\n",
++					s_heartbeat_rx_count);
+ 				BK_LOGE(MOD_TAG, "IPC[%d]heartbeat timeout %d,%d\r\n",cpu_x_id,cpu_x_heartbeat_timestamp,(u32)rtos_get_time());
+ 				/*when cpu1 heartbeat timeout, then system reboot*/
+ 				cpu_x_heartbeat_timeout = 1;
+@@ -335,6 +345,7 @@ void mb_ipc_heartbeat_notify(u32 cpu_id)
+ 	{
+ 		return;
+ 	}
++	s_heartbeat_rx_count++;
+ 	rtos_set_event_ex(&mb_ipc_heart_event, MB_IPC_HEARTBEAT_FLAG);
+ }
+ 

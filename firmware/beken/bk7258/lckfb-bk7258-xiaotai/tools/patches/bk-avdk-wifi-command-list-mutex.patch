@@ -1,0 +1,18 @@
+diff --git a/ap/components/bk_wifi_driver/wdrv_tx.c b/ap/components/bk_wifi_driver/wdrv_tx.c
+--- a/ap/components/bk_wifi_driver/wdrv_tx.c
++++ b/ap/components/bk_wifi_driver/wdrv_tx.c
+@@ -335,9 +335,14 @@
+             cfm->waitcfm = WDRV_CMD_WAITCFM;
+             cfm->cfm_sn  = hdr->cmd_sn;
+ 
++            /* RX confirmation and timeout removal already use cfm_lock.
++             * The header-local spinlocks differ between TX and RX objects,
++             * so insertion must join the same mutex-protected list lifetime. */
++            rtos_lock_mutex(&wdrv_host_env.cfm_lock);
+             WDRV_ENTER_TXMSG_CRITICAL(int_level);
+             co_list_push_back((struct co_list *)&wdrv_host_env.cfm_pending_list,(struct co_list_hdr *)&cfm->list);
+             WDRV_EXIT_TXMSG_CRITICAL(int_level);
++            rtos_unlock_mutex(&wdrv_host_env.cfm_lock);
+ 
+             wdrv_tx_msg_send(msg, msg_len, WDRV_CMD_WAITCFM);
+ 

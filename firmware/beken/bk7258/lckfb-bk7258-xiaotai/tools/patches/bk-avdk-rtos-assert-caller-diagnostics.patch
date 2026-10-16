@@ -1,0 +1,45 @@
+diff --git a/ap/components/bk_rtos/freertos/v10/rtos_pub_smp.c b/ap/components/bk_rtos/freertos/v10/rtos_pub_smp.c
+index 699ca7e..6dd7866 100755
+--- a/ap/components/bk_rtos/freertos/v10/rtos_pub_smp.c
++++ b/ap/components/bk_rtos/freertos/v10/rtos_pub_smp.c
+@@ -15,6 +15,7 @@
+ #include "bk_uart.h"
+ #include "bk_arch.h"
+ #include <components/system.h>
++#include <components/log.h>
+ #include <driver/gpio.h>
+ #include "rtos_impl.h"
+ #include "cmsis_gcc.h"
+@@ -520,6 +521,13 @@ bk_err_t rtos_trylock_mutex(beken_mutex_t *mutex)
+ 
+ bk_err_t rtos_lock_mutex( beken_mutex_t* mutex )
+ {
++	uint32_t isr = platform_is_in_interrupt_context() != 0;
++	uint32_t irq = platform_local_irq_disabled() != 0;
++	if (isr || (s_is_started_scheduler && irq)) {
++		bk_printf_raw_nonblock(BK_LOG_ERROR, TAG,
++			"[DEBUG-bk-rtos] api=mutex caller=%p irq=%u isr=%u\r\n",
++			__builtin_return_address(0), irq, isr);
++	}
+ 	RTOS_ASSERT_TASK_CONTEXT();
+ 	RTOS_ASSERT_INT_ENABLED_WITH_SCHEDULER();
+ 
+@@ -1424,11 +1432,18 @@ beken_time_t rtos_get_time( void )
+ bk_err_t rtos_delay_milliseconds( uint32_t num_ms )
+ {
+     uint32_t ticks;
++	uint32_t irq = platform_local_irq_disabled() != 0;
+ 
+     ticks = num_ms / bk_get_ms_per_tick();
+ 	if (ticks == 0)
+         ticks = 1;
+ 
++	if (irq) {
++		bk_printf_raw_nonblock(BK_LOG_ERROR, TAG,
++			"[DEBUG-bk-rtos] api=delay caller=%p irq=%u isr=%u\r\n",
++			__builtin_return_address(0), irq,
++			platform_is_in_interrupt_context() != 0);
++	}
+ 	RTOS_ASSERT_INT_ENABLED();
+ 
+     vTaskDelay( (portTickType) ticks );

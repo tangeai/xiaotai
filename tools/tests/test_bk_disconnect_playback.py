@@ -20,12 +20,15 @@ class BKDisconnectPlayback(unittest.TestCase):
 #include <stddef.h>
 #include <stdatomic.h>
 #define BK_LOGI(...) ((void)0)
+#define CONNECTION_STREAM 1
 #define CONNECTION_AI 2
 #define CONNECTION_ROOM 5
 #define MEDIA_EVENT_DISCONNECT 1
 #define MEDIA_EVENT_CLOSED 2
 typedef void *tirtc_conn_t;
 typedef struct {int type,mode,error;unsigned generation;tirtc_conn_t connection;} media_event_t;
+static media_event_t s_pending_close_event;
+static atomic_int s_pending_close_state;
 static tirtc_conn_t current=(void *)1;
 static unsigned pending,written,clock_ms,stops,disconnects,drain_checks;
 static bool running=true,uplink=true,stuck;

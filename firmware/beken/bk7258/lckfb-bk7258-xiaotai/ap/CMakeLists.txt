@@ -110,6 +110,11 @@ armino_component_register(
 )
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
     XIAOTAI_FIRMWARE_VERSION=\"${XIAOTAI_FIRMWARE_VERSION}\")
+get_filename_component(identity_dir "${CMAKE_BINARY_DIR}/.." ABSOLUTE)
+if(NOT EXISTS "${identity_dir}/xiaotai_build_identity.h")
+    message(FATAL_ERROR "Missing build identity; invoke tools/build.sh")
+endif()
+target_include_directories(${COMPONENT_LIB} PRIVATE "${identity_dir}")
 
 add_prebuilt_library(tirtc_bk7258
                      "${TIRTC_ROOT}/lib/libTiRTC.a")

@@ -4,12 +4,12 @@
 | --- | --- |
 | Product | XiaoTai for LCKFB BK7258 |
 | Board | Default LCKFB BK7258 development board configuration |
-| Platform SDK | Official Gitee BK-AVDK SMP `release/v3.1.1.8` |
-| Platform SDK commit | `1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7` |
+| Platform SDK | Official BK-AVDK SMP `release/v3.1.1.10` (fetched from Gitee) |
+| Platform SDK commit | `398cab28b938e69ba2071a597daf00845dd080b6` |
 | TiRTC | TiRTC-Nano v2.5.0 mini |
 | TiRTC package | `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini` |
-| TiRTC target | `beken-bk7258`, built for BK-AVDK `3.1.1.8-official-1cfd56af` |
-| TiRTC archive SHA-256 | `47e26827ca2419084163e3656dca4d6e508e433381784e9c03f232d3dbaa4171` |
+| TiRTC target | `beken-bk7258`, built for BK-AVDK `3.1.1.10-official-398cab28` |
+| TiRTC archive SHA-256 | `1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9` |
 | TiRTC crypto provider | Official BK SDK `psa_mbedtls` component, Mbed TLS 3.5.2; no bundled/project-vendored Mbed TLS |
 | TiRTC HTTP SSL | Disabled by the package (`SSL=disabled`) |
 | TiRTC media DTLS | Disabled by the package (`DTLS=disabled`); current sessions also use `use_dtls=0` |
@@ -28,6 +28,11 @@ material and does not define this identity. The TiRTC package is vendored under
 `third_party/tirtc`. Its private media security implementation remains inside
 that package. A build with another platform SDK, compiler ABI, TiRTC archive,
 or memory map is a different artifact and must be validated again.
+
+The earlier `release/v3.1.1.8` probe reports remain historical observations;
+they do not verify this SDK and TiRTC pair on hardware. This upgrade is a
+controlled candidate for the AP heartbeat issue until the same board passes
+long-run and media-session tests.
 
 The active archive is the package built for the official SDK Mbed TLS 3.5.2
 ABI. Its TiRTC SSL and DTLS features are disabled; the platform provider is
@@ -58,3 +63,11 @@ Wi-Fi temporary transmit queue against a broken `next`/`prev` chain observed
 during media disconnect. It detaches the current SKB for the original caller's
 send/free path and resets the damaged batch head instead of allowing
 `__skb_unlink` to dereference address `0x4` and reboot the device.
+
+`bk-avdk-ap-tx-owned-buffer.patch` gives every AP netif TX a separate contiguous
+buffer and initialized IPC descriptor. It preserves the source pbuf and balances
+references on queue and allocation failures. `bk-avdk-wifi-command-list-mutex.patch`
+serializes pending-command insertion with the mutex already used by RX confirmation
+and timeout removal; the header-local spinlocks are different objects in TX/RX.
+`bk-avdk-pbuf-owner-diagnostics.patch` records the direct caller when CP attempts
+to free an AP SRAM pbuf, without suppressing the existing heap assertion.

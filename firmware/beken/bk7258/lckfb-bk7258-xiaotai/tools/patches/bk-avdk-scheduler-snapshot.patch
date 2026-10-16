@@ -1,0 +1,238 @@
+diff --git a/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/portable/GCC/ARM_CM33_NTZ/non_secure/port.c b/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/portable/GCC/ARM_CM33_NTZ/non_secure/port.c
+index 7af0ab08..229e05e2 100755
+--- a/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/portable/GCC/ARM_CM33_NTZ/non_secure/port.c
++++ b/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/portable/GCC/ARM_CM33_NTZ/non_secure/port.c
+@@ -1453,6 +1453,9 @@ BaseType_t port_uxOldInterruptState[portNUM_PROCESSORS] = {0};
+ #if CONFIG_CRITICAL_LR_RECORD
+ #define LR_TEST_MAX_COUNT 20
+ #define LR_TEST_SECTION __attribute__((used, section(".sram_spinlock_section"))) 
++/* DEBUG-bk-hb: phase 1 acquire, 2 CRC, 3 LR record/nesting, 4 CRC update,
++ * 5 release, 6 exit bookkeeping, 0 completed. Never prints inside the lock. */
++LR_TEST_SECTION volatile uint32_t debug_port_wait[2][8];
+ LR_TEST_SECTION static uint32_t port_uxCriticalCrc[portNUM_PROCESSORS] = {0};
+ LR_TEST_SECTION static uint32_t port_uxCriticalCrcEnabled[portNUM_PROCESSORS] = {0};
+ 
+@@ -1566,13 +1569,28 @@ BaseType_t __attribute__((optimize("-O3"))) xPortEnterCriticalTimeout(portMUX_TY
+     uint32_t lr = __get_LR();
+     #endif
+     BaseType_t xOldInterruptLevel = portSET_INTERRUPT_MASK_FROM_ISR();
++    #if CONFIG_CRITICAL_LR_RECORD
++    uint32_t debug_core = portGET_CORE_ID();
++    debug_port_wait[debug_core][1] = (uint32_t)mux;
++    debug_port_wait[debug_core][2] = mux->owner;
++    debug_port_wait[debug_core][3] = mux->count;
++    debug_port_wait[debug_core][4] = xOldInterruptLevel;
++    debug_port_wait[debug_core][5] = port_uxCriticalNesting[debug_core];
++    debug_port_wait[debug_core][6] = lr;
++    debug_port_wait[debug_core][0] = 1;
++    #endif
+     if (!spinlock_acquire(mux, timeout)) {
+         //Timed out attempting to get spinlock. Restore previous interrupt level and return
++        #if CONFIG_CRITICAL_LR_RECORD
++        debug_port_wait[debug_core][0] = 0;
++        #endif
+         portCLEAR_INTERRUPT_MASK_FROM_ISR(xOldInterruptLevel);
+         return pdFAIL;
+     }
+     #if CONFIG_CRITICAL_LR_RECORD
++    debug_port_wait[debug_core][0] = 2;
+     check_critical_crc();
++    debug_port_wait[debug_core][0] = 3;
+     vPortEnterCriticalLrRecord(lr);
+     #endif
+     //Spinlock acquired. Increment the critical nesting count.
+@@ -1584,7 +1602,10 @@ BaseType_t __attribute__((optimize("-O3"))) xPortEnterCriticalTimeout(portMUX_TY
+         port_uxOldInterruptState[coreID] = xOldInterruptLevel;
+     }
+     #if CONFIG_CRITICAL_LR_RECORD
++    debug_port_wait[debug_core][7] = newNesting;
++    debug_port_wait[debug_core][0] = 4;
+     update_critical_crc();
++    debug_port_wait[debug_core][0] = 0;
+     #endif
+     return pdPASS;
+ }
+@@ -1599,8 +1620,14 @@ void vPortExitCritical(portMUX_TYPE *mux)
+     uint32_t lr = __get_LR();
+     #endif
+     BaseType_t coreID = portGET_CORE_ID();
++    #if CONFIG_CRITICAL_LR_RECORD
++    debug_port_wait[coreID][1] = (uint32_t)mux;
++    debug_port_wait[coreID][6] = lr;
++    debug_port_wait[coreID][0] = 5;
++    #endif
+     spinlock_release(mux, port_uxOldInterruptState[coreID]);
+     #if CONFIG_CRITICAL_LR_RECORD
++    debug_port_wait[coreID][0] = 6;
+     check_critical_crc();
+     vPortExitCriticalLrRecord(lr);
+     #endif
+@@ -1611,6 +1638,7 @@ void vPortExitCritical(portMUX_TYPE *mux)
+         port_uxCriticalNesting[coreID] = nesting;
+         #if CONFIG_CRITICAL_LR_RECORD
+         update_critical_crc();
++        debug_port_wait[coreID][0] = 0;
+         #endif
+         //This is the last exit call, restore the saved interrupt level
+         if ( nesting == 0 ) {
+@@ -1618,3 +1646,26 @@ void vPortExitCritical(portMUX_TYPE *mux)
+         }
+     }
+ }
++
++#if CONFIG_CRITICAL_LR_RECORD
++/* DEBUG-bk-hb: queue receive entry, before yield, and after queue unlock.
++ * Keep each core's last boundary, then freeze it at the first event reentry. */
++LR_TEST_SECTION volatile uint32_t debug_queue_wait[2][3][8];
++extern volatile uint32_t debug_event_fault[2][16];
++void vPortDebugQueueWait(uint32_t queue, uint32_t stage)
++{
++    uint32_t irq = portSET_INTERRUPT_MASK_FROM_ISR();
++    uint32_t core = portGET_CORE_ID();
++    if (debug_event_fault[core][0] == 0U) {
++        debug_queue_wait[core][stage][0] = queue;
++        debug_queue_wait[core][stage][1] = irq;
++        debug_queue_wait[core][stage][2] = __get_IPSR();
++        debug_queue_wait[core][stage][3] = __get_BASEPRI();
++        debug_queue_wait[core][stage][4] = __get_FAULTMASK();
++        debug_queue_wait[core][stage][5] = portNVIC_INT_CTRL_REG;
++        debug_queue_wait[core][stage][6] = port_uxCriticalNesting[core];
++        debug_queue_wait[core][stage][7] = port_uxOldInterruptState[core];
++    }
++    portCLEAR_INTERRUPT_MASK_FROM_ISR(irq);
++}
++#endif
+diff --git a/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/queue.c b/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/queue.c
+index c4c2031c..616ba896 100755
+--- a/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/queue.c
++++ b/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/queue.c
+@@ -1590,6 +1590,10 @@ BaseType_t xQueueReceive( QueueHandle_t xQueue,
+     BaseType_t xEntryTimeSet = pdFALSE;
+     TimeOut_t xTimeOut;
+     Queue_t * const pxQueue = xQueue;
++    #if CONFIG_CRITICAL_LR_RECORD
++    extern void vPortDebugQueueWait(uint32_t queue, uint32_t stage);
++    vPortDebugQueueWait((uint32_t)pxQueue, 0U);
++    #endif
+ 
+     /* Check the pointer is not NULL. */
+     configASSERT( ( pxQueue ) );
+@@ -1693,6 +1697,9 @@ BaseType_t xQueueReceive( QueueHandle_t xQueue,
+                     /* Not timed out yet. Block the current task. */
+                     traceBLOCKING_ON_QUEUE_RECEIVE( pxQueue );
+                     vTaskPlaceOnEventList( &( pxQueue->xTasksWaitingToReceive ), xTicksToWait );
++                    #if CONFIG_CRITICAL_LR_RECORD
++                    vPortDebugQueueWait((uint32_t)pxQueue, 1U);
++                    #endif
+                     portYIELD_WITHIN_API();
+                 }
+                 else
+@@ -1715,6 +1722,10 @@ BaseType_t xQueueReceive( QueueHandle_t xQueue,
+         taskEXIT_CRITICAL( &( pxQueue->xQueueLock ) );
+ #endif
+ 
++        #if CONFIG_CRITICAL_LR_RECORD
++        vPortDebugQueueWait((uint32_t)pxQueue, 2U);
++        #endif
++
+         /* If queue locks ARE being used:
+          * - At this point, the queue is empty and entry time has been set
+          * - We follow the original procedure for locking the queue before
+@@ -1740,7 +1751,10 @@ BaseType_t xQueueReceive( QueueHandle_t xQueue,
+ 
+                     if( xTaskResumeAll() == pdFALSE )
+                     {
+-                        portYIELD_WITHIN_API();
++                        #if CONFIG_CRITICAL_LR_RECORD
++                    vPortDebugQueueWait((uint32_t)pxQueue, 1U);
++                    #endif
++                    portYIELD_WITHIN_API();
+                     }
+                     else
+                     {
+diff --git a/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/tasks.c b/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/tasks.c
+index 965552cd..0ba87262 100755
+--- a/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/tasks.c
++++ b/ap/components/os_source/freertos_smp_v2p0/FreeRTOS-Kernel/tasks.c
+@@ -3802,6 +3802,16 @@ void vTaskSwitchContext( void )
+ }
+ /*-----------------------------------------------------------*/
+ 
++#if CONFIG_CRITICAL_LR_RECORD
++/* DEBUG-bk-hb: memory-only breadcrumbs; CP reads these after heartbeat loss.
++ * phase: 1 kernel lock, 2 event insert, 3 delayed-list update, 4 unlock, 0 done. */
++__attribute__((used, section(".sram_spinlock_section")))
++volatile uint32_t debug_event_wait[2][8];
++__attribute__((used, section(".sram_spinlock_section")))
++volatile uint32_t debug_event_fault[2][16];
++extern BaseType_t port_uxCriticalNesting[], port_uxOldInterruptState[];
++#endif
++
+ void vTaskPlaceOnEventList( List_t * const pxEventList,
+                             const TickType_t xTicksToWait )
+ {
+@@ -3813,7 +3823,44 @@ void vTaskPlaceOnEventList( List_t * const pxEventList,
+ 
+     /* For SMP, we need to take the kernel lock here as we are about to access
+      * kernel data structures. */
++    #if CONFIG_CRITICAL_LR_RECORD
++    /* Caller holds the queue lock with interrupts masked: core cannot migrate. */
++    uint32_t debug_core = portGET_CORE_ID();
++    debug_event_wait[debug_core][1] = (uint32_t)pxEventList;
++    debug_event_wait[debug_core][2] = (uint32_t)&pxCurrentTCBs[debug_core]->xEventListItem;
++    debug_event_wait[debug_core][3] = (uint32_t)&pxCurrentTCBs[debug_core]->xStateListItem;
++    debug_event_wait[debug_core][4] = (uint32_t)pxDelayedTaskList;
++    debug_event_wait[debug_core][5] = xTicksToWait;
++    debug_event_wait[debug_core][6] = (uint32_t)pxCurrentTCBs[debug_core];
++    debug_event_wait[debug_core][7] = pxEventList->uxNumberOfItems;
++    debug_event_wait[debug_core][0] = 1;
++    #endif
+     prvENTER_CRITICAL( &xKernelLock );
++    #if CONFIG_CRITICAL_LR_RECORD
++    debug_event_wait[debug_core][0] = 2;
++    /* Preserve the FIRST reentry, before vListInsert creates a self-loop.
++     * This is evidence only: do not skip insertion or repair kernel lists. */
++    TCB_t *debug_tcb = pxCurrentTCBs[debug_core];
++    if (debug_tcb->xEventListItem.pxContainer != NULL &&
++        debug_event_fault[debug_core][0] == 0U) {
++        debug_event_fault[debug_core][1] = (uint32_t)debug_tcb;
++        debug_event_fault[debug_core][2] = (uint32_t)pxEventList;
++        debug_event_fault[debug_core][3] = pxEventList->uxNumberOfItems;
++        debug_event_fault[debug_core][4] = xTickCount;
++        debug_event_fault[debug_core][5] = debug_tcb->xStateListItem.xItemValue;
++        debug_event_fault[debug_core][6] = (uint32_t)debug_tcb->xEventListItem.pxContainer;
++        debug_event_fault[debug_core][7] = (uint32_t)debug_tcb->xStateListItem.pxContainer;
++        debug_event_fault[debug_core][8] = __get_PRIMASK();
++        debug_event_fault[debug_core][9] = __get_IPSR();
++        debug_event_fault[debug_core][10] = __get_BASEPRI();
++        debug_event_fault[debug_core][11] = __get_FAULTMASK();
++        debug_event_fault[debug_core][12] = port_uxCriticalNesting[debug_core];
++        debug_event_fault[debug_core][13] = port_uxOldInterruptState[debug_core];
++        debug_event_fault[debug_core][14] = uxSchedulerSuspended[debug_core];
++        debug_event_fault[debug_core][15] = portNVIC_INT_CTRL_REG;
++        debug_event_fault[debug_core][0] = 1U;
++    }
++    #endif
+     {
+         /* Place the event list item of the TCB in the appropriate event list.
+          * This is placed in the list in priority order so the highest priority task
+@@ -3828,10 +3875,19 @@ void vTaskPlaceOnEventList( List_t * const pxEventList,
+          * simultaneous access from interrupts. */
+         vListInsert( pxEventList, &( pxCurrentTCBs[ portGET_CORE_ID() ]->xEventListItem ) );
+ 
++        #if CONFIG_CRITICAL_LR_RECORD
++        debug_event_wait[debug_core][0] = 3;
++        #endif
+         prvAddCurrentTaskToDelayedList( xTicksToWait, pdTRUE );
++        #if CONFIG_CRITICAL_LR_RECORD
++        debug_event_wait[debug_core][0] = 4;
++        #endif
+     }
+     /* Release the previously taken kernel lock. */
+     prvEXIT_CRITICAL( &xKernelLock );
++    #if CONFIG_CRITICAL_LR_RECORD
++    debug_event_wait[debug_core][0] = 0;
++    #endif
+ }
+ /*-----------------------------------------------------------*/
+ 

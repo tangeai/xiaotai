@@ -6,8 +6,9 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_SDK_TAG = "release/v3.1.1.8"
-EXPECTED_SDK_COMMIT = "1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7"
+WORKSPACE = Path(__file__).resolve().parents[5]
+EXPECTED_SDK_TAG = "release/v3.1.1.10"
+EXPECTED_SDK_COMMIT = "398cab28b938e69ba2071a597daf00845dd080b6"
 
 
 def report(ok: bool, label: str, detail: str) -> None:
@@ -19,7 +20,7 @@ sdk_candidates = []
 if sdk_arg:
     sdk_candidates.append(Path(sdk_arg).expanduser())
 sdk_candidates.extend([
-    ROOT.parent / ".tools/bk_avdk_smp-release-v3.1.1.8",
+    WORKSPACE / ".tools/bk_avdk_smp-release-v3.1.1.10",
 ])
 sdk = next((p.resolve() for p in sdk_candidates
             if (p / "tools/build_tools/build_files/project_main.mk").is_file()), None)
@@ -36,12 +37,12 @@ report(sdk_identity_ok, "BK-AVDK identity",
 
 compiler = shutil.which("arm-none-eabi-gcc")
 if compiler is None:
-    local_compiler = (ROOT.parent / ".tools/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc")
+    local_compiler = (WORKSPACE / ".tools/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc")
     if local_compiler.is_file():
         compiler = str(local_compiler)
 report(compiler is not None, "GCC Arm None EABI", compiler or "not installed")
 
-python_env = ROOT.parent / ".tools/bk-python/bin/python"
+python_env = WORKSPACE / ".tools/bk-python/bin/python"
 report(python_env.is_file(), "BK-AVDK Python environment", str(python_env))
 
 ok = sdk is not None and sdk_identity_ok and compiler is not None and python_env.is_file()

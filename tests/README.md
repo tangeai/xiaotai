@@ -32,6 +32,149 @@ bash tools/check.sh
 
 ## 测试驱动开发约定
 
+2026-10-16 BK7258 功能复查补充 `test_bk_close_reconnect.py`，通过生产 SDK
+断开/接入回调、关闭通知入口和媒体 worker 回放五种模式各 100 轮关闭与重连。
+旧实现先在“关闭待处理时 busy 必须保持”断言失败；现在传输句柄清空前发布关闭
+屏障，旧音视频清理期间拒绝新接入，清理完成后、业务通知前恢复准入，避免影响
+AI 转拨或待接听来电。覆盖重复/陈旧回调、唤醒队列失败重试及清理中接入。
+已注册 `tools/check.sh`；主机桩不执行真实音频 DMA、SDK 网络线程或 SRAM
+独占监视器，候选固件仍需按 `HARDWARE_ACCEPTANCE.md` 完成实板功能验收。
+
+2026-10-16 build.48 实板确认：控制队列入口 PRIMASK=0，解锁后仍为 1，
+PendSV pending；同一个事件节点在等待到期前重复入链。build.49 仅将每轮
+轮询执行 CAS 的 `s_pending_close_state` 移至 SDK `.sram_spinlock_section`。
+`test_bk_room_close_callback.py` 新增目标 GCC 编译实际入口/声明的段归属检查，
+先因 `.bss` 失败再通过；既有交接测试覆盖一次通知、队列失败重试、消费后复位。
+此测试已由 `tools/check.sh` 注册，证明存储布局与交接合同，不模拟 SRAM
+独占监视器。build.49 交付后用户反馈 uptime 已达 21 分 38 秒，所贴约 15 分
+50 秒待机窗口无重启且内存稳定；写丢失的底层硬件因果和负载稳定性仍未直接验证。
+
+2026-10-16 build.47 实板反复失败：控制 TCB `0x60557c50` 的事件节点
+`0x60557c68` 前后指针都等于自身，事件链表 count=2；状态节点仍在延时链表，
+唤醒 tick 比冻结 tick 大 100。AP1 阶段停在 vListInsert，AP0 等内核锁，随后
+CP 的 8 秒心跳保护复位。HTTP 200、SDK start rc=0 不能证明调度正常。
+`test_bk_event_reentry.py` 用实际 SDK vListInsert/vTaskPlaceOnEventList 重放重复
+入链，复现相同自环；第一次运行因没有保存首次重复入链而失败，加入取证后通过。
+它只证明自环机制和取证有效，尚未复现让阻塞任务再次运行的上游原因，不能算修复。
+
+build.48 开发取证增加 `ap-first-reentry`（首次检测到已入链的事件节点）与
+`ap-queue-boundary`，首次异常后冻结该核的队列边界记录。保持原队列/锁行为，
+不跳过重复插入、不提高心跳超时。事件概要分两行，修正旧日志被 UART 截断。
+
+- first-reentry 的 16 个 word 按 offset 顺序为：有效标记、TCB、目标事件链表、
+  插入前 count、tick、唤醒 tick、原事件 container、原状态 container、PRIMASK、
+  IPSR、BASEPRI、FAULTMASK、临界嵌套数、保存的中断状态、scheduler suspended、ICSR。
+- queue-boundary 每 8 个 word 为一个阶段（0=API 入口、1=yield 前、2=解锁后）：
+  queue 地址、PRIMASK、IPSR、BASEPRI、FAULTMASK、ICSR、临界嵌套数、保存的中断状态。
+  记录按核保存；若任务迁核或其他任务覆盖，必须用 queue 地址核对，不能拼成同一任务轨迹。
+- 下一次实板需要从启动到首次心跳超时的日志，重点保留上述两种记录，以及
+  ap-port、ap-event-tail。尚未完成实板验证；不能将 build.48 标记为重启修复版。
+
+2026-10-16 build.46 实板：两次 CP 快照 tick=5179，kernel owner=1/count=1；
+TCB0=显示线程、TCB1=控制线程。LR 对应 xQueueSemaphoreTake 和
+xQueueReceive→vTaskPlaceOnEventList；LR 是调用返回地址，不能当作当前 PC。
+临界记录深度为 1/2，nesting 读值为 0/0，尚不能据此判定链表循环或内存破坏。
+官方 .8→.10 的 spinlock.c/h 确有改动，任务/队列源码相同不代表整个锁路径相同。
+build.47 增加仅开发启用的内存阶段记录与有地址边界的六字读取，不修改锁算法。
+`test_bk_scheduler_snapshot.py` 先在真实 vTaskPlaceOnEventList 的锁入口断言失败，
+再验证两个核的锁等待、事件插入、延时链表更新、解锁阶段，以及实际 port 入口的
+嵌套锁计数和中断恢复；它不模拟硬件独占访问或证明重启已修复。
+`test_bk_critical_lr_snapshot.py` 校验 CP 打包需要新增 AP 符号并拒绝陈旧地址。
+下一次实板须保留 ap-port、ap-event、ap-event-memory 和 ap-lr 全部超时行。
+
+2026-10-16 BK7258 build.44 版本误判纠正：同一 AP ELF 同时含 SDK 的
+`1.0.0+build.42` 和产品的 `1.0.0+build.44`。SDK 的 APP_VERSION 在 CMake
+配置时读取环境，增量构建未重新配置，旧的启动版本不能用来断言用户烧错文件。
+`test_boot_identity.py` 新增三个失败用例：新构建未使 SDK 配置缓存失效、
+finalize 放行混合版本、finalize 放行新 ELF 配旧烧录内容。现在构建号变化会
+重新配置 AP/CP，并校验 ELF 版本唯一、整包剥离 CRC 后的 AP/CP 内容与 BIN
+一致。启动身份改用普通 raw 输出，避免非阻塞启动输出丢失。
+build.46 开发镜像启用临界区 LR 记录，CP 超时快照从本次 AP ELF 获取地址，
+再次打包后验证地址契约并恢复 SDK 源码；release 关闭该记录。
+build.44 的频繁重启仍是有效的实板失败证据。主机回归只能证明身份校验和
+诊断构建正确，不能证明 AP 停顿已修复；需采集 build.46 首次超时的 ap-lr 输出。
+
+2026-10-16 BK7258 build.41 重启复查：实板除 IPC 心跳超时外，还捕获
+CP `pbuf_free` 释放 AP SRAM 地址导致的 `os_free_debug` 断言。
+`test_bk_wifi_tx_ownership.py` 通过实际 SDK netif 发送入口，先复现两次异步
+发送复用同一描述符，再验证每次发送独立复制、描述符初始化、源 pbuf 不变以及
+分配/发送失败引用平衡；命令确认用例通过真实收发入口，先捕获 TX 插入列表未持有
+RX/超时路径共同使用的 mutex，再验证确认、超时与信号量初始化失败。
+`test_bk_mqtt_eof.py` 先以 `EOF busy loop detected` 复现 MQTT 对关闭连接持续
+读取，再验证 EOF/半帧立即退出、超时仍作为空闲、完整帧和分段输入正常。
+这些是已复现的代码缺陷；尚未证明它们解释全部 AP SMP 停顿，必须核对新镜像
+的实板复位频率。CP `DEBUG-bk-pbuf-owner` 仅在异常跨堆释放时增加直接调用者诊断。
+
+2026-10-16 BK7258 构建身份：`test_boot_identity.py` 先因启动日志只有产品
+版本、没有单次构建号而失败；后来又因误用日期构建号而失败。现在构建脚本
+把工程内 `BUILD_NUMBER` 的数字递增，AP 启动时打印完整的
+`1.0.0+build.n` 和 `build=n`，构建记录和验证包清单将其绑定到最终 `all-app.bin` 的
+SHA-256。测试用临时镜像验证头文件、构建记录与 SHA-256 一致，并要求最终
+AP ELF 包含同一构建号。仍需在实板启动日志中核对 `build=` 与准备烧录的
+清单，才能确认板上运行的是这份镜像。
+
+同一工程 `package/` 中的正式烧录副本使用 `1.0.0+build.n` 命名；SDK 原生
+`all-app.bin` 仍用于 SDK 打包流程。`test_boot_identity.py` 先因没有唯一命名
+副本失败，再验证同目录副本与原生整包逐字节一致。构建身份头文件和记录直接
+放在已有构建根目录，不再新建身份子目录。
+
+2026-10-16 BK7258 版本上报与产物整理：新增回归先复现平台上报仍为
+`1.0.0`、打包文件名缺少 build 号和输出目录缺少用途说明，再通过编译实际
+平台 profile JSON 验证其使用生成的完整版本。验证包测试通过公开打包入口核对
+文件名、清单版本、SHA 和构建配置一致，并拒绝 profile 不匹配的产物。
+本地开发使用默认工程目录，只有线上发布候选使用 SDK 的 `_release` 目录；
+用途记录在产物目录的 `README.md`。测试均注册在 `tools/check.sh`。
+
+2026-10-15 BK7258 跨核 Wi-Fi 发包缓冲区：现场 CP `core_thread` 在
+`rwnx_start_xmit` 读取 `skb->p` 时发生非对齐访问，寄存器中的指针已被数据覆盖；
+同时可见 `bam_set_baw_state` 断言和 AP 心跳超时。官方 SDK 的
+`lwip_psram_example` 在 AP/CP 两侧启用 `CONTROLLER_AP_BUFFER_COPY`，并在
+AP 启用 `LWIP_MEM_LIBC_MALLOC_USE_PSRAM`。`test_bk_cp_tx_buffer_copy.py`
+先在现有配置失败，再检查两侧配置和已编译 CP 公共入口
+`cif_handle_txdata` 确实先复制 AP pbuf、归还 AP 缓冲区，再排入 CP Wi-Fi
+发送队列。该主机检查只证明跨核缓冲区隔离路径已编入固件；心跳超时是否消除，
+仍须刷入同一镜像做空闲长稳、网络重连和呼叫实板验证。
+
+2026-10-15 后续实板反证：启用官方 AP 缓冲区复制的镜像仍多次在 AP 最后
+一次 `tx-exit rc=0` 后停止心跳，CP 在约 8 秒后断言重启；停止前堆空闲量稳定，
+且故障可在启动几秒或空闲数分钟后出现。当前日志不能判定 AP 是被硬件停核，
+还是两个核的软件调度停顿。`test_bk_heartbeat_trace.py` 先因分析器不能关联
+CP 的 AP 硬件状态快照失败，再验证同一次启动的超时记录含 halt、断电状态，
+并在下次启动清空旧快照。CP 只在心跳超时断言前读取 SYS 的运行状态及两颗
+AP 核控制寄存器，不修改寄存器。刷入新镜像后须收集
+`[DEBUG-bk-hb] ap-hw` 行；即使显示双核仍运行，也还需要 AP 停顿现场的 PC/
+调用栈才能定位具体代码。
+
+2026-10-16 BK7258 心跳判超回到 8 秒：官方 SDK 3.1.1.10 在未启用
+`CONFIG_WDT_EN` 时按 2 秒心跳的 3 个周期（6 秒）判超；10 月 2 日所用
+3.1.1.8 为 8 秒。`test_bk_heartbeat_timeout.py` 先在未接入补丁时失败，再把
+项目补丁应用于 SDK 原始 CP 源码，并编译执行无 WDT 的超时表达式，验证其为
+8000 毫秒。只延长 CP 判超窗口，不改变 AP 发心跳周期；AP 停顿原因仍待实板定位。
+
+2026-10-15 BK7258 超时现场 AP 状态：`test_bk_heartbeat_trace.py` 的新增用例
+先复现分析器遗漏 CP 采集的两次 AP SRAM 快照，再验证同一超时记录保留
+系统 tick、当前任务指针及 shell、mailbox、内核自旋锁的 owner/count，
+并在下一次 AP 启动时丢弃旧快照。独立的 `tirtc-prestart-locksnap` 镜像
+仅在 CP 心跳超时路径隔 20 毫秒读取两次共享 SRAM；原始 SDK 源文件已恢复。
+主机测试和编译只能证明采集代码与解析逻辑可用，现场快照和故障根因仍待实板验证。
+
+2026-10-16 BK7258 临界区调用地址诊断：`tirtc-prestart-locksnap` 实板现场
+显示 AP core1 持有 `xKernelLock`，20 毫秒内 AP tick 未变化。新的隔离镜像启用
+SDK 的 `CONFIG_CRITICAL_LR_RECORD`，并在 CP 超时路径读取双核嵌套临界区调用
+地址及最近进入地址。`test_bk_critical_lr_snapshot.py` 通过诊断工具的命令行
+验证 AP ELF 符号契约、CP 插桩、地址变化拒绝及 SDK 源码恢复；旧 AP ELF 因缺少
+LR 符号被拒绝，新镜像经双核 Release 编译。主机测试不能证明实板能捕获持锁
+调用点，且该 SDK 选项增加临界区开销；仍需烧录并保存首次超时的 `ap-lr` 行。
+
+2026-10-16 BK7258 媒体工作线程 SRAM 候选：实板 `prestart-critical-lr` 镜像在
+约 10 分 46 秒再次发生 IPC 心跳超时，CP 两次快照均显示 AP core1 持有
+`xKernelLock`、tick 停在 `640099`，进入临界区的地址对应 `xQueueReceive()` 与
+`vTaskPlaceOnEventList()`；当前任务 TCB 位于 PSRAM，但快照还不能确认它就是
+媒体线程，也没有实时 PC。`test_bk_room_close_callback.py` 通过生产
+`start_media_worker()` 验证媒体线程使用 SDK 的内部 SRAM 建线程接口、保留原优先级
+与 4096 字节栈，并覆盖启动失败时的队列清理；测试先在 PSRAM 实现上失败。
+该改动是待实板验证的单变量候选，主机检查和编译均不能保证连续运行几十分钟。
+
 2026-10-14 BK7258 周期指标的 SMP 锁：`test_bk_metrics_no_kernel_scan.py`
 先因统计任务调用 `uxTaskGetSystemState` 失败，再验证统计仅读取任务数。
 SDK 实现的全任务扫描持有 `xKernelLock`；现场曾在
@@ -77,6 +220,72 @@ release 编译已通过；连续进出房间及退出后至少 30 秒无 IPC 心
 产品控制线程在回调栈外发送一次唤醒事件，并覆盖队列满后的重试。修复候选
 已通过主机测试和 BK release 编译；空闲长稳、AI 双向音频和房间退出仍需
 同一固件实板验证，不能据此宣称心跳问题已根治。
+
+2026-10-15 后续实板日志确认上述阻塞等待候选仍出现 IPC 心跳超时：H5 STREAM
+关闭并完成本机清理后重连时复现，另一次停在 `metrics-log-enter` 与实际
+`METRICS` 输出之间。SDK 的普通 shell 日志在缓冲区满时会等待信号量，
+而周期指标和 TiRTC 回调都经 `xiaotai_log_write()` 使用该模式。
+`tools/test_log_levels.sh` 已由 `tools/check.sh` 注册；本次先使它在公开日志
+接口上因使用普通日志模式失败，再验证改用非阻塞输出且保留级别过滤、
+格式化内容。日志拥塞时允许丢弃一条日志。这个测试不能证明其他 SDK
+锁点已经排除；H5 查看、AI 对话及空闲长稳仍需实板复验。
+
+2026-10-15 BK7258 一次性定位镜像：实板既在 H5 STREAM 启动后，也在 READY
+空闲约 100 秒后发生 CP `IPC[1]heartbeat timeout`；另一次报
+`os_free_debug: invalid heap pointer 0x2801aec8`。该地址落在当前 AP
+链接图的 lwIP 静态堆内，但尚缺释放调用者证据，不能据此修改所有权逻辑。
+SDK 补丁仅以 `[DEBUG-bk-hb]` 记录 AP 发送前后序号与返回值、CP
+超时时收到的心跳总数，以 `[DEBUG-bk-lwip-free]` 记录 CP lwIP 非法释放的
+指针、调用地址与 CP 堆起点；CP 中断接收路径只增加计数。
+`test_bk_heartbeat_trace.py` 先复现分析器缺少这些字段及非法释放未判失败，
+再验证每次启动独立归因。完成源码检查与双核 release 编译后，仍需同一镜像
+实板捕获一次完整故障日志，才能根据 AP/CP 发送接收状态和 CP ELF 调用地址
+确定修复点。
+
+2026-10-15 后续实板捕获：READY 空闲时 AP 第 226 次心跳发送成功且 CP
+累计收到 226 次，之后 AP 不再发送；另一次启动只发送了第 1 次。另一轮
+空闲超过 18 分钟后启动 H5 音视频，分别触发
+`rtos_delay_milliseconds`、`rtos_lock_mutex` 的本核中断关闭断言；断言输出缺少
+调用者地址，不能确认是哪条业务或 SDK 路径。`test_bk_heartbeat_trace.py`
+先因日志分析器不能识别新的断言定位字段失败，再验证其记录 API、调用者、
+中断状态和 ISR 状态，并将事件判为失败。BK SDK 诊断补丁只在这两处断言
+前用非阻塞日志输出调用者地址；须用同一固件实板复现并用 AP ELF 符号化，
+再决定修复点。
+
+2026-10-15 BK7258 心跳任务栈隔离：对照 Beken `bk_avdk_smp` 官方
+`release/v3.1.1.8` 和 `release/v3.1.1.10` 源码，SMP 通用建栈接口在
+`CONFIG_TASK_STACK_IN_PSRAM=y` 时会把心跳栈放进 PSRAM；官方另提供
+`rtos_create_sram_thread()`，启动任务等关键任务使用它。新版心跳实现没有
+自动将栈转到 SRAM。`test_bk_heartbeat_sram.py` 编译并调用实际 SDK 的公开
+`mb_ipc_heartbeat_init()`，先因创建通用任务失败，再验证以原优先级创建
+至少 1024 字节的 SRAM 栈。板级补丁只切换心跳建栈接口，BK release
+双核编译与完整主机检查通过；该改动隔离心跳对 PSRAM 任务栈的依赖，
+尚不能证明 AP 全局调度停顿已消除。实板须用新镜像覆盖此前空闲约 5、
+8、27、56 分钟发生的超时窗口，并复验 H5/AI/房间退出。
+
+2026-10-15 新镜像实板启动回归：`Oct 15 2026 14:56:35` 的 AP ELF 在
+`0x02187496` 固定 HardFault，`CFSR=0x82`，读空地址。精确 ELF 符号化表明
+PC 在 `psram_prvInsertBlockIntoFreeList()`，调用路径为
+`bk_ipc_core_init()` → `rtos_create_thread()` → 首次 2048 字节 PSRAM 栈
+分配。该时刻 `system_main.c` 尚未调用 `mb_ipc_heartbeat_init()`，因此不能
+把启动崩溃直接归因于心跳任务本身。Beken SDK 的 `rtos_create_sram_thread()`
+适合启动期 IPC 工作线程；板级补丁将此线程的 TCB 和栈移到内部 SRAM，避免
+IPC 初始化依赖尚未稳定的 PSRAM 堆。`test_bk_ipc_boot_stack.py` 在旧 ELF
+检查到通用建线程接口而失败，改动后检查构建产物的实际调用。PSRAM 堆空闲
+链表为何在该次启动变成空指针仍需实板继续验证；新固件要先确认启动日志，
+再做长时间心跳及 H5/AI 测试。
+
+2026-10-15 后续实板日志：AP 心跳发送与 CP 接收均持续成功，随后 AP 停止发送，
+CP 约 8 秒后报 `IPC[1]heartbeat timeout`。多次超时的 SYS 快照相同：
+`run=0x00007060 cpu1=0x02150031 cpu2=0x02150239`；运行状态中的双核
+halt 和断电位均未置位，但不能据此证明 AP 仍在执行指令。其中一次明确停在
+`metrics-log-enter`，未出现 `METRICS` 输出。SDK 普通日志在缓冲区满时反复
+等待信号量；周期指标仍直接使用普通 `BK_LOGI`。`test_bk_rssi_cache.py`
+通过生产 `xiaotai_metrics_start()` 触发采样，修改前因调用阻塞日志失败，
+修改后验证指标使用非阻塞日志；该测试已由 `tools/check.sh` 注册。日志缓冲区满时
+可丢弃单次指标。其他超时没有共同的指标停点，仍需新镜像空闲长稳和 H5/AI
+实板复验。另有多次启动记录 `reset=17`，SDK 定义为 HardFault，须单独收集
+异常寄存器和对应 ELF 的调用栈。
 
 固件版本由发布负责人指定为 `major.minor.patch`。`test_firmware_versions.py`
 验证所有板卡、设备能力上报和构建调度；实际编译与失败重试都不改版本。

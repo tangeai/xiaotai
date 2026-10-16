@@ -1,11 +1,101 @@
 """The TiRTC room close callback must avoid RTOS queues and serial logging."""
 
 import unittest
+import re
+import subprocess
+import tempfile
+from pathlib import Path
 
 from test_s3_product_regressions import ROOT, function, run_c
 
 
 class BKRoomCloseCallback(unittest.TestCase):
+    def test_close_cas_uses_sdk_exclusive_memory_section(self):
+        """Compile the actual handoff entry and its storage with the target GCC.
+
+        This checks placement, not the silicon's exclusive-monitor behavior.
+        The existing handoff test checks delivery/retry semantics on the host.
+        """
+        prefix = ROOT / '.tools/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-'
+        gcc = str(prefix) + 'gcc'
+        if not Path(gcc).exists():
+            self.skipTest('Beken target compiler not installed')
+        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
+        declaration = re.search(r'^static atomic_int s_pending_close_state\b[^;]*;',
+                                source, re.MULTILINE).group(0)
+        unit = r'''
+#include <stdatomic.h>
+#include <stddef.h>
+#define BK_OK 0
+#define MEDIA_EVENT_WAKE 15
+typedef struct { unsigned type; } media_event_t;
+extern void *s_media_queue;
+extern int rtos_push_to_queue(void **, const media_event_t *, unsigned);
+''' + declaration + '\n' + function(source, 'xiaotai_tirtc_service_close_wakeup')
+        with tempfile.TemporaryDirectory() as directory:
+            c = Path(directory) / 'handoff.c'
+            obj = Path(directory) / 'handoff.o'
+            c.write_text(unit)
+            subprocess.run([gcc, '-mcpu=cortex-m33', '-mthumb', '-Os', '-c',
+                            str(c), '-o', str(obj)], check=True, capture_output=True)
+            symbols = subprocess.check_output([str(prefix) + 'objdump', '-t', str(obj)], text=True)
+            state = next(line for line in symbols.splitlines()
+                         if line.endswith(' s_pending_close_state'))
+            self.assertIn('.sram_spinlock_section', state,
+                          'close CAS must not reserve ordinary kernel/DMA SRAM')
+
+    def test_media_worker_uses_internal_sram_stack(self):
+        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
+        run_c(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stddef.h>
+#define BK_OK 0
+#define BK_FAIL -1
+#define MEDIA_QUEUE_DEPTH 16
+typedef void *beken_queue_t;
+typedef void *beken_thread_t;
+typedef void *beken_thread_arg_t;
+typedef struct { int type; } media_event_t;
+static beken_queue_t s_media_queue;
+static beken_thread_t s_media_thread;
+static int create_result, init_count, deinit_count, create_count;
+static void media_worker(beken_thread_arg_t arg) { (void)arg; }
+static int rtos_init_queue(beken_queue_t *queue, const char *name,
+                           unsigned item_size, unsigned depth) {
+    assert(name && item_size == sizeof(media_event_t) && depth == MEDIA_QUEUE_DEPTH);
+    *queue = (void *)1;
+    init_count++;
+    return BK_OK;
+}
+static int rtos_deinit_queue(beken_queue_t *queue) {
+    assert(*queue == (void *)1);
+    deinit_count++;
+    return BK_OK;
+}
+static int rtos_create_sram_thread(beken_thread_t *thread, uint8_t priority,
+                                   const char *name, void (*entry)(beken_thread_arg_t),
+                                   uint32_t stack_size, beken_thread_arg_t arg) {
+    assert(thread == &s_media_thread && priority == 5 && name &&
+           entry == media_worker && stack_size == 4096 && arg == 0);
+    create_count++;
+    return create_result;
+}
+''' + function(source, 'start_media_worker') + r'''
+int main(void) {
+    assert(start_media_worker() == BK_OK);
+    assert(init_count == 1 && create_count == 1 && deinit_count == 0);
+    assert(start_media_worker() == BK_OK);
+    assert(init_count == 1 && create_count == 1);
+    s_media_queue = 0;
+    create_result = BK_FAIL;
+    assert(start_media_worker() == BK_FAIL);
+    assert(init_count == 2 && create_count == 2 && deinit_count == 1);
+    assert(s_media_queue == 0);
+    return 0;
+}
+''')
+
     def test_control_task_services_close_even_when_events_keep_arriving(self):
         source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_app.c').read_text()
         control = function(source, 'control_task')
@@ -67,7 +157,8 @@ int main(void) {
     assert(queue_pushes == 1 && atomic_load(&s_pending_close_state) == 3);
     assert(media_wait_next_event(&event));
     assert(event.type == MEDIA_EVENT_CLOSED && event.generation == 7);
-    assert(atomic_load(&s_pending_close_state) == 0);
+    assert(atomic_load(&s_pending_close_state) == 1); /* Worker owns cleanup. */
+    atomic_store(&s_pending_close_state, 0); /* Simulate completed cleanup. */
     s_pending_close_event = (media_event_t){.type=MEDIA_EVENT_CLOSED, .generation=8};
     atomic_store(&s_pending_close_state, 2);
     fail_next_push = true;
@@ -75,7 +166,7 @@ int main(void) {
     assert(atomic_load(&s_pending_close_state) == 2);
     xiaotai_tirtc_service_close_wakeup();
     assert(media_wait_next_event(&event));
-    assert(event.generation == 8 && atomic_load(&s_pending_close_state) == 0);
+    assert(event.generation == 8 && atomic_load(&s_pending_close_state) == 1);
     return 0;
 }
 ''')
@@ -137,7 +228,7 @@ int main(void) {
     media_event_t delivered = {0};
     atomic_store(&s_pending_close_state, 3);
     assert(take_pending_close_event(&delivered));
-    assert(atomic_load(&s_pending_close_state) == 0);
+    assert(atomic_load(&s_pending_close_state) == 1);
     assert(delivered.connection == handle && delivered.mode == CONNECTION_ROOM);
     assert(delivered.generation == 7 && delivered.error == 0);
     assert(!take_pending_close_event(&delivered));

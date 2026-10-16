@@ -13,9 +13,9 @@
 #error "this probe is for the BK7258 bk_avdk_smp v3.1.1 line"
 #endif
 
-#define SDK_VERSION "release/v3.1.1.8"
-#define SDK_REVISION "1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7"
-#define BOARD_CONFIG_SHA256 "71aab64bd263cd6570402b81fa2d9990313699560b62f461d84ad9fc497c64d6"
+#define SDK_VERSION "release/v3.1.1.10"
+#define SDK_REVISION "398cab28b938e69ba2071a597daf00845dd080b6"
+#define BOARD_CONFIG_SHA256 "eab5eb583bf60d1001063c10d1dae697186d182a240a8793ece574a6643e2012"
 
 static const char *test_name(tirtc_bk_test_t value)
 {

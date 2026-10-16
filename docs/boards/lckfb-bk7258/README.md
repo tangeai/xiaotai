@@ -87,7 +87,7 @@ BKFIL 的界面与参数说明见[Beken BKFIL v4 官方文档](https://docs.beke
 | 项目 | 内容 |
 | --- | --- |
 | 板卡 ID（仓库中的开发板唯一名称） | `lckfb-bk7258` |
-| 芯片与平台 | BK7258 / BK-AVDK SMP 3.1.1.8 |
+| 芯片与平台 | BK7258 / BK-AVDK SMP 3.1.1.10（实板复验中） |
 | 存储与内存 | 8 MiB Flash、16 MiB PSRAM、640 KiB SRAM（均为当前分区/内存配置声明） |
 | 显示与触摸 | ST7789V2 SPI 屏、FT6336 触摸 |
 | 音频 | 板载 ADC/DAC、麦克风、扬声器和功放；AI 支持全双工 AEC，8 kHz 通话当前使用 AGC |
@@ -103,7 +103,8 @@ BKFIL 的界面与参数说明见[Beken BKFIL v4 官方文档](https://docs.beke
 
 ## 音视频参数
 
-H5、设备呼叫和微信通话使用 8 kHz 单声道 A-law，每个网络包 40 毫秒、320 字节。
+H5、设备呼叫和微信通话使用 8 kHz 单声道 A-law，上行每个网络包 20 毫秒、160 字节。
+下行按实际包长解码，不要求对端采用相同分包长度。
 AI 使用 16 kHz 单声道 Opus，每包 20 毫秒，目标码率 16 kbit/s；编码包长度可变，
 当前单包缓冲上限为 512 字节。
 
@@ -121,10 +122,10 @@ AI 的 AEC（声学回声消除）按 20 毫秒、320 个采样处理，播放�
 | 依赖项 | 固定版本或文件 | 来源或下载链接 | SHA-256 |
 | --- | --- | --- | --- |
 | 主机环境 | Linux/WSL2、Git、Python 3 | [Git](https://git-scm.com/downloads)、[Python](https://www.python.org/downloads/) | 无 |
-| BK-AVDK SMP | `release/v3.1.1.8`，提交 `1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7` | [Beken 官方仓库](https://gitee.com/bekencorp/bk_avdk_smp/tree/1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7) | 无 |
+| BK-AVDK SMP | `release/v3.1.1.10`，提交 `398cab28b938e69ba2071a597daf00845dd080b6` | [Beken 官方发布](https://github.com/bekencorp/bk_avdk_smp/releases/tag/release%2Fv3.1.1.10) | 无 |
 | C/C++ 编译器 | `arm-none-eabi-gcc 10.3.1 20210824`，`gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2` | [Beken 官方 Arm 工具链目录](https://dl.bekencorp.com/tools/toolchain/arm) | `97dbb4f019ad1650b732faffcc881689cedc14e2b7ee863d390e0a41ef16c9a3` |
-| TiRTC-Nano | `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini.tgz`，工程使用其中的 `libTiRTC.a` | [BK7258 发布目录](https://repo-sdk.tange-ai.com/service/rest/repository/browse/tirtc-sdks/releases/beken-bk7258/)、[v2.5.0 下载包](https://repo-sdk.tange-ai.com/repository/tirtc-sdks/releases/beken-bk7258/tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini/tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini.tgz) | 下载包：`348c6571ac3aff61c0fc90ab2fde40588f155a63514063ded6956feae3f84cf7`；工程内静态库：`47e26827ca2419084163e3656dca4d6e508e433381784e9c03f232d3dbaa4171` |
-| 厂商组件 | AP/CP 多媒体、网络、显示、触摸、DVP（数字视频端口）和音频组件 | [BK-AVDK SMP 源码](https://gitee.com/bekencorp/bk_avdk_smp/tree/1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7) | 无 |
+| TiRTC-Nano | 本地交付的 `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini`，manifest 指向 BK-AVDK 3.1.1.10 | 公开下载链接待核实 | 工程内静态库：`1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9` |
+| 厂商组件 | AP/CP 多媒体、网络、显示、触摸、DVP（数字视频端口）和音频组件 | [BK-AVDK SMP 源码](https://github.com/bekencorp/bk_avdk_smp/tree/398cab28b938e69ba2071a597daf00845dd080b6) | 无 |
 
 Beken 工程保持独立的 AP/CP（应用处理器/协处理器）、分区、TLS ABI（线程局部存储应用二进制接口）和 TiRTC 静态库，不能套用 ESP-IDF 依赖。
 
@@ -215,9 +216,56 @@ python3 tools/build.py --board lckfb-bk7258
 
 整包产物位于
 `firmware/beken/bk7258/lckfb-bk7258-xiaotai/build/bk7258/lckfb-bk7258-xiaotai/package/all-app.bin`。
-使用 release 配置构建时，产物位于同一 `build/bk7258/` 目录下的
-`lckfb-bk7258-xiaotai_release/package/all-app.bin`。烧录前应核对所选构建配置、
+本地开发和诊断都使用这个默认目录。只有准备线上发布时才显式传入 `--release`，
+由 SDK 生成 `lckfb-bk7258-xiaotai_release/package/`。烧录前应核对所选构建配置、
 版本和文件 SHA-256；`app_pack.rbl` 仅用于 OTA。
+
+每次通过构建脚本编译都会将工程内 `BUILD_NUMBER` 的数字递增 1。
+`VERSION.md` 保留产品版本号，例如 `1.0.0`；启动日志 `XIAOTAI_BOOT`
+打印 `version=1.0.0+build.40 build=40`，与
+`build/bk7258/<所选工程配置>/build_identity.json` 一致。临时验证包的
+`MANIFEST.json` 也记录同一编号。构建记录保存整包
+SHA-256；在电脑上对待烧录的 `all-app.bin` 执行 `sha256sum` 核对。
+
+产品版本号继续使用 `VERSION.md`；开机日志、平台能力上报、SDK 镜像版本和
+交付清单统一使用完整的 `x.x.x+build.n`。
+
+构建脚本在构建号变化时重新配置 AP/CP，避免 SDK 缓存旧的 `APP_VERSION`。
+交付前要求 AP ELF 只包含本次完整版本，并将整包中剥离 CRC 的 AP/CP 内容
+与编译出的 BIN 逐字节比较；仅出现本次版本字符串不足以通过身份检查。
+
+当前开发配置启用 `CONFIG_CRITICAL_LR_RECORD`：CP 心跳超时后间隔 20ms
+读取两次 AP 的 tick、内核锁、任务指针及临界区调用地址，打印 `[DEBUG-bk-hb] ap-lr`。
+地址从本次 AP ELF 获取并在再次打包后复核，SDK 临时插桩随后恢复。release
+关闭该临界区记录。它是停顿诊断，会增加临界区开销，不代表重启已修复。
+
+当前 CP 的 IPC 心跳判超窗口设为 8 秒，与 10 月 2 日构建一致；AP 仍每
+2 秒发送一次心跳。它只决定 AP 停止回应后 CP 等多久才复位，不能修复
+AP 调度停顿。
+
+构建脚本在同一个 `package/` 目录保留 SDK 原生的 `all-app.bin`，并生成
+`lckfb-bk7258-<版本号>+build.<构建号>-all-app.bin`，两份内容相同。正式交付使用带
+版本号与 build 号的文件名，烧录偏移仍为 `0x00000000`。同目录自动生成
+`README.md`，记录构建用途、development/release、完整版本、原始路径、SHA-256
+和实板验证状态。用途可通过 `XIAOTAI_BUILD_PURPOSE` 指定。
+
+### 临时验证固件
+
+后续编译物统一保存在工程内：开发联调用默认目录，线上发布候选用 SDK 的
+`_release` 目录。根目录 `output/` 只保留整理后的历史基线与说明，构建和打包
+不再自动向其中复制文件；不按日期或诊断用途另建目录。
+其他分支的对照固件可显式导出到 `output/`，仍用完整版本命名，并在 Markdown
+说明中记录分支与用途。
+
+需要包含配对 AP/CP ELF 的完整验证包时，显式执行：
+
+```bash
+python3 tools/package_validation_firmware.py --board lckfb-bk7258
+```
+
+默认打包 development 产物；线上发布才传 `--beken-build-profile release`。
+ZIP、整包和 OTA 副本的文件名都包含完整版本号，保存在所选工程的同一
+`package/` 目录；构建用途记录在该目录的 `README.md`。
 
 ## 测试
 

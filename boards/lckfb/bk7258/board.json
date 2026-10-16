@@ -6,7 +6,7 @@
   "revision": null,
   "platform": "beken",
   "target": "bk7258",
-  "sdk": {"name": "bk_avdk_smp", "version": "release/v3.1.1.8"},
+  "sdk": {"name": "bk_avdk_smp", "version": "release/v3.1.1.10"},
   "project_dir": "firmware/beken/bk7258/lckfb-bk7258-xiaotai",
   "capabilities": ["audio", "buttons", "camera-h264", "display", "touch", "wifi"],
   "resources": {"flash_bytes": 8388608, "psram_bytes": 16777216},

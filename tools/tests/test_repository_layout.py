@@ -387,9 +387,9 @@ class RepositoryLayoutTests(unittest.TestCase):
                 "9b4e35c7a2cb203fc463417739199429057c8b036936faa11f844c726455301f",
             ),
             "lckfb-bk7258": (
-                "1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7",
+                "398cab28b938e69ba2071a597daf00845dd080b6",
                 "arm-none-eabi-gcc 10.3.1",
-                "47e26827ca2419084163e3656dca4d6e508e433381784e9c03f232d3dbaa4171",
+                "1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9",
             ),
         }
         for board_id, facts in expected.items():

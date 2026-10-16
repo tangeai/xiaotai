@@ -2,9 +2,9 @@
 
 ## Platform baseline
 
-- Source: <https://gitee.com/bekencorp/bk_avdk_smp.git>
-- Tag: `release/v3.1.1.8`
-- Commit: `1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7`
+- Source: <https://gitee.com/bekencorp/bk_avdk_smp.git> (same tag and commit as the official GitHub repository)
+- Tag: `release/v3.1.1.10`
+- Commit: `398cab28b938e69ba2071a597daf00845dd080b6`
 - Target: default LCKFB BK7258 development board configuration
 - Reused facts: AP/CP build layout, configuration baseline, Flash partitions,
   16 MiB PSRAM regions, DVP/audio component selection, and minimal CP entry.
@@ -26,9 +26,9 @@ product and do not define the TiRTC business API.
   `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini`
 - Vendored destination: `third_party/tirtc`
 - Archive SHA-256:
-  `47e26827ca2419084163e3656dca4d6e508e433381784e9c03f232d3dbaa4171`
+  `1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9`
 - Package target: `beken-bk7258`
-- Package build baseline: `BK-AVDK 3.1.1.8-official-1cfd56af`, matching the
+- Package build baseline: `BK-AVDK 3.1.1.10-official-398cab28`, matching the
   product's official public SDK baseline
 
 ## Product behavior

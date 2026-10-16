@@ -129,7 +129,10 @@ static void emit_snapshot(void)
     snprintf(s_snapshot.stack_low_task, sizeof(s_snapshot.stack_low_task), "%s", stack_low_task);
     rtos_unlock_mutex(&s_state_mutex);
     bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE metrics-log-enter\n");
-    BK_LOGI(TAG,
+    /* The shell's common log mode can wait for buffer space. This periodic
+     * task must never hold that path while AP heartbeat scheduling depends on
+     * the same SMP kernel. A full log buffer may drop this sample. */
+    bk_printf_nonblock(BK_LOG_INFO, TAG,
             "METRICS {\"uptime_ms\":%u,\"state\":\"%s\","
             "\"internal\":{\"free\":%u,\"minimum\":%u,"
             "\"largest\":null,\"blocks\":null},"

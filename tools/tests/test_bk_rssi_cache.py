@@ -33,15 +33,25 @@ class TestBkRssiCache(unittest.TestCase):
 #define BK_FAIL -1
 #define BK_ERR_BUSY -2
 #define BK_LOG_NONE 0
-#define TAG "metrics"
+#define BK_LOG_INFO 3
+#define TAG "xiaotai_metrics"
 #define METRICS_INTERVAL_MS 10000U
 #define configMAX_TASK_NAME_LEN 16
 #define LWIP_STATS 0
 #define LINK_STATS 0
+static unsigned blocking_log_calls, nonblocking_metrics_calls;
 static void BK_LOGI(const char *tag, const char *fmt, ...)
 {
     (void)tag;
     (void)fmt;
+    blocking_log_calls++;
+}
+static void bk_printf_nonblock(int level, char *tag, const char *fmt, ...)
+{
+    assert(level == BK_LOG_INFO);
+    assert(strcmp(tag, "xiaotai_metrics") == 0);
+    assert(strncmp(fmt, "METRICS ", 8) == 0);
+    nonblocking_metrics_calls++;
 }
 typedef void *beken_thread_t;
 typedef void *beken_mutex_t;
@@ -97,6 +107,8 @@ int main(void)
     assert(s_thread != NULL);
     assert(wifi_rpc_calls == 0);
     assert(xiaotai_metrics_cached_rssi() == -128);
+    assert(blocking_log_calls == 0);
+    assert(nonblocking_metrics_calls == 1);
     return 0;
 }
 ''')

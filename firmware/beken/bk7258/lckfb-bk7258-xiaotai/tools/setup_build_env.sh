@@ -5,10 +5,10 @@ project_dir=$(cd "$(dirname "$0")/.." && pwd)
 source "$project_dir/tools/repository.sh"
 workspace_dir=$(xiaotai_find_repository_root "$project_dir")
 tools_dir="$workspace_dir/.tools"
-sdk="$tools_dir/bk_avdk_smp-release-v3.1.1.8"
+sdk="$tools_dir/bk_avdk_smp-release-v3.1.1.10"
 sdk_url='https://gitee.com/bekencorp/bk_avdk_smp.git'
-sdk_tag='release/v3.1.1.8'
-sdk_commit='1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7'
+sdk_tag='release/v3.1.1.10'
+sdk_commit='398cab28b938e69ba2071a597daf00845dd080b6'
 archive="$tools_dir/downloads/gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2"
 toolchain="$tools_dir/gcc-arm-none-eabi-10.3-2021.10"
 python_env="$tools_dir/bk-python"
@@ -16,7 +16,7 @@ toolchain_url='https://dl.bekencorp.com/d/tools/toolchain/arm/gcc-arm-none-eabi-
 toolchain_sha256='97dbb4f019ad1650b732faffcc881689cedc14e2b7ee863d390e0a41ef16c9a3'
 
 mkdir -p "$tools_dir/downloads"
-if [ ! -d "$sdk/.git" ]; then
+if [ ! -e "$sdk/.git" ]; then
     git clone --depth 1 --branch "$sdk_tag" "$sdk_url" "$sdk"
 fi
 actual_sdk_commit=$(git -C "$sdk" rev-parse HEAD)
