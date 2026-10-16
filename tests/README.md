@@ -32,6 +32,12 @@ bash tools/check.sh
 
 ## 测试驱动开发约定
 
+2026-10-17 ESP32 双附件交付：`test_esp_merged_firmware.py` 从分文件 ZIP 调用
+公开合并入口，覆盖 S3/P4 不同引导地址、P4 OTA 数据、原始 ZIP 不变、两附件校验清单、
+损坏输入、区域重叠、错误合并结果与工具失败。先在缺少合并入口时失败，实现后通过，
+已注册 `tools/check.sh`。主机测试使用外部 esptool 进程替身；真实发布包还须使用
+ESP-IDF 环境中的 esptool 合并并逐段校验，同版网页烧录和启动由实板验收确认。
+
 三板发布身份：`test_firmware_versions.py` 从构建入口验证编号分配、失败重试、
 dry-run 不修改编号、并行构建互斥及原生 CMake 嵌入和依赖重配置。
 `test_esp_package_identity.py` 验证实际 BIN 描述符、ELF 与构建号一致，拒绝旧包。

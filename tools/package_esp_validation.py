@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from esp_image_identity import validate_application
+from merge_esp_firmware import merge_package
 
 VERIFICATION_STATUSES = (
     "BUILD_VERIFIED_HIL_PENDING",
@@ -96,8 +97,9 @@ def package_board(
             flasher["flash_files"].items(), key=lambda item: int(item[0], 16)
         )
     ]
-    flash_command = "esptool.py --chip {chip} write_flash {files}".format(
+    flash_command = "esptool.py --chip {chip} write_flash {settings} {files}".format(
         chip=flasher["extra_esptool_args"]["chip"],
+        settings=" ".join(flasher.get('write_flash_args', [])),
         files=" ".join(f"{item['offset']} {item['file']}" for item in flash_files),
     )
 
@@ -143,6 +145,12 @@ def package_board(
             "Build source commit: not recorded by the native ESP-IDF image.\n\n"
             "Run from this extracted directory:\n"
             f"  {flash_command}\n\n"
+            "Web flashing: use every BIN at its MANIFEST.json flash_files offset.\n"
+            "An application BIN alone is not a full image. Do not write it at 0x0.\n"
+            f"The sibling {board_id}-{version}-merged.bin is a single-file alternative,\n"
+            "flashed at 0x0. It overwrites gaps, including NVS (Wi-Fi/binding data).\n"
+            "Use split files without whole-chip erase to leave unwritten data regions intact;\n"
+            "configuration compatibility still depends on the firmware and partition layout.\n\n"
             "The ELF is included for crash-address symbolization.\n",
         )
     return zip_path
@@ -166,9 +174,10 @@ def main() -> int:
                       verification_status=args.verification_status)
         for project in args.projects
     ]
-    sums = "".join(f"{sha256(path)}  {path.name}\n" for path in archives)
+    artifacts = [artifact for package in archives for artifact in (package, merge_package(package))]
+    sums = "".join(f"{sha256(path)}  {path.name}\n" for path in artifacts)
     (output_dir / "SHA256SUMS").write_text(sums, encoding="utf-8")
-    for path in archives:
+    for path in artifacts:
         print(path)
     return 0
 

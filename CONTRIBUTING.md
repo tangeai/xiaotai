@@ -26,7 +26,7 @@ GitHub 发布统一遵守[固件版本与发布](#固件版本与发布)。
 | 代理操作、何时读取详细规则 | 根目录 `AGENTS.md`；板级 `AGENTS.md` 只补板级要求 | 代理执行；文档与测试入口检查 |
 | 产品、平台、板卡、驱动及固件工程的目录边界 | [架构](ARCHITECTURE.md#目录导览) | `test_repository_layout.py` |
 | 对外型号、永久板卡 ID、工程目录和目标芯片 | `boards/<vendor>/<board>/board.json` | `tools/build.py --validate`、`test_board_registry.py` |
-| 开发流程、版本、发布名称和交付检查 | 本文 | `test_firmware_versions.py`、`test_boot_identity.py`、`test_validation_packaging.py`；GitHub 标题须发布前后核对 |
+| 开发流程、版本、发布名称和交付检查 | 本文 | `test_firmware_versions.py`、`test_boot_identity.py`、`test_validation_packaging.py`、`test_esp_merged_firmware.py`；GitHub 标题须发布前后核对 |
 | SDK、编译器、ABI、原生产物与烧录布局 | 目标板卡指南、原生构建脚本及依赖清单 | 原生构建及板级契约检查 |
 | 产品状态、交互、房间刷新和媒体参数 | [产品需求](docs/product/PRODUCT_REQUIREMENTS.md)、[交互规范](docs/product/PRODUCT_INTERACTION_PROFILES.md)、[媒体合同](docs/product/MEDIA_CONTRACT.md) | 产品公共接口和平台回归测试 |
 | 测试层次、覆盖率和实板证据 | [测试说明](tests/README.md) | `bash tools/check.sh`；目标板卡 HIL |
@@ -182,6 +182,28 @@ S3/P4 首次启用从 1 开始，BK 延续原有计数。构建号从本次产�
 正式发布后的修改使用新产品版本和新 Release，保留旧标签及附件，由维护者手动清理。
 历史 1.0.0 下载名保持原样。发布操作不隐含授权 git push；遵守用户明确的推送限制。
 
+### ESP32 分文件与完整镜像
+
+ESP32-S3、ESP32-P4 采用下表的附件规则；BK 保持现有打包方式。
+这是本项目的文件命名约定；镜像格式和合并流程使用乐鑫 esptool。
+
+| 附件 | 内容与用途 |
+|---|---|
+| `<board-id>-<产品版本>+build.<构建号>-validation.zip` | 分文件包：原生 BIN、烧录清单、说明和 ELF；按清单分别烧录 |
+| `<board-id>-<产品版本>+build.<构建号>-merged.bin` | 完整镜像：与 ZIP 并列，直接下载，从 `0x0` 烧录；不再套 ZIP，也不重复放入分文件 ZIP |
+| `SHA256SUMS` | 同时列出上述 ZIP 和完整 BIN 的 SHA-256 |
+
+完整 BIN 必须由同一份已校验 ZIP 中的 `flasher_args.json` 和原始镜像经
+`esptool merge_bin` 生成，不重新编译、不增加 build 编号。按实际清单包含所有烧录
+文件：不能硬编码 S3 的布局用于 P4，不能漏掉 P4 的 OTA 初始化数据。
+合并后必须逐段核对原始字节、地址、总长度和 `0xFF` 填充区域；发布工具使用
+`--merged` 再校验，禁止同名不同内容覆盖。
+
+完整 BIN 用于首次烧录，会写入镜像间的空隙，包括当前两板的 NVS 区；下载入口和
+发布说明必须明确提示 Wi-Fi、绑定等持久配置会被覆盖。保留配置的升级使用分文件包，
+不做全片擦除，且需核对分区布局与配置兼容性。生成和校验成功不代表网页烧录或实板
+启动已验收，必须另行记录同版硬件验证。
+
 ### 编译与打包
 
 跨平台构建只使用 `tools/build.py`。一次原生编译选择一块板和一个变体；
@@ -202,6 +224,18 @@ BK7258 打包命令必须再加 `--beken-build-profile release`，否则工具�
 产物。ESP-IDF 使用原生 `build/`；BK 开发目录为 `build/bk7258/<project>/`，
 发布目录为 `build/bk7258/<project>_release/`，烧录文件在相应 `package/` 下。
 默认打包保留在这些原生目录；`--output` 只用于显式导出副本。
+
+ESP32 打包需先激活该工程的 ESP-IDF Python 环境以提供 esptool；统一打包入口会
+同时输出 ZIP、完整 BIN 和包含两者的校验文件。只给已有 ZIP 补充完整镜像时执行：
+
+```bash
+python3 tools/merge_esp_firmware.py --package <已有验证包路径> --output <导出目录>
+python3 tools/release_firmware.py --package <导出目录中的ZIP> --merged <导出目录中的完整BIN>
+```
+
+此操作保留已有 ZIP 的原始字节。新增完整 BIN 到已有 Release 时保留原标签、标题、
+ZIP 和版本号，补充附件用途说明，并更新 `SHA256SUMS` 覆盖两者；仅改变交付格式
+不等于新固件版本。上传仍需符合用户授权，不执行自动 git push。
 
 ### 发布完成条件
 

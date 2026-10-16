@@ -12,6 +12,7 @@ import sys
 import zipfile
 
 from firmware_version import FirmwareVersion
+from merge_esp_firmware import verify_merged
 
 BOARDS = {
     'lckfb-bk7258': ('BK7258', 'bk7258'),
@@ -20,7 +21,7 @@ BOARDS = {
 }
 
 
-def release_plan(package: Path) -> dict:
+def release_plan(package: Path, merged: Path | None = None) -> dict:
     with zipfile.ZipFile(package) as archive:
         if len(archive.namelist()) != len(set(archive.namelist())):
             raise ValueError('duplicate archive entries')
@@ -49,7 +50,7 @@ def release_plan(package: Path) -> dict:
         if not any(r['path'] == application['path'] and
                    r['sha256'] == application['sha256'] for r in records):
             raise ValueError('application missing from verified files')
-    return {
+    plan = {
         'board_id': board, 'product_version': product, 'build_number': number,
         'firmware_version': version, 'tag': f'{prefix}-v{product}',
         'title': f'{label} v{product} · build.{number}',
@@ -58,14 +59,18 @@ def release_plan(package: Path) -> dict:
         'application': application,
         'verification_status': manifest['verification_status'],
     }
+    if merged is not None:
+        plan['merged'] = verify_merged(package, merged)
+    return plan
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--package', required=True, type=Path)
+    parser.add_argument('--merged', type=Path, help='verify a sibling ESP merged BIN against the ZIP')
     args = parser.parse_args()
     try:
-        print(json.dumps(release_plan(args.package), ensure_ascii=False, indent=2))
+        print(json.dumps(release_plan(args.package, args.merged), ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError, KeyError, zipfile.BadZipFile) as exc:
         print(f'release validation failed: {exc}', file=sys.stderr)

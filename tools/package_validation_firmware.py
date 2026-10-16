@@ -13,6 +13,7 @@ from pathlib import Path
 
 from board_registry import Board, find_board, load_boards
 from firmware_version import FirmwareVersion
+from merge_esp_firmware import merge_package
 from package_esp_validation import (add_file, git_output, package_board, sha256,
                                     VERIFICATION_STATUSES, verification_readme_status)
 
@@ -189,10 +190,9 @@ def main() -> int:
             output_dir = board.project_path(root) / 'build'
         output_dir.mkdir(parents=True, exist_ok=True)
         if board.data["platform"] == "esp-idf":
-            archives.append(
-                package_board(root, board.project_path(root), output_dir, board.id,
-                              verification_status=args.verification_status)
-            )
+            package = package_board(root, board.project_path(root), output_dir, board.id,
+                                    verification_status=args.verification_status)
+            archives.extend((package, merge_package(package)))
         elif board.data["platform"] == "beken":
             archives.append(
                 package_beken(

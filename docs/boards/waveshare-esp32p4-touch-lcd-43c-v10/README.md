@@ -32,6 +32,10 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 
 ### 直接烧录发布包
 
+发布页如提供 `-merged.bin` 完整镜像，首次烧录只需选择该文件并填写地址 `0x0`。
+完整镜像会覆盖 NVS 中的 Wi-Fi、绑定等持久配置；保留配置的升级使用下面的分文件包，
+并核对分区布局与配置兼容性。两种附件及校验规则见[发布规范](../../../CONTRIBUTING.md#esp32-分文件与完整镜像)。
+
 从 [P4 v1.0.1 · build.2 固件发布页](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1)
 下载名称以 `waveshare-esp32p4-touch-lcd-43c-v10-` 开头的压缩包。本次发布包已通过构建
 和主机检查，同版实板验收仍待完成；下文旧版设备互呼日志仅作历史证据，具体范围见发布说明。解压后先核对 `MANIFEST.json`

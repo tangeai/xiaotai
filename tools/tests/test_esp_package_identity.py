@@ -93,11 +93,16 @@ class EspPackageIdentity(unittest.TestCase):
     def test_unified_cli_forwards_verification_status(self):
         board=Board(self.root/'board.json',{'id':'demo-board',
             'project_dir':'demo','platform':'esp-idf'})
+        # This fixture isolates application identity/status forwarding. Full flash
+        # inputs and merged delivery are exercised by test_esp_merged_firmware.py.
+        merged = self.output/'demo-board-1.0.0-merged.bin'
+        merged.write_bytes(b'merged fixture')
         with patch.object(sys,'argv',['package_validation_firmware.py',
                 '--board','demo-board','--output',str(self.output),
                 '--verification-status','HIL_VERIFIED']), \
              patch.object(unified,'load_boards',return_value=[board]), \
              patch.object(unified,'__file__',str(self.root/'tools/package_validation_firmware.py')), \
+             patch.object(unified,'merge_package',return_value=merged), \
              patch('package_esp_validation.git_output',return_value='packaging-head'):
             self.assertEqual(unified.main(),0)
         with zipfile.ZipFile(self.output/'demo-board-1.0.0-validation.zip') as z:
