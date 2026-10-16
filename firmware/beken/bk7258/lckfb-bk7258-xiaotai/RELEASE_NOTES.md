@@ -4,6 +4,23 @@
 `lckfb-bk7258`，default 变体（touch-full / compact）。本次替换同名
 `bk7258-v1.0.0` 发布，产品版本保持 `1.0.0`，具体固件由构建号和 SHA-256 区分。
 
+## 本次构建
+
+- 完整版本：`1.0.0+build.51`；构建配置：`release`。
+- 固件构建源码：`edb7df81be2e7b1589ee8ce0582611ae5180566c`。发布提交在其基础上
+  仅记录递增后的 `BUILD_NUMBER` 和本次产物说明；包内 `build_identity.json`
+  保留实际编译源码提交，`MANIFEST.json` 记录打包时的发布提交。
+- 原生完整烧录产物：
+  `firmware/beken/bk7258/lckfb-bk7258-xiaotai/build/bk7258/lckfb-bk7258-xiaotai_release/package/all-app.bin`。
+- 完整烧录镜像 SHA-256：
+  `311ed4e3789186bcd884eb6d385c44126ac9ce3a1440080893c71e9827e9f42f`。
+- OTA 镜像 SHA-256：
+  `d39c0dbc1df9264c638d89fdbb40a8bf106a54c63cbd997859b950f1368ac17c`。
+- 正式 AP ELF 已核验 `s_pending_close_state` 位于 `.spinlock`，地址
+  `0x28003030`；AP/CP 原生构建及工程契约通过。
+- `bash tools/check.sh`、`python3 tools/build.py --validate`、
+  `python3 -m unittest discover -s tools/tests -v` 通过（318 项工具测试）。
+
 ## 新增
 
 - 增加单调递增的构建号，启动日志、平台固件版本上报、烧录文件名和包内身份
