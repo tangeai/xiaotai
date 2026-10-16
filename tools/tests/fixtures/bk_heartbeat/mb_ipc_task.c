@@ -1,3 +1,6 @@
+
+#if defined(SLAVE_HB_TASK)
+
 static void mb_ipc_task( void *para )
 {
 	u32 seq = 0;
@@ -18,3 +21,6 @@ static void mb_ipc_task( void *para )
 			seq, send_rc, (u32)rtos_get_time());
 	}
 }
+
+#endif
+
