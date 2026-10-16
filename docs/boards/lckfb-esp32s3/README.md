@@ -30,9 +30,11 @@ Flash 是闪存，PSRAM 是用于音视频缓冲的大块运行内存。
 
 ### 直接烧录发布包
 
-下载 [v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.0/lckfb-esp32s3-1.0.0-validation.zip)，
-版本内容见 [Release 说明](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.0)。解压后先核对 `MANIFEST.json`（发布包清单）中的板卡 ID、
+下载 [v1.0.1 · build.2 固件包](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.2-validation.zip)，
+版本内容见 [Release 说明](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.1)。解压后先核对 `MANIFEST.json`（发布包清单）中的板卡 ID、
 SHA-256 和 `flash_files`，再按包内 `README.txt` 的命令烧录。
+
+本次发布包已通过构建和主机检查，同版实板验收仍待完成，具体范围见 Release 说明。
 
 也可以使用[乐鑫官方 ESP Web Tool](https://espressif.github.io/esptool-js/)。在 Chrome 或
 Edge 中连接本板串口，按 `flash_files` 逐项添加文件和地址后执行 `Program`。该工具不会

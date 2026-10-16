@@ -29,9 +29,12 @@ BK7258 采用 AP/CP（应用处理器/协处理器）双镜像架构，不能按
 
 ### 获取固件
 
-从 [GitHub Releases](https://github.com/tangeai/xiaotai/releases) 下载名称以
-`lckfb-bk7258-` 开头的压缩包，解压并核对 `MANIFEST.json` 后，使用其中的
-`all-app.bin`。自行编译时，使用本页“编译”一节列出的 `all-app.bin` 产物。
+从 [BK7258 v1.0.1 · build.56 发布页](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.1)
+下载名称以 `lckfb-bk7258-` 开头的压缩包，解压并核对 `MANIFEST.json` 后，使用其中以
+`-all-app.bin` 结尾的文件。自行编译时，使用本页“编译”一节列出的 `all-app.bin` 产物。
+下文的 `all-app.bin` 和 `app_pack.rbl` 在发布包中均带板卡、版本和构建号前缀。
+
+本次发布包已通过构建和主机检查，同版音质和完整实板验收仍待完成，具体范围见发布说明。
 
 ### 选择烧录工具
 
