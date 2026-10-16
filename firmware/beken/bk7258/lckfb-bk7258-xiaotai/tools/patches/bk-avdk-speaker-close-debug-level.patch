@@ -1,0 +1,26 @@
+--- a/ap/components/audio_play/src/onboard_speaker_play.c
++++ b/ap/components/audio_play/src/onboard_speaker_play.c
+@@ -222,9 +222,9 @@
+ 
+     if (spk_data_read_handle->can_process)
+     {
+-        LOGI("[DEBUG-bk-spk-close] task-process-sem-delete-begin\n");
++        LOGD("[DEBUG-bk-spk-close] task-process-sem-delete-begin\n");
+         rtos_deinit_semaphore(&spk_data_read_handle->can_process);
+-        LOGI("[DEBUG-bk-spk-close] task-process-sem-delete-returned\n");
++        LOGD("[DEBUG-bk-spk-close] task-process-sem-delete-returned\n");
+         spk_data_read_handle->can_process = NULL;
+     }
+ 
+@@ -369,9 +369,9 @@
+ 
+     if (spk_data_read_handle->read_buff)
+     {
+-        LOGI("[DEBUG-bk-spk-close] close-buffer-free-begin\n");
++        LOGD("[DEBUG-bk-spk-close] close-buffer-free-begin\n");
+         os_free(spk_data_read_handle->read_buff);
+-        LOGI("[DEBUG-bk-spk-close] close-buffer-free-returned\n");
++        LOGD("[DEBUG-bk-spk-close] close-buffer-free-returned\n");
+     }
+ 
+     LOGD("deinit spk data read complete\n");

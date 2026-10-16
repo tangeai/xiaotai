@@ -41,6 +41,7 @@ class BKCloseReconnect(unittest.TestCase):
 #define VOIP_AUDIO_ID 0
 #define BEKEN_WAIT_FOREVER 0xffffffffU
 #define BK_LOGI(...) ((void)0)
+#define BK_LOGD(...) ((void)0)
 #define BK_LOGW(...) ((void)0)
 #define BK_LOGE(...) ((void)0)
 #define os_free free

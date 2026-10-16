@@ -20,6 +20,7 @@ class BKDisconnectPlayback(unittest.TestCase):
 #include <stddef.h>
 #include <stdatomic.h>
 #define BK_LOGI(...) ((void)0)
+#define BK_LOGD(...) ((void)0)
 #define CONNECTION_STREAM 1
 #define CONNECTION_AI 2
 #define CONNECTION_ROOM 5

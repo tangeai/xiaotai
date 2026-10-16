@@ -32,6 +32,8 @@ sdk_patches=(
     "$project_dir/tools/patches/bk-avdk-speaker-close-diagnostics.patch"
     "$project_dir/tools/patches/bk-avdk-heartbeat-8s.patch"
     "$project_dir/tools/patches/bk-avdk-heartbeat-owner-diagnostics.patch"
+    "$project_dir/tools/patches/bk-avdk-heartbeat-debug-level.patch"
+    "$project_dir/tools/patches/bk-avdk-speaker-close-debug-level.patch"
     "$project_dir/tools/patches/bk-avdk-ipc-worker-sram.patch"
     "$project_dir/tools/patches/bk-avdk-rtos-assert-caller-diagnostics.patch"
 )
@@ -115,6 +117,15 @@ if ! grep -Fq 'CONFIG_PSA_MBEDTLS=y' "$ap_config"; then
     echo "TiRTC requires the BK SDK psa_mbedtls component" >&2
     exit 1
 fi
+
+# Normalize overlapping follow-up diagnostics before validating the base patches.
+# This keeps a second build as reproducible as the first patched SDK build.
+for followup in bk-avdk-speaker-close-debug-level.patch bk-avdk-heartbeat-debug-level.patch; do
+    patch_path="$project_dir/tools/patches/$followup"
+    if git -C "$sdk_dir" apply --reverse --check --ignore-whitespace "$patch_path" 2>/dev/null; then
+        git -C "$sdk_dir" apply --reverse --ignore-whitespace "$patch_path"
+    fi
+done
 
 for sdk_patch in "${sdk_patches[@]}"; do
     # The pinned SDK contains sources whose whitespace can differ after CRLF

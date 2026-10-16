@@ -81,9 +81,9 @@ int main(void){
 ''' + constants + r'''
 static atomic_bool s_running=true,s_play_run=true,s_playback_in_progress;
 static atomic_uint s_last_downlink_ms,s_opus_received_frames,s_last_opus_rx_ms,
-    s_downlink_frames,s_playback_pcm_ms,s_playback_tail_ms;
+    s_downlink_frames,s_playback_pcm_ms,s_playback_tail_ms,s_admission_busy;
 static char log_text[512];
-static bool s_ring_mutex_ready=true,locked;
+static bool s_ring_mutex_ready=true,locked,release_on_wait,stop_on_wait;
 static int s_ring_mutex,s_codec=1;
 static uint8_t storage[OPUS_PACKET_SLOTS*OPUS_MAX_PACKET_BYTES],*s_opus_ring=storage;
 static uint16_t s_opus_lengths[OPUS_PACKET_SLOTS];
@@ -91,11 +91,15 @@ static size_t s_opus_head,s_opus_count,s_opus_queue_peak;
 static uint32_t s_dropped_bytes;
 static uint32_t rtos_get_time(void){return 1000;}
 static int rtos_trylock_mutex(int *m){if(locked)return BK_ERR_BUSY;locked=true;return BK_OK;}
+static int rtos_lock_mutex_timeout(int *m,unsigned ticks){
+    assert(ticks==1);if(stop_on_wait)s_running=false;if(release_on_wait){locked=false;release_on_wait=false;}
+    return rtos_trylock_mutex(m);
+}
 static void rtos_unlock_mutex(int *m){assert(locked);locked=false;}
 ''' + function(source, 'xiaotai_audio_play_opus') + function(source, 'opus_ring_take')
               + function(source, 'xiaotai_audio_log_playback_status') + r'''
 int main(void){
-    (void)s_opus_received_frames;(void)s_opus_queue_peak;
+    (void)s_opus_received_frames;(void)s_opus_queue_peak;(void)s_admission_busy;
 ''' + scenario + r'''
 }
 ''')
@@ -120,6 +124,29 @@ int main(void){
     locked=true;assert(xiaotai_audio_play_opus(storage,1)==BK_ERR_BUSY);locked=false;
     s_running=false;assert(xiaotai_audio_play_opus(storage,1)==BK_ERR_NOT_INIT);
     assert(xiaotai_audio_play_opus(NULL,1)==BK_ERR_PARAM);
+''')
+
+    def test_transient_contention_does_not_discard_audio(self):
+        self.replay(r'''
+    uint8_t packet=42,output=0;
+    locked=true;release_on_wait=true;
+    assert(xiaotai_audio_play_opus(&packet,1)==1 &&
+           "a short queue/AEC lock handoff must not discard a received packet");
+    assert(opus_ring_take(&output,1)==1 && output==42);
+    locked=true;
+    assert(xiaotai_audio_play_opus(&packet,1)==BK_ERR_BUSY);
+    locked=false;
+    assert(s_admission_busy==1);
+    xiaotai_audio_log_playback_status("drained");
+    assert(strstr(log_text,"busy=1"));
+''')
+
+    def test_stop_during_lock_handoff_rejects_without_queueing(self):
+        self.replay(r'''
+    uint8_t packet=42;
+    locked=true;release_on_wait=true;stop_on_wait=true;
+    assert(xiaotai_audio_play_opus(&packet,1)==BK_ERR_NOT_INIT);
+    assert(!locked && s_opus_count==0 && s_admission_busy==0);
 ''')
 
     def test_last_packet_stays_active_while_decoder_owns_it(self):

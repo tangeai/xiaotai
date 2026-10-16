@@ -6,6 +6,25 @@ from test_s3_product_regressions import ROOT, function, run_c
 
 
 class BKTirtcLogCallback(unittest.TestCase):
+    def test_release_sdk_logging_has_explicit_info_ceiling(self):
+        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
+        # Exercise the actual public start boundary's logging preamble.
+        start = function(source, 'xiaotai_tirtc_start')
+        begin = start.index('    TiRtcLogSetCallback(')
+        end = start.index('    if (s_log_level ==', begin)
+        for level in (3, 4):
+            run_c(f'#define CONFIG_LOG_LEVEL {level}\n' + r'''
+#include <assert.h>
+static int s_log_level=-1,applied=-1;
+static void tirtc_sdk_log_callback(void){}
+static void TiRtcLogSetCallback(void (*cb)(void)){assert(cb==tirtc_sdk_log_callback);}
+static void TiRtcLogSetLevel(int level){applied=level;}
+int main(void){
+''' + start[begin:end] + r'''
+(void)s_log_level;assert(applied==(CONFIG_LOG_LEVEL<=3 ? 4:-1));
+}
+''')
+
     def test_sdk_log_callback_uses_nonblocking_console_and_chunks_output(self):
         source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
         run_c(r'''

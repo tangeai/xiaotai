@@ -32,6 +32,19 @@ bash tools/check.sh
 
 ## 测试驱动开发约定
 
+2026-10-16 BK 音频争锁与发布日志：`test_bk_ai_playback.py` 通过实际 Opus
+入队入口复现短暂锁占用直接丢包；现在最多等待一个 SDK tick（本工程 1 ms），
+超时仍返回 BUSY，累计 `busy` 单独记录，不再用 overflow=0 推断无丢包。
+`test_bk_release_traces.py` 回放实际心跳任务与 metrics 入口，验证 INFO 保留
+心跳发送和指标样本、关闭原始调试打印，DEBUG 保留取证。均注册 `tools/check.sh`。
+这不证明实板音质改善或排除 DAC 削波；需要同版连续播放、双讲和结束尾音听音验收。
+
+2026-10-16 BK 彩色点阵嘴：`test_bk_ai_face_animation.py` 通过生产公开
+`xiaotai_ui_update_ai_mouth()` 验证与 S3 相同的青、绿、暖黄 RGB565 像素及
+高字节在前的面板格式；旧实现因底行颜色不符失败。保留 66×36 嘴部更新、
+相同输入不刷新、禁用动效不刷新及缓冲区边界检查；沿用 `tools/check.sh` 注册。
+实板仍须确认面板颜色、Tag 优先级及播放时嘴部动效。
+
 2026-10-16 三板尾音复查：P4 `test_p4_ai_playback.py` 与 BK
 `test_bk_ai_playback.py` 在生产公开状态入口注入最后一次写入完成的线程交错，
 旧实现均误判排空，修复后保留 worker 所有权或最新硬件尾部期限。

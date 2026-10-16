@@ -60,6 +60,7 @@ static atomic_bool s_playback_in_progress;
 static atomic_uint s_last_downlink_ms;
 static atomic_uint s_playback_tail_ms;
 static atomic_uint s_opus_received_frames;
+static atomic_uint s_admission_busy;
 static atomic_uint s_playback_pcm_ms;
 static atomic_uint s_playback_columns;
 static atomic_uint s_playback_columns_at_ms;
@@ -909,6 +910,7 @@ int xiaotai_audio_start(xiaotai_audio_codec_t codec,
     s_downlink_frames = 0;
     s_opus_queue_peak = 0U;
     atomic_store(&s_opus_received_frames, 0U);
+    atomic_store(&s_admission_busy, 0U);
     atomic_store(&s_playback_pcm_ms, 0U);
     atomic_store(&s_last_opus_rx_ms, rtos_get_time());
     atomic_store_explicit(&s_playback_in_progress, false,
@@ -994,7 +996,18 @@ int xiaotai_audio_play_alaw(const uint8_t *data, size_t size)
     if (data == NULL || size == 0) return BK_ERR_PARAM;
     if (!s_running || !s_play_run ||
         s_codec != XIAOTAI_AUDIO_CODEC_ALAW_8K) return BK_ERR_NOT_INIT;
-    if (rtos_trylock_mutex(&s_ring_mutex) != BK_OK) return BK_ERR_BUSY;
+    /* The pinned SMP SDK takes ticks here despite the timeout_ms parameter
+     * name. Allow one scheduler tick for a short ring/AEC copy to finish;
+     * never wait indefinitely inside the TiRTC receive callback. */
+    if (rtos_trylock_mutex(&s_ring_mutex) != BK_OK &&
+        rtos_lock_mutex_timeout(&s_ring_mutex, 1U) != BK_OK) {
+        atomic_fetch_add_explicit(&s_admission_busy, 1U, memory_order_relaxed);
+        return BK_ERR_BUSY;
+    }
+    if (!s_running || !s_play_run) {
+        rtos_unlock_mutex(&s_ring_mutex);
+        return BK_ERR_NOT_INIT;
+    }
 
     if (size > AUDIO_RING_BYTES) {
         data += size - AUDIO_RING_BYTES;
@@ -1037,7 +1050,18 @@ int xiaotai_audio_play_opus(const uint8_t *data, size_t size)
     }
     if (!s_running || !s_play_run ||
         s_codec != XIAOTAI_AUDIO_CODEC_OPUS_16K) return BK_ERR_NOT_INIT;
-    if (rtos_trylock_mutex(&s_ring_mutex) != BK_OK) return BK_ERR_BUSY;
+    /* The pinned SMP SDK takes ticks here despite the timeout_ms parameter
+     * name. Allow one scheduler tick for a short ring/AEC copy to finish;
+     * never wait indefinitely inside the TiRTC receive callback. */
+    if (rtos_trylock_mutex(&s_ring_mutex) != BK_OK &&
+        rtos_lock_mutex_timeout(&s_ring_mutex, 1U) != BK_OK) {
+        atomic_fetch_add_explicit(&s_admission_busy, 1U, memory_order_relaxed);
+        return BK_ERR_BUSY;
+    }
+    if (!s_running || !s_play_run) {
+        rtos_unlock_mutex(&s_ring_mutex);
+        return BK_ERR_NOT_INIT;
+    }
     if (s_opus_count == OPUS_PACKET_SLOTS) {
         s_opus_head = (s_opus_head + 1U) % OPUS_PACKET_SLOTS;
         --s_opus_count;
@@ -1104,11 +1128,12 @@ int xiaotai_audio_stop(void)
     rtos_deinit_semaphore(&s_capture_stopped);
     rtos_deinit_semaphore(&s_play_stopped);
     BK_LOGI(TAG,
-            "audio stopped up=%u down=%u dropped=%u aec=%u ref-under=%u ref-over=%u\n",
+            "audio stopped up=%u down=%u dropped=%u aec=%u ref-under=%u ref-over=%u busy=%u\n",
             (unsigned)s_uplink_frames, (unsigned)s_downlink_frames,
             (unsigned)s_dropped_bytes, (unsigned)s_aec_processed_frames,
             (unsigned)s_aec_reference_underruns,
-            (unsigned)s_aec_reference_overruns);
+            (unsigned)s_aec_reference_overruns,
+            (unsigned)atomic_load(&s_admission_busy));
     return BK_OK;
 }
 
@@ -1150,7 +1175,7 @@ void xiaotai_audio_log_playback_status(const char *stage)
     uint32_t now_ms = rtos_get_time();
     int32_t tail_ms = (int32_t)(atomic_load(&s_playback_tail_ms) - now_ms);
     BK_LOGI(TAG,
-            "AI playback stage=%s rx=%u written=%u overflow=%u pending=%u peak=%u slots=%u active=%d pcm-ms=%u tail-ms=%u last-rx-age-ms=%u\n",
+            "AI playback stage=%s rx=%u written=%u overflow=%u pending=%u peak=%u slots=%u active=%d pcm-ms=%u tail-ms=%u last-rx-age-ms=%u busy=%u\n",
             stage, (unsigned)atomic_load(&s_opus_received_frames),
             (unsigned)atomic_load(&s_downlink_frames),
             (unsigned)dropped, (unsigned)queued, (unsigned)peak,
@@ -1158,7 +1183,8 @@ void xiaotai_audio_log_playback_status(const char *stage)
             atomic_load(&s_playback_in_progress) ? 1 : 0,
             (unsigned)atomic_load(&s_playback_pcm_ms),
             (unsigned)(tail_ms > 0 ? tail_ms : 0),
-            (unsigned)(now_ms - atomic_load(&s_last_opus_rx_ms)));
+            (unsigned)(now_ms - atomic_load(&s_last_opus_rx_ms)),
+            (unsigned)atomic_load(&s_admission_busy));
 }
 
 uint32_t xiaotai_audio_playback_columns(void)

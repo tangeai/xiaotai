@@ -202,6 +202,10 @@ int main(void){
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdbool.h>
+#define BK_OK 0
+#define AI_MOUTH_X 127U
+#define AI_MOUTH_Y 116U
 #define AI_MOUTH_W 66U
 #define AI_MOUTH_H 36U
 static uint8_t storage[AI_MOUTH_W * AI_MOUTH_H * 2U + 2U];
@@ -212,17 +216,36 @@ static frame_buffer_t *s_ai_mouth_frame;
 static frame_buffer_t *frame_buffer_display_malloc(size_t bytes){
     assert(bytes==AI_MOUTH_W*AI_MOUTH_H*2U);return &frame;
 }
-''' + function(source, 'ai_mouth_pixels') + r'''
+static bool s_ai_mouth_mutex_ready=true,s_ai_mouth_enabled=true,locked;
+static int s_ai_mouth_mutex;
+static uint32_t s_ai_mouth_generation=1,s_ai_mouth_columns=~0U;
+static unsigned flushes;
+static void rtos_lock_mutex(int *m){assert(!locked);locked=true;}
+static void rtos_unlock_mutex(int *m){assert(locked);locked=false;}
+static unsigned xiaotai_board_display_generation(void){return 1;}
+static int xiaotai_board_display_flush_region(unsigned x,unsigned y,unsigned w,
+    unsigned h,const uint8_t *pixels,unsigned generation){
+    assert(locked && x==127 && y==116 && w==66 && h==36);
+    assert(pixels==storage && generation==1);flushes++;return BK_OK;
+}
+''' + function(source, 'ai_mouth_pixels') + function(source, 'xiaotai_ui_update_ai_mouth') + r'''
 int main(void){
     storage[sizeof(storage)-2]=0xa5;storage[sizeof(storage)-1]=0x5a;
-    ai_mouth_pixels(0,0x07e0);
+    xiaotai_ui_update_ai_mouth(0);
     assert(s_ai_mouth_pixels==storage);
-    assert(storage[((32*AI_MOUTH_W)+6)*2]==0x07);
-    assert(storage[((32*AI_MOUTH_W)+6)*2+1]==0xe0);
+    assert(storage[((32*AI_MOUTH_W)+6)*2]==0x55);
+    assert(storage[((32*AI_MOUTH_W)+6)*2+1]==0xd8);
     assert(storage[((27*AI_MOUTH_W)+6)*2]==0);
-    ai_mouth_pixels(7,0x07e0);
-    assert(storage[((2*AI_MOUTH_W)+6)*2]==0x07);
+    xiaotai_ui_update_ai_mouth(7);
+    const uint16_t expected[]={0x55d8,0x55d8,0x55d8,0x7633,0x7633,0xddad,0xddad};
+    for(unsigned row=0;row<7;row++){
+        unsigned offset=((32-row*5)*AI_MOUTH_W+6)*2;
+        assert(((unsigned)storage[offset]<<8 | storage[offset+1])==expected[row]);
+    }
     assert(storage[((27*AI_MOUTH_W)+15)*2]==0);
+    assert(flushes==2);
+    xiaotai_ui_update_ai_mouth(7);assert(flushes==2);
+    s_ai_mouth_enabled=false;xiaotai_ui_update_ai_mouth(0);assert(flushes==2);
     assert(storage[sizeof(storage)-2]==0xa5 && storage[sizeof(storage)-1]==0x5a);
 }
 ''')

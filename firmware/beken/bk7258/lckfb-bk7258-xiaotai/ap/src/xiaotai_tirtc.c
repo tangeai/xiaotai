@@ -726,16 +726,16 @@ static void media_worker(beken_thread_arg_t argument)
         if (event.type == MEDIA_EVENT_CLOSED) {
             /* Temporary close-path probes: remove after the SMP stall has
              * been reproduced with an identified failing boundary. */
-            BK_LOGI(TAG, "[DEBUG-bk-close] worker-received mode=%d generation=%u\n",
+            BK_LOGD(TAG, "[DEBUG-bk-close] worker-received mode=%d generation=%u\n",
                     (int)event.mode, (unsigned)event.generation);
             (void)xiaotai_video_stop();
-            BK_LOGI(TAG, "[DEBUG-bk-close] worker-video-stopped\n");
+            BK_LOGD(TAG, "[DEBUG-bk-close] worker-video-stopped\n");
             if (event.mode == CONNECTION_AI && xiaotai_audio_running()) {
                 xiaotai_audio_set_uplink_enabled(false);
                 drain_ai_playback_after_transport_close();
             }
             (void)xiaotai_audio_stop();
-            BK_LOGI(TAG, "[DEBUG-bk-close] worker-audio-stopped\n");
+            BK_LOGD(TAG, "[DEBUG-bk-close] worker-audio-stopped\n");
             if (event.mode == CONNECTION_ROOM || event.mode == CONNECTION_STREAM) {
                 xiaotai_audio_set_uplink_enabled(true);
             }
@@ -770,7 +770,7 @@ static void media_worker(beken_thread_arg_t argument)
                 s_handlers.on_room_disconnected(event.generation, event.error,
                                                 s_handlers.context);
             }
-            BK_LOGI(TAG, "[DEBUG-bk-close] worker-handler-returned\n");
+            BK_LOGD(TAG, "[DEBUG-bk-close] worker-handler-returned\n");
             BK_LOGI(TAG, "connection closed mode=%d generation=%u error=%d\n",
                     event.mode, (unsigned)event.generation, event.error);
         }
@@ -1240,6 +1240,12 @@ int xiaotai_tirtc_start(const xiaotai_tirtc_config_t *config)
 
     s_state = XIAOTAI_TIRTC_STARTING;
     TiRtcLogSetCallback(tirtc_sdk_log_callback);
+#if CONFIG_LOG_LEVEL <= 3
+    /* TiRTC uses 4 for INFO; Beken uses 3. Never inherit verbose SDK defaults
+     * in a release, or enable the >10 WebRTC transport diagnostic levels. */
+    s_log_level = 4;
+    TiRtcLogSetLevel(s_log_level);
+#endif
     if (s_log_level == XIAOTAI_TIRTC_LOG_LEVEL_SDK_DEFAULT) {
         BK_LOGI(TAG, "TiRTC SDK serial callback installed log level=SDK default\n");
     } else {
@@ -1265,9 +1271,13 @@ int xiaotai_tirtc_start(const xiaotai_tirtc_config_t *config)
         rc = TiRtcSetOption(TIRTC_OPT_MAX_SEND_BUFFER, &bytes, sizeof(bytes));
         if (rc != 0) goto fail;
     }
+#if CONFIG_LOG_LEVEL > 3
     bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE tirtc-init-enter\n");
+#endif
     rc = TiRtcInit();
+#if CONFIG_LOG_LEVEL > 3
     bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE tirtc-init-exit rc=%d\n", rc);
+#endif
     if (rc != 0) goto fail;
     s_initialized = true;
     BK_LOGI(TAG, "TiRTC initialization completed\n");
@@ -1298,9 +1308,13 @@ int xiaotai_tirtc_start(const xiaotai_tirtc_config_t *config)
     if (rc == 0) rc = set_poll_timeout_option(config->poll_timeout_ms);
     if (rc == 0) {
         BK_LOGI(TAG, "TiRTC options configured; submitting SDK start\n");
+#if CONFIG_LOG_LEVEL > 3
         bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE tirtc-start-enter\n");
+#endif
         rc = TiRtcStart(config->device_id, &s_callbacks);
+#if CONFIG_LOG_LEVEL > 3
         bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE tirtc-start-exit rc=%d\n", rc);
+#endif
     }
     if (rc == 0) {
         BK_LOGI(TAG, "TiRTC SDK start submitted\n");

@@ -37,9 +37,8 @@ static bool s_ai_mouth_mutex_ready;
 static bool s_ai_mouth_enabled;
 static uint32_t s_ai_mouth_generation;
 static uint32_t s_ai_mouth_columns;
-static uint16_t s_ai_mouth_accent;
 
-static void ai_mouth_pixels(uint32_t columns, uint16_t color)
+static void ai_mouth_pixels(uint32_t columns)
 {
     if (s_ai_mouth_pixels == NULL) {
         s_ai_mouth_frame = frame_buffer_display_malloc(
@@ -54,6 +53,9 @@ static void ai_mouth_pixels(uint32_t columns, uint16_t color)
         if (height > 7U) height = 7U;
         if (height == 0U) height = 1U;
         for (unsigned row = 0U; row < height; ++row) {
+            /* S3's #55B8C4 / #72C79B / #D8B66A in RGB565. Keep the
+             * panel's existing high-byte-first storage and fixed row colors. */
+            uint16_t color = row < 3U ? 0x55d8 : row < 5U ? 0x7633 : 0xddad;
             unsigned cx = 6U + column * 9U;
             unsigned cy = 32U - row * 5U;
             for (unsigned dy = 0U; dy < 4U; ++dy) {
@@ -401,7 +403,7 @@ static void ai_face(frame_buffer_t *frame, xiaotai_ai_ui_phase_t phase,
     if (dots) {
         rectangle(frame, 108, 89, 36, 5, accent);
         rectangle(frame, 176, 89, 36, 5, accent);
-        ai_mouth_pixels(0U, accent);
+        ai_mouth_pixels(0U);
         if (s_ai_mouth_pixels != NULL) {
             for (unsigned row = 0U; row < AI_MOUTH_H; ++row) {
                 memcpy(frame->frame + ((AI_MOUTH_Y + row) * LCD_WIDTH +
@@ -621,7 +623,6 @@ void xiaotai_ui_show_ai(xiaotai_ai_ui_phase_t phase,
         s_ai_mouth_enabled = true;
         s_ai_mouth_generation = face_generation;
         s_ai_mouth_columns = 0U;
-        s_ai_mouth_accent = accent;
     }
     rtos_unlock_mutex(&s_ai_mouth_mutex);
 }
@@ -971,7 +972,7 @@ void xiaotai_ui_update_ai_mouth(uint32_t columns)
         rtos_unlock_mutex(&s_ai_mouth_mutex);
         return;
     }
-    ai_mouth_pixels(columns, s_ai_mouth_accent);
+    ai_mouth_pixels(columns);
     if (xiaotai_board_display_flush_region(AI_MOUTH_X, AI_MOUTH_Y,
                                             AI_MOUTH_W, AI_MOUTH_H,
                                             s_ai_mouth_pixels,

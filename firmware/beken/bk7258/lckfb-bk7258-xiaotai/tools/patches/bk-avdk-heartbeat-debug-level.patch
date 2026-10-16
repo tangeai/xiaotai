@@ -1,0 +1,33 @@
+--- a/ap/middleware/driver/mailbox/mb_ipc_heartbeat.c
++++ b/ap/middleware/driver/mailbox/mb_ipc_heartbeat.c
+@@ -1,20 +1,30 @@
+ static void mb_ipc_task( void *para )
+ {
++#if CONFIG_LOG_LEVEL > 3
+ 	u32 seq = 0;
+ 	bk_err_t send_rc;
++#endif
+ 
+ 	ipc_send_power_up();
+ 
+ 	while(1)
+ 	{
+ 		rtos_delay_milliseconds(MB_IPC_HEARTBEAT_TIME);
++#if CONFIG_LOG_LEVEL > 3
+ 		seq++;
+ 		bk_printf_raw_nonblock(BK_LOG_INFO, MOD_TAG,
+ 			"[DEBUG-bk-hb] tx-enter seq=%u ms=%u\r\n",
+ 			seq, (u32)rtos_get_time());
++#endif
++#if CONFIG_LOG_LEVEL > 3
+ 		send_rc = ipc_send_heart_beat(0);
++#else
++		(void)ipc_send_heart_beat(0);
++#endif
++#if CONFIG_LOG_LEVEL > 3
+ 		bk_printf_raw_nonblock(BK_LOG_INFO, MOD_TAG,
+ 			"[DEBUG-bk-hb] tx-exit seq=%u rc=%d ms=%u\r\n",
+ 			seq, send_rc, (u32)rtos_get_time());
++#endif
+ 	}
+ }
