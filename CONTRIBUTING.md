@@ -13,9 +13,27 @@
 
 ESP-IDF 与 Beken 使用各自的 SDK 工程和工具链。不要为了统一命令而合并它们的构建文件，也不要提交本机工具链、构建目录、设备密钥或无线网络凭证。
 
-使用 `python3 tools/build.py --board <board-id>` 编译固件。版本号由发布负责人指定，
-构建和重试均不自动修改版本。`--release` 只选择发布配置。相同版本的具体产物
-通过源码提交号及固件 SHA-256 区分；替换发布包前应核对两者。
+使用 `python3 tools/build.py --board <board-id>` 编译固件。版本、产物路径、打包和
+GitHub 发布统一遵守[固件版本与发布](#固件版本与发布)。
+
+## 约束规则索引
+
+同一规则在下表的权威出处维护，其他文档引用；历史实验、发布说明和聊天记录只作为
+当次证据。修改规则时同步其检查入口，不能把历史参数当作现行要求。
+
+| 范围 | 权威出处 | 已有检查 |
+|---|---|---|
+| 代理操作、何时读取详细规则 | 根目录 `AGENTS.md`；板级 `AGENTS.md` 只补板级要求 | 代理执行；文档与测试入口检查 |
+| 产品、平台、板卡、驱动及固件工程的目录边界 | [架构](ARCHITECTURE.md#目录导览) | `test_repository_layout.py` |
+| 对外型号、永久板卡 ID、工程目录和目标芯片 | `boards/<vendor>/<board>/board.json` | `tools/build.py --validate`、`test_board_registry.py` |
+| 开发流程、版本、发布名称和交付检查 | 本文 | `test_firmware_versions.py`、`test_boot_identity.py`、`test_validation_packaging.py`；GitHub 标题须发布前后核对 |
+| SDK、编译器、ABI、原生产物与烧录布局 | 目标板卡指南、原生构建脚本及依赖清单 | 原生构建及板级契约检查 |
+| 产品状态、交互、房间刷新和媒体参数 | [产品需求](docs/product/PRODUCT_REQUIREMENTS.md)、[交互规范](docs/product/PRODUCT_INTERACTION_PROFILES.md)、[媒体合同](docs/product/MEDIA_CONTRACT.md) | 产品公共接口和平台回归测试 |
+| 测试层次、覆盖率和实板证据 | [测试说明](tests/README.md) | `bash tools/check.sh`；目标板卡 HIL |
+
+板卡 ID 使用小写连字符形式，是构建和包名的永久身份；对外型号用于页面和硬件匹配。
+CMake 工程名、BIN/ELF 名称沿用原生工程定义，例如 `lckfb_esp32s3_xiaotai.bin`，
+不能为了与板卡 ID 字面一致而改名。新增名称先登记，已有名称和路径的变更按迁移处理。
 
 ## 选择正确的开发方式
 
@@ -110,7 +128,7 @@ python3 tools/build.py --validate
 python3 -m unittest discover -s tools/tests -v
 ```
 
-提交前建议运行完整仓库检查：
+提交前运行完整仓库检查：
 
 ```bash
 bash tools/check.sh
@@ -134,6 +152,62 @@ bash tools/check.sh
 的 `.local/` 目录都只用于本机文件，不能提交。
 
 中文文档应使用自然、直接的表达。一个段落只说明一个主题；不可避免的英文缩写在首次出现时用括号解释。中文版确认无误后，再同步生成英文版，两个版本应保留相同结构和事实来源。
+
+## 固件版本与发布
+
+### 版本与名称
+
+产品版本由发布负责人指定为 `major.minor.patch`，构建、失败和重试均不修改它。
+ESP-IDF 从工程 `PROJECT_VER` 读取，BK7258 从工程 `VERSION.md` 读取。
+BK 原生脚本另行递增 `BUILD_NUMBER`，生成 `1.0.0+build.N` 用于启动身份和取证；
+这是构建身份，不改变产品版本或稳定 Release 标签。构建号从本次产物读取，不能猜测。
+
+当前三类线上 Release 按下表命名。型号、厂商、功能描述写入正文；标题只能使用表中
+格式，不能自行添加描述后缀。新平台的发布名称先由发布负责人确定。
+
+| 平台 | 稳定 GitHub 标签 | Release 标题 |
+|---|---|---|
+| ESP32-S3 | `esp32s3-v<产品版本>` | `ESP32-S3 v<产品版本>` |
+| ESP32-P4 | `esp32p4-v<产品版本>` | `ESP32-P4 v<产品版本>` |
+| BK7258 | `bk7258-v<产品版本>` | `BK7258 v<产品版本> · build.<本次构建号>` |
+
+包名以永久板卡 ID 开头，由现有打包工具生成。现有 BK 线上下载使用
+`lckfb-bk7258-<产品版本>-validation.zip` 稳定名称；打包器生成的带构建身份文件
+作为该下载名的副本上传，清单保留真实身份。替换同一版本时保留公开下载名和地址。
+
+### 编译与打包
+
+跨平台构建只使用 `tools/build.py`。一次原生编译选择一块板和一个变体；
+`--all` 是按板依次执行的批量检查，不是把多块板组合进同一个固件。
+`--release` 向原生工程传递发布配置选择，不分配产品版本，也不保证各 SDK 的
+输出目录相同。SDK 原生命令用于板内调试和烧录，不能新增另一套跨平台分发入口。
+
+先核对目标板卡指南和原生脚本，再执行：
+
+```bash
+bash tools/check.sh
+python3 tools/build.py --board <board-id> --release
+python3 tools/package_validation_firmware.py --board <board-id>
+```
+
+BK7258 打包命令必须再加 `--beken-build-profile release`，否则工具默认选择开发
+产物。ESP-IDF 使用原生 `build/`；BK 开发目录为 `build/bk7258/<project>/`，
+发布目录为 `build/bk7258/<project>_release/`，烧录文件在相应 `package/` 下。
+默认打包保留在这些原生目录；`--output` 只用于显式导出副本。
+
+### 发布完成条件
+
+1. 上传前列出板卡 ID、产品版本、标签、标题、资产名称及源码提交，逐项与上表和
+   本次产物核对；替换现有 Release 时，先读取线上信息核对目标。
+2. 核对 BIN/ELF、清单和实际烧录文件的身份及 SHA-256；交付写明原始产物的准确
+   路径、版本和完整 SHA-256，导出包标明是副本。
+3. 正文说明新增、修改、验证结果和剩余实板项目。旧板卡跑通记录不能替代本次
+   精确产物验收；未完成 HIL 的包保留 `BUILD_VERIFIED_HIL_PENDING`。
+4. 发布后重新读取 GitHub 的实际标题、标签和资产名称，核对远端校验值并确认公开
+   下载可用。全部一致后才能报告“已发布”；名称不符时先修正再完成交付。
+
+以上是执行出口检查。现有 CI 校验版本和产物合同，尚未自动拦截 GitHub 自定义标题；
+不能把 `tools/check.sh` 通过当作线上名称已合规。
 
 ## 提交前检查
 

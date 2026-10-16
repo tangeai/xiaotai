@@ -28,11 +28,11 @@ Treat a board manifest as build metadata, not hardware proof. Hardware claims
 belong in the referenced Hardware IR or probe report and retain their evidence
 grade. A build selects exactly one board and one variant.
 
-When building or packaging firmware, follow the selected board's native project
-profile, artifact names, and output layout. Inspect its build script and board
-guide before naming a flashable file. Give the exact original build artifact
-path, version, and SHA-256 in the handoff; identify any validation-package copy
-as a copy. Keep generated build directories to the project's defined profiles.
+Before building, packaging, creating or editing a GitHub Release, or replacing
+online assets, read [firmware versions and releases](CONTRIBUTING.md#固件版本与发布).
+Use its naming table and completion checks. Native build scripts and board
+guides define artifact paths; the rule index in
+[CONTRIBUTING.md](CONTRIBUTING.md#约束规则索引) identifies each other authority.
 
 When changing UI, buttons, voice controls, or user-visible flow, read
 [`PRODUCT_INTERACTION_PROFILES.md`](docs/product/PRODUCT_INTERACTION_PROFILES.md)

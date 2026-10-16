@@ -287,9 +287,9 @@ halt 和断电位均未置位，但不能据此证明 AP 仍在执行指令。�
 实板复验。另有多次启动记录 `reset=17`，SDK 定义为 HardFault，须单独收集
 异常寄存器和对应 ELF 的调用栈。
 
-固件版本由发布负责人指定为 `major.minor.patch`。`test_firmware_versions.py`
-验证所有板卡、设备能力上报和构建调度；实际编译与失败重试都不改版本。
-同版本产物以源码提交号和 SHA-256 区分。
+固件版本规则见[固件版本与发布](../CONTRIBUTING.md#固件版本与发布)。`test_firmware_versions.py`
+验证各板产品版本和构建调度，`test_boot_identity.py` 验证 BK 构建身份与最终
+烧录内容；具体产物核对和发布完成条件统一按该节执行。
 
 2026-10-14 串口 EP 覆盖：`test_serial_ep_override.py` 已注册到 `tools/check.sh`。
 回归测试编译两端公开持久化接口和 URL 校验函数，覆盖设置、读取、恢复默认、
@@ -728,12 +728,9 @@ codec、采样率、首帧计数、发送返回码和结束统计；视频至少
 
 ## 发布门禁
 
-发布候选包应依次执行：
-
-```bash
-bash tools/check.sh
-python3 tools/build.py --all --keep-going
-```
+发布候选包按[固件版本与发布](../CONTRIBUTING.md#固件版本与发布)执行目标板卡的
+完整检查、发布配置构建和打包。`--all --keep-going` 用于跨板批量构建检查，
+发布单块板不要求编译所有板卡。
 
 构建成功只证明编译组合成立。每块要发布的板卡仍需使用本次构建产物执行上述产品
 业务矩阵；未完成 HIL 的包必须明确标记“待验证”，不能沿用旧版本结论。

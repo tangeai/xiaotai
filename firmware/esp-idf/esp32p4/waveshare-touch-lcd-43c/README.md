@@ -41,7 +41,9 @@ python3 tools/build.py --board waveshare-esp32p4-touch-lcd-43c-v10
 bash tools/check.sh
 ```
 
-生成物由构建脚本统一复制到 `output/`。工程内的 `build/`、日志和临时报告不提交。
+原生产物保留在工程 `build/` 下，应用为 `build/xiaotai_esp32p4.bin`。
+打包与导出按[固件版本与发布](../../../../CONTRIBUTING.md#固件版本与发布)执行。
+工程内的 `build/`、日志和临时报告不提交。
 
 ## 证据与待办
 
