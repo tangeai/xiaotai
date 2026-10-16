@@ -30,8 +30,8 @@ Flash 是闪存，PSRAM 是用于音视频缓冲的大块运行内存。
 
 ### 直接烧录发布包
 
-从 [GitHub Releases](https://github.com/tangeai/xiaotai/releases) 下载名称以
-`lckfb-esp32s3-` 开头的压缩包。解压后先核对 `MANIFEST.json`（发布包清单）中的板卡 ID、
+下载 [v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.0/lckfb-esp32s3-1.0.0-validation.zip)，
+版本内容见 [Release 说明](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.0)。解压后先核对 `MANIFEST.json`（发布包清单）中的板卡 ID、
 SHA-256 和 `flash_files`，再按包内 `README.txt` 的命令烧录。
 
 也可以使用[乐鑫官方 ESP Web Tool](https://espressif.github.io/esptool-js/)。在 Chrome 或
@@ -100,14 +100,15 @@ PCB（印刷电路板）V1.0.1 丝印为准。
 
 ## 音视频参数
 
-H5、AI 和语音呼叫使用 8 kHz 单声道 A-law，每包 20 毫秒、160 字节。H5 上行音频为
-流 10、下行为流 14；AI 双向音频为流 1。
+H5 和设备/微信语音呼叫使用 8 kHz 单声道 A-law，每包 20 毫秒、160 字节。H5 上行
+音频为流 10、下行为流 14。AI 双向音频为流 1，使用 16 kHz 单声道 Opus，
+每包 20 毫秒、目标码率 16 kbps、编码复杂度 0。
 
 H5 视频使用流 11，格式为 MJPEG（逐帧 JPEG 图像），分辨率 320×240，目标帧率为
 8 fps（每秒 8 帧），单张 JPEG 上限为 128 KiB。
 
-麦克风和扬声器回采先以 16 kHz 进入 AEC（声学回声消除），净化后低通降采样到
-8 kHz，再编码成 A-law。完整处理链见[音视频参数与媒体处理](../../product/MEDIA_CONTRACT.md)。
+麦克风和扬声器回采先以 16 kHz 进入 AEC（声学回声消除）。AI 使用净化后的
+16 kHz 音频编码 Opus；H5 和语音呼叫低通降采样到 8 kHz 后编码 A-law。完整处理链见[音视频参数与媒体处理](../../product/MEDIA_CONTRACT.md)。
 
 ## 环境与依赖
 

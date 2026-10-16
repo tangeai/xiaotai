@@ -14,26 +14,19 @@
 
 优先从 [GitHub Releases](https://github.com/tangeai/xiaotai/releases) 下载已经打包的验证固件。压缩包名称以板卡 ID（开发板在本仓库中的唯一名称，用于选择编译目标和核对固件包）开头，不要只按芯片名称选择固件。
 
-首页优先提供立创·实战派 BK7258 的固件下载入口：
+以下三款开发板均提供 v1.0.0 固件包，下载时请核对完整型号：
 
 | 对外型号 | 板卡 ID | 下载固件 | 烧录说明 |
 |---|---|---|---|
 | 立创·实战派 BK7258 | `lckfb-bk7258` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.0/lckfb-bk7258-1.0.0-validation.zip) | [开发板指南](docs/boards/lckfb-bk7258/README.md) |
+| 立创·实战派 ESP32-S3（PCB V1.0.1） | `lckfb-esp32s3` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.0/lckfb-esp32s3-1.0.0-validation.zip) | [开发板指南](docs/boards/lckfb-esp32s3/README.md) |
+| 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3（V1.0） | `waveshare-esp32p4-touch-lcd-43c-v10` | [下载 v1.0.0 固件包](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.0/waveshare-esp32p4-touch-lcd-43c-v10-1.0.0-validation.zip) | [开发板指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md) |
 
-推荐下载固件包，其中包含完整烧录镜像、OTA（无线升级）镜像、分区表、构建摘要和
-SHA-256 校验清单。只需要首次完整烧录时，也可以直接下载 `all-app.bin`。
-
-<details>
-<summary>更多开发板</summary>
-
-| 对外型号 | 板卡 ID | 发布包名称前缀 | 烧录说明 |
-|---|---|---|---|
-| 立创·实战派 ESP32-S3 | `lckfb-esp32s3` | `lckfb-esp32s3-` | [开发板指南](docs/boards/lckfb-esp32s3/README.md) |
+固件包包含对应板卡的烧录文件、烧录配置和校验信息。ESP32 按清单完整烧录多个文件；
+BK7258 首次烧录使用包内 `all-app.bin`，`app_pack.rbl` 用于 OTA（无线升级）。
 
 其他已经适配的开发板及其型号、固件名称和使用说明统一收录在
 [完整开发板目录](docs/boards/README.md)。
-
-</details>
 
 发布包内的 `MANIFEST.json` 记录板卡、源码版本、文件校验值和烧录信息；解压后先核对
 清单，再连接设备。

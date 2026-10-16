@@ -2,7 +2,7 @@
 
 这是立创·实战派 ESP32-S3 开发板 PCB V1.0.1 的 AIROBOT 语音版固件，
 板上模组为 `ESP32-S3-WROOM-1-N16R8`。固件使用 ESP-IDF 5.5.x、TiRTC SDK
-2.3.0 和 LVGL 8.3.11。工程包含 320×240 触控产品界面、设备配网/绑定上线、
+2.5.0 和 LVGL 8.3.11。工程包含 320×240 触控产品界面、设备配网/绑定上线、
 AI 双向语音、设备/微信纯语音呼叫，以及原有 H5 MJPEG 实时画面与双向语音能力。
 S3 产品界面不显示视频通话、本地预览或摄像头开关。
 
@@ -127,7 +127,7 @@ components/starter_console/   最小串口命令
 components/platform_client/   服务发现、设备 HTTP/MQTT
 components/wifi_manager/      Wi-Fi 与 SoftAP 配置
 components/runtime_config/    NVS 设备凭证
-third_party/tirtc/             TiRTC SDK 2.3.0
+third_party/tirtc/             TiRTC SDK 2.5.0
 ```
 
 会话状态只在 `starter_runtime` 任务中改变。TiRTC 回调只投递有长度上限的事件或把音频复制到固定队列；回调中不执行 HTTP、阻塞等待、SDK Stop 或 Uninit。

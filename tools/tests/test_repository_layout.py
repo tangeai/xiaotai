@@ -110,12 +110,13 @@ class RepositoryLayoutTests(unittest.TestCase):
             self.assertGreaterEqual(len(lines), 3, relative)
             self.assertEqual(lines[2], navigation, relative)
 
-    def test_root_readme_features_two_boards_and_catalog_lists_every_board(self):
+    def test_root_readme_features_three_boards_and_catalog_lists_every_board(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         catalog = (ROOT / "docs/boards/README.md").read_text(encoding="utf-8")
         featured = {
             "lckfb-bk7258",
             "lckfb-esp32s3",
+            "waveshare-esp32p4-touch-lcd-43c-v10",
         }
         for manifest in (ROOT / "boards").glob("*/*/board.json"):
             board_id = json.loads(manifest.read_text(encoding="utf-8"))["id"]

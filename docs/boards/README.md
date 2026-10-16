@@ -10,7 +10,7 @@
 | 板卡 ID（仓库中的开发板唯一名称） | 厂商与型号 | 平台 | 资源 | 能力 | 当前状态 | 说明 |
 |---|---|---|---|---|---|---|
 | `alientek-atk-dnesp32s3` | ALIENTEK ATK-DNESP32S3 V1.4 | ESP32-S3 / ESP-IDF | 16 MB Flash / 8 MB PSRAM | 音频、按键、MJPEG 摄像头、Wi-Fi | 实板已跑通 | [打开](alientek-atk-dnesp32s3/README.md) |
-| `lckfb-esp32s3` | 立创·实战派 ESP32-S3（ESP32-S3-WROOM-1-N16R8，PCB V1.0.1） | ESP32-S3 / ESP-IDF | 16 MB Flash / 8 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Wi-Fi | 实板已跑通 | [打开](lckfb-esp32s3/README.md) |
+| `lckfb-esp32s3` | 立创·实战派 ESP32-S3（ESP32-S3-WROOM-1-N16R8，PCB V1.0.1） | ESP32-S3 / ESP-IDF | 16 MB Flash / 8 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Wi-Fi | 实板已跑通 | [下载 v1.0.0 固件](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.0) · [开发板指南](lckfb-esp32s3/README.md) |
 | `waveshare-esp32p4-touch-lcd-43c-v10` | Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 | ESP32-P4 / ESP-IDF | 32 MB Flash / 32 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Hosted Wi-Fi | 设备互呼已实板运行；完整验收待补 | [下载 v1.0.0 固件](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.0) · [开发板指南](waveshare-esp32p4-touch-lcd-43c-v10/README.md) |
 | `lckfb-bk7258` | 立创·实战派 BK7258 | BK7258 / Beken AVDK | 8 MiB Flash / 16 MiB PSRAM / 640 KiB SRAM（构建配置） | 音频、屏幕、触摸、H.264 摄像头、Wi-Fi | 实板已跑通 | [打开](lckfb-bk7258/README.md) |
 
