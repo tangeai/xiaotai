@@ -347,20 +347,20 @@
     "artifacts": [
       {
         "path": "../../../firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/m5stack_cores3_lite_xiaotai.bin",
-        "size_bytes": 4097808,
-        "sha256": "c70885d9ef28170ac4ad0456d45720317329ab351a3d72d2f77ffcd3d8d6a7f8"
+        "size_bytes": 4097904,
+        "sha256": "ad624368092a620726ca9a3c4554e79aefba608da1ba5843157c24e34792d6e9"
       },
       {
         "path": "../../../firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/m5stack_cores3_lite_xiaotai.elf",
-        "size_bytes": 29137872,
-        "sha256": "e278d1e71432fd70d12c48bc53df3dbe2d3429496333e8005e8a4a9e8b29512b"
+        "size_bytes": 29137896,
+        "sha256": "3f97c9b8f0589a5164ed2e4cce40714c17e8b6a43b825be963a07b34f6fef396"
       }
     ],
     "status": "COMPILE_PASS",
     "variant": "ili9342e",
-    "version": "1.0.1+build.12",
+    "version": "1.0.1+build.14",
     "idf_version": "v5.5.5",
-    "note": "Quad PSRAM and board-owned LCD rotation. Native E-panel build exited 0. Display/PSRAM guards and final repository checks are recorded in VALIDATION.md. Current-image HIL pending."
+    "note": "Native E-panel build exited 0. 180-degree camera presentation and official CoreS3 BSP AW88298 15 dB PA compensation. See VALIDATION.md for host regression and build identity. Current-image HIL pending; AEC overload remains unresolved."
   },
   "runtime_evidence": [],
   "features": {
@@ -396,7 +396,7 @@
     },
     {
       "severity": "warning",
-      "description": "User build.10 reports occasional AI self-echo and temporary unresponsive touch. status: AEC 2240 deadline misses / 9101 blocks, MIC clipped samples 351474; no playback I2S failures or RX overflow. Playback-active MIC/ref/clean measurement and 33 vs 24 dB gain comparison pending; see SOURCES.md and VALIDATION.md."
+      "description": "User build.12 has near-end recognition while silent but poor barge-in during playback: MIC clipping and AEC processing above 32 ms budget. Official CoreS3 BSP PA gain compensation omission corrected in build.14; no HIL yet. ES7210 requested 33 dB maps to 30 dB in locked driver. See OFFICIAL_AUDIO_REVIEW.md."
     }
   ],
   "verification_scope": {
@@ -410,6 +410,6 @@
       "tools/tests/test_onboarding_faults.py"
     ],
     "standalone_skill_build_assessment": "not certified; this repository shares sources outside the native IDF project and uses the current Opus AI contract",
-    "runtime": "User build.10 version/ELF prefix match: binding/MQTT/AI admitted, RX decoded/played counts match. Temporary unresponsive touch later recovered; occasional self-echo remains unresolved. build.12 includes canonical portal and user-requested camera-at-top 180-degree display/touch rotation; no agent flashing or current-artifact HIL."
+    "runtime": "User build.12 identity prefix matches the previous artifact; AI playback completes but barge-in is poor, MIC clipping and AEC overruns observed. build.14 adds camera presentation metadata and official PA compensation. No current-artifact HIL or agent flashing."
   }
 }

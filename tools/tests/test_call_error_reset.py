@@ -1,6 +1,7 @@
 """Replay call admission: new calls clear historical errors, rejected calls do not."""
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
+from test_camera_rotation_report import runtime_config
 
 
 class CallErrorReset(unittest.TestCase):
@@ -53,7 +54,7 @@ static void call_http_response(void){}
 static void*call_http_tag(uint32_t g,int stage){(void)g;(void)stage;return NULL;}
 static int platform_client_request_timeout(int service,const char*path,const char*body,unsigned timeout,void(*cb)(void),void*tag){(void)service;(void)path;(void)body;(void)timeout;(void)cb;(void)tag;return 0;}
 static void finish_call_session(int e,const char*s){(void)e;(void)s;}
-''' + function(source, 'begin_call_common') + function(source, 'accept_call') + r'''
+''' + runtime_config(source) + function(source, 'begin_call_common') + function(source, 'accept_call') + r'''
 int main(void){
  starter_product_contact_t c={0};
  for(int mode=0;mode<2;mode++){

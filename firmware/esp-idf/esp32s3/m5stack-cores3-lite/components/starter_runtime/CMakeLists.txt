@@ -4,4 +4,6 @@ include("${XIAOTAI_REPO_ROOT}/platforms/esp-idf/components/starter_runtime/CMake
 
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE XIAOTAI_BOARD_MODEL="m5stack-cores3-lite")
+    # Camera at the top; remote players rotate the unmodified camera pixels.
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE XIAOTAI_BOARD_CAMERA_ROTATION=180)
 endif()

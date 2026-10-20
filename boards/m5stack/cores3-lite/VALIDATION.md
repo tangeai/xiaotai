@@ -3,19 +3,19 @@
 工具链：ESP-IDF **v5.5.5**，提交 `b774170ff46c393eeb5e495ea37936038d3f4f4f`。
 板卡 K128-Lite 的物理 PCB 和屏幕版本未确认。用户 build.9 日志确认 PSRAM 与应用启动，
 照片显示花屏；build.10 已由用户运行并报告触摸暂时失去响应、自回声问题。
-当前 build.12 包含绑定入口修复与摄像头在顶部的 180° 显示/触摸方向，尚未实板验收。本次未由代理烧录、未发布。
+当前 build.14 补齐摄像头 180° 上报与官方 AW88298 PA 增益补偿，尚未实板验收。本次未由代理烧录、未发布。
 交付模式为本地开发构建，不创建 GitHub Release 或发布包。
 
 | 检查 | 结果 |
 |---|---|
 | Skill 0.10.1 Doctor：目标编译器、ESP-IDF、TiRTC ABI | PASS；未使用旧 managed kit |
 | Hardware IR v2 校验、严格 intake | PASS / READY_TO_PORT；不是实板证明 |
-| 新增公共边界回归 | PASS，6 项板级回归 + 5 项 PSRAM 配置回归 + 3 项显示/触摸几何回归；先失败再修正 |
+| 新增公共边界回归 | PASS，7 项板级回归 + 5 项 PSRAM 配置回归 + 3 项显示/触摸几何回归；先失败再修正 |
 | `python3 tools/build.py --validate` | PASS，5 块板 |
-| `python3 -m unittest discover -s tools/tests -v` | PASS，374 项 |
+| `python3 -m unittest discover -s tools/tests -v` | PASS，378 项 |
 | `bash tools/check.sh` | PASS；产品核心行覆盖率 93.09%、分支覆盖率 63.74% |
 | `ili9342c` | build.6 仅历史编译通过，含错误 Octal 配置，禁止继续使用；本次未重建 C 变体 |
-| `ili9342e` 原生构建 | PASS，`1.0.1+build.12`，Quad PSRAM / 180° 显示与触摸 / 绑定地址统一，退出码 0 |
+| `ili9342e` 原生构建 | PASS，`1.0.1+build.14`，Quad PSRAM / 180° 显示、触摸与摄像头上报 / 官方 PA 补偿，退出码 0 |
 | PSRAM 有效配置与最终链接 | PASS，`CONFIG_SPIRAM_MODE_QUAD=y`；ELF map 链接 `esp_psram_impl_ap_quad.c.obj` |
 | BIN/ELF 身份、镜像内板名、单一 I²C 驱动族 | PASS |
 | 编译输入隔离 | PASS，只编译 M5 板级源码；C 屏定义仅作用于显示组件 |
@@ -24,7 +24,8 @@
 | build.9 显示 | FAIL（用户照片），共享 LVGL 配置覆盖板级方向 |
 | build.10 绑定与 AI | 用户日志确认凭证保存、MQTT 在线、AI 准入和上下行计数；声学未通过 |
 | build.10 交互与 AEC | FAIL（用户反馈）：触摸暂时无响应，随后恢复；偶发把自身回复识别为用户说话 |
-| build.12 显示、触摸、媒体、H5、AI、设备/微信通话、PTT、双讲、稳定性 | SKIP，待实板 |
+| build.12 AI 双讲 | FAIL（用户反馈及日志）：安静时能识别，播放时难以打断；有输入削顶和处理超期 |
+| build.14 显示、触摸、媒体、H5、AI、设备/微信通话、PTT、双讲、稳定性 | SKIP，待实板 |
 
 当前产物属于 **COMPILE_PASS**。该仓库使用共享源码和当前 Opus AI 合同，通过仓库的
 行为回归及原生构建门禁验证；未套用独立生成工程的旧 A-law AI 静态合同，也未声称通过
@@ -33,10 +34,10 @@
 ## 当前保留产物：ILI9342E
 
 - 应用：`firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/m5stack_cores3_lite_xiaotai.bin`
-- 版本：`1.0.1+build.12`；大小：4097808 字节。
-- 应用 BIN SHA-256：`c70885d9ef28170ac4ad0456d45720317329ab351a3d72d2f77ffcd3d8d6a7f8`。
-- ELF：同目录 `m5stack_cores3_lite_xiaotai.elf`；大小：29137872 字节。
-- 完整 ELF SHA-256：`e278d1e71432fd70d12c48bc53df3dbe2d3429496333e8005e8a4a9e8b29512b`；与 BIN 内 `app_elf_sha256` 一致。
+- 版本：`1.0.1+build.14`；大小：4097904 字节。
+- 应用 BIN SHA-256：`ad624368092a620726ca9a3c4554e79aefba608da1ba5843157c24e34792d6e9`。
+- ELF：同目录 `m5stack_cores3_lite_xiaotai.elf`；大小：29137896 字节。
+- 完整 ELF SHA-256：`3f97c9b8f0589a5164ed2e4cce40714c17e8b6a43b825be963a07b34f6fef396`；与 BIN 内 `app_elf_sha256` 一致。
 - 原生引导与分区产物、烧录地址见同目录 `flasher_args.json`。BIN 不是从 0 地址烧录的合并镜像。
 
 ## 旧产物与失败证据
@@ -99,6 +100,47 @@ swap=false、mirror_x=true、mirror_y=true，C/E 两个屏幕变体共用。
 包括立创方向不变。触摸按 esp_lcd_touch 1.2.1 的 `max - raw` 软件镜像语义设置
 包含端点的 319/239，验证四角及中心不越界；显示仍保持 320×240，无软件旋转缓冲。
 待用户实测摄像头朝上时的显示和四角按钮，当前未烧录。
+
+### build.13 摄像头方向上报
+
+生产 HTTP 提交回放在修正前复现 M5 profile 缺少 `camera_rotation`、设备呼叫两入口
+沿用 270°。M5 runtime component 现在单独定义 `XIAOTAI_BOARD_CAMERA_ROTATION=180`，
+用于 stream/call/voip profile 和呼叫 request/device-info 的数值字段。
+摄像头像素、编码尺寸及音频通话能力不变；立创与 P4 的原字段和值由同一测试验证。
+`test_camera_rotation_report.py` 3 项、全量 377 项 tools unittest、`tools/check.sh`
+均通过；原生 E 变体编译退出 0，ESP-IDF v5.5.5，应用描述符与完整 ELF 哈希一致。
+尚未烧录；升级联网并重新打开实时查看后，需用有上下左右文字的画面验收。
+
+### build.12 播放时难以打断：证据范围
+
+用户日志的版本、编译时间与 ELF 前缀 `e278d1e71` 匹配历史 build.12；完整设备镜像
+未重新读取。该版本本地 BIN/ELF 已被 build.13 替换，不能把旧观察作为新版本通过证据。
+用户确认安静时可识别，扬声器播放时说话难以打断。10 秒观察窗口内，麦克风峰值
+反复为 32768，回采 RMS 145–384，AEC 输出 RMS 1040–2315；回采有数据但不能据此
+证明槽序、同步或双讲正确。会话 status：706 个 AEC 块、18508 个麦克风削顶采样点、
+617 次处理超期，播放中平均处理约 45–47 ms（每块 512 点 / 16 kHz = 32 ms）。
+这些为墙钟处理耗时，包含任务被抢占的时间，不等于 AEC 算法独占 CPU 时间。
+最后 status 的回采接近零时播放已经停止，不能与播放中的窗口混用。
+
+立创 S3 与 M5 共用相同 AEC/Opus/AI 上行源码，且 `libesp_audio_processor.a`
+SHA-256 均为 `670639c3d136c7e3909aa90bcaac573600b7e98b6850be8fd5484b4cdea96dcc`。
+两者均为 FD_LOW_COST + AGGR，16 kHz MR，单块 512 点；M5 读取四槽后压紧，
+立创由 codec 层选择两个 DMA 槽。两板都没有“扬声器播放时关闭 AI 上行”的分支。
+M5 Quad PSRAM 与立创 Octal PSRAM 不同，尚不能从总耗时直接判定带宽为根因。
+此次诊断先核查官方资料；未更改 MIC 增益、AEC 模式、缓存或任务优先级。后续只按明确官方依据补齐 PA 补偿，见下节。
+
+### build.14 官方功放标定修正
+
+核对 Espressif 官方 CoreS3 BSP 固定提交后，确认 build.12/13 的 AW88298 配置漏了
+`.hw_gain.pa_gain=15`。真实 `audio_codecs_init()` 边界测试先因 PA gain=0 失败，
+补齐板级配置后通过；仍验证 MIC1 初始化请求 30 dB、MIC3 请求 0 dB及共享时钟初始化。
+独立重放官方音量函数证实，它改变的是 DAC 衰减补偿，而不是增加实际功放增益。
+此修正只编译进 M5 板卡，不改变立创 S3/P4 的硬件或音频代码。
+
+编译版本 `1.0.1+build.14`，ESP-IDF v5.5.5，2026-10-21 00:02:37，退出 0。
+全量仓库检查与 378 项 tools 测试通过；源码证据、请求 33 dB 实际量化为 30 dB 的
+复现、官方普通录音示例的适用限制见 [OFFICIAL_AUDIO_REVIEW.md](OFFICIAL_AUDIO_REVIEW.md)。
+build.14 尚未烧录，不能声称已解决削顶、45–47 ms 处理超期或自然打断。
 
 ### ILI9342C 历史构建记录（不可继续使用）
 

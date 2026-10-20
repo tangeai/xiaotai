@@ -294,6 +294,9 @@ static esp_err_t audio_codecs_init(void)
     aw88298_codec_cfg_t amp_cfg = {
         .ctrl_if = s_amp_ctrl_if,
         .reset_pin = -1,
+        /* Official CoreS3 BSP calibration: compensate the PA's 15 dB gain
+         * when mapping UI volume to DAC attenuation. See OFFICIAL_AUDIO_REVIEW.md. */
+        .hw_gain.pa_gain = 15.0f,
     };
     s_amp_codec_if = aw88298_codec_new(&amp_cfg);
     if (s_amp_codec_if == NULL) {

@@ -45,6 +45,24 @@
 #define XIAOTAI_BOARD_MODEL "lckfb-esp32s3"
 #endif
 
+/* Receiver presentation only; the encoder keeps the sensor's pixels.
+ * Boards without an override retain their existing profile and call metadata. */
+#ifdef XIAOTAI_BOARD_CAMERA_ROTATION
+#if XIAOTAI_BOARD_CAMERA_ROTATION != 0 && XIAOTAI_BOARD_CAMERA_ROTATION != 90 && \
+    XIAOTAI_BOARD_CAMERA_ROTATION != 180 && XIAOTAI_BOARD_CAMERA_ROTATION != 270
+#error "Camera presentation must be 0, 90, 180 or 270 degrees clockwise"
+#endif
+#define XIAOTAI_STRINGIFY_VALUE_(x) #x
+#define XIAOTAI_STRINGIFY_VALUE(x) XIAOTAI_STRINGIFY_VALUE_(x)
+#define XIAOTAI_CAMERA_PROFILE_FIELDS \
+    "\"camera_rotation\":" XIAOTAI_STRINGIFY_VALUE(XIAOTAI_BOARD_CAMERA_ROTATION) ","
+#define XIAOTAI_CALL_CAMERA_ROTATION_JSON \
+    XIAOTAI_STRINGIFY_VALUE(XIAOTAI_BOARD_CAMERA_ROTATION)
+#else
+#define XIAOTAI_CAMERA_PROFILE_FIELDS ""
+#define XIAOTAI_CALL_CAMERA_ROTATION_JSON "270"
+#endif
+
 #define RUNTIME_QUEUE_DEPTH 12U
 #define RUNTIME_TEXT_MAX 4096U
 /*
@@ -1240,10 +1258,13 @@ static void request_device_profile(void)
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,\"up_video_mt\":[\"mjpeg\"],"
         "\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"
+        XIAOTAI_CAMERA_PROFILE_FIELDS
         "\"audio_rate\":8000,\"audio_channels\":1,\"no_video\":false},"
         "\"call\":{\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"
+        XIAOTAI_CAMERA_PROFILE_FIELDS
         "\"audio_rate\":8000,\"audio_channels\":1,\"no_video\":true},"
         "\"voip\":{\"screen_width\":1,\"screen_height\":1,"
+        XIAOTAI_CAMERA_PROFILE_FIELDS
         "\"audio_rate\":8000,\"audio_channels\":1,"
         "\"up_video_mt\":\"none\",\"down_video_mt\":\"none\","
         "\"down_audio_mt\":\"alaw\",\"no_video\":true,"
@@ -1498,7 +1519,7 @@ static void dial_contact(uint8_t index, bool video)
         starter_tirtc_expect_call(session_generation());
         (void)snprintf(body, sizeof(body),
                        "{\"targets\":[\"%s\"],\"call_type\":\"%s\","
-                       "\"camera_rotation\":270}",
+                       "\"camera_rotation\":" XIAOTAI_CALL_CAMERA_ROTATION_JSON "}",
                        s_call_peer_id, video ? "video" : "audio");
         service = PLATFORM_SERVICE_CALL;
         path = "/v1/call/request";
@@ -1542,7 +1563,8 @@ static void accept_call(void)
     char body[384];
     (void)snprintf(body, sizeof(body),
                    "{\"device_id\":\"%s\",\"room_id\":\"%s\","
-                   "\"purpose\":\"call\",\"camera_rotation\":270}",
+                   "\"purpose\":\"call\",\"camera_rotation\":"
+                   XIAOTAI_CALL_CAMERA_ROTATION_JSON "}",
                    s_call_peer_id, s_call_room_id);
     esp_err_t err = platform_client_request_timeout(
         PLATFORM_SERVICE_CALL, "/v1/call/device/info", body,

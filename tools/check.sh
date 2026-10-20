@@ -7,6 +7,7 @@ python3 "$repo_dir/tools/tests/test_cores3_board.py"
 python3 "$repo_dir/tools/tests/test_cores3_memory_config.py"
 # Includes CoreS3 camera-at-top 180-degree display/touch and LCKFB compatibility.
 python3 "$repo_dir/tools/tests/test_s3_display_geometry.py"
+python3 "$repo_dir/tools/tests/test_camera_rotation_report.py"
 python3 "$repo_dir/tools/tests/test_contact_pagination_layout.py"
 python3 "$repo_dir/tools/tests/test_tip_layout.py"
 python3 "$repo_dir/tools/tests/test_room_keypad.py"

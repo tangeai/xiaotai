@@ -4,6 +4,7 @@ import sys
 import unittest
 
 from test_s3_product_regressions import ROOT, function, run_c
+from test_camera_rotation_report import runtime_config
 
 sys.path.insert(0, str(ROOT / "tools"))
 from board_registry import build_command, find_board, load_boards
@@ -43,6 +44,74 @@ int main(void) {
     assert(out[0]==100);
 }
 ''', [BOARD])
+
+    def test_codec_initialization_uses_official_amplifier_gain_compensation(self):
+        source = (BOARD / "board_adapter.c").read_text()
+        # Execute the production initialization at the codec creation boundary.
+        # The 15 dB contract comes from the pinned Espressif CoreS3 BSP, not
+        # from this project's initializer; a zero-filled hw_gain is the defect.
+        run_c(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+typedef int esp_err_t;
+#define ESP_OK 0
+#define ESP_FAIL -1
+#define ESP_ERR_NO_MEM -2
+#define ESP_CODEC_DEV_OK 0
+#define I2S_AUDIO_PORT 0
+#define BOARD_I2C_PORT 0
+#define BOARD_I2C_HZ 400000
+#define AW88298_CODEC_DEFAULT_ADDR 0x6c
+#define ES7210_CODEC_DEFAULT_ADDR 0x80
+#define ESP_CODEC_DEV_TYPE_OUT 1
+#define ESP_CODEC_DEV_TYPE_IN 2
+#define AUDIO_HW_SAMPLE_RATE_HZ 16000
+#define AUDIO_TDM_SLOTS 4
+#define AUDIO_MCLK_MULTIPLE 256
+#define ES7210_SEL_MIC1 1
+#define ES7210_SEL_MIC2 2
+#define ES7210_SEL_MIC3 4
+#define ESP_CODEC_DEV_MAKE_CHANNEL_MASK(c) (1U << (c))
+typedef struct {int port; void *rx_handle,*tx_handle;} audio_codec_i2s_cfg_t;
+typedef struct {int port,addr,clock_speed_hz;void *bus_handle;} audio_codec_i2c_cfg_t;
+typedef struct {float pa_gain,pa_voltage,codec_dac_voltage;} hw_gain_t;
+typedef struct {void *ctrl_if;int reset_pin;hw_gain_t hw_gain;} aw88298_codec_cfg_t;
+typedef struct {int dev_type;void *codec_if,*data_if;} esp_codec_dev_cfg_t;
+typedef struct {int sample_rate,bits_per_sample,channel,channel_mask;} esp_codec_dev_sample_info_t;
+typedef struct {void *ctrl_if;bool master_mode;int mic_selected,mclk_div;} es7210_codec_cfg_t;
+static void *s_i2s_rx,*s_i2s_tx,*s_i2c_bus,*s_i2s_data_if,*s_amp_ctrl_if;
+static void *s_amp_codec_if,*s_speaker_dev,*s_es7210_ctrl_if,*s_es7210_codec_if,*s_microphone_dev;
+static int amp_created,clock_checked,mic_gain,reference_gain;
+static void *audio_codec_new_i2s_data(const audio_codec_i2s_cfg_t *c){return (void *)1;}
+static void *audio_codec_new_i2c_ctrl(const audio_codec_i2c_cfg_t *c){return (void *)1;}
+static void *aw88298_codec_new(const aw88298_codec_cfg_t *c){
+    assert(c->reset_pin == -1);
+    assert(c->hw_gain.pa_gain == 15.0f);
+    assert(c->hw_gain.pa_voltage == 0 && c->hw_gain.codec_dac_voltage == 0);
+    amp_created++;
+    return (void *)1;
+}
+static void *esp_codec_dev_new(const esp_codec_dev_cfg_t *c){return (void *)(intptr_t)c->dev_type;}
+static int esp_codec_dev_open(void *d,const esp_codec_dev_sample_info_t *c){return 0;}
+static int esp_codec_dev_set_out_vol(void *d,int vol){assert(vol==70);return 0;}
+static int esp_codec_dev_set_out_mute(void *d,bool mute){assert(mute);return 0;}
+static void *es7210_codec_new(const es7210_codec_cfg_t *c){assert(c->mic_selected==7);return (void *)1;}
+static int esp_codec_dev_set_in_channel_gain(void *d,unsigned mask,float gain){
+    if(mask==1)mic_gain=(int)gain;
+    if(mask==4)reference_gain=(int)gain;
+    return 0;
+}
+static int audio_amplifier_clock_init(void){clock_checked++;return 0;}
+''' + function(source, "audio_codecs_init") + r'''
+int main(void){
+    reference_gain=-1;
+    assert(audio_codecs_init()==0);
+    assert(amp_created==1 && clock_checked==1);
+    assert(mic_gain==30 && reference_gain==0);
+}
+''')
 
     def test_camera_power_preserves_audio_backlight_and_usb_direction(self):
         source = (BOARD / "board_power.c").read_text()
@@ -149,7 +218,7 @@ static int platform_client_request_timeout(int service,const char *url,
     assert(strstr(body,"\"no_video\":true"));
     return ESP_OK;
 }
-''' + function(source, "request_device_profile") + r'''
+''' + runtime_config(source) + function(source, "request_device_profile") + r'''
 int main(void) {
     request_device_profile();
     assert(s_voip_profile_inflight);
