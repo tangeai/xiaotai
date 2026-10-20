@@ -1,5 +1,9 @@
 # 小钛 ESP32-P4 工程
 
+当前应用工程使用 **ESP-IDF v5.5.5**；先在仓库根目录执行
+`. tools/activate_esp_idf.sh`，再用 `idf.py --version` 核对。
+
+
 本目录是 `ESP32-P4-WIFI6-Touch-LCD-4.3` 的 ESP-IDF 工程，供二次开发者定位
 构建入口与媒体实现。规格、依赖、编译、烧录和硬件验证步骤请从
 [开发板使用说明](../../../../docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md) 开始。

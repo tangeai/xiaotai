@@ -1,0 +1,4 @@
+# Generated from dependencies.lock; this board has no local component patches.
+/managed_components/
+# idf.py monitor captures can contain device identities and runtime credentials.
+/log.*.txt

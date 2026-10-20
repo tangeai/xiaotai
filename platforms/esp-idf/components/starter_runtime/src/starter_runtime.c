@@ -41,6 +41,10 @@
 #include "xiaotai_ai_protocol.h"
 #include "xiaotai_ai_view.h"
 
+#ifndef XIAOTAI_BOARD_MODEL
+#define XIAOTAI_BOARD_MODEL "lckfb-esp32s3"
+#endif
+
 #define RUNTIME_QUEUE_DEPTH 12U
 #define RUNTIME_TEXT_MAX 4096U
 /*
@@ -1231,7 +1235,7 @@ static void request_device_profile(void)
 #else
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-S3\","
-        "\"board_model\":\"lckfb-esp32s3\"},"
+        "\"board_model\":\"" XIAOTAI_BOARD_MODEL "\"},"
         "\"firmware_version\":\"1.0.1\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,\"up_video_mt\":[\"mjpeg\"],"

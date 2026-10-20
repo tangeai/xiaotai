@@ -6,6 +6,9 @@
 完整的环境、构建、烧录和验证步骤见
 [板卡使用说明](../../../docs/boards/lckfb-esp32s3/README.md)。本页只记录板级代码职责。
 
+当前工程使用 **ESP-IDF v5.5.5**；先在仓库根目录执行
+`. tools/activate_esp_idf.sh`，用 `idf.py --version` 核对后再构建。
+
 ## 构建与烧录
 
     python3 tools/build.py --board lckfb-esp32s3

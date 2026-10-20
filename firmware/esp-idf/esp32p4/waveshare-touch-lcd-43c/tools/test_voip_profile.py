@@ -13,6 +13,12 @@ source = (repo_root / "platforms/esp-idf/components/starter_runtime/src/starter_
 start = source.index("static void request_device_profile(void)")
 profiles = re.findall(r"static const char profile\[\] =\s*(.*?);", source[start:], re.S)
 def decode(text):
+    # The common S3 runtime's board identity is selected by its component.
+    # Resolve the default literal for this LCKFB baseline; CoreS3's override
+    # is exercised through the compiled public submission in test_cores3_board.
+    default_board = re.search(r'#define XIAOTAI_BOARD_MODEL ("[^"]+")', source)
+    if default_board:
+        text = text.replace("XIAOTAI_BOARD_MODEL", default_board.group(1))
     return json.loads("".join(ast.literal_eval(s) for s in re.findall(r'"(?:\\.|[^"\\])*"', text)))
 p4, s3 = map(decode, profiles[:2])
 p4_manifest = json.loads((repo_root / "boards/waveshare/esp32p4-touch-lcd-43c/board.json").read_text())

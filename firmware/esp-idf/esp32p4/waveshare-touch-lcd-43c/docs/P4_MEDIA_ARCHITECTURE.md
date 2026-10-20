@@ -1,5 +1,9 @@
 # ESP32-P4 媒体架构
 
+当前应用工程使用 **ESP-IDF v5.5.5**；先在仓库根目录执行
+`. tools/activate_esp_idf.sh`，再用 `idf.py --version` 核对。
+
+
 本页面向微雪 4.3 英寸 P4 工程的二次开发，说明当前参与构建的模块、媒体所有权和性能边界。
 编译、烧录见[开发板指南](../../../../../docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md)，
 各业务参数统一维护在[音视频合同](../../../../../docs/product/MEDIA_CONTRACT.md)。

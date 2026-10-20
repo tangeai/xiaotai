@@ -63,8 +63,7 @@ CONFIG_IDF_EXPERIMENTAL_FEATURES=y
 CONFIG_CACHE_L2_CACHE_256KB=y
 CONFIG_CACHE_L2_CACHE_LINE_128B=y
 
-# 生产平台门户：绑定页与注册入口指向 xiaotai.chat（不再使用 demo-open 域名）。
-CONFIG_XIAOTAI_PORTAL_URL="https://xiaotai.chat"
+# 服务发现地址；用户绑定入口统一由产品文案定义为 xiaotai.chat。
 CONFIG_XIAOTAI_DISCOVERY_URL="http://ep-open.tangeopen.com/services"
 
 CONFIG_BSP_ERROR_CHECK=y

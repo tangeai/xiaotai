@@ -1,5 +1,9 @@
 # ATK-DNESP32S3 内存预算与实测项
 
+当前应用工程使用 **ESP-IDF v5.5.5**；先在仓库根目录执行
+`. tools/activate_esp_idf.sh`，再用 `idf.py --version` 核对。
+
+
 目标硬件按厂家资料为 16 MB Flash / 8 MB PSRAM；实际板卡容量必须由启动日志确认。当前配置为 2 个 PSRAM 摄像头帧缓冲、QVGA JPEG、16 kHz 双向 I²S，TiRTC 最大发送缓冲 256 KiB。媒体层拒绝大于 128 KiB 的 JPEG，并在发送缓冲达到 192 KiB 时暂停视频；该限制约束应用提交的帧，不代表摄像头驱动实际分配的帧缓冲上限。
 
 | 已由源代码限制的项目 | 上限或配置 | 内存位置/待验证 |

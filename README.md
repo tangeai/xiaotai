@@ -112,6 +112,9 @@ python3 tools/build.py --board <board-id>
 python3 tools/build.py --all --keep-going
 ```
 
+当前 ESP32-S3 / ESP32-P4 工程使用 **ESP-IDF v5.5.5**，构建前执行
+`. tools/activate_esp_idf.sh`，并用 `idf.py --version` 核对。
+
 ESP-IDF 和 Beken 仍是两个独立 SDK（软件开发工具包）工程。统一入口只负责选板和分发，
 不会把两套构建系统混在一起。开发和交付要求见[参与开发](CONTRIBUTING.md)。
 

@@ -1,5 +1,10 @@
 # ESP-IDF platform project
 
+Current S3 and P4 projects use **ESP-IDF v5.5.5**, commit
+`b774170ff46c393eeb5e495ea37936038d3f4f4f`. Source
+`tools/activate_esp_idf.sh` from the repository root and check `idf.py --version`.
+The component range `>=5.5,<5.6` is a compatibility constraint, not the current build version.
+
 ESP32-S3 and ESP32-P4 share a platform family but use target-specific TiRTC
 archives and toolchains. During migration, board manifests dispatch to the
 existing ESP-IDF projects. Board drivers will move behind the stable media and
@@ -64,3 +69,11 @@ remain in board adapters.
 Build and hardware verification belong to each board's release record, not to
 this directory description. BK audio also consumes the common lifecycle and
 PCM contract; its other peripherals remain behind Beken-specific board adapters.
+
+The CoreS3-Lite project uses the same product/runtime and the canonical S3 media
+pipeline in `components/starter_media_s3`. LCKFB's previous media source paths
+remain compatibility symlinks. M5 power, audio, camera, display and touch live
+under `boards/m5stack/cores3-lite`; explicit ILI9342C/E variants select panel
+commands. GPIO0 remains I2S MCLK, so this touch board's optional button startup
+succeeds without creating a GPIO polling task. Board identity is injected by
+the selected runtime component instead of inheriting LCKFB's reported name.

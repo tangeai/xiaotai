@@ -1,4 +1,5 @@
 #include "xiaotai_binding_countdown.h"
+#include "xiaotai_ui_copy.h"
 /*
  * ThingConnect 平台传输 adapter。
  *
@@ -51,7 +52,7 @@
 /* 必须与组合根的联调 profile 一致，避免空配置时静默切回 HTTPS。 */
 #define PLATFORM_DEFAULT_DISCOVERY CONFIG_XIAOTAI_DISCOVERY_URL
 #define PLATFORM_DEFAULT_PROVISION_TIMEOUT_SECONDS 190U
-#define EXPERIENCE_PLATFORM_URL CONFIG_XIAOTAI_PORTAL_URL
+#define EXPERIENCE_PLATFORM_URL XIAOTAI_BIND_PORTAL_URL
 #define PROVISION_DONE_BIT BIT0
 #define PROVISION_ERROR_BIT BIT1
 #define PROVISION_READY_BIT BIT2

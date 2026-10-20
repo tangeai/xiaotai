@@ -85,7 +85,7 @@ RGB565 资源导入方式。其教学示例中逐帧分配/复制/释放位图�
 ## 自动验证
 
 ```bash
-# 先激活自己的 ESP-IDF 5.5.x 环境
+# 先激活自己的 ESP-IDF 5.5.5 环境
 idf.py build
 bash ../../../../tools/run_host_tests.sh
 bash tools/check_product_ui_policy.sh ../../../../platforms/esp-idf/components/starter_product/src/starter_product.c

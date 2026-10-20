@@ -1,7 +1,7 @@
 # lckfb_esp32s3_xiaotai
 
 这是立创·实战派 ESP32-S3 开发板 PCB V1.0.1 的 AIROBOT 语音版固件，
-板上模组为 `ESP32-S3-WROOM-1-N16R8`。固件使用 ESP-IDF 5.5.x、TiRTC SDK
+板上模组为 `ESP32-S3-WROOM-1-N16R8`。固件使用 ESP-IDF 5.5.5、TiRTC SDK
 2.5.0 和 LVGL 8.3.11。工程包含 320×240 触控产品界面、设备配网/绑定上线、
 AI 双向语音、设备/微信纯语音呼叫，以及原有 H5 MJPEG 实时画面与双向语音能力。
 S3 产品界面不显示视频通话、本地预览或摄像头开关。
@@ -10,7 +10,7 @@ S3 产品界面不显示视频通话、本地预览或摄像头开关。
 
 ## 构建和烧录
 
-准备 ESP-IDF 5.5.x 环境后执行：
+准备 ESP-IDF 5.5.5 环境后执行：
 
 ```bash
 idf.py set-target esp32s3

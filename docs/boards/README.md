@@ -9,10 +9,11 @@
 
 | 板卡 ID（仓库中的开发板唯一名称） | 厂商与型号 | 平台 | 资源 | 能力 | 当前状态 | 说明 |
 |---|---|---|---|---|---|---|
-| `alientek-atk-dnesp32s3` | ALIENTEK ATK-DNESP32S3 V1.4 | ESP32-S3 / ESP-IDF | 16 MB Flash / 8 MB PSRAM | 音频、按键、MJPEG 摄像头、Wi-Fi | 实板已跑通 | [打开](alientek-atk-dnesp32s3/README.md) |
-| `lckfb-esp32s3` | 立创·实战派 ESP32-S3（ESP32-S3-WROOM-1-N16R8，PCB V1.0.1） | ESP32-S3 / ESP-IDF | 16 MB Flash / 8 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Wi-Fi | 实板已跑通 | [下载 v1.0.1 · build.2](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.1) · [开发板指南](lckfb-esp32s3/README.md) |
-| `waveshare-esp32p4-touch-lcd-43c-v10` | Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 | ESP32-P4 / ESP-IDF | 32 MB Flash / 32 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Hosted Wi-Fi | 设备互呼已实板运行；完整验收待补 | [下载 v1.0.1 · build.2](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1) · [开发板指南](waveshare-esp32p4-touch-lcd-43c-v10/README.md) |
+| `alientek-atk-dnesp32s3` | ALIENTEK ATK-DNESP32S3 V1.4 | ESP32-S3 / ESP-IDF 5.5.5 | 16 MB Flash / 8 MB PSRAM | 音频、按键、MJPEG 摄像头、Wi-Fi | 实板已跑通 | [打开](alientek-atk-dnesp32s3/README.md) |
+| `lckfb-esp32s3` | 立创·实战派 ESP32-S3（ESP32-S3-WROOM-1-N16R8，PCB V1.0.1） | ESP32-S3 / ESP-IDF 5.5.5 | 16 MB Flash / 8 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Wi-Fi | 实板已跑通 | [下载 v1.0.1 · build.2](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.1) · [开发板指南](lckfb-esp32s3/README.md) |
+| `waveshare-esp32p4-touch-lcd-43c-v10` | Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 | ESP32-P4 / ESP-IDF 5.5.5 | 32 MB Flash / 32 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Hosted Wi-Fi | 设备互呼已实板运行；完整验收待补 | [下载 v1.0.1 · build.2](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1) · [开发板指南](waveshare-esp32p4-touch-lcd-43c-v10/README.md) |
 | `lckfb-bk7258` | 立创·实战派 BK7258 | BK7258 / Beken AVDK | 8 MiB Flash / 16 MiB PSRAM / 640 KiB SRAM（构建配置） | 音频、屏幕、触摸、H.264 摄像头、Wi-Fi | 实板已跑通 | [下载 v1.0.1 · build.56](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.1) · [开发板指南](lckfb-bk7258/README.md) |
+| `m5stack-cores3-lite` | M5Stack CoreS3-Lite (K128-Lite) | ESP32-S3 / ESP-IDF 5.5.5 | 16 MB Flash / 8 MB PSRAM | AEC、音频、触摸屏、GC0308、Wi-Fi | 编译适配；实板待验证 | [开发板指南](m5stack-cores3-lite/README.md) |
 
 当前 v1.0.1 三板发布包已通过构建和主机检查，同版实板验收仍待完成；表中的历史
 实板记录不代表本次发布包已经完成全部验收，具体范围见各 Release 说明。

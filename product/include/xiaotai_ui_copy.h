@@ -1,10 +1,11 @@
 #ifndef XIAOTAI_UI_COPY_H
 #define XIAOTAI_UI_COPY_H
 
-/* Product wording shared by touch adapters; geometry remains platform-owned. */
+/* Product wording shared by UI and console; geometry remains platform-owned. */
+#define XIAOTAI_BIND_PORTAL_URL "https://xiaotai.chat"
 #define XIAOTAI_UI_BIND_SUCCESS "绑定成功，正在启动…"
 #define XIAOTAI_UI_BIND_TITLE "绑定设备"
-#define XIAOTAI_UI_BIND_URL "打开 https://xiaotai.chat"
+#define XIAOTAI_UI_BIND_URL "打开 " XIAOTAI_BIND_PORTAL_URL
 #define XIAOTAI_UI_BIND_ACCOUNT "首次使用先注册，已有账号直接登录"
 #define XIAOTAI_UI_BIND_ENTER "选择「添加设备」，输入下方验证码"
 #define XIAOTAI_UI_ROOM_PASSWORD_HINT "无密码直接点击确定"

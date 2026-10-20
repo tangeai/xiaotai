@@ -1,4 +1,5 @@
 """Run production onboarding entry points with deterministic SDK fault injection."""
+import re
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
 
@@ -117,18 +118,35 @@ int main(void){provision_mqtt_t ctx={.events=(void*)1,.mqtt=1,.ack_message_id=-1
 
     def test_binding_page_is_not_released_before_storage_or_online(self):
         source = PLATFORM.read_text()
+        portal_define = re.search(r'^#define EXPERIENCE_PLATFORM_URL .+$',
+                                  source, re.MULTILINE).group(0)
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
+#include "''' + str(ROOT / 'product/include/xiaotai_ui_copy.h') + r'''"
 #define ESP_OK 0
 #define ESP_ERR_INVALID_ARG 1
 #define PLATFORM_DEFAULT_DISCOVERY "test"
-#define EXPERIENCE_PLATFORM_URL "test"
-#define ESP_LOGW(...) ((void)0)
+/* Reproduce a saved sdkconfig from before the public portal was corrected. */
+#define CONFIG_XIAOTAI_PORTAL_URL "https://demo-open.tange-ai.com"
+''' + portal_define + r'''
+static unsigned portal_logs;
+static void observe_warning(const char *format, ...){
+ char message[256];
+ va_list args;va_start(args,format);
+ vsnprintf(message,sizeof(message),format,args);va_end(args);
+ if(strstr(message,"registration/login:")){
+  assert(!strcmp(message,"registration/login: https://xiaotai.chat"));
+  assert(!strcmp(XIAOTAI_UI_BIND_URL,"打开 https://xiaotai.chat"));
+  portal_logs++;
+ }
+}
+#define ESP_LOGW(tag,...) observe_warning(__VA_ARGS__)
 #define ESP_LOGI(...) ((void)0)
 #define ESP_LOGD(...) ((void)0)
 typedef int esp_err_t;
@@ -150,6 +168,7 @@ int main(void){platform_provision_config_t c={.mac_address="mac"};platform_provi
  assert(platform_client_provision(&c,&result)==ESP_OK);
  assert(s_binding_required && !s_provisioning); /* Credentials are not persisted yet. */
  grant_error=7;assert(platform_client_provision(&c,&result)==7 && s_binding_required);
+ assert(portal_logs==2);
 }
 ''')
 

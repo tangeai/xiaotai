@@ -361,7 +361,11 @@ class P4ReleaseContractTest(unittest.TestCase):
             ("XIAOTAI_UI_BIND_ENTER", "选择「添加设备」，输入下方验证码"),
         ):
             self.assertIn(macro, binding)
-            self.assertIn(text, copy)
+            if macro == "XIAOTAI_UI_BIND_URL":
+                self.assertIn('#define XIAOTAI_BIND_PORTAL_URL "https://xiaotai.chat"', copy)
+                self.assertIn('#define XIAOTAI_UI_BIND_URL "打开 " XIAOTAI_BIND_PORTAL_URL', copy)
+            else:
+                self.assertIn(text, copy)
             self.assertIn(text, requirements)
         self.assertIn("等待绑定，验证码将语音播报 3 次", binding)
         self.assertIn("等待绑定，验证码将语音播报 3 次", requirements)

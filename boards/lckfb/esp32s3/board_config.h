@@ -55,6 +55,9 @@
 #define LCD_V_RES 240
 #define LCD_NATIVE_H_RES 240
 #define LCD_NATIVE_V_RES 320
+#define LCD_SWAP_XY true
+#define LCD_MIRROR_X true
+#define LCD_MIRROR_Y false
 #define LCD_PIN_MOSI GPIO_NUM_40
 #define LCD_PIN_SCLK GPIO_NUM_41
 #define LCD_PIN_DC GPIO_NUM_39

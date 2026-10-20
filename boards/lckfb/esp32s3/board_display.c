@@ -66,8 +66,8 @@ esp_err_t szpi_board_display_init(szpi_board_display_t *display)
     ESP_RETURN_ON_ERROR(esp_lcd_panel_init(display->panel), TAG, "panel init");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_invert_color(display->panel, true), TAG,
                         "panel invert");
-    ESP_RETURN_ON_ERROR(esp_lcd_panel_swap_xy(display->panel, true), TAG, "panel swap");
-    ESP_RETURN_ON_ERROR(esp_lcd_panel_mirror(display->panel, true, false), TAG,
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_swap_xy(display->panel, LCD_SWAP_XY), TAG, "panel swap");
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_mirror(display->panel, LCD_MIRROR_X, LCD_MIRROR_Y), TAG,
                         "panel mirror");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(display->panel, true), TAG, "panel on");
 
@@ -84,7 +84,7 @@ esp_err_t szpi_board_display_init(szpi_board_display_t *display)
         .rst_gpio_num = GPIO_NUM_NC,
         .int_gpio_num = GPIO_NUM_NC,
         .levels = {.reset = 0, .interrupt = 0},
-        .flags = {.swap_xy = 1, .mirror_x = 1, .mirror_y = 0},
+        .flags = {.swap_xy = LCD_SWAP_XY, .mirror_x = LCD_MIRROR_X, .mirror_y = LCD_MIRROR_Y},
     };
     ESP_RETURN_ON_ERROR(esp_lcd_touch_new_i2c_ft5x06(
                             touch_io, &touch, &display->touch),

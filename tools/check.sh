@@ -3,6 +3,10 @@ set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+python3 "$repo_dir/tools/tests/test_cores3_board.py"
+python3 "$repo_dir/tools/tests/test_cores3_memory_config.py"
+# Includes CoreS3 camera-at-top 180-degree display/touch and LCKFB compatibility.
+python3 "$repo_dir/tools/tests/test_s3_display_geometry.py"
 python3 "$repo_dir/tools/tests/test_contact_pagination_layout.py"
 python3 "$repo_dir/tools/tests/test_tip_layout.py"
 python3 "$repo_dir/tools/tests/test_room_keypad.py"
@@ -12,6 +16,7 @@ python3 "$repo_dir/tools/tests/test_reset_only_prototype.py"
 python3 "$repo_dir/tools/tests/test_binding_guidance.py"
 python3 "$repo_dir/tools/tests/test_binding_countdown.py"
 python3 "$repo_dir/tools/tests/test_binding_completion.py"
+# Includes saved legacy portal configuration versus the actual binding log/UI.
 python3 "$repo_dir/tools/tests/test_onboarding_faults.py"
 python3 "$repo_dir/tools/tests/test_status_metric_validity.py"
 python3 "$repo_dir/tools/tests/test_call_error_reset.py"

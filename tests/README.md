@@ -14,6 +14,11 @@ bash tools/check.sh
 `tools/check.sh` 会执行全部主机测试、板卡 manifest 校验和补丁空白检查。若只需要
 重复运行主机测试，可执行 `bash tools/run_host_tests.sh`。
 
+`test_onboarding_faults.py` 还回放带旧 `CONFIG_XIAOTAI_PORTAL_URL` 的真实
+ESP 绑定入口，捕获串口输出并与屏幕文案核对。旧实现输出演示站而失败；修正后
+共同使用产品层 `https://xiaotai.chat`。该配置只用于提示，移除不影响服务发现、
+API 或 MQTT 地址；原有绑定显示、存储失败和重试测试继续覆盖流程。
+
 产品核心测试还会生成 `tests/.local/reports/product-core-coverage.json`，并要求生产
 代码行覆盖率不低于 88%，分支覆盖率不低于 57%。会话运行时单独要求 95% 行、65%
 分支，呼叫状态要求 95% 行、60% 分支，媒体参数契约要求 100%，多人对讲要求
@@ -31,6 +36,32 @@ bash tools/check.sh
 - 重构约束：仓库布局、构建调度、验证包和板卡 registry。
 
 ## 测试驱动开发约定
+
+CoreS3 摄像头在顶部的 180° 方向通过 `test_s3_display_geometry.py` 回放生产
+LVGL 注册与触摸配置。先在原方向断言失败，再验证两轴镜像且不交换 XY；
+按锁定的 esp_lcd_touch 1.2.1 `max - raw` 语义验证四角和中心，坐标不越界。
+同一测试继续保护立创原方向。实板仍需检查屏幕朝向和四角点击。
+
+S3 显示几何回归：`test_s3_display_geometry.py` 执行生产 `lvgl_init()`，
+在 LVGL 注册边界按实际板卡的原生尺寸验证地址范围、四角和方向。
+先复现 CoreS3 被共享代码强制交换 XY 后，240×320 面板地址范围与 320×240 UI 不符；
+改为板级方向参数后通过，并保留立创 ST7789 交换 XY / 水平镜像的既有行为。
+已注册 `tools/check.sh` 和 CoreS3 原生构建检查。实板仍须验证完整页面、颜色和四角触摸。
+
+CoreS3-Lite PSRAM 启动回归：`test_cores3_memory_config.py` 先在当前默认 Octal
+模式上失败，再验证 Quad 默认值及生产 CMake 检查入口对旧配置、关闭 PSRAM、
+冲突配置的拒绝。真实 `idf.py reconfigure` 也用保留的 Octal `sdkconfig` 验证拒绝，
+避免只改 defaults 而继续编出错误镜像。已注册 `tools/check.sh`；
+这证明配置约束，Quad 固件启动、8 MB 内存识别与内存测试仍须同版实板验证。
+
+CoreS3-Lite：`test_cores3_board.py` 先在缺少板卡、供电入口及音频槽位适配时失败，
+新增实现后验证显式 C/E 屏幕变体、独立版本来源、MIC1/MIC3 压紧、摄像头电源位保护、
+错误传播及面板指令隔离。设备能力上报用 HEAD 原实现重放，先复现错误的立创板名；
+触摸板按键启动先复现缺失成功入口，再验证不占 GPIO0 且不阻塞控制启动。
+已注册 `tools/check.sh`，也由新板原生构建执行。S3 媒体源码移入平台目录属于行为保持
+重构，既有 `test_s3_*`、音频契约和主机媒体测试继续通过原兼容路径覆盖。
+ESP-IDF 版本文档由板卡清单、`tools/setup_esp_idf.sh` 和实际构建描述符交叉核对；
+不为文案新增自证测试。实板仍需核对 PCB/屏幕、音视频、双讲和全部业务流程。
 
 2026-10-17 ESP32 双附件交付：`test_esp_merged_firmware.py` 从分文件 ZIP 调用
 公开合并入口，覆盖 S3/P4 不同引导地址、P4 OTA 数据、原始 ZIP 不变、两附件校验清单、

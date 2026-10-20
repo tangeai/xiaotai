@@ -3987,8 +3987,8 @@ static esp_err_t lvgl_init(void)
     };
     ESP_RETURN_ON_ERROR(lvgl_port_init(&port), TAG, "LVGL port");
     /*
-     * The working device-monitor BSP for this exact ST7789 + FT5x06 display
-     * uses a complete canvas in PSRAM and sends it in 10-line SPI chunks.
+     * The LCKFB ST7789 reference uses a complete canvas in PSRAM and sends
+     * it in bounded SPI chunks. Keep this shared S3 buffering policy.
      * A two-buffer, 10-line render canvas caused intermittent incomplete
      * invalidated areas here: LVGL's objects were valid, but one eye's dirty
      * rectangle was not consistently committed to the panel.  Keep the full
@@ -4004,7 +4004,10 @@ static esp_err_t lvgl_init(void)
         .hres = LCD_H_RES,
         .vres = LCD_V_RES,
         .monochrome = false,
-        .rotation = {.swap_xy = true, .mirror_x = true, .mirror_y = false},
+        /* The port reapplies these values during registration and rotation.
+         * Use the same board geometry as panel and touch initialization. */
+        .rotation = {.swap_xy = LCD_SWAP_XY,
+                     .mirror_x = LCD_MIRROR_X, .mirror_y = LCD_MIRROR_Y},
         .flags = {.buff_dma = false, .buff_spiram = true},
     };
     s_display = lvgl_port_add_disp(&display);

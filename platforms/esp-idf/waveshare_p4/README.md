@@ -1,5 +1,9 @@
 # Waveshare ESP32-P4 family adapter
 
+当前应用工程使用 **ESP-IDF v5.5.5**；先在仓库根目录执行
+`. tools/activate_esp_idf.sh`，再用 `idf.py --version` 核对。
+
+
 This directory owns the hardware implementation shared by the supported
 Waveshare ESP32-P4 display boards. Per-board pin, codec, and panel choices stay
 in each board's `hardware_board_config.h`; product session and UI policy stay

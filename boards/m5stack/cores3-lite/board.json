@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "m5stack-cores3-lite",
+  "vendor": "M5Stack",
+  "model": "CoreS3-Lite (K128-Lite)",
+  "revision": null,
+  "platform": "esp-idf",
+  "target": "esp32s3",
+  "sdk": {
+    "name": "ESP-IDF",
+    "version": "5.5.5"
+  },
+  "project_dir": "firmware/esp-idf/esp32s3/m5stack-cores3-lite",
+  "capabilities": [
+    "aec",
+    "audio",
+    "camera-mjpeg",
+    "display",
+    "touch",
+    "wifi"
+  ],
+  "resources": {
+    "flash_bytes": 16777216,
+    "psram_bytes": 8388608
+  },
+  "evidence": {
+    "hardware_ir": "boards/m5stack/cores3-lite/hardware-ir.json"
+  },
+  "variants": [
+    {
+      "name": "ili9342e",
+      "default": true,
+      "interaction_profile": "touch-full",
+      "layout_profile": "compact"
+    },
+    {
+      "name": "ili9342c",
+      "default": false,
+      "interaction_profile": "touch-full",
+      "layout_profile": "compact"
+    }
+  ],
+  "migration": {
+    "stage": "board-adapter"
+  }
+}

@@ -1,0 +1,415 @@
+{
+  "schema_version": 2,
+  "board": {
+    "id": "m5stack-cores3-lite",
+    "vendor": "M5Stack",
+    "model": "CoreS3-Lite K128-Lite",
+    "hardware_revision": "PCB unconfirmed; schematic v1.0; explicit ILI9342C/E variants",
+    "physical_revision_confirmed": false
+  },
+  "sources": [
+    {
+      "id": "bsp_audio.c",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://raw.githubusercontent.com/espressif/esp-bsp/master/bsp/m5stack_core_s3/src/bsp_audio.c",
+      "revision": "downloaded 2026-10-20; SHA-256 29f7b11377132cd10f54fd090cdc029d9d0b0b3e14ab0d52ead47c3f5067a244"
+    },
+    {
+      "id": "bsp_camera.c",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://raw.githubusercontent.com/espressif/esp-bsp/master/bsp/m5stack_core_s3/src/bsp_camera.c",
+      "revision": "downloaded 2026-10-20; SHA-256 d034dc4eda55a7c412ef6e096889aff5008f691d187a1ff5303df732d4b3b28b"
+    },
+    {
+      "id": "bsp_display.c",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://raw.githubusercontent.com/espressif/esp-bsp/master/bsp/m5stack_core_s3/src/bsp_display.c",
+      "revision": "downloaded 2026-10-20; SHA-256 4670c095dc02ce7c4ebf6c1ae5e974eb39d0c30ca5e23163ba30fe9f924c10f8"
+    },
+    {
+      "id": "bsp_feature_en.c",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://raw.githubusercontent.com/espressif/esp-bsp/master/bsp/m5stack_core_s3/src/bsp_feature_en.c",
+      "revision": "downloaded 2026-10-20; SHA-256 7afb947602329f772e2a4834eb5060d5af7add34e8d4533d6fec9950203076cb"
+    },
+    {
+      "id": "bsp_i2c.c",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://raw.githubusercontent.com/espressif/esp-bsp/master/bsp/m5stack_core_s3/src/bsp_i2c.c",
+      "revision": "downloaded 2026-10-20; SHA-256 aa0f2549e262f144f0751d49b69561b8a1846cd14d249713afa503c1b20e6e83"
+    },
+    {
+      "id": "bsp_io_expander.c",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://raw.githubusercontent.com/espressif/esp-bsp/master/bsp/m5stack_core_s3/src/bsp_io_expander.c",
+      "revision": "downloaded 2026-10-20; SHA-256 e08eb4bfef3149945210a512294ff33e4bcdcf8aa8ee6331374e54b9f423ba12"
+    },
+    {
+      "id": "m5stack_core_s3.h",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://raw.githubusercontent.com/espressif/esp-bsp/master/bsp/m5stack_core_s3/include/bsp/m5stack_core_s3.h",
+      "revision": "downloaded 2026-10-20; SHA-256 63b9b375b6405470002fc03f3518204312076bfd0acefb190b76e12d175c6e38"
+    },
+    {
+      "id": "M5Unified.cpp",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://raw.githubusercontent.com/m5stack/M5Unified/master/src/M5Unified.cpp",
+      "revision": "downloaded 2026-10-20; SHA-256 fc6dd5141febc3f04e6a20ada9fee2b2287b07701e5495c5bf52ca83e9375146"
+    },
+    {
+      "id": "M5Unified-LICENSE",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://raw.githubusercontent.com/m5stack/M5Unified/master/LICENSE",
+      "revision": "downloaded 2026-10-20; SHA-256 44611d917bece311f5c8eeffce83d8bf9e9ca3f815d262f694ff4a7996af50ea"
+    },
+    {
+      "id": "CoreS3-Lite.html",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://docs.m5stack.com/zh_CN/core/CoreS3-Lite",
+      "revision": "downloaded 2026-10-20; SHA-256 a1b392faa3e1619398c2613a9f29d220a1054286ecb9c38fa4dc6cf21ff93a8c"
+    },
+    {
+      "id": "Sch_M5_CoreS3_v1.0.pdf",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/490/Sch_M5_CoreS3_v1.0.pdf",
+      "revision": "downloaded 2026-10-20; SHA-256 58a15454eccb11d2668e1a9a3ad85943b9a58b104c5f1ed137b790192ec27c04"
+    },
+    {
+      "id": "AXP2101.pdf",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/datasheet/core/K128%20CoreS3/AXP2101_Datasheet_V1.0_en.pdf",
+      "revision": "downloaded 2026-10-20; SHA-256 421011983c56034e1074d28e22826e8414d55f8dc5344cd67967942e3bc8b8d9"
+    },
+    {
+      "id": "ES7210.pdf",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/datasheet/core/K128%20CoreS3/ES7210.PDF",
+      "revision": "downloaded 2026-10-20; SHA-256 909a13dcd8770835914ef0de0cb5a44aba6d4312daf1d99768e0dab65f0e87e6"
+    },
+    {
+      "id": "AW88298.pdf",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/datasheet/core/K128%20CoreS3/AW88298.PDF",
+      "revision": "downloaded 2026-10-20; SHA-256 d9060b2d8a19f4bcb85c5e116458dfd53973d9ddfd26b334ff8b149be064a9bf"
+    },
+    {
+      "id": "GC0308.pdf",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/datasheet/core/K128%20CoreS3/GC0308.PDF",
+      "revision": "downloaded 2026-10-20; SHA-256 b8a73e544473cd14e04760db5c0c906129036ef0d2f5f86d87f451d3df5f4dcd"
+    },
+    {
+      "id": "AW9523B.pdf",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/products/core/CoreS3/AW9523B-CN.pdf",
+      "revision": "downloaded 2026-10-20; SHA-256 24022acd5860b74eb898b08a93e09287bde1909fae3caab4eb27a8a2a1b12d42"
+    },
+    {
+      "id": "ILI9342E.pdf",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/644/ILI9342E.pdf",
+      "revision": "downloaded 2026-10-20; SHA-256 2bcca2655e73d4b569583e518dc64b514678dea6ccb8b3ed8bfcf081bdc0c188"
+    },
+    {
+      "id": "Panel_ILI9342.hpp",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://raw.githubusercontent.com/m5stack/M5GFX/master/src/lgfx/v1/panel/Panel_ILI9342.hpp",
+      "revision": "downloaded 2026-10-20; SHA-256 675e3837c13306b72826c9d3a8e69b3d7dd680e334e50784cbbea2c616b79a16"
+    },
+    {
+      "id": "M5GFX.cpp",
+      "kind": "official-vendor-document-or-source",
+      "location": "https://raw.githubusercontent.com/m5stack/M5GFX/master/src/M5GFX.cpp",
+      "revision": "downloaded 2026-10-20; SHA-256 314251ee69846afa754e11738bb44eaf00509c2b8b5b9de679f34e10411af6bc"
+    },
+    {
+      "id": "project-adapter",
+      "kind": "project-source",
+      "location": "board_adapter.c",
+      "revision": "source design; hardware unverified"
+    }
+  ],
+  "soc": {
+    "target": "esp32s3",
+    "module": "ESP32-S3; exact package marking unprobed",
+    "flash_mb": 16,
+    "psram_mb": 8,
+    "source_refs": [
+      "Sch_M5_CoreS3_v1.0.pdf",
+      "m5stack_core_s3.h",
+      "project-adapter"
+    ]
+  },
+  "toolchain": {
+    "framework": "esp-idf",
+    "framework_version": "5.5.5",
+    "verification": "corroborated",
+    "tirtc": {
+      "platform": "espressif-esp32s3",
+      "version": "2.5.0",
+      "sdk_path": "../../../firmware/esp-idf/esp32s3/m5stack-cores3-lite/third_party/tirtc",
+      "build_contract": "manifest/build-contract.env"
+    },
+    "source_refs": [
+      "project-adapter"
+    ]
+  },
+  "camera": {
+    "present": true,
+    "sensor": "GC0308",
+    "interface": "DVP RGB565; external 24MHz oscillator",
+    "selected_video_profile": "gc0308-qvga-mjpeg",
+    "video_profiles": [
+      {
+        "id": "gc0308-qvga-mjpeg",
+        "codec": "mjpeg",
+        "available": true,
+        "output_format": "jpeg_complete_frames",
+        "refresh_frame_control": true,
+        "stream_id": 11,
+        "verification": "corroborated",
+        "source_refs": [
+          "Sch_M5_CoreS3_v1.0.pdf",
+          "m5stack_core_s3.h",
+          "project-adapter"
+        ]
+      }
+    ],
+    "source_refs": [
+      "Sch_M5_CoreS3_v1.0.pdf",
+      "m5stack_core_s3.h",
+      "project-adapter"
+    ]
+  },
+  "audio_input": {
+    "present": true,
+    "interface": "ES7210 four-slot TDM MIC1/MIC3/MIC2/MIC4; normalize MIC1+physical speaker reference MIC3",
+    "codecs": [
+      {
+        "name": "alaw",
+        "sample_rates_hz": [
+          8000
+        ],
+        "verification": "corroborated"
+      },
+      {
+        "name": "opus",
+        "sample_rates_hz": [
+          16000
+        ],
+        "verification": "corroborated"
+      }
+    ],
+    "source_refs": [
+      "Sch_M5_CoreS3_v1.0.pdf",
+      "m5stack_core_s3.h",
+      "project-adapter"
+    ]
+  },
+  "audio_output": {
+    "present": true,
+    "interface": "AW88298 standard I2S, widened 32-bit slots, 16-bit samples",
+    "codecs": [
+      {
+        "name": "alaw",
+        "sample_rates_hz": [
+          8000
+        ],
+        "verification": "corroborated"
+      },
+      {
+        "name": "opus",
+        "sample_rates_hz": [
+          16000
+        ],
+        "verification": "corroborated"
+      }
+    ],
+    "source_refs": [
+      "Sch_M5_CoreS3_v1.0.pdf",
+      "m5stack_core_s3.h",
+      "project-adapter"
+    ]
+  },
+  "hardware_resources": {
+    "i2c": {
+      "used": true,
+      "driver_family": "ng",
+      "single_driver_family": true,
+      "verification": "corroborated"
+    },
+    "i2s": {
+      "used": true,
+      "controller_and_gpio_ownership_resolved": true,
+      "verification": "corroborated"
+    },
+    "audio_channel_mapping": {
+      "required": true,
+      "resolved": true,
+      "verification": "corroborated"
+    },
+    "duplex_audio": {
+      "simultaneous_capture_playback": true,
+      "playback_reference_available": true,
+      "aec_implementation_available": true,
+      "verification": "corroborated"
+    },
+    "camera_realtime": {
+      "pipeline_safe": true,
+      "verification": "corroborated"
+    },
+    "memory": {
+      "startup_and_media_budgeted": true,
+      "verification": "corroborated",
+      "design_budget": "PSRAM: 2x153600 camera + 131072 JPEG + 2x153600 LVGL buffers plus bounded audio queues/AFE/model; internal DMA reserve 131072 configured. Runtime free/largest/stack margins unmeasured.",
+      "psram_bus_mode": "quad",
+      "psram_bus_mode_verification": "schematic",
+      "psram_bus_mode_evidence": "Sch_M5_CoreS3_v1.0.pdf page 3, U7 SIO0/SIO1/SIO2/SIO3, CS1. Capacity alone does not imply Octal mode.",
+      "psram_clock_mhz": 80,
+      "psram_runtime_verification": "User build.9 log: Found 8MB PSRAM, 80MHz, SPI SRAM memory test OK, entered app_main. Version/time/ELF prefix match local build.9; full device hash not supplied. Does not certify current image."
+    },
+    "source_refs": [
+      "Sch_M5_CoreS3_v1.0.pdf",
+      "m5stack_core_s3.h",
+      "project-adapter"
+    ],
+    "pin_map": {
+      "i2c_sda": 12,
+      "i2c_scl": 11,
+      "i2s_mclk": 0,
+      "i2s_bclk": 34,
+      "i2s_ws": 33,
+      "i2s_capture": 14,
+      "i2s_playback": 13,
+      "camera_data": [
+        39,
+        40,
+        41,
+        42,
+        15,
+        16,
+        48,
+        47
+      ],
+      "camera_pclk": 45,
+      "camera_vsync": 46,
+      "camera_href": 38,
+      "camera_xclk": -1,
+      "lcd_mosi": 37,
+      "lcd_clk": 36,
+      "lcd_cs": 3,
+      "lcd_dc": 35
+    }
+  },
+  "onboarding": {
+    "wifi_credentials": {
+      "selected_method": "softap",
+      "methods": [
+        {
+          "id": "softap",
+          "type": "softap",
+          "available": true,
+          "ssid_prefix": "XiaoTai-",
+          "auth_mode": "open",
+          "ipv4_address": "192.168.6.1",
+          "captive_portal": true,
+          "verification": "corroborated",
+          "source_refs": [
+            "project-adapter"
+          ]
+        }
+      ],
+      "credentials_committed_to_source": false,
+      "reprovisioning_defined": true
+    },
+    "device_binding": {
+      "selected_method": "verification-code",
+      "methods": [
+        {
+          "id": "verification-code",
+          "type": "verification_code",
+          "available": true,
+          "verification": "corroborated",
+          "source_refs": [
+            "project-adapter"
+          ]
+        }
+      ],
+      "credentials_committed_to_source": false,
+      "stored_credential_state_handled": true,
+      "clear_binding_control": true
+    },
+    "source_refs": [
+      "project-adapter"
+    ]
+  },
+  "build_evidence": {
+    "artifacts": [
+      {
+        "path": "../../../firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/m5stack_cores3_lite_xiaotai.bin",
+        "size_bytes": 4097808,
+        "sha256": "c70885d9ef28170ac4ad0456d45720317329ab351a3d72d2f77ffcd3d8d6a7f8"
+      },
+      {
+        "path": "../../../firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/m5stack_cores3_lite_xiaotai.elf",
+        "size_bytes": 29137872,
+        "sha256": "e278d1e71432fd70d12c48bc53df3dbe2d3429496333e8005e8a4a9e8b29512b"
+      }
+    ],
+    "status": "COMPILE_PASS",
+    "variant": "ili9342e",
+    "version": "1.0.1+build.12",
+    "idf_version": "v5.5.5",
+    "note": "Quad PSRAM and board-owned LCD rotation. Native E-panel build exited 0. Display/PSRAM guards and final repository checks are recorded in VALIDATION.md. Current-image HIL pending."
+  },
+  "runtime_evidence": [],
+  "features": {
+    "requested": [
+      "h5_live_audio",
+      "h5_live_video",
+      "h5_talkback",
+      "ai_talk",
+      "device_call",
+      "wechat_voip"
+    ]
+  },
+  "issues": [
+    {
+      "classification": "source_resolvable",
+      "status": "resolved",
+      "description": "Official webpage audio table reverses GPIO13/14 relative to schematic page2/3 and official BSP. Use RX14/TX13."
+    },
+    {
+      "classification": "hil_resolvable",
+      "status": "pending",
+      "description": "Physical PCB/panel revision, camera orientation, real TDM slots, AEC double talk, runtime memory and all network flows need exact-artifact HIL."
+    },
+    {
+      "classification": "hil_resolvable",
+      "status": "resolved",
+      "description": "Octal configuration corrected to schematic U7 Quad. User build.9 log confirms 8MB/80MHz PSRAM and memory-test PASS, then enters app_main. Version/time/ELF prefix match local build.9; not a current-image HIL certificate."
+    },
+    {
+      "classification": "hil_resolvable",
+      "status": "pending",
+      "description": "User build.9 photo shows corrupted LCD. Production lvgl_init overwrote native ILI9342 320x240 with LCKFB swap_xy/mirror_x, shrinking column address space to 240. Regression reproduces mismatch; board-owned rotation corrects it. New display firmware needs panel/color/four-corner-touch HIL."
+    },
+    {
+      "severity": "warning",
+      "description": "User build.10 reports occasional AI self-echo and temporary unresponsive touch. status: AEC 2240 deadline misses / 9101 blocks, MIC clipped samples 351474; no playback I2S failures or RX overflow. Playback-active MIC/ref/clean measurement and 33 vs 24 dB gain comparison pending; see SOURCES.md and VALIDATION.md."
+    }
+  ],
+  "verification_scope": {
+    "method": "repository-native public-interface regressions and ESP-IDF compile/post-link audit",
+    "checks": [
+      "tools/tests/test_cores3_board.py",
+      "tools/check.sh",
+      "tools/check_esp_idf_i2c_driver_family.sh",
+      "tools/tests/test_cores3_memory_config.py",
+      "tools/tests/test_s3_display_geometry.py",
+      "tools/tests/test_onboarding_faults.py"
+    ],
+    "standalone_skill_build_assessment": "not certified; this repository shares sources outside the native IDF project and uses the current Opus AI contract",
+    "runtime": "User build.10 version/ELF prefix match: binding/MQTT/AI admitted, RX decoded/played counts match. Temporary unresponsive touch later recovered; occasional self-echo remains unresolved. build.12 includes canonical portal and user-requested camera-at-top 180-degree display/touch rotation; no agent flashing or current-artifact HIL."
+  }
+}

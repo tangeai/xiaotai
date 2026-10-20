@@ -17,7 +17,7 @@
 
 ## 构建依赖
 
-- ESP-IDF 5.5.4；
+- ESP-IDF 5.5.5（`v5.5.5`，提交 `b774170ff46c393eeb5e495ea37936038d3f4f4f`）；
 - ESP32-P4 版 TiRTC SDK，身份和校验值见 `components/tirtc_sdk/VERSION.md` 与
   `components/tirtc_sdk/SHA256SUMS.txt`；
 - 其他 ESP-IDF 组件的解析版本见 `dependencies.lock`。
