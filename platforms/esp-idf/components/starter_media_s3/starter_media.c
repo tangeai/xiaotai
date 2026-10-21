@@ -573,9 +573,15 @@ static void audio_uplink_task(void *argument)
             update_max_counter(&s_audio_encode_max_us, encode_us);
             update_timing_average(&s_encode_average, item->generation,
                                   &s_audio_encode_avg_us, encode_us);
-            if (encoded == ESP_AUDIO_ERR_OK && output.encoded_bytes > 0U &&
+            bool encoded_ok = encoded == ESP_AUDIO_ERR_OK && output.encoded_bytes > 0U &&
                 output.encoded_bytes <= sizeof(encoded_packet) &&
-                (use_opus || output.encoded_bytes == AUDIO_PACKET_SAMPLES)) {
+                (use_opus || output.encoded_bytes == AUDIO_PACKET_SAMPLES);
+            /* Encoding can yield while the runtime stops, mutes or replaces
+             * this owner. Do not submit its PCM using the SDK's new owner. */
+            if (encoded_ok && same_session(item->mode, item->generation) &&
+                item->mute_epoch == atomic_load(&s_mute_epoch) &&
+                !atomic_load_explicit(&s_microphone_muted, memory_order_acquire) &&
+                uplink_allowed(item->mode) && starter_tirtc_audio_ready()) {
                 int ret = use_opus
                     ? starter_tirtc_send_opus(item->timestamp_ms, encoded_packet,
                                               output.encoded_bytes)
@@ -594,7 +600,7 @@ static void audio_uplink_task(void *argument)
                                  (unsigned long)item->timestamp_ms);
                     }
                 }
-            } else {
+            } else if (!encoded_ok) {
                 ESP_LOGW(TAG, "uplink encode failed mode=%d ret=%s bytes=%u",
                          (int)item->mode,
                          esp_err_to_name(encoded), (unsigned)output.encoded_bytes);

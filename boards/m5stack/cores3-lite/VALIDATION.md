@@ -58,16 +58,16 @@ build.14 用户已运行，但报告每轮经常需要重复。此次未由代�
 行为回归及原生构建门禁验证；未套用独立生成工程的旧 A-law AI 静态合同，也未声称通过
 该 Skill 的独立 BUILD_VERIFIED 认证。设备业务与声学可用性仍须实板验收。
 
-## 当前保留产物：ILI9342E build.28
+## 当前保留产物：ILI9342E build.29
 
-本次 S3 纯音频策略原生构建退出 0；新镜像未烧录。两板能力上报、呼叫、媒体、SDK
+本次 S3 纯音频策略及编码后发送门禁修复原生构建退出 0；新镜像未烧录。两板能力上报、呼叫、媒体、SDK
 与 UI 的公共入口回归通过；H5 视频保留，P4 通话策略不变。
-精确版本为 `1.0.1+build.28`，ESP-IDF v5.5.5，屏幕变体 `ili9342e`。
+精确版本为 `1.0.1+build.29`，ESP-IDF v5.5.5，屏幕变体 `ili9342e`。
 
-- 应用：`firmware/esp-idf/esp32s3/m5stack-cores3-lite/artifacts/1.0.1+build.28/m5stack_cores3_lite_xiaotai.bin`，4020704 字节。
-- 应用 BIN SHA-256：`14fc9e01b1254efd12260aa43fb0ae6119b52465fb7c8c9f6cab3a50b7245dcd`。
-- ELF：同目录 `m5stack_cores3_lite_xiaotai.elf`，29081204 字节。
-- 完整 ELF SHA-256：`cf921d580ba83d9dba3fced2e53390518bb406b343e5ffde37442b1b3cb19855`；与 BIN 内 `app_elf_sha256` 一致。
+- 应用：`firmware/esp-idf/esp32s3/m5stack-cores3-lite/artifacts/1.0.1+build.29/m5stack_cores3_lite_xiaotai.bin`，4020784 字节。
+- 应用 BIN SHA-256：`45dbb13b749e4d0892d6a602e9a117bc969b307634b82347919a9ea7dd205d2b`。
+- ELF：同目录 `m5stack_cores3_lite_xiaotai.elf`，29081692 字节。
+- 完整 ELF SHA-256：`5cd0e940bf2ca2594488d8e5d3d2e16491b416e2b269f8d5b1fa903e200135b1`；与 BIN 内 `app_elf_sha256` 一致。
 - 同目录保留 bootloader、分区表及原生 `flasher_args.json`；封版说明见
   [FREEZE.md](../../../docs/boards/m5stack-cores3-lite/FREEZE.md)。
 

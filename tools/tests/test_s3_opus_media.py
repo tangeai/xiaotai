@@ -169,8 +169,14 @@ int main(void){
     def test_uplink_selects_codec_and_preserves_20ms_frames(self):
         self.check_uplink(g711=False)
 
-    def check_uplink(self, g711):
-        run_c(f'#define CONFIG_STARTER_AI_UPLINK_G711A {int(g711)}\n' + COMMON + r'''
+    def test_uplink_discards_frames_invalidated_during_encoding(self):
+        for g711 in (False, True):
+            for interruption in range(1, 8):
+                with self.subTest(g711=g711, interruption=interruption):
+                    self.check_uplink(g711, interruption)
+
+    def check_uplink(self, g711, interruption=0):
+        run_c(f'#define CONFIG_STARTER_AI_UPLINK_G711A {int(g711)}\n#define INTERRUPT_CASE {interruption}\n' + COMMON + r'''
 typedef struct {int mode;uint32_t generation,timestamp_ms;unsigned mute_epoch;
     size_t sample_count;int16_t pcm[320];} audio_tx_item_t;
 static audio_tx_item_t pool[1],*s_audio_tx_pool=pool;
@@ -180,9 +186,13 @@ static atomic_bool s_microphone_muted,s_uplink_enabled=true,s_room_pressed;
 static jmp_buf done;
 static unsigned reads,opus_enc,alaw_enc,opus_send,alaw_send;
 static size_t encoded_size=37;
+static unsigned interrupt_encode, encode_warnings;
+static bool transport_ready=true;
+#undef ESP_LOGW
+#define ESP_LOGW(...) ((void)++encode_warnings)
 static int64_t clock_us;
 static int64_t esp_timer_get_time(void){return clock_us;}
-static bool starter_tirtc_audio_ready(void){return true;}
+static bool starter_tirtc_audio_ready(void){return transport_ready;}
 static int xQueueReceive(int q,uint8_t *slot,int wait){
     if(reads++) {longjmp(done,1);} *slot=0;return pdTRUE;
 }
@@ -191,6 +201,15 @@ static int encode(esp_audio_enc_in_frame_t *in,esp_audio_enc_out_frame_t *out,bo
     clock_us+=opus ? 3000 : 800;
     assert(in->len==(opus ? 640U : 320U));
     assert(((int16_t *)in->buffer)[0]==42);
+    switch(interrupt_encode) {
+    case 1: s_microphone_muted=true;break;
+    case 2: atomic_fetch_add(&s_mute_epoch,1);break;
+    case 3: ++active_generation;break;
+    case 4: mode=STARTER_TIRTC_H5;break;
+    case 5: s_uplink_enabled=false;break;
+    case 6: s_room_pressed=false;break;
+    case 7: transport_ready=false;break;
+    }
     out->encoded_bytes=opus ? encoded_size : 160;return codec_error;
 }
 static int esp_g711_enc_process(void *h,esp_audio_enc_in_frame_t *i,esp_audio_enc_out_frame_t *o){
@@ -226,6 +245,15 @@ int main(void){
     assert(atomic_load(&s_audio_encode_max_us)==(CONFIG_STARTER_AI_UPLINK_G711A ? 800 : 3000));
     mode=STARTER_TIRTC_AI;codec_error=-1;replay();assert(opus_send==expected_opus && alaw_send==expected_alaw);
     codec_error=0;s_microphone_muted=true;replay();assert(opus_enc+alaw_enc==201);
+    if (INTERRUPT_CASE) {
+        s_microphone_muted=false;s_room_pressed=true;
+        mode=INTERRUPT_CASE==6 ? STARTER_TIRTC_ROOM : STARTER_TIRTC_AI;
+        unsigned warnings=encode_warnings;
+        interrupt_encode=INTERRUPT_CASE;replay();
+        assert(opus_send==expected_opus && alaw_send==expected_alaw);
+        assert(encode_warnings==warnings); /* Cancellation is not a codec error. */
+        assert(pool[0].sample_count==0); /* Return the slot even on cancellation. */
+    }
 }
 ''')
 

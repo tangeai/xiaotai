@@ -443,31 +443,31 @@
   "build_evidence": {
     "artifacts": [
       {
-        "path": "artifacts/1.0.1+build.28/m5stack_cores3_lite_xiaotai.bin",
-        "size_bytes": 4020704,
-        "sha256": "14fc9e01b1254efd12260aa43fb0ae6119b52465fb7c8c9f6cab3a50b7245dcd"
+        "path": "artifacts/1.0.1+build.29/m5stack_cores3_lite_xiaotai.bin",
+        "size_bytes": 4020784,
+        "sha256": "45dbb13b749e4d0892d6a602e9a117bc969b307634b82347919a9ea7dd205d2b"
       },
       {
-        "path": "artifacts/1.0.1+build.28/m5stack_cores3_lite_xiaotai.elf",
-        "size_bytes": 29081204,
-        "sha256": "cf921d580ba83d9dba3fced2e53390518bb406b343e5ffde37442b1b3cb19855"
+        "path": "artifacts/1.0.1+build.29/m5stack_cores3_lite_xiaotai.elf",
+        "size_bytes": 29081692,
+        "sha256": "5cd0e940bf2ca2594488d8e5d3d2e16491b416e2b269f8d5b1fa903e200135b1"
       },
       {
-        "path": "artifacts/1.0.1+build.28/bootloader.bin",
+        "path": "artifacts/1.0.1+build.29/bootloader/bootloader.bin",
         "size_bytes": 20848,
         "sha256": "baec2960de2b8d802c1417e7c399f1cd09c96c03d18ed12eba72bcffdbf650ef"
       },
       {
-        "path": "artifacts/1.0.1+build.28/partition-table.bin",
+        "path": "artifacts/1.0.1+build.29/partition_table/partition-table.bin",
         "size_bytes": 3072,
         "sha256": "1edad21a69d0791cb6fe8a4f47ea7c64cfd302031f8db2c9f68cdc9568ca124c"
       }
     ],
     "status": "COMPILE_PASS",
     "variant": "ili9342e",
-    "version": "1.0.1+build.28",
+    "version": "1.0.1+build.29",
     "idf_version": "v5.5.5",
-    "note": "ESP-IDF v5.5.5 native ILI9342E build and BIN/ELF identity passed. All S3 device and WeChat calls are audio-only; no video advertisement, UI action or media/SDK submission. H5 MJPEG and 180-degree metadata retained. AI alaw/8k uplink and opus/16k downlink, M5-only 4352-byte caption PSRAM migration and existing 64-byte cache-line configuration retained. No gain/AEC tuning. This artifact has not been flashed or hardware-validated. Artifact paths are relative to the native project; older runtime evidence only applies to its named artifacts."
+    "note": "ESP-IDF v5.5.5 native build and exact BIN/ELF identity passed. Post-encoding S3 uplink revalidates session, mute epoch, microphone, PTT/uplink and transport readiness; frames invalidated during encoding are not submitted and queue slots are returned. S3 calls remain audio-only, H5 MJPEG retained, AI up alaw/8k down opus/16k. No AEC/gain or memory/cache tuning in this patch. Current artifact has not been flashed; prior runtime observations apply only to their named artifacts. Artifact paths relative to native project."
   },
   "runtime_evidence": [
     {
@@ -598,6 +598,6 @@
       "tools/tests/test_cores3_text_memory.py"
     ],
     "standalone_skill_build_assessment": "not certified; repository-native shared AI alaw/8k uplink and opus/16k downlink",
-    "runtime": "Current build.28: not flashed; HIL pending. Build.25 partial observations and known double-talk failure remain historical, not a certificate for build.28."
+    "runtime": "Current build.29: not flashed; HIL pending. Build.25 observations and known double-talk failure remain historical."
   }
 }

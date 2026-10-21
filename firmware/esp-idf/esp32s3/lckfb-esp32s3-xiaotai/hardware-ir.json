@@ -484,27 +484,27 @@
     }
   },
   "build_evidence": {
-    "firmware_version": "1.0.1+build.9",
+    "firmware_version": "1.0.1+build.10",
     "verification": "local_build_only",
-    "note": "ESP-IDF v5.5.5 native build and exact BIN/ELF identity passed. All S3 device/WeChat calls are audio-only; video advertisement, UI and media/SDK paths disabled. H5 MJPEG retained. AI alaw/8000 up and opus/16000 down retained. No new HIL for this artifact. M5 caption external-BSS selection does not apply to this board.",
+    "note": "ESP-IDF v5.5.5 native build and exact BIN/ELF identity passed. Post-encoding S3 uplink revalidates session, mute epoch, microphone, PTT/uplink and transport readiness; frames invalidated during encoding are not submitted and queue slots are returned. S3 calls remain audio-only, H5 MJPEG retained, AI up alaw/8k down opus/16k. No AEC/gain or memory/cache tuning in this patch. Current artifact has not been flashed; prior runtime observations apply only to their named artifacts. Artifact paths relative to native project.",
     "artifacts": [
       {
-        "path": "artifacts/1.0.1+build.9/lckfb_esp32s3_xiaotai.bin",
-        "size_bytes": 4021456,
-        "sha256": "0f13e11b870dc2f1ea606a88437c3bf5ed30842ef5995056a0062c7ff5e79286"
+        "path": "artifacts/1.0.1+build.10/lckfb_esp32s3_xiaotai.bin",
+        "size_bytes": 4021552,
+        "sha256": "d7f1e31a17017e5e0a4092fd2b2e88b60058f7b3464bf42466f82212333ea767"
       },
       {
-        "path": "artifacts/1.0.1+build.9/lckfb_esp32s3_xiaotai.elf",
-        "size_bytes": 29048208,
-        "sha256": "a263adf03d1fd1627d3ebb0f25914c883d12ac4a20223257bd9f4d780255893f"
+        "path": "artifacts/1.0.1+build.10/lckfb_esp32s3_xiaotai.elf",
+        "size_bytes": 29048696,
+        "sha256": "e45f445656543952c6842dd393c654d2af1390cb73b8b687c51bf4503dcad6e2"
       },
       {
-        "path": "artifacts/1.0.1+build.9/bootloader.bin",
+        "path": "artifacts/1.0.1+build.10/bootloader/bootloader.bin",
         "size_bytes": 20848,
         "sha256": "ed21893ef615a5dd8d6501168f8be8b3cbb08deec5249dccc611b9210883d92d"
       },
       {
-        "path": "artifacts/1.0.1+build.9/partition-table.bin",
+        "path": "artifacts/1.0.1+build.10/partition_table/partition-table.bin",
         "size_bytes": 3072,
         "sha256": "1edad21a69d0791cb6fe8a4f47ea7c64cfd302031f8db2c9f68cdc9568ca124c"
       }

@@ -70,6 +70,7 @@ python3 "$repo_dir/tools/tests/test_call_camera_feedback.py"
 python3 "$repo_dir/tools/tests/test_temperature_font_symbols.py"
 python3 "$repo_dir/tools/tests/test_s3_room_refresh.py"
 python3 "$repo_dir/tools/tests/test_s3_async_regressions.py"
+# Includes mute/PTT/session/transport changes during S3 encoding (A-law and Opus).
 python3 "$repo_dir/tools/tests/test_s3_opus_media.py"
 # AI canonical alaw, legacy alias, admission failures and bounded diagnostics.
 python3 "$repo_dir/tools/tests/test_cores3_ai_g711.py"
