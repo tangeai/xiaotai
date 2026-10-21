@@ -123,8 +123,12 @@ class CameraRotationReportTest(unittest.TestCase):
             self.assertEqual(profile["profiles"][scene].get("camera_rotation"), 180)
         self.assertEqual(profile["profiles"]["stream"]["up_video_mt"], ["mjpeg"])
         self.assertEqual(profile["profiles"]["stream"]["up_video_streamid"], 11)
-        for scene in ("call", "voip"):
-            self.assertTrue(profile["profiles"][scene]["no_video"])
+        self.assertTrue(profile["profiles"]["call"]["no_video"])
+        for board in ("m5stack", "lckfb"):
+            voip = requests(board)["/v1/device/profile"]["profiles"]["voip"]
+            self.assertTrue(voip["no_video"])
+            self.assertEqual(voip["up_video_mt"], "none")
+            self.assertEqual(voip["down_video_mt"], "none")
 
     def test_cores3_outgoing_and_incoming_call_metadata_agree(self):
         result = requests("m5stack")

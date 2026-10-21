@@ -85,7 +85,7 @@ static int esp_opus_dec_open(void *cfg,unsigned size,void **handle){
     *handle=decoder_fails ? NULL : (void *)2;return decoder_fails ? -1 : 0;
 }
 static void esp_opus_enc_close(void *handle){assert(handle==(void *)1);closes++;}
-typedef struct {int type,valueint;const char *valuestring;} cJSON;
+typedef struct {int type;double valuedouble;const char *valuestring;} cJSON;
 static cJSON codec={2,0,"opus"},rate={3,16000,NULL},channels={3,1,NULL};
 static bool cJSON_IsObject(const cJSON *p){return p && p->type==1;}
 static bool cJSON_IsString(const cJSON *p){return p && p->type==2;}
@@ -99,21 +99,24 @@ static const cJSON *cJSON_GetObjectItemCaseSensitive(const cJSON *p,const char *
 int main(void){
     assert(opus_init()==0 && s_opus_encoder && s_opus_decoder);
     decoder_fails=true;assert(opus_init()==-1 && !s_opus_encoder && closes==1);
-    cJSON profile={1,0,NULL};assert(ai_audio_profile_valid(&profile));
-    codec.valuestring="alaw";assert(!ai_audio_profile_valid(&profile));
-    codec.valuestring="opus";rate.valueint=8000;assert(!ai_audio_profile_valid(&profile));
-    rate.valueint=16000;channels.valueint=2;assert(!ai_audio_profile_valid(&profile));
-    channels.valueint=1;assert(!ai_audio_profile_valid(NULL));
+    cJSON profile={1,0,NULL};assert(ai_audio_profile_valid(&profile, false));
+    codec.valuestring="alaw";assert(!ai_audio_profile_valid(&profile, false));
+    codec.valuestring="opus";rate.valuedouble=8000;assert(!ai_audio_profile_valid(&profile, false));
+    rate.valuedouble=16000;channels.valuedouble=2;assert(!ai_audio_profile_valid(&profile, false));
+    channels.valuedouble=1;assert(!ai_audio_profile_valid(NULL, false));
 }
 ''')
 
     def test_wake_tail_and_live_audio_join_without_rate_or_timestamp_mixing(self):
-        source = MEDIA.read_text()
+        self.check_preroll(g711=False)
+
+    def check_preroll(self, g711, source_path=MEDIA):
+        source = source_path.read_text()
         capture = function(source, 'audio_capture_task')
-        start = capture.index('        bool replay = false;')
+        start = capture.index('        bool ai_opus =' if '        bool ai_opus =' in capture else '        bool replay =')
         body = capture[start:capture.rfind('\n    }')]
         preroll = ROOT / 'platforms/esp-idf/components/starter_media_common'
-        run_c(COMMON + '#include "' + str(preroll / 'include/starter_preroll.h') + '"\n' +
+        run_c(f'#define CONFIG_STARTER_AI_UPLINK_G711A {int(g711)}\n' + COMMON + '#include "' + str(preroll / 'include/starter_preroll.h') + '"\n' +
               (preroll / 'src/starter_preroll.c').read_text().replace('#include "starter_preroll.h"', '') + r'''
 #define AUDIO_PACKET_MS 20U
 static starter_preroll_t s_preroll;
@@ -130,10 +133,10 @@ static void xSemaphoreGive(int h){}
 static bool starter_tirtc_audio_ready(void){return true;}
 static int64_t esp_timer_get_time(void){return 1000000;}
 static bool enqueue_uplink_pcm(int m,uint32_t g,uint32_t ts,const int16_t *pcm,size_t samples,unsigned epoch){
-    assert(m==STARTER_TIRTC_AI && g==7 && samples==320 && packets<2);
+    assert(m==STARTER_TIRTC_AI && g==7 && samples==(CONFIG_STARTER_AI_UPLINK_G711A ? 160 : 320) && packets<2);
     timestamps[packets]=ts;memcpy(sent[packets++],pcm,samples*2);return true;
 }
-''' + function(source, 'upsample_ai_preroll') + r'''
+''' + function(source, 'prepare_ai_preroll_pcm') + r'''
 static void capture_step(void){uint32_t generation=7;unsigned mute_epoch=0;do{
 ''' + body + r'''
 }while(0);}
@@ -146,18 +149,28 @@ int main(void){
     s_expected_wake_token=starter_preroll_prepare(&s_preroll,978,1000);
     assert(starter_preroll_bind(&s_preroll,s_expected_wake_token,7,1000));
     capture_step();
-    assert(packets==1 && packet_samples==26 && s_expected_wake_token==0);
+    assert(packets==1 && packet_samples==(CONFIG_STARTER_AI_UPLINK_G711A ? 13 : 26) && s_expected_wake_token==0);
+    clean.pcm_8k=live;clean.samples=147;
     clean.pcm_16k=live;clean.samples_16k=294;capture_step();
     assert(packets==2 && packet_samples==0);
     assert(timestamps[1]-timestamps[0]==20);
-    assert(sent[0][0]==0 && sent[0][318]==159 && sent[0][319]==159);
-    assert(sent[1][0]==160 && sent[1][24]==172 && sent[1][25]==172);
-    assert(sent[1][26]==1000 && sent[1][319]==1293);
+    if(CONFIG_STARTER_AI_UPLINK_G711A){
+        assert(sent[0][0]==0 && sent[0][159]==159);
+        assert(sent[1][0]==160 && sent[1][12]==172);
+        assert(sent[1][13]==1000 && sent[1][159]==1146);
+    }else{
+        assert(sent[0][0]==0 && sent[0][318]==159 && sent[0][319]==159);
+        assert(sent[1][0]==160 && sent[1][24]==172 && sent[1][25]==172);
+        assert(sent[1][26]==1000 && sent[1][319]==1293);
+    }
 }
 ''')
 
     def test_uplink_selects_codec_and_preserves_20ms_frames(self):
-        run_c(COMMON + r'''
+        self.check_uplink(g711=False)
+
+    def check_uplink(self, g711):
+        run_c(f'#define CONFIG_STARTER_AI_UPLINK_G711A {int(g711)}\n' + COMMON + r'''
 typedef struct {int mode;uint32_t generation,timestamp_ms;unsigned mute_epoch;
     size_t sample_count;int16_t pcm[320];} audio_tx_item_t;
 static audio_tx_item_t pool[1],*s_audio_tx_pool=pool;
@@ -188,7 +201,7 @@ static int esp_opus_enc_process(void *h,esp_audio_enc_in_frame_t *i,esp_audio_en
 }
 static int starter_tirtc_send_alaw(uint32_t ts,const void *data,uint32_t size){
     clock_us+=25000;
-    assert(mode!=STARTER_TIRTC_AI && ts==100 && size==160);alaw_send++;return 0;
+    assert((CONFIG_STARTER_AI_UPLINK_G711A || mode!=STARTER_TIRTC_AI) && ts==100 && size==160);alaw_send++;return 0;
 }
 static int starter_tirtc_send_opus(uint32_t ts,const void *data,uint32_t size){
     clock_us+=25000;
@@ -197,7 +210,7 @@ static int starter_tirtc_send_opus(uint32_t ts,const void *data,uint32_t size){
 ''' + playback_fixture(MEDIA.read_text()) + function(MEDIA.read_text(), 'update_max_counter') + function(MEDIA.read_text(), 'update_timing_average') + function(MEDIA.read_text(), 'uplink_allowed') + function(MEDIA.read_text(), 'audio_uplink_task') + r'''
 static void replay(void){
     reads=0;pool[0]=(audio_tx_item_t){.mode=mode,.generation=active_generation,.timestamp_ms=100,
-        .sample_count=mode==STARTER_TIRTC_AI ? 320 : 160};pool[0].pcm[0]=42;
+        .sample_count=mode==STARTER_TIRTC_AI && !CONFIG_STARTER_AI_UPLINK_G711A ? 320 : 160};pool[0].pcm[0]=42;
     if(setjmp(done)==0) audio_uplink_task(NULL);
 }
 int main(void){
@@ -206,16 +219,21 @@ int main(void){
         mode=STARTER_TIRTC_AI;encoded_size=37+i;replay();
         mode=STARTER_TIRTC_H5;replay();
     }
-    assert(opus_enc==100 && alaw_enc==100 && opus_send==100 && alaw_send==100 && resets==100);
-    assert(atomic_load(&s_audio_encode_avg_us)==1900);
-    assert(atomic_load(&s_audio_encode_max_us)==3000);
-    mode=STARTER_TIRTC_AI;codec_error=-1;replay();assert(opus_send==100);
-    codec_error=0;s_microphone_muted=true;replay();assert(opus_enc==101);
+    unsigned expected_opus=CONFIG_STARTER_AI_UPLINK_G711A ? 0 : 100;
+    unsigned expected_alaw=CONFIG_STARTER_AI_UPLINK_G711A ? 200 : 100;
+    assert(opus_enc==expected_opus && alaw_enc==expected_alaw && opus_send==expected_opus && alaw_send==expected_alaw && resets==expected_opus);
+    assert(atomic_load(&s_audio_encode_avg_us)==(CONFIG_STARTER_AI_UPLINK_G711A ? 800 : 1900));
+    assert(atomic_load(&s_audio_encode_max_us)==(CONFIG_STARTER_AI_UPLINK_G711A ? 800 : 3000));
+    mode=STARTER_TIRTC_AI;codec_error=-1;replay();assert(opus_send==expected_opus && alaw_send==expected_alaw);
+    codec_error=0;s_microphone_muted=true;replay();assert(opus_enc+alaw_enc==201);
 }
 ''')
 
     def test_downlink_opus_is_played_at_16k_without_double_upsampling(self):
-        run_c(COMMON + r'''
+        self.check_downlink(g711=False)
+
+    def check_downlink(self, g711):
+        run_c(f'#define CONFIG_STARTER_AI_UPLINK_G711A {int(g711)}\n' + COMMON + r'''
 typedef struct {int mode;uint32_t generation;struct {size_t length;} frame;
     uint8_t payload[1500];} audio_rx_item_t;
 static int16_t s_decode_pcm[1500],s_play_stereo[6000];

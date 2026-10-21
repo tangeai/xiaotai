@@ -35,6 +35,13 @@ CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM=y
 CONFIG_SR_MN_CN_NONE=y
 CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
 
+# CoreS3 cache-line A/B candidate: retain the 32 KB cache/internal-heap budget.
+# ESP-SR S3 examples use 64-byte lines; validate on this Quad-PSRAM board.
+# See docs/boards/m5stack-cores3-lite/AUDIO_PERFORMANCE_REVIEW.md.
+CONFIG_ESP32S3_DATA_CACHE_32KB=y
+# CONFIG_ESP32S3_DATA_CACHE_LINE_32B is not set
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
 # CoreS3-Lite 320x240 产品界面使用随固件编译的完整基本 CJK 字库。
 CONFIG_LV_COLOR_16_SWAP=y
 CONFIG_LV_FONT_FMT_TXT_LARGE=y

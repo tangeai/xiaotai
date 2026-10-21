@@ -2,7 +2,7 @@
 /*
  * AIROBOT S3 产品界面。
  *
- * 320x240 横屏只提供语音 AI 与语音联系人入口，不创建任何视频通话控件。
+ * 320x240 横屏提供语音 AI、设备语音与微信语音入口。
  * LVGL 回调只写本地状态或投递 runtime 意图；网络与 TiRTC 状态仍由各自任务
  * 持有。屏幕休眠使用单调时间，触摸和持续声音活动均可唤醒。
  */
@@ -305,8 +305,20 @@ static starter_ai_ui_phase_t s_previous_ai_phase = STARTER_AI_UI_IDLE;
 static char s_previous_subtitle[193];
 static char s_rendered_expression[16];
 static char s_last_history_subtitle[193];
-static char s_ai_history[2048];
-static char s_ai_display[2304];
+/* Board opt-in for task-only caption payloads. Keep UI state, locks, DMA and
+ * Flash/NVS stacks in their existing memory. Static BSS preserves capacity,
+ * boot-time zeroing and lifetime without a new allocation/failure path. */
+#if XIAOTAI_UI_TEXT_PSRAM
+#if !CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY
+#error "XIAOTAI_UI_TEXT_PSRAM requires external BSS"
+#endif
+#define PRODUCT_CAPTION_BSS_ATTR EXT_RAM_BSS_ATTR
+#else
+#define PRODUCT_CAPTION_BSS_ATTR
+#endif
+static PRODUCT_CAPTION_BSS_ATTR char s_ai_history[2048];
+static PRODUCT_CAPTION_BSS_ATTR char s_ai_display[2304];
+#undef PRODUCT_CAPTION_BSS_ATTR
 static char s_call_result[33];
 static char s_previous_verification_code[17];
 static lv_obj_t *s_binding_countdown_label;
@@ -693,6 +705,11 @@ static lv_obj_t *make_button(lv_obj_t *parent,
 static void set_object_visible(lv_obj_t *object, bool visible);
 static void refresh_room_controls(const starter_runtime_product_snapshot_t *room);
 static void render_page(void);
+#if CONFIG_IDF_TARGET_ESP32P4
+static lv_timer_t *s_video_timer;
+static bool s_video_timer_running;
+static void product_video_timer_sync(void);
+#endif
 static void refresh_settings_controls(void);
 static void refresh_call_controls(starter_runtime_status_t runtime,
                                   const starter_runtime_product_snapshot_t *product);
@@ -823,7 +840,7 @@ static void handle_voice_result(const starter_voice_result_t *result,
              * path.  A foreground call owns the microphone and is never
              * interrupted by a wake detection.
              */
-            starter_runtime_status_t status = starter_runtime_status();
+            starter_runtime_status_t status = starter_runtime_status_snapshot();
             if (status.state == STARTER_RUNTIME_WAITING ||
                 status.state == STARTER_RUNTIME_H5_ACTIVE) {
                 s_ai_history[0] = '\0';
@@ -933,7 +950,7 @@ static void handle_voice_result(const starter_voice_result_t *result,
     case STARTER_VOICE_INTENT_REST:
         /* 休息不关网络、不重启，也不误挂正在进行的人际通话。 */
         {
-            starter_runtime_state_t state = starter_runtime_status().state;
+            starter_runtime_state_t state = starter_runtime_status_snapshot().state;
             if (state == STARTER_RUNTIME_AI_CONNECTING ||
                 state == STARTER_RUNTIME_AI_ACTIVE) {
                 (void)starter_runtime_ai_stop();
@@ -949,7 +966,7 @@ static void handle_voice_result(const starter_voice_result_t *result,
     case STARTER_VOICE_INTENT_START_AI_CHAT:
     case STARTER_VOICE_INTENT_CALL_CONTACT_REMOTE:
         {
-            starter_runtime_status_t status = starter_runtime_status();
+            starter_runtime_status_t status = starter_runtime_status_snapshot();
             esp_err_t err = ESP_OK;
             if (status.state != STARTER_RUNTIME_AI_ACTIVE &&
                 status.state != STARTER_RUNTIME_AI_CONNECTING) {
@@ -1036,7 +1053,7 @@ static void on_action(lv_event_t *event)
     product_page_t previous_page = s_page;
     note_interaction();
     if (action == ACTION_AI) {
-        starter_runtime_status_t status = starter_runtime_status();
+        starter_runtime_status_t status = starter_runtime_status_snapshot();
         if (status.state != STARTER_RUNTIME_AI_ACTIVE &&
             status.state != STARTER_RUNTIME_AI_CONNECTING) {
             s_ai_history[0] = '\0';
@@ -1215,13 +1232,13 @@ static void on_action(lv_event_t *event)
         s_page = PAGE_MENU;
 #if CONFIG_IDF_TARGET_ESP32P4
     } else if (action == ACTION_CALL_CAMERA) {
-        starter_runtime_status_t runtime = starter_runtime_status();
+        starter_runtime_status_t runtime = starter_runtime_status_snapshot();
         starter_runtime_product_snapshot_t product = starter_runtime_product_snapshot();
         if (starter_runtime_call_set_camera_enabled(runtime.session_generation,
                 !product.call_camera_enabled) != ESP_OK)
             ESP_LOGW(TAG, "camera control queue busy; state unchanged");
     } else if (action == ACTION_CALL_ROTATE) {
-        starter_runtime_status_t runtime = starter_runtime_status();
+        starter_runtime_status_t runtime = starter_runtime_status_snapshot();
         starter_runtime_product_snapshot_t product =
             starter_runtime_product_snapshot();
         if (runtime.state == STARTER_RUNTIME_CALL_ACTIVE &&
@@ -1262,10 +1279,8 @@ static void on_action(lv_event_t *event)
             ++s_room_members_page;
     } else if (action == ACTION_VOICE_CALL) {
         (void)starter_runtime_call_contact(s_selected_contact);
-#if CONFIG_IDF_TARGET_ESP32P4
     } else if (action == ACTION_VIDEO_CALL) {
         (void)starter_runtime_call_contact_video(s_selected_contact);
-#endif
     } else if (action >= ACTION_CONTACT_CALL_BASE &&
                action < ACTION_CONTACT_CALL_BASE + STARTER_PRODUCT_CONTACTS_MAX) {
         s_selected_contact = (uint8_t)(action - ACTION_CONTACT_CALL_BASE);
@@ -1299,7 +1314,7 @@ static void on_action(lv_event_t *event)
     } else if (s_page == PAGE_CALL) {
         starter_runtime_product_snapshot_t product =
             starter_runtime_product_snapshot();
-        refresh_call_controls(starter_runtime_status(), &product);
+        refresh_call_controls(starter_runtime_status_snapshot(), &product);
     }
 }
 
@@ -1566,7 +1581,7 @@ static void on_home_tap(lv_event_t *event)
     note_interaction();
     s_hint_visible = false;
     s_hint_due_ms = monotonic_ms() + PRODUCT_HINT_PERIOD_MS;
-    starter_runtime_status_t status = starter_runtime_status();
+    starter_runtime_status_t status = starter_runtime_status_snapshot();
     if (status.state != STARTER_RUNTIME_AI_ACTIVE &&
         status.state != STARTER_RUNTIME_AI_CONNECTING) {
         s_ai_history[0] = '\0';
@@ -1598,7 +1613,7 @@ static void call_ring_task(void *argument)
         ai_ack_t ack = {0};
         if (ring_kind == CALL_RING_NONE && s_ai_ack_queue != NULL &&
             xQueueReceive(s_ai_ack_queue, &ack, 0) == pdTRUE) {
-            starter_runtime_status_t status = starter_runtime_status();
+            starter_runtime_status_t status = starter_runtime_status_snapshot();
             if (esp_timer_get_time() / 1000 <= ack.expires_ms &&
                 status.state == STARTER_RUNTIME_AI_CONNECTING &&
                 status.session_generation == ack.expected_session) {
@@ -1840,7 +1855,7 @@ static void render_home(lv_obj_t *screen)
 
 static void render_ai_chat(lv_obj_t *screen)
 {
-    starter_runtime_status_t runtime = starter_runtime_status();
+    starter_runtime_status_t runtime = starter_runtime_status_snapshot();
     starter_runtime_product_snapshot_t product =
         starter_runtime_product_snapshot();
     (void)make_header_back_button(screen, ACTION_AI_BACK);
@@ -2230,24 +2245,19 @@ static void render_contact_detail(lv_obj_t *screen)
     (void)make_button(screen, "语音通话", 18, 125, 132, 48, ACTION_VOICE_CALL);
     (void)make_button(screen, "视频通话", 170, 125, 132, 48, ACTION_VIDEO_CALL);
 #else
-    (void)make_button(screen, "语音通话", 50, 125, 220, 48,
-                      ACTION_VOICE_CALL);
+    (void)make_button(screen, "语音通话", 50, 125, 220, 48, ACTION_VOICE_CALL);
 #endif
 }
 
 static void render_call(lv_obj_t *screen)
 {
-    starter_runtime_status_t runtime = starter_runtime_status();
+    starter_runtime_status_t runtime = starter_runtime_status_snapshot();
     starter_runtime_product_snapshot_t product =
         starter_runtime_product_snapshot();
     /* CALL_PERSISTENT_CONTROLS: all three call modes share one object tree.
      * Accepting must not delete/recreate the page while TiRTC switches media
      * ownership, otherwise a slow LVGL flush can look like a call exit. */
-#if CONFIG_IDF_TARGET_ESP32P4
     render_header(screen, "通话");
-#else
-    render_header(screen, "语音通话");
-#endif
     s_call_peer_label = make_label(screen, "未知联系人", 35, 66, 250,
                                    lv_color_hex(0xFFFFFF));
     lv_obj_set_style_text_align(s_call_peer_label, LV_TEXT_ALIGN_CENTER, 0);
@@ -2320,7 +2330,8 @@ static void refresh_call_controls(starter_runtime_status_t runtime,
         ? (product->call_wechat ? "微信视频" : "设备视频")
         : (product->call_wechat ? "微信语音" : "设备语音");
 #else
-    const char *source = product->call_wechat ? "微信语音" : "设备语音";
+    const char *source = product->call_video ? "微信视频" :
+                         (product->call_wechat ? "微信语音" : "设备语音");
 #endif
     const char *status = product->call_incoming
                              ? "来电"
@@ -2345,9 +2356,10 @@ static void refresh_call_controls(starter_runtime_status_t runtime,
                                ? "本端摄像头已关闭" : "通话中")));
 #else
         lv_label_set_text(s_call_status_label,
-                          incoming ? "语音来电" :
+                          incoming ? (product->call_video ? "视频来电" : "语音来电") :
                           (runtime.state == STARTER_RUNTIME_CALL_CONNECTING
-                               ? "正在建立语音通话" : "语音通话中"));
+                               ? "正在建立通话" :
+                               (product->call_video ? "视频通话中" : "语音通话中")));
 #endif
     }
     set_object_visible(s_call_accept_button, incoming);
@@ -3408,9 +3420,13 @@ static void product_tick(lv_timer_t *timer)
         s_wifi_notice = WIFI_NOTICE_NONE;
         voice_state_changed = true;
     }
-    starter_runtime_status_t runtime = starter_runtime_status();
+    const int64_t queue_finished_us = esp_timer_get_time();
+    starter_runtime_status_t runtime = starter_runtime_status_snapshot();
+    const int64_t runtime_finished_us = esp_timer_get_time();
     starter_runtime_product_snapshot_t product = starter_runtime_product_snapshot();
+    const int64_t product_finished_us = esp_timer_get_time();
     starter_media_status_t media = starter_media_status();
+    const int64_t media_finished_us = esp_timer_get_time();
     bool runtime_changed = runtime.state != s_previous_runtime_state;
     bool call_now = product.call_incoming ||
                     runtime.state == STARTER_RUNTIME_CALL_INCOMING ||
@@ -3927,6 +3943,9 @@ static void product_tick(lv_timer_t *timer)
     (void)snprintf(s_previous_room_message, sizeof(s_previous_room_message), "%s",
                    product.room_message);
 
+#if CONFIG_IDF_TARGET_ESP32P4
+    product_video_timer_sync();
+#endif
     const int64_t refresh_elapsed_us = esp_timer_get_time() - refresh_started_us;
     if (refresh_elapsed_us > PRODUCT_UI_REFRESH_SLOW_US &&
         refresh_started_us - s_ui_refresh_slow_last_us >
@@ -3934,15 +3953,88 @@ static void product_tick(lv_timer_t *timer)
         s_ui_refresh_slow_last_us = refresh_started_us;
         ESP_LOGW(TAG,
                  "UI refresh slow: total=%lld us expression=%lld us page=%u "
-                 "runtime=%u",
+                 "runtime=%u stages-us: queue=%lld runtime=%lld product=%lld "
+                 "media=%lld view=%lld",
                  (long long)refresh_elapsed_us,
                  (long long)expression_elapsed_us,
                  (unsigned)s_page,
-                 (unsigned)runtime.state);
+                 (unsigned)runtime.state,
+                 (long long)(queue_finished_us - refresh_started_us),
+                 (long long)(runtime_finished_us - queue_finished_us),
+                 (long long)(product_finished_us - runtime_finished_us),
+                 (long long)(media_finished_us - product_finished_us),
+                 (long long)(refresh_elapsed_us -
+                             (media_finished_us - refresh_started_us) -
+                             expression_elapsed_us));
     }
 }
 
+#if !CONFIG_IDF_TARGET_ESP32P4
+/* LVGL owns both callbacks. No locks, allocations or per-frame logging here.
+ * S3's PSRAM -> SPI port waits for DMA inside flush_cb, so this is render +
+ * synchronous transfer wall time, including preemption, NOT CPU time.
+ * Pixel counts come from LVGL after dirty-area joining, not canvas capacity. */
+static void (*s_previous_render_monitor)(lv_disp_drv_t *, uint32_t, uint32_t);
+
+static void product_render_monitor(lv_disp_drv_t *driver, uint32_t elapsed_ms,
+                                   uint32_t pixels)
+{
+    static int64_t window_started_us;
+    static bool window_started;
+    static uint32_t refreshes, max_pixels, max_render_ms;
+    static uint64_t total_pixels, total_render_ms;
+    const int64_t now_us = esp_timer_get_time();
+    if (!window_started) {
+        window_started_us = now_us;
+        window_started = true;
+    }
+    ++refreshes;
+    total_pixels += pixels;
+    total_render_ms += elapsed_ms;
+    if (pixels > max_pixels) max_pixels = pixels;
+    if (elapsed_ms > max_render_ms) max_render_ms = elapsed_ms;
+    if (now_us - window_started_us >= PRODUCT_UI_REFRESH_LOG_INTERVAL_US) {
+        ESP_LOGI(TAG,
+                 "UI render window: span-ms=%lld refreshes=%lu pixels=%llu "
+                 "max-pixels=%lu render-ms=%llu max-render-ms=%lu",
+                 (long long)((now_us - window_started_us) / 1000),
+                 (unsigned long)refreshes, (unsigned long long)total_pixels,
+                 (unsigned long)max_pixels, (unsigned long long)total_render_ms,
+                 (unsigned long)max_render_ms);
+        /* Keep adjacent windows contiguous, even if no refresh is needed. */
+        window_started_us = now_us;
+        refreshes = max_pixels = max_render_ms = 0U;
+        total_pixels = total_render_ms = 0U;
+    }
+    if (s_previous_render_monitor != NULL)
+        s_previous_render_monitor(driver, elapsed_ms, pixels);
+}
+
+static void product_render_probe_install(lv_disp_t *display)
+{
+    if (display->driver->monitor_cb == product_render_monitor) return;
+    s_previous_render_monitor = display->driver->monitor_cb;
+    display->driver->monitor_cb = product_render_monitor;
+}
+#endif
+
 #if CONFIG_IDF_TARGET_ESP32P4
+static void product_video_timer_sync(void)
+{
+    if (s_video_timer == NULL) return;
+    bool active = s_page == PAGE_CALL && p4_video_ui_active();
+    if (active == s_video_timer_running) return;
+    s_video_timer_running = active;
+    if (active) {
+        lv_timer_resume(s_video_timer);
+        lv_timer_ready(s_video_timer);
+    } else {
+        lv_timer_pause(s_video_timer);
+        /* Release the last displayed frame once, on leaving live video. */
+        p4_video_ui_tick(lv_scr_act(), false);
+    }
+}
+
 /* MJPEG conversion completes in bursts while it shares PPA with camera
  * rotation. Poll video independently from the 100 ms product-state timer so
  * two ready frames in one UI period are not always collapsed into one. LVGL's
@@ -3951,7 +4043,8 @@ static void product_tick(lv_timer_t *timer)
 static void product_video_tick(lv_timer_t *timer)
 {
     (void)timer;
-    p4_video_ui_tick(lv_scr_act(), s_page == PAGE_CALL);
+    product_video_timer_sync();
+    if (s_video_timer_running) p4_video_ui_tick(lv_scr_act(), true);
 }
 #endif
 
@@ -4022,12 +4115,20 @@ static esp_err_t lvgl_init(void)
     if (!lvgl_port_lock(1000)) {
         return ESP_ERR_TIMEOUT;
     }
+#if !CONFIG_IDF_TARGET_ESP32P4
+    product_render_probe_install(s_display);
+#endif
     /* The screen survives page rebuilds; lv_obj_clean removes children only.
      * Re-registering here on every render wraps LVGL's 6-bit event count. */
     lv_obj_add_event_cb(lv_scr_act(), on_screen_event, LV_EVENT_ALL, NULL);
     render_page();
 #if CONFIG_IDF_TARGET_ESP32P4
-    (void)lv_timer_create(product_video_tick, PRODUCT_VIDEO_TICK_MS, NULL);
+    s_video_timer = lv_timer_create(product_video_tick, PRODUCT_VIDEO_TICK_MS, NULL);
+    if (s_video_timer == NULL) {
+        lvgl_port_unlock();
+        return ESP_ERR_NO_MEM;
+    }
+    lv_timer_pause(s_video_timer);
 #endif
     (void)lv_timer_create(product_tick, 100, NULL);
     if (s_call_ring_task == NULL &&

@@ -1,4 +1,11 @@
 menu "XiaoTai application"
+config STARTER_AI_UPLINK_G711A
+    bool
+    default y
+    help
+        Product AI profile: A-law 8 kHz uplink, Opus 16 kHz downlink.
+        Capture/AEC keep the board's existing 16 kHz processing domain.
+
 config XIAOTAI_DISCOVERY_URL
     string "ThingConnect service discovery URL"
     default "http://ep-open.tangeopen.com/services"

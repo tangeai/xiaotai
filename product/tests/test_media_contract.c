@@ -20,9 +20,12 @@ int main(void)
     assert(xiaotai_media_contract_get(XIAOTAI_MEDIA_MODE_AI, &contract));
     assert(contract.up_audio_stream_id == 1U);
     assert(contract.down_audio_stream_id == 1U);
-    assert(contract.sample_rate_hz == 16000U);
-    assert(contract.frame_samples == 320U);
-    assert(contract.codec == XIAOTAI_MEDIA_CODEC_OPUS);
+    assert(contract.sample_rate_hz == 8000U);
+    assert(contract.frame_samples == 160U);
+    assert(contract.codec == XIAOTAI_MEDIA_CODEC_ALAW);
+    assert(contract.down_sample_rate_hz == 16000U);
+    assert(contract.down_frame_samples == 320U);
+    assert(contract.down_codec == XIAOTAI_MEDIA_CODEC_OPUS);
     assert(!contract.has_video);
 
     assert(xiaotai_media_contract_get(XIAOTAI_MEDIA_MODE_DEVICE_CALL,

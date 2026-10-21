@@ -1,4 +1,5 @@
 #include "xiaotai_audio.h"
+#include "starter_audio_resampler.h"
 #include "xiaotai_audio_agc.h"
 #include "xiaotai_audio_ns.h"
 #include "xiaotai_audio_policy.h"
@@ -100,6 +101,9 @@ static xiaotai_audio_codec_t s_codec = XIAOTAI_AUDIO_CODEC_ALAW_8K;
 static size_t s_frame_samples = XIAOTAI_AUDIO_ALAW_FRAME_SAMPLES;
 static xiaotai_audio_agc_t s_uplink_agc;
 static xiaotai_audio_ns_t s_uplink_ns;
+/* s_codec continues to describe hardware/DSP and downlink; uplink is separate. */
+static xiaotai_audio_codec_t s_uplink_codec;
+static starter_audio_resampler_16k_to_8k_t s_uplink_resampler;
 static OpusEncoder *s_opus_encoder;
 static OpusDecoder *s_opus_decoder;
 static AECContext *s_aec;
@@ -540,10 +544,11 @@ static void capture_task(beken_thread_arg_t argument)
     int16_t pcm[AUDIO_MAX_FRAME_SAMPLES];
     uint8_t alaw[AUDIO_ALAW_FRAME_BYTES];
     uint8_t opus[OPUS_MAX_PACKET_BYTES];
+    int16_t narrow_pcm[AUDIO_ALAW_FRAME_BYTES];
 
-    BK_LOGI(TAG, "capture task started: codec=%s rate=%u mono samples=%u\n",
-            s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? "opus" : "alaw",
-            s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? 16000U : 8000U,
+    BK_LOGI(TAG, "capture task started: uplink=%s rate=%u DSP-samples=%u\n",
+            s_uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? "opus" : "alaw",
+            s_uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? 16000U : 8000U,
             (unsigned)s_frame_samples);
     while (s_capture_run) {
         size_t bytes_read = 0U;
@@ -618,7 +623,7 @@ static void capture_task(beken_thread_arg_t argument)
         }
         const uint8_t *encoded = alaw;
         size_t encoded_size = sizeof(alaw);
-        if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
+        if (s_uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
             int length = opus_encode(s_opus_encoder, pcm, OPUS_FRAME_SAMPLES,
                                      opus, sizeof(opus));
             if (length < 0) {
@@ -628,10 +633,19 @@ static void capture_task(beken_thread_arg_t argument)
             encoded = opus;
             encoded_size = (size_t)length;
         } else {
-            for (size_t i = 0; i < s_frame_samples; ++i) {
-                alaw[i] = muted ? 0xd5U : linear2alaw((int)pcm[i]);
+            const int16_t *wire_pcm = pcm;
+            size_t wire_samples = s_frame_samples;
+            if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
+                wire_samples = starter_audio_resampler_16k_to_8k_process(
+                    &s_uplink_resampler, pcm, s_frame_samples,
+                    narrow_pcm, AUDIO_ALAW_FRAME_BYTES);
+                wire_pcm = narrow_pcm;
             }
-            encoded_size = s_frame_samples;
+            if (wire_samples != AUDIO_ALAW_FRAME_BYTES) continue;
+            for (size_t i = 0; i < wire_samples; ++i) {
+                alaw[i] = muted ? 0xd5U : linear2alaw((int)wire_pcm[i]);
+            }
+            encoded_size = wire_samples;
         }
         xiaotai_audio_uplink_fn callback = s_uplink;
         if (callback != NULL &&
@@ -764,7 +778,18 @@ static void destroy_devices(void)
 int xiaotai_audio_start(xiaotai_audio_codec_t codec,
                         xiaotai_audio_uplink_fn uplink, void *context)
 {
-    if (uplink == NULL) return BK_ERR_PARAM;
+    return xiaotai_audio_start_duplex(codec, codec, uplink, context);
+}
+
+int xiaotai_audio_start_duplex(xiaotai_audio_codec_t uplink_codec,
+                               xiaotai_audio_codec_t codec,
+                               xiaotai_audio_uplink_fn uplink, void *context)
+{
+    if (uplink == NULL ||
+        (uplink_codec != XIAOTAI_AUDIO_CODEC_ALAW_8K &&
+         uplink_codec != XIAOTAI_AUDIO_CODEC_OPUS_16K) ||
+        (uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K &&
+         codec != XIAOTAI_AUDIO_CODEC_OPUS_16K)) return BK_ERR_PARAM;
     if (codec != XIAOTAI_AUDIO_CODEC_ALAW_8K &&
         codec != XIAOTAI_AUDIO_CODEC_OPUS_16K) return BK_ERR_PARAM;
     if (s_running) return BK_ERR_BUSY;
@@ -820,6 +845,8 @@ int xiaotai_audio_start(xiaotai_audio_codec_t codec,
         goto fail;
     }
     s_codec = codec;
+    s_uplink_codec = uplink_codec;
+    starter_audio_resampler_16k_to_8k_reset(&s_uplink_resampler);
     s_frame_samples = frame_samples;
     atomic_store(&s_playback_columns, 0U);
     atomic_store(&s_playback_columns_at_ms, 0U);
@@ -952,7 +979,12 @@ int xiaotai_audio_start(xiaotai_audio_codec_t codec,
     if (rc != BK_OK) goto fail_started;
 
     s_running = true;
-    BK_LOGI(TAG, "full-duplex board audio started\n");
+    BK_LOGI(TAG, "full-duplex board audio started uplink=%s/%u downlink=%s/%u DSP=%u\n",
+            uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? "opus" : "alaw",
+            uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? 16000U : 8000U,
+            codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? "opus" : "alaw",
+            codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? 16000U : 8000U,
+            (unsigned)required_rate);
     return BK_OK;
 
 fail_started:

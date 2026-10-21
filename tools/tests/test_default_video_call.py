@@ -23,8 +23,8 @@ class DefaultVideoCall(unittest.TestCase):
 #define CONFIG_IDF_TARGET_ESP32P4 {p4}
 {selector}
 int main(void) {{
-    assert(call_video_for_request(NULL, true) == {expected});
-    assert(call_video_for_request("", true) == {expected});
+    assert(call_video_for_request(NULL, true) == {p4});
+    assert(call_video_for_request("", true) == {p4});
     assert(call_video_for_request(NULL, false) == false);
     assert(call_video_for_request("video", false) == {expected});
     assert(call_video_for_request("voice", true) == false);

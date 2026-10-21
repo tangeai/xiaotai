@@ -127,6 +127,110 @@
       "kind": "project-source",
       "location": "board_adapter.c",
       "revision": "source design; hardware unverified"
+    },
+    {
+      "id": "user-build17-status-20261021",
+      "kind": "user-provided-serial-log",
+      "location": "VALIDATION.md",
+      "revision": "2026-10-21; user-provided partial log, version/time/ELF-prefix matched; no flash readback"
+    },
+    {
+      "id": "tests/.local/cache-line-20261021/cache-B-boot.log",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cache-line-20261021/cache-B-boot.log",
+      "sha256": "24e1b98e5e0744137be57f17088f8dec3b4398c3c53b8f90e7193b6e83141bbb",
+      "revision": "2026-10-21; historical observation, artifact identity recorded in runtime_evidence"
+    },
+    {
+      "id": "tests/.local/cache-line-20261021/cache-B-play.log",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cache-line-20261021/cache-B-play.log",
+      "sha256": "ef19337966abdc10f41abbdc38328638baa24c4b8b582235fd771727eb7bb6ff",
+      "revision": "2026-10-21; historical observation, artifact identity recorded in runtime_evidence"
+    },
+    {
+      "id": "tests/.local/cache-line-20261021/cache-B-analysis.json",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cache-line-20261021/cache-B-analysis.json",
+      "sha256": "71e647d0abf52a141162d974cb0190712799d536d1321ee5a434a4498383c4a6",
+      "revision": "2026-10-21; historical observation, artifact identity recorded in runtime_evidence"
+    },
+    {
+      "id": "tests/.local/cache-line-20261021/cache-A-boot.log",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cache-line-20261021/cache-A-boot.log",
+      "sha256": "23aec2c9ee70744e08db7de08e2020cd8fa2f86965bca0409d092c0e26a39f5f",
+      "revision": "2026-10-21; historical observation, artifact identity recorded in runtime_evidence"
+    },
+    {
+      "id": "tests/.local/cache-line-20261021/cache-A2-active.log",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cache-line-20261021/cache-A2-active.log",
+      "sha256": "2a5cedf05a2dbee4840e687f277ddbb220a8259bac7d56c3eb1402696217bd77",
+      "revision": "2026-10-21; historical observation, artifact identity recorded in runtime_evidence"
+    },
+    {
+      "id": "tests/.local/cache-line-20261021/cycle-snapshots.json",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cache-line-20261021/cycle-snapshots.json",
+      "sha256": "ad33b2398190f2550534cf45e4f887a94a90c7b140562b2437f7ab1639f1ad1c",
+      "revision": "2026-10-21; historical observation, artifact identity recorded in runtime_evidence"
+    },
+    {
+      "id": "tests/.local/cache-line-20261021/REPORT.md",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cache-line-20261021/REPORT.md",
+      "sha256": "b16ea2bd3929df2a087500eaaa3e92c23209ef6e6ab55e1b191e9a0bd820ff03",
+      "revision": "2026-10-21; historical observation, artifact identity recorded in runtime_evidence"
+    },
+    {
+      "id": "cores3-build25-HIL.md",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cores3-psram-text/HIL.md",
+      "sha256": "b4492fb28201fcaf49c6b8430c761f6b70e77b5769987bada3e5e7a8afc42ab7",
+      "revision": "2026-10-21; build.25 only; partial hardware observation"
+    },
+    {
+      "id": "cores3-build25-flash25.log",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cores3-psram-text/flash25.log",
+      "sha256": "be96fe5fe3f4e4c0175b11c4e0bafc1da60bd51f25b98465daa980da6ead4e7a",
+      "revision": "2026-10-21; build.25 only; partial hardware observation"
+    },
+    {
+      "id": "cores3-build25-boot25.log",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cores3-psram-text/boot25.log",
+      "sha256": "70fa60249448e50f3ecaa4deaa510ea2a36c4a9340f95717e85985482804dc43",
+      "revision": "2026-10-21; build.25 only; partial hardware observation"
+    },
+    {
+      "id": "cores3-build25-play25-analysis.json",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cores3-psram-text/play25-analysis.json",
+      "sha256": "6aff5301bb4177ae06ed4b16e800086b7ab363f20d9377a9d15bbc04b5060f1f",
+      "revision": "2026-10-21; build.25 only; partial hardware observation"
+    },
+    {
+      "id": "cores3-build25-lifecycle25.json",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cores3-psram-text/lifecycle25.json",
+      "sha256": "4ffef112338d4ed4e59a462a9f0f1a3757f78bef8b3efb668d86f6aa69a17a57",
+      "revision": "2026-10-21; build.25 only; partial hardware observation"
+    },
+    {
+      "id": "cores3-build25-QUIET_SPEECH.md",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cores3-psram-text/QUIET_SPEECH.md",
+      "sha256": "7b55cf7012287e3dc75c0e892aa752641cf1b25e387a1bac4353acc23936769d",
+      "revision": "2026-10-21; build.25 only; controlled user feedback, partial acoustic observations"
+    },
+    {
+      "id": "cores3-build25-DOUBLETALK.md",
+      "kind": "local-runtime-observation",
+      "location": "../../../tests/.local/cores3-psram-text/DOUBLETALK.md",
+      "sha256": "0a08681a2034ff091e2da882fa1c448e99f27dae107c3187adf49bdad41d9e30",
+      "revision": "2026-10-21; build.25 only; controlled user feedback, partial acoustic observations"
     }
   ],
   "soc": {
@@ -189,13 +293,6 @@
         "name": "alaw",
         "sample_rates_hz": [
           8000
-        ],
-        "verification": "corroborated"
-      },
-      {
-        "name": "opus",
-        "sample_rates_hz": [
-          16000
         ],
         "verification": "corroborated"
       }
@@ -346,23 +443,109 @@
   "build_evidence": {
     "artifacts": [
       {
-        "path": "../../../firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/m5stack_cores3_lite_xiaotai.bin",
-        "size_bytes": 4097904,
-        "sha256": "ad624368092a620726ca9a3c4554e79aefba608da1ba5843157c24e34792d6e9"
+        "path": "artifacts/1.0.1+build.28/m5stack_cores3_lite_xiaotai.bin",
+        "size_bytes": 4020704,
+        "sha256": "14fc9e01b1254efd12260aa43fb0ae6119b52465fb7c8c9f6cab3a50b7245dcd"
       },
       {
-        "path": "../../../firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/m5stack_cores3_lite_xiaotai.elf",
-        "size_bytes": 29137896,
-        "sha256": "3f97c9b8f0589a5164ed2e4cce40714c17e8b6a43b825be963a07b34f6fef396"
+        "path": "artifacts/1.0.1+build.28/m5stack_cores3_lite_xiaotai.elf",
+        "size_bytes": 29081204,
+        "sha256": "cf921d580ba83d9dba3fced2e53390518bb406b343e5ffde37442b1b3cb19855"
+      },
+      {
+        "path": "artifacts/1.0.1+build.28/bootloader.bin",
+        "size_bytes": 20848,
+        "sha256": "baec2960de2b8d802c1417e7c399f1cd09c96c03d18ed12eba72bcffdbf650ef"
+      },
+      {
+        "path": "artifacts/1.0.1+build.28/partition-table.bin",
+        "size_bytes": 3072,
+        "sha256": "1edad21a69d0791cb6fe8a4f47ea7c64cfd302031f8db2c9f68cdc9568ca124c"
       }
     ],
     "status": "COMPILE_PASS",
     "variant": "ili9342e",
-    "version": "1.0.1+build.14",
+    "version": "1.0.1+build.28",
     "idf_version": "v5.5.5",
-    "note": "Native E-panel build exited 0. 180-degree camera presentation and official CoreS3 BSP AW88298 15 dB PA compensation. See VALIDATION.md for host regression and build identity. Current-image HIL pending; AEC overload remains unresolved."
+    "note": "ESP-IDF v5.5.5 native ILI9342E build and BIN/ELF identity passed. All S3 device and WeChat calls are audio-only; no video advertisement, UI action or media/SDK submission. H5 MJPEG and 180-degree metadata retained. AI alaw/8k uplink and opus/16k downlink, M5-only 4352-byte caption PSRAM migration and existing 64-byte cache-line configuration retained. No gain/AEC tuning. This artifact has not been flashed or hardware-validated. Artifact paths are relative to the native project; older runtime evidence only applies to its named artifacts."
   },
-  "runtime_evidence": [],
+  "runtime_evidence": [
+    {
+      "label": "User serial status, 2026-10-21, build.17",
+      "artifact_sha256": "f3e31adeabc3df82aaf5071ceb2a2129dc57ee00dce729edba862d6668f0d7fd",
+      "elf_sha256": "ad24d9071105f21e6c7ceb45f95492941b97d42ae8e22ed2cfaf7af9acf8c732",
+      "verification": "user_reported",
+      "acceptance_levels": [
+        "L2"
+      ],
+      "features": [
+        "ai_talk"
+      ],
+      "source_refs": [
+        "user-build17-status-20261021"
+      ],
+      "notes": "Version, compile time and ELF prefix match retained artifact. AI alaw/8000 input and opus/16000 output accepted. TX 9355, RX/decoded/played 1677, decode/i2s-fail 0; encode avg 144 us. Window 209: 1043 ms wall/1024 ms audio, capture-overflow 0, clipped mic 48. Partial observation only; natural interruption, ASR accuracy and long run not accepted. L2 records observed runtime only; L6 AI acoustic acceptance is not claimed."
+    },
+    {
+      "label": "CoreS3 cache-line B observation, 2026-10-21, build.24",
+      "artifact_sha256": "e0ee432861753a861ff8bed425d136e136a87909820462d53f9273139da1d404",
+      "elf_sha256": "468da465d80efa183f2d971804f8c0dacabdfd9c407640a8841215d944a6308f",
+      "verification": "measured",
+      "acceptance_levels": [
+        "L2"
+      ],
+      "features": [
+        "ai_talk"
+      ],
+      "source_refs": [
+        "tests/.local/cache-line-20261021/cache-B-boot.log",
+        "tests/.local/cache-line-20261021/cache-B-play.log",
+        "tests/.local/cache-line-20261021/cache-B-analysis.json"
+      ],
+      "notes": "Exact flash hashes and boot ELF verified; 8 MB PSRAM memory test, Wi-Fi, MQTT, wake startup observed. 80 AI playback windows in generation 5: mean wall 1111.04 ms per 1024 ms audio, AEC wrapper 32984.14 us. Two capture-overflow events in all sampled windows (one in sustained playback). Final playback drained RX/decoded/written=10855, RX overflow=0. Performance target FAIL; approximate cloud-audio scenario, settings values unconfirmed. A2 rollback to build.23 observed 25 sustained-playback windows: wall 1199.76 ms/1024 ms, AEC 36339.92 us, one capture-overflow event. A2 is below planned 30 samples; acoustic/full-product acceptance remains pending. Device restored to build.23; defaults/build tree retain the unaccepted 64 B candidate."
+    },
+    {
+      "label": "Cache A2 rollback and six AI lifecycle cycles, 2026-10-21, build.23",
+      "artifact_sha256": "0a9882af66047bc9ea558c8c840b7e4b20033e2589d305fbf1bd21c41a4c3fbf",
+      "elf_sha256": "a1acc050242e400abd701bfcc64cab6d475ad02ebf221a944a8754a7c94fe45b",
+      "verification": "measured",
+      "acceptance_levels": [
+        "L2"
+      ],
+      "features": [
+        "ai_talk"
+      ],
+      "source_refs": [
+        "tests/.local/cache-line-20261021/cache-A-boot.log",
+        "tests/.local/cache-line-20261021/cache-A2-active.log",
+        "tests/.local/cache-line-20261021/cycle-snapshots.json",
+        "tests/.local/cache-line-20261021/REPORT.md"
+      ],
+      "notes": "Restored exact build.23 identity, NVS preserved. A2: 25 sustained playback windows, mean wall 1199.76 ms/1024 ms, AEC wrapper 36339.92 us, one observed capture overflow. Below planned 30 windows. Six serial AI start/stop cycles generations 2..7: active then waiting, last-error=0, wake listening restored. Largest internal block 24576 throughout. Transient heap reduction recovered during idle to pre-cycle level. Acoustic double-talk, touch, weak-network and other media modes not certified; no L6 claim."
+    },
+    {
+      "label": "CoreS3 caption PSRAM runtime, 2026-10-21, build.25",
+      "artifact_sha256": "22692abfd31f1c598d68ecb5ef7eb4b00e83cd6ba4700b7df414ea2f7cd80245",
+      "elf_sha256": "95c555add4b155a71cfc451f6d12caaf6b6439603ecfc25d66e9dd4ff671bbd9",
+      "verification": "measured",
+      "acceptance_levels": [
+        "L2"
+      ],
+      "features": [
+        "ai_talk"
+      ],
+      "source_refs": [
+        "cores3-build25-HIL.md",
+        "cores3-build25-flash25.log",
+        "cores3-build25-boot25.log",
+        "cores3-build25-play25-analysis.json",
+        "cores3-build25-lifecycle25.json",
+        "cores3-build25-QUIET_SPEECH.md",
+        "cores3-build25-DOUBLETALK.md"
+      ],
+      "notes": "Native three-image flash verified, boot version/ELF prefix match, PSRAM test and bound Wi-Fi/MQTT startup pass. Six AI cycles generations 2..7 enter active then waiting/wake, last-error=0. Final idle internal-free=53895 and largest=29696 stable at 92/122/152 seconds, PSRAM-free=6587944. 61 sampled sustained-playback windows: mean wall/audio=1086.95/1024 ms, AEC wrapper=31866.11 us, one observed capture overflow; realtime target not met. Initial playback RX/decoded/written=10157, decode/I2S/RX-overflow=0. One reconnect generation recorded media dropped=1, cause unresolved. Visual captions/touch, subjective audio, double-talk, NVS save/unbind and other media modes not certified. No L6 claim. Device left build.25 waiting with wake enabled; serial observer closed. Subsequent user session 8 feedback: interruption difficult and recognition often poor even with playback stopped; acoustic acceptance FAIL (user reported). Read-only status confirmed same firmware and session, no decode/I2S errors; historical counters cannot localize the near-end speech loss. Follow-up controlled tests: quiet complete-sentence recognition 3/3 correct; one complete-sentence barge-in correct. At about 30 cm, formula short-phrase barge-in required two repetitions and only the final part was recognized. Subsequent controlled quiet formula recognized correctly once. Double-talk acceptance remains FAIL; these limited quiet passes do not certify all speech. No tuning applied."
+    }
+  ],
   "features": {
     "requested": [
       "h5_live_audio",
@@ -407,9 +590,14 @@
       "tools/check_esp_idf_i2c_driver_family.sh",
       "tools/tests/test_cores3_memory_config.py",
       "tools/tests/test_s3_display_geometry.py",
-      "tools/tests/test_onboarding_faults.py"
+      "tools/tests/test_onboarding_faults.py",
+      "tools/tests/test_s3_audio_observation.py",
+      "tools/tests/test_cores3_ai_g711.py",
+      "tools/tests/test_ai_alaw_rollout.py",
+      "tools/tests/test_s3_audio_calls.py",
+      "tools/tests/test_cores3_text_memory.py"
     ],
-    "standalone_skill_build_assessment": "not certified; this repository shares sources outside the native IDF project and uses the current Opus AI contract",
-    "runtime": "User build.12 identity prefix matches the previous artifact; AI playback completes but barge-in is poor, MIC clipping and AEC overruns observed. build.14 adds camera presentation metadata and official PA compensation. No current-artifact HIL or agent flashing."
+    "standalone_skill_build_assessment": "not certified; repository-native shared AI alaw/8k uplink and opus/16k downlink",
+    "runtime": "Current build.28: not flashed; HIL pending. Build.25 partial observations and known double-talk failure remain historical, not a certificate for build.28."
   }
 }

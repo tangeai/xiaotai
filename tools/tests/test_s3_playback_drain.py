@@ -43,7 +43,7 @@ static void finish_session(int error){assert(error==0);finished++;}
 
 class S3PlaybackDrain(unittest.TestCase):
     def test_start_publishes_active_only_after_output_ready(self):
-        body = function(MEDIA.read_text(), 'starter_media_start')
+        body = function(MEDIA.read_text(), 'video_enabled_for_mode') + function(MEDIA.read_text(), 'starter_media_start')
         atomics = sorted(set(re.findall(r'atomic_\w+\(\s*&([a-zA-Z_][a-zA-Z_0-9]*)', body)) | {'s_audio_playback_pending'})
         run_c(r'''
 #include <assert.h>

@@ -18,6 +18,8 @@ start = source.index("static void product_set_call(")
 publisher = source[start:source.index("\n}", start) + 2]
 start = source.index("static void reset_call_media_state(")
 resetter = source[start:source.index("\n}", start) + 2]
+start = source.index("static bool call_video_for_request(const char *media, bool wechat)\n{")
+selector = source[start:source.index("\n}", start) + 2]
 code = r'''
 #include <assert.h>
 #include <stdbool.h>
@@ -29,8 +31,8 @@ static void *s_product_mutex = (void *)1;
 static int xSemaphoreTake(void *m, int ms) { (void)m; (void)ms; return 1; }
 static void xSemaphoreGive(void *m) { (void)m; }
 static bool s_call_wechat, s_call_outgoing, s_call_video, s_call_camera_enabled;
-static unsigned short s_call_remote_rotation;
-static bool s_call_remote_rotation_reported;
+static unsigned short s_call_remote_rotation __attribute__((unused));
+static bool s_call_remote_rotation_reported __attribute__((unused));
 typedef struct cJSON cJSON;
 static const cJSON *payload __attribute__((unused));
 static void __attribute__((unused))
@@ -43,7 +45,7 @@ static struct {
     char call_peer[65];
 } s_product_snapshot;
 void starter_media_set_call_video(bool video) { media_video = video; }
-''' + resetter + "\n" + publisher + r'''
+''' + selector + '\n' + resetter + "\n" + publisher + r'''
 static void incoming(bool wechat, const char *room_type) {
     (void)room_type;
 ''' + selection + r'''
@@ -60,7 +62,7 @@ static int check(bool wechat, const char *type, bool outgoing, bool chosen, bool
     s_call_video = s_call_camera_enabled = media_video = chosen;
     incoming(wechat, type);
     if (s_product_snapshot.call_video != expected || media_video != chosen ||
-        s_product_snapshot.call_camera_enabled != expected) {
+        (CONFIG_IDF_TARGET_ESP32P4 && s_product_snapshot.call_camera_enabled != expected)) {
         fprintf(stderr, "FAIL pending: wx=%d type='%s' outgoing=%d chosen=%d expected_video=%d actual_ui_video=%d media_video=%d\n",
                 wechat, type, outgoing, chosen, expected,
                 s_product_snapshot.call_video, media_video);
@@ -81,7 +83,7 @@ int main(void) {
     const char *types[] = {"", "video", "voice", "audio"};
     for (unsigned i = 0; i < 4; ++i) {
         bool video = CONFIG_IDF_TARGET_ESP32P4 && i < 2;
-        for (int chosen = 0; chosen <= CONFIG_IDF_TARGET_ESP32P4; ++chosen) {
+        for (int chosen = 0; chosen <= 1; ++chosen) {
             /* Incoming calls must replace the previous call's media state. */
             failures += check(true, types[i], false, chosen, video);
             failures += check(false, types[i], false, chosen,
@@ -100,4 +102,4 @@ with tempfile.TemporaryDirectory(prefix="incoming-call-media-") as tmp:
                         f"-DCONFIG_IDF_TARGET_ESP32P4={p4}", str(path / "test.c"),
                         "-o", str(path / "test")], check=True)
         subprocess.run([str(path / "test")], check=True)
-print("PASS: P4 pending-call UI and explicit-answer media switch; outbound/S3 baseline")
+print("PASS: P4 pending-call UI and explicit-answer media switch; S3 incoming audio-only")

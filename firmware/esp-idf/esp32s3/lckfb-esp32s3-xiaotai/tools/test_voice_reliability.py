@@ -152,7 +152,7 @@ static int xQueueReceive(void *q, ai_ack_t *out, int wait) {
     pending = false; *out = request; return pdTRUE;
 }
 static int64_t esp_timer_get_time(void) { return now_ms * 1000; }
-starter_runtime_status_t starter_runtime_status(void) { return status; }
+starter_runtime_status_t starter_runtime_status_snapshot(void) { return status; }
 static int starter_media_play_pcm8k(const int16_t *p, size_t n) {
     (void)p; (void)n; ++plays; return -1; /* interrupted/muted/busy */
 }
@@ -554,23 +554,24 @@ int main(void) {
 
 def test_voice_diag_command():
     run("voice-diag command: bounded duration, default, malformed input, read-only snapshots", r'''
-static unsigned snapshots, identities, delays;
+static unsigned snapshots, identities, delays, events;
 #define printf(...) ((void)0)
 static void print_firmware_identity(void) { ++identities; }
 static void print_wake_diagnostics(void) { ++snapshots; }
+static void print_ai_diagnostic_events(void) { ++events; }
 static void vTaskDelay(unsigned ms) { assert(ms==1000); ++delays; }
 ''' + function("../platforms/esp-idf/components/starter_console/src/starter_console.c", "command_voice_diag") + r'''
 int main(void) {
     char *args[]={"voice-diag", "5", "extra"};
-    assert(command_voice_diag(1,args)==0 && snapshots==21 && delays==20 && identities==1);
-    snapshots=delays=identities=0;
-    assert(command_voice_diag(2,args)==0 && snapshots==6 && delays==5 && identities==1);
+    assert(command_voice_diag(1,args)==0 && snapshots==21 && delays==20 && identities==1 && events==2);
+    snapshots=delays=identities=events=0;
+    assert(command_voice_diag(2,args)==0 && snapshots==6 && delays==5 && identities==1 && events==2);
     const char *invalid[]={"4","31","-1","5x","","99999999999999999999999"};
-    snapshots=delays=identities=0;
+    snapshots=delays=identities=events=0;
     for (unsigned i=0;i<sizeof(invalid)/sizeof(invalid[0]);++i) {
         args[1]=(char*)invalid[i]; assert(command_voice_diag(2,args)==1);
     }
-    assert(command_voice_diag(3,args)==1 && snapshots==0 && delays==0 && identities==0);
+    assert(command_voice_diag(3,args)==1 && snapshots==0 && delays==0 && identities==0 && events==0);
     return 0;
 }
 ''')
@@ -836,7 +837,7 @@ static char s_ai_role_id[2], s_ai_request_id[2], s_call_room_id[2], s_call_peer_
 static char s_call_peer_name[2], s_call_wx_app_id[2], s_call_wx_model_id[2];
 static char s_call_connect_peer[2], s_call_connect_token[2], s_call_wx_session_token[2];
 static char s_call_wx_payload[2], s_call_id[2];
-static bool s_call_wechat, s_call_outgoing, s_call_waiting_confirm;
+static bool s_call_wechat, s_call_outgoing, s_call_waiting_confirm, s_call_video;
 static bool s_voip_connect_inflight;
 static bool s_call_peer_answered, s_call_p2p_connected;
 static atomic_int s_last_error;
@@ -860,6 +861,7 @@ static void product_set_call(bool a,bool b,const char*c,bool d) {(void)a;(void)b
 static void publish_state(void) {}
 static void resume_mqtt_after_external_connect(void) {}
 '''
+    body += function("../platforms/esp-idf/components/starter_runtime/src/starter_runtime.c", "reset_call_media_state")
     body += function("../platforms/esp-idf/components/starter_runtime/src/starter_runtime.c", "finish_session")
     body += r'''
 int main(void) {

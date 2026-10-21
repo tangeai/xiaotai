@@ -711,10 +711,10 @@ require("xiaotai_audio_frame_samples_for_rate(required_rate)" in audio_source an
         audio_source.find("xiaotai_audio_agc_process(&s_uplink_agc, pcm") <
         audio_source.find("opus_encode(s_opus_encoder, pcm") and
         audio_source.find("xiaotai_audio_agc_process(&s_uplink_agc, pcm") <
-        audio_source.find("linear2alaw((int)pcm[i])") and
+        audio_source.find("linear2alaw((int)wire_pcm[i])") and
         "SDK AGC level in=%u out=%u limited=%u failures=%u" in audio_source,
         "BK SDK NS ready rate=16000 frame=320 suppression=-25dB" in audio_source and
-        "AI Opus must use observable BK SDK NS after AEC and before AGC/encoding; both uplinks use AGC")
+        "AI must use observable BK SDK NS after AEC and before AGC/encoding; both uplinks use AGC")
 require("ECHO_DIAG AEC" in audio_source and
         "ECHO_DIAG RX" in tirtc_source and
         "ECHO_DIAG RX-SUM" in tirtc_source and

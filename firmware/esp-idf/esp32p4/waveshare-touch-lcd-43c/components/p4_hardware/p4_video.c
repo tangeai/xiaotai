@@ -609,6 +609,13 @@ static void hide_video_image(void)
     }
 }
 
+bool p4_video_ui_active(void)
+{
+    starter_tirtc_mode_t mode = starter_tirtc_mode();
+    return atomic_load(&s_live_generation) != 0 &&
+           (mode == STARTER_TIRTC_CALL || mode == STARTER_TIRTC_VOIP);
+}
+
 void p4_video_ui_tick(lv_obj_t *screen, bool call_page)
 {
     uint32_t generation = atomic_load(&s_live_generation);

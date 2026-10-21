@@ -43,6 +43,10 @@ typedef struct {
     int (*set_capture_gain)(void *context, unsigned gain);
     int (*set_volume)(void *context, unsigned percent);
     int (*set_muted)(void *context, bool muted);
+    /* Optional nonblocking, non-consuming capture queue overflow event count.
+     * Lifetime counter modulo 2^32; false/NULL means unavailable, not zero loss.
+     * Events are not PCM sample counts. Must not access hardware synchronously. */
+    bool (*capture_overflows)(void *context, uint32_t *events);
 } xiaotai_board_audio_adapter_t;
 
 /* Validate the callable surface before a media worker starts. request_stop

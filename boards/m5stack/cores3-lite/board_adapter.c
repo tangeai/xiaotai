@@ -11,6 +11,7 @@
 #include "freertos/task.h"
 #include "esp_camera.h"
 #include "esp_log.h"
+#include "esp_attr.h"
 #include "driver/i2s_std.h"
 #include "driver/i2s_tdm.h"
 #include "esp_codec_dev.h"
@@ -33,6 +34,42 @@ static const audio_codec_if_t *s_amp_codec_if;
 static esp_codec_dev_handle_t s_microphone_dev;
 static esp_codec_dev_handle_t s_speaker_dev;
 static bool s_audio_ready;
+
+/* RX queue loss is not included in the media queue's dropped counter.
+ * IDF calls this in ISR context: bounded scalar bookkeeping only, no logging. */
+static DRAM_ATTR portMUX_TYPE s_capture_probe_lock = portMUX_INITIALIZER_UNLOCKED;
+static DRAM_ATTR uint32_t s_capture_overflows;
+static bool s_capture_probe_ready;
+
+static bool IRAM_ATTR audio_capture_overflow(i2s_chan_handle_t channel,
+                                            i2s_event_data_t *event, void *context)
+{
+    (void)channel;
+    (void)event;
+    (void)context;
+    portENTER_CRITICAL_ISR(&s_capture_probe_lock);
+    ++s_capture_overflows;
+    portEXIT_CRITICAL_ISR(&s_capture_probe_lock);
+    return false;
+}
+
+static esp_err_t audio_capture_probe_init(void)
+{
+    const i2s_event_callbacks_t callbacks = {.on_recv_q_ovf = audio_capture_overflow};
+    esp_err_t err = i2s_channel_register_event_callback(s_i2s_rx, &callbacks, NULL);
+    s_capture_probe_ready = err == ESP_OK;
+    return err;
+}
+
+static bool audio_adapter_capture_overflows(void *context, uint32_t *events)
+{
+    (void)context;
+    if (events == NULL || !s_capture_probe_ready) return false;
+    portENTER_CRITICAL(&s_capture_probe_lock);
+    *events = s_capture_overflows;
+    portEXIT_CRITICAL(&s_capture_probe_lock);
+    return true;
+}
 
 esp_err_t szpi_board_init(void)
 {
@@ -235,7 +272,9 @@ static esp_err_t audio_i2s_init(void)
         },
     };
     rx_config.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256;
-    return i2s_channel_init_tdm_mode(s_i2s_rx, &rx_config);
+    err = i2s_channel_init_tdm_mode(s_i2s_rx, &rx_config);
+    if (err != ESP_OK) return err;
+    return audio_capture_probe_init();
 }
 
 static esp_err_t audio_amplifier_clock_init(void)
@@ -530,6 +569,7 @@ const xiaotai_board_audio_adapter_t *szpi_board_audio_adapter(void)
         .set_capture_gain = audio_adapter_set_capture_gain,
         .set_volume = audio_adapter_set_volume,
         .set_muted = audio_adapter_set_muted,
+        .capture_overflows = audio_adapter_capture_overflows,
     };
     return &adapter;
 }

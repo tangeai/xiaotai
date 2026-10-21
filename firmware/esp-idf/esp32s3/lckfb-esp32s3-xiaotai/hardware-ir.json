@@ -218,7 +218,7 @@
     {
       "id": "thingconnect-workspace",
       "kind": "managed-device-kit-generation",
-      "location": "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/README.md",
+      "location": "../../../../docs/boards/lckfb-esp32s3/README.md",
       "revision": "Generated from ESP32 Device Kit 1.1.1; Doctor resolves the managed Kit and the self-contained TiRTC SDK 2.3.0"
     }
   ],
@@ -370,7 +370,7 @@
           8000
         ],
         "channels": 1,
-        "path": "ES7210 MIC1 + MIC3 reference at 16 kHz -> ESP-SR 2.4.6 FD_LOW_COST AEC -> 8 kHz PCM -> espressif/esp_audio_codec G711-A encoder",
+        "path": "ES7210 MIC1 + MIC3 reference at 16 kHz -> ESP-SR 2.4.7 FD_LOW_COST AEC -> anti-alias 8 kHz PCM -> G711-A encoder (including AI)",
         "verification": "build_verified"
       },
       {
@@ -484,31 +484,27 @@
     }
   },
   "build_evidence": {
-    "firmware_version": "1.0.0+build.48",
+    "firmware_version": "1.0.1+build.9",
     "verification": "local_build_only",
-    "note": "ESP-IDF 5.5.5 compile and semantic gates passed; exact artifacts retained. No serial hardware verification in this run. Previous runtime observations remain historical.",
+    "note": "ESP-IDF v5.5.5 native build and exact BIN/ELF identity passed. All S3 device/WeChat calls are audio-only; video advertisement, UI and media/SDK paths disabled. H5 MJPEG retained. AI alaw/8000 up and opus/16000 down retained. No new HIL for this artifact. M5 caption external-BSS selection does not apply to this board.",
     "artifacts": [
       {
-        "path": "artifacts/1.0.0+build.48/lckfb_esp32s3_xiaotai.bin",
-        "label": "1.0.0+build.48 lckfb_esp32s3_xiaotai.bin",
-        "size_bytes": 4092848,
-        "sha256": "166d4f92b3eb8bb2f6ae17de89a23ae48ccbe9b8e62834473d2231b4d92e42a9"
+        "path": "artifacts/1.0.1+build.9/lckfb_esp32s3_xiaotai.bin",
+        "size_bytes": 4021456,
+        "sha256": "0f13e11b870dc2f1ea606a88437c3bf5ed30842ef5995056a0062c7ff5e79286"
       },
       {
-        "path": "artifacts/1.0.0+build.48/lckfb_esp32s3_xiaotai.elf",
-        "label": "1.0.0+build.48 lckfb_esp32s3_xiaotai.elf",
-        "size_bytes": 28968576,
-        "sha256": "141fc84a536399d7a43acb228166234e6a67ac34ef8bf736edcd6b76151e0fd9"
+        "path": "artifacts/1.0.1+build.9/lckfb_esp32s3_xiaotai.elf",
+        "size_bytes": 29048208,
+        "sha256": "a263adf03d1fd1627d3ebb0f25914c883d12ac4a20223257bd9f4d780255893f"
       },
       {
-        "path": "artifacts/1.0.0+build.48/bootloader.bin",
-        "label": "1.0.0+build.48 bootloader/bootloader.bin",
+        "path": "artifacts/1.0.1+build.9/bootloader.bin",
         "size_bytes": 20848,
-        "sha256": "aa3ec2d1d99956d0d56891d5ec0392571d21b94f87924270aaa25461da0ed0b3"
+        "sha256": "ed21893ef615a5dd8d6501168f8be8b3cbb08deec5249dccc611b9210883d92d"
       },
       {
-        "path": "artifacts/1.0.0+build.48/partition-table.bin",
-        "label": "1.0.0+build.48 partition_table/partition-table.bin",
+        "path": "artifacts/1.0.1+build.9/partition-table.bin",
         "size_bytes": 3072,
         "sha256": "1edad21a69d0791cb6fe8a4f47ea7c64cfd302031f8db2c9f68cdc9568ca124c"
       }
@@ -625,6 +621,39 @@
       "severity": "non-blocking-this-round",
       "summary": "The user used /dev/ttyACM0 to flash and monitor predecessor artifacts, while the agent does not own the serial device during this build cycle.",
       "resolution": "The current artifact remains unflashed by the agent; rerun flash/monitor on /dev/ttyACM0 and bind HIL observations to 56104cf2...."
+    }
+  ],
+  "build_history": [
+    {
+      "firmware_version": "1.0.0+build.48",
+      "verification": "local_build_only",
+      "note": "ESP-IDF 5.5.5 compile and semantic gates passed; exact artifacts retained. No serial hardware verification in this run. Previous runtime observations remain historical.",
+      "artifacts": [
+        {
+          "path": "artifacts/1.0.0+build.48/lckfb_esp32s3_xiaotai.bin",
+          "label": "1.0.0+build.48 lckfb_esp32s3_xiaotai.bin",
+          "size_bytes": 4092848,
+          "sha256": "166d4f92b3eb8bb2f6ae17de89a23ae48ccbe9b8e62834473d2231b4d92e42a9"
+        },
+        {
+          "path": "artifacts/1.0.0+build.48/lckfb_esp32s3_xiaotai.elf",
+          "label": "1.0.0+build.48 lckfb_esp32s3_xiaotai.elf",
+          "size_bytes": 28968576,
+          "sha256": "141fc84a536399d7a43acb228166234e6a67ac34ef8bf736edcd6b76151e0fd9"
+        },
+        {
+          "path": "artifacts/1.0.0+build.48/bootloader.bin",
+          "label": "1.0.0+build.48 bootloader/bootloader.bin",
+          "size_bytes": 20848,
+          "sha256": "aa3ec2d1d99956d0d56891d5ec0392571d21b94f87924270aaa25461da0ed0b3"
+        },
+        {
+          "path": "artifacts/1.0.0+build.48/partition-table.bin",
+          "label": "1.0.0+build.48 partition_table/partition-table.bin",
+          "size_bytes": 3072,
+          "sha256": "1edad21a69d0791cb6fe8a4f47ea7c64cfd302031f8db2c9f68cdc9568ca124c"
+        }
+      ]
     }
   ]
 }

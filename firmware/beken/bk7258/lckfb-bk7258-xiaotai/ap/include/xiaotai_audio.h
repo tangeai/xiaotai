@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 /* TiRTC product audio contracts. Remote-view/call/VoIP use G.711 A-law at
- * 8 kHz in 20 ms packets; AI uses Opus at 16 kHz in 20 ms packets. */
+ * 8 kHz in 20 ms packets; AI uplink uses A-law/8 kHz, downlink Opus/16 kHz, both 20 ms. */
 
 typedef enum {
     XIAOTAI_AUDIO_CODEC_ALAW_8K = 0,
@@ -21,6 +21,12 @@ typedef int (*xiaotai_audio_uplink_fn)(const uint8_t *alaw,
 /** Start full-duplex board audio. The callback runs on the microphone task. */
 int xiaotai_audio_start(xiaotai_audio_codec_t codec,
                         xiaotai_audio_uplink_fn uplink, void *context);
+
+/** Configure independent wire directions. Supports symmetric profiles and
+ * A-law/8k uplink + Opus/16k downlink; hardware/AEC/NS/AGC remain 16k for AI. */
+int xiaotai_audio_start_duplex(xiaotai_audio_codec_t uplink_codec,
+                               xiaotai_audio_codec_t downlink_codec,
+                               xiaotai_audio_uplink_fn uplink, void *context);
 
 /**
  * Queue received G.711 A-law without blocking the TiRTC callback.

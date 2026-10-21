@@ -37,6 +37,82 @@ API 或 MQTT 地址；原有绑定显示、存储失败和重试测试继续覆�
 
 ## 测试驱动开发约定
 
+S3 纯音频通话：`test_s3_audio_calls.py` 分别按 M5/立创定义执行能力上报、
+呼叫选择/接听、媒体视频策略、SDK 发送与联系人渲染入口。先复现旧实现声明/发送视频
+及显示视频按钮，再验证上下行 `none`、`no_video=true`、外呼 voice、旧视频状态拦截，
+同时保留 H5 MJPEG。已注册 `tools/check.sh`。主机回放不证明服务端已更新能力；
+新固件仍须重连上报并验证微信主被叫双向音频。
+
+CoreS3 文本内存：`test_cores3_text_memory.py` 执行各板真实组件 CMake 入口，
+编译生产字幕数组及历史追加函数，检查编译后段归属、容量、去重、截断和清空复用。
+先复现 M5 两个屏幕变体仍占内部 BSS，以及关闭外部 BSS 时未拒绝构建；
+再验证仅 M5 的 4352 字节文本移入外部段，立创 S3/P4 仍使用内部 BSS。
+已注册 `tools/check.sh`。主机属性桩不模拟 PSRAM/cache；还须核对原生 ELF，
+并实板验证字幕、设置保存、解绑及媒体并发，不能据此声称 CPU 或 AEC 已改善。
+
+CoreS3 缓存行对照：`test_cores3_cache_experiment.py` 经检查器 CLI 验证最终
+sdkconfig，只允许 32 B → 64 B 缓存行及其派生值变化，拒绝旧配置未生效、
+扩大缓存容量、混改音频/优化选项、缺失或冲突配置。先在旧默认配置上失败，
+再修改 M5 默认值；它不证明性能收益。构建后还须用真实 baseline/candidate
+sdkconfig 运行 `tools/check_cores3_cache_experiment.py`，并进行实板对照。
+
+S3 摄像头与方向由 `test_s3_h5_cadence.py`、`test_camera_rotation_report.py`
+覆盖：H5 目标节拍、通话/AI/房间不采帧、编码期间挂断不发旧帧、H5 方向保持。
+`test_default_video_call.py` 和 `test_incoming_call_media.py` 验证 S3 语音选择、
+来电与显式接听，以及 P4 原有视频策略。实板仍须验证两种呼叫方向、双向音频、
+拥塞、挂断重拨和 H5 切换；原微信单向视频候选已按产品要求撤回。
+
+UI 周期预算：`test_ui_status_budget.py` 回放产品 tick、触摸、控制台与诊断入口，
+先复现普通 UI 重复扫描任务栈，再验证常规读不扫描、诊断读仍返回真实水位。
+`test_p4_ui_video_timer.py` 先复现空闲时重复清理，再验证无视频暂停、视频就绪恢复、
+挂断/离页一次清理及重新进入恢复。两项已注册统一检查；主机测试不证明真机耗时。
+
+UI 耗时观测：`test_ui_refresh_observation.py` 在生产 tick 的快照边界注入等待，
+验证总时间被拆分到正确阶段；回放实际 LVGL monitor 回调，验证局部/全屏像素统计、
+窗口清零、限频和原回调保留。先复现旧日志没有阶段区分且缺少渲染观测，再添加探针。
+`test_s3_display_geometry.py` 同时验证在持有 LVGL 锁时安装探针。已注册统一检查；
+这些是诊断准确性测试，不是卡顿修复或实板吞吐证明。
+
+`test_task_diag.py` 回放实际串口命令与 tick ISR，验证每核采样归属、固定窗口、
+缺失任务归入其他而不误读当前任务、停止后的迟到回调、重复调用清零及部分注册失败清理。
+先因缺少入口失败，新增后通过并注册统一检查。S3 使用官方 hook，不改变 TiRTC SDK
+要求关闭 trace 的配置；这些测试验证观测行为，不证明实板 CPU 占用或卡顿根因。
+
+
+统一 AI 格式：`test_ai_alaw_rollout.py` 回放 P4/BK 生产采集与编码 worker、
+BK AI 媒体准备和 SDK 发送入口，验证 16 kHz DSP、8 kHz/160 字节上行、
+旧代次/静音/错误长度拦截、初始化失败清理及 P4 预录音尾段衔接。
+还覆盖编码期间静音/代次变化不得发送、正常丢弃不得误报编码失败，
+以及 BK AI→8 kHz 通话→AI 的 DSP 与包长、静音 A-law 零值和发送门禁。
+先复现两板仍执行 Opus 编码及 P4 丢尾段，再修改实现；已加入 `tools/check.sh`。
+
+产品协议和业务场景回归验证 alaw 上行 / Opus 下行的请求、响应与独立方向合同；
+S3/M5 编码、预录音、Opus 下行继续由 `test_cores3_ai_g711.py` 覆盖。
+共享 FIR 的迁移保持原 API，既有 `test_audio_resampler.sh` 覆盖分块连续性和抗混叠，
+没有为文件移动添加自证测试。BK 和 P4 原有播放、结束排空及会话测试继续执行。
+四板默认配置会通过原生构建后的 sdkconfig 核验；主机测试不代替各板的声学验收。
+
+
+`test_cores3_ai_g711.py` 驱动生产 start_session 和响应格式校验、TiRTC SDK
+发送入口、编码 worker、预录音到实时音频衔接及下行播放。先复现 AI A-law 被拒、
+仍发送 Opus/16 kHz 和预录音采样数不符，再验证上行 8 kHz / 160 字节 / 20 ms、
+下行保持 Opus / 16 kHz；默认 Opus 路径继续由 `test_s3_opus_media.py` 保护。
+已注册 `tools/check.sh`。这些测试不证明服务端已接受非对称格式或实板处理耗时下降。
+
+build.17 增强同一已注册测试：实际 start_session 发送入口按官方 AI 协议使用
+`alaw`；生产 CONNECTING 响应分支先复现拒绝合法 `alaw/8000`，再验证修复后
+兼容 `g711a` 别名。错误采样率、声道、下行编码、缺失字段与旧请求不能准入；
+失败诊断只打印白名单编码和数值，不泄露会话 ID、token 或未知字符串。
+
+
+`test_s3_audio_observation.py` 执行生产采音边界采样、32 块聚合、公开快照和
+控制台格式化，覆盖排队未播、DMA 尾音、会话换代、计数重置、时钟回绕与不支持观测。
+CoreS3 探针测试执行回调注册、溢出计数及非消耗读取，验证错误传播；
+原实现因缺少观测入口失败，新增后通过，已注册 `tools/check.sh`。
+现有 voice-diag 回归同时保护命令时长、只读行为及首尾事件输出。
+主机测试不模拟真实 DMA/调度，不证明重复说话或 AEC 超期已经解决。
+
+
 `test_camera_rotation_report.py` 回放生产能力上报、发起设备呼叫和接听信息提交，
 从 M5 工程的编译定义读取方向，解析真实提交的 JSON。旧实现分别因缺少方向、
 沿用 270° 失败；修正后 M5 三个场景及两个呼叫入口均为数值 180，语音能力不变。

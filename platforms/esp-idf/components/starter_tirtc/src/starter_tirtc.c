@@ -931,7 +931,11 @@ int starter_tirtc_send_alaw(uint32_t timestamp_ms,
     if (connection == NULL || data == NULL || length == 0U ||
         (mode != STARTER_TIRTC_H5 && mode != STARTER_TIRTC_VOIP &&
          mode != STARTER_TIRTC_CALL &&
-         mode != STARTER_TIRTC_ROOM)) {
+         mode != STARTER_TIRTC_ROOM
+#if CONFIG_STARTER_AI_UPLINK_G711A
+         && mode != STARTER_TIRTC_AI
+#endif
+         )) {
         return TIRTC_E_INVALID_PARAMETER;
     }
     /* 调用者只提交编码数据；协议 stream/media/flags 在此集中固定。 */
@@ -986,11 +990,18 @@ int starter_tirtc_send_mjpeg(uint32_t timestamp_ms,
     tirtc_conn_t connection = (tirtc_conn_t)atomic_load_explicit(
         &s_connection, memory_order_acquire);
     starter_tirtc_mode_t mode = starter_tirtc_mode();
-    if (connection == NULL || (mode != STARTER_TIRTC_H5 && mode != STARTER_TIRTC_CALL) ||
+#if !CONFIG_IDF_TARGET_ESP32P4
+    if (mode != STARTER_TIRTC_H5) return TIRTC_E_INVALID_PARAMETER;
+#endif
+    if (connection == NULL || (mode != STARTER_TIRTC_H5 && mode != STARTER_TIRTC_CALL
+#if !CONFIG_IDF_TARGET_ESP32P4
+                               && mode != STARTER_TIRTC_VOIP
+#endif
+                              ) ||
         data == NULL || length == 0U) {
         return TIRTC_E_INVALID_PARAMETER;
     }
-    if (mode == STARTER_TIRTC_CALL) {
+    if (mode == STARTER_TIRTC_CALL || mode == STARTER_TIRTC_VOIP) {
         if (!starter_tirtc_video_ready()) return TIRTC_E_INVALID_PARAMETER;
         size_t limit = atomic_load(&s_send_buffer_limit);
         if (limit != 0U) {
@@ -1040,6 +1051,11 @@ bool starter_tirtc_audio_ready(void)
 
 bool starter_tirtc_video_ready(void)
 {
+#if !CONFIG_IDF_TARGET_ESP32P4
+    if (starter_tirtc_mode() != STARTER_TIRTC_H5) return false;
+#endif
+    /* VoIP media starts only after business confirmation, on both SoCs. */
+    if (starter_tirtc_connected() && starter_tirtc_mode() == STARTER_TIRTC_VOIP) return true;
 #if CONFIG_IDF_TARGET_ESP32P4
     if (starter_tirtc_connected() && (starter_tirtc_mode() == STARTER_TIRTC_CALL ||
         starter_tirtc_mode() == STARTER_TIRTC_VOIP)) return true;

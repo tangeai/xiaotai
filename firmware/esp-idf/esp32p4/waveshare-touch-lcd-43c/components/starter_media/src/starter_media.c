@@ -6,6 +6,7 @@
 #include "starter_aec.h"
 #include "starter_voice.h"
 #include "starter_preroll.h"
+#include "starter_audio_resampler.h"
 
 #include <math.h>
 #include <stdatomic.h>
@@ -628,7 +629,10 @@ static esp_err_t opus_and_3a_init(void)
     /* Calls and Room use 8 kHz A-law. Give this path more digital headroom
      * than AI and target -1 dBFS; the limiter still prevents clipping. */
     set_agc_config(s_agc_8k, 30, 1, 1);
-    ESP_LOGI(TAG, "Opus + 3A ready: AI=16k/20ms/16kbps NS=aggressive "
+#if CONFIG_STARTER_AI_UPLINK_G711A
+    ESP_LOGI(TAG, "AI audio profile: uplink=alaw/8000 downlink=opus/16000 mono/20ms");
+#endif
+    ESP_LOGI(TAG, "AI 3A ready: DSP=16k/20ms NS=aggressive "
                   "AGC=target-3dBFS calls=8k AGC target-1dBFS gain=30dB");
     return ESP_OK;
 }
@@ -703,13 +707,21 @@ static void audio_uplink_task(void *argument)
     uint8_t encoded[OPUS_MAX_PACKET_BYTES];
     int16_t filtered[AUDIO_PACKET_SAMPLES_MAX];
     int16_t processed[AUDIO_PACKET_SAMPLES_MAX];
+#if CONFIG_STARTER_AI_UPLINK_G711A
+    int16_t alaw_pcm[ALAW_PACKET_SAMPLES];
+    starter_audio_resampler_16k_to_8k_t ai_resampler = {0};
+    uint32_t resampler_generation = 0;
+#endif
     for (;;) {
         uint8_t slot = 0;
         if (xQueueReceive(s_audio_tx_ready_queue, &slot, portMAX_DELAY) != pdTRUE) {
             continue;
         }
         audio_tx_item_t *item = &s_audio_tx_pool[slot];
-        bool ready = same_session(item->mode, item->generation) &&
+        size_t expected_samples = item->mode == STARTER_TIRTC_AI
+                                      ? OPUS_PACKET_SAMPLES : ALAW_PACKET_SAMPLES;
+        bool ready = item->sample_count == expected_samples &&
+                     same_session(item->mode, item->generation) &&
                      item->mute_epoch == atomic_load(&s_mute_epoch) &&
                      starter_tirtc_audio_ready() &&
                      !atomic_load_explicit(&s_microphone_muted, memory_order_acquire) &&
@@ -758,23 +770,43 @@ static void audio_uplink_task(void *argument)
                 if (input_abs > input_peak) input_peak = input_abs;
                 if (output_abs > output_peak) output_peak = output_abs;
             }
+            /* NS/AGC stay at 16 kHz; only the transport is narrowband. */
+            bool use_opus = item->mode == STARTER_TIRTC_AI;
+            const int16_t *encode_pcm = processed;
+            size_t encode_samples = item->sample_count;
+#if CONFIG_STARTER_AI_UPLINK_G711A
+            use_opus = false;
+            if (item->mode == STARTER_TIRTC_AI) {
+                if (resampler_generation != item->generation) {
+                    starter_audio_resampler_16k_to_8k_reset(&ai_resampler);
+                    resampler_generation = item->generation;
+                }
+                encode_samples = starter_audio_resampler_16k_to_8k_process(
+                    &ai_resampler, processed, item->sample_count,
+                    alaw_pcm, ALAW_PACKET_SAMPLES);
+                encode_pcm = alaw_pcm;
+            } else {
+                resampler_generation = 0;
+            }
+#endif
             esp_audio_enc_in_frame_t input = {
-                .buffer = (uint8_t *)processed,
-                .len = item->sample_count * sizeof(*processed),
+                .buffer = (uint8_t *)encode_pcm,
+                .len = encode_samples * sizeof(*encode_pcm),
             };
             esp_audio_enc_out_frame_t output = {
                 .buffer = encoded,
                 .len = sizeof(encoded),
             };
-            esp_audio_err_t encode_result = item->mode == STARTER_TIRTC_AI
+            esp_audio_err_t encode_result = use_opus
                 ? esp_opus_enc_process(s_opus_encoder, &input, &output)
                 : esp_g711_enc_process(s_g711_encoder, &input, &output);
             bool encoded_ok = encode_result == ESP_AUDIO_ERR_OK &&
                 output.encoded_bytes > 0U &&
-                (item->mode == STARTER_TIRTC_AI ||
-                 output.encoded_bytes == ALAW_PACKET_SAMPLES);
-            if (encoded_ok) {
-                int ret = item->mode == STARTER_TIRTC_AI
+                (use_opus || output.encoded_bytes == ALAW_PACKET_SAMPLES);
+            if (encoded_ok && same_session(item->mode, item->generation) &&
+                item->mute_epoch == atomic_load(&s_mute_epoch) &&
+                !atomic_load(&s_microphone_muted) && uplink_allowed(item->mode)) {
+                int ret = use_opus
                     ? starter_tirtc_send_opus(item->timestamp_ms, encoded,
                                                output.encoded_bytes)
                     : starter_tirtc_send_alaw(item->timestamp_ms, encoded,
@@ -800,15 +832,30 @@ static void audio_uplink_task(void *argument)
                                  (unsigned)uxTaskGetStackHighWaterMark(NULL));
                     }
                 }
-            } else {
+            } else if (!encoded_ok) {
                 ESP_LOGW(TAG, "uplink encode failed mode=%d ret=%d bytes=%u",
                          (int)item->mode, (int)encode_result,
                          (unsigned)output.encoded_bytes);
             }
         }
+#if CONFIG_STARTER_AI_UPLINK_G711A
+        if (!ready) resampler_generation = 0;
+#endif
         memset(item, 0, sizeof(*item));
         (void)xQueueSend(s_audio_tx_free_queue, &slot, 0);
     }
+}
+
+/* Replay shares the 16 kHz NS/AGC domain with live AI PCM. */
+static size_t prepare_ai_preroll_pcm(const int16_t *input, size_t samples,
+                                     int16_t *output)
+{
+    for (size_t i = 0; i < samples; ++i) {
+        int16_t next = i + 1U < samples ? input[i + 1U] : input[i];
+        output[2U * i] = input[i];
+        output[2U * i + 1U] = (int16_t)(((int32_t)input[i] + next) / 2);
+    }
+    return samples * 2U;
 }
 
 static void audio_capture_task(void *argument)
@@ -1003,14 +1050,7 @@ static void audio_capture_task(void *argument)
                     uint32_t timestamp;
                     if (!starter_preroll_peek(&s_preroll, generation, preroll_8k,
                                               ALAW_PACKET_SAMPLES, &timestamp)) break;
-                    for (size_t i = 0; i < ALAW_PACKET_SAMPLES; ++i) {
-                        int16_t current = preroll_8k[i];
-                        int16_t next = i + 1U < ALAW_PACKET_SAMPLES
-                                           ? preroll_8k[i + 1U] : current;
-                        packet_pcm[i * 2U] = current;
-                        packet_pcm[i * 2U + 1U] =
-                            (int16_t)(((int32_t)current + next) / 2);
-                    }
+                    (void)prepare_ai_preroll_pcm(preroll_8k, ALAW_PACKET_SAMPLES, packet_pcm);
                     if (!enqueue_uplink_pcm(mode, generation, timestamp, packet_pcm,
                                             OPUS_PACKET_SAMPLES, mute_epoch)) break;
                     starter_preroll_consume(&s_preroll, ALAW_PACKET_SAMPLES);
@@ -1019,9 +1059,10 @@ static void audio_capture_task(void *argument)
                                                  ALAW_PACKET_SAMPLES, &packet_samples,
                                                  &next_timestamp_ms)) {
                     s_expected_wake_token = 0;
-                    /* A sub-20 ms 8 kHz tail cannot form a valid Opus frame;
-                     * discard it instead of mixing sample-rate domains. */
-                    packet_samples = 0;
+                    /* Preserve the partial replay once, in the same 16 kHz
+                     * domain as the following live PCM. */
+                    packet_samples = prepare_ai_preroll_pcm(
+                        preroll_8k, packet_samples, packet_pcm);
                     /* Keep replay=true for this iteration: clean was already
                      * appended above and must not be transmitted a second time. */
                     ESP_LOGI(TAG, "AI preroll complete; live audio generation=%lu",

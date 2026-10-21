@@ -448,10 +448,8 @@ static int send_encoded_audio(const uint8_t *audio,
                      (mode == CONNECTION_ROOM ? ROOM_AUDIO_ID :
                       (mode == CONNECTION_VOIP ? VOIP_AUDIO_ID :
                                                 STREAM_UP_AUDIO_ID)),
-        .media = mode == CONNECTION_AI ? TIRTC_AUDIO_OPUS :
-                                         TIRTC_AUDIO_ALAW,
-        .flags = mode == CONNECTION_AI ? TIRTC_AUDIOSAMPLE_16K16B1C :
-                                         TIRTC_AUDIOSAMPLE_8K16B1C,
+        .media = TIRTC_AUDIO_ALAW,
+        .flags = TIRTC_AUDIOSAMPLE_8K16B1C,
         .ts = timestamp_ms,
         .length = (uint32_t)size,
     };
@@ -1830,8 +1828,9 @@ int xiaotai_tirtc_ai_prepare_media(void)
     }
     xiaotai_audio_set_uplink_enabled(false);
     atomic_store_explicit(&s_audio_subscribed, false, memory_order_release);
-    int rc = xiaotai_audio_start(XIAOTAI_AUDIO_CODEC_OPUS_16K,
-                                 send_encoded_audio, NULL);
+    int rc = xiaotai_audio_start_duplex(XIAOTAI_AUDIO_CODEC_ALAW_8K,
+                                        XIAOTAI_AUDIO_CODEC_OPUS_16K,
+                                        send_encoded_audio, NULL);
     if (rc == BK_OK) {
         rc = TiRtcSubscribeAudio(connection, AI_AUDIO_ID);
     }

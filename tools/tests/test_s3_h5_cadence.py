@@ -15,6 +15,7 @@ class S3H5Cadence(unittest.TestCase):
 #define ESP_LOGW(...) ((void)0)
 #define pdMS_TO_TICKS(x) (x)
 #define STARTER_TIRTC_H5 1
+#define STARTER_TIRTC_VOIP 3
 #define XIAOTAI_CAMERA_FRAME_RGB565 1
 #define PIXFORMAT_RGB565 1
 #define CAMERA_FRAME_INTERVAL_MS 125U
@@ -28,14 +29,15 @@ typedef struct {const void *data;size_t size,width,height;int format;} xiaotai_b
 typedef struct {uint8_t *buf;size_t len,width,height;int format;} camera_fb_t;
 typedef struct {uint8_t *buffer;size_t capacity,length;bool overflow;} starter_jpeg_collector_t;
 static atomic_uint s_mode,s_generation,s_video_sent,s_jpeg_deadline_misses;
-static atomic_bool s_video_refresh_requested;
+static atomic_bool s_video_refresh_requested, s_call_video;
+static bool invalidate_during_encode, disable_during_encode, stopped;
 static atomic_uint_fast32_t s_jpeg_max_encode_us;
 static uint8_t s_jpeg_buffer[JPEG_BUFFER_BYTES];
 static uint32_t now_ms,encoding_ms,acquired,released,sends,yields,last_timestamp;
 static jmp_buf done;
 static int64_t esp_timer_get_time(void){return (int64_t)now_ms*1000;}
-static void vTaskDelay(unsigned ticks){assert(ticks>0);now_ms+=ticks;yields++;}
-static bool same_session(int m,uint32_t g){return m==1 && g==7;}
+static void vTaskDelay(unsigned ticks){assert(ticks>0);now_ms+=ticks;yields++;if(now_ms>5000)longjmp(done,1);}
+static bool same_session(int m,uint32_t g){return m==s_mode && g==s_generation && !stopped;}
 static bool starter_tirtc_video_ready(void){return true;}
 static size_t starter_tirtc_send_buffer_used(void){return 0;}
 static bool xiaotai_board_camera_frame_is_valid(const xiaotai_board_camera_frame_t *f){return true;}
@@ -48,7 +50,10 @@ static struct {void *context;int (*acquire)(void *,xiaotai_board_camera_frame_t 
 static void starter_jpeg_collect(void){}
 static bool frame2jpg_cb(camera_fb_t *f,unsigned quality,void (*cb)(void),starter_jpeg_collector_t *jpg){
     assert(f->width==320 && f->height==240 && quality==80);
-    now_ms+=encoding_ms;jpg->length=100;return true;
+    now_ms+=encoding_ms;jpg->length=100;
+    if(invalidate_during_encode){s_generation++;stopped=true;}
+    if(disable_during_encode)s_call_video=false;
+    return true;
 }
 static void update_max_counter(atomic_uint_fast32_t *p,uint32_t v){if(v>*p)*p=v;}
 static int starter_tirtc_send_mjpeg(uint32_t timestamp,const void *data,size_t size){
@@ -60,17 +65,29 @@ static int starter_tirtc_send_mjpeg(uint32_t timestamp,const void *data,size_t s
     if(sends==20)longjmp(done,1);
     return 0;
 }
-''' + function(MEDIA.read_text(),'camera_task') + r'''
+''' + function(MEDIA.read_text(),'starter_media_set_call_video') + function(MEDIA.read_text(),'video_enabled_for_mode') + function(MEDIA.read_text(),'camera_task') + r'''
 int main(void){
     s_mode=1;s_generation=7;
     const unsigned durations[]={90,110,124,200};
     for(unsigned i=0;i<4;i++){
+        s_mode=STARTER_TIRTC_H5;starter_media_set_call_video(true);
         now_ms=0;acquired=released=sends=yields=0;encoding_ms=durations[i];
         s_jpeg_deadline_misses=0;
         if(!setjmp(done))camera_task(NULL);
         assert(acquired==20 && released==20 && yields>=20);
         assert(s_jpeg_deadline_misses==(encoding_ms>125 ? 20U : 0U));
     }
+    // All S3 call modes stay audio-only, even if an old caller sets video=true.
+    for(unsigned mode=2;mode<=5;mode++) for(unsigned video=0;video<=1;video++){
+        s_mode=mode;starter_media_set_call_video(video);now_ms=0;acquired=sends=0;
+        if(!setjmp(done))camera_task(NULL);
+        assert(acquired==0 && sends==0);
+    }
+    // A hangup while H5 JPEG encodes cannot leak the old frame.
+    s_mode=STARTER_TIRTC_H5;s_generation=7;stopped=false;
+    now_ms=0;acquired=released=sends=0;invalidate_during_encode=true;
+    if(!setjmp(done))camera_task(NULL);
+    assert(acquired==1 && released==1 && sends==0);
 }
 ''')
 

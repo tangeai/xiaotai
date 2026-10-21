@@ -74,6 +74,7 @@ assert (bk_stream["down_audio_streamid"], bk_stream["down_video_streamid"]) == (
 assert s3_stream["audio_rate"] == 8000
 assert s3["profiles"]["call"]["no_video"] is True
 assert s3["profiles"]["voip"]["no_video"] is True
+assert s3["profiles"]["voip"]["up_video_mt"] == "none"
 assert s3["profiles"]["voip"]["down_video_mt"] == "none"
 profile_function = source[start:source.index("static void handle_voip_profile", start)]
 assert 'PLATFORM_SERVICE_DEVICE, "/v1/device/profile"' in profile_function

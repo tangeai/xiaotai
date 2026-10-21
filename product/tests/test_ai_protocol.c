@@ -1,6 +1,7 @@
 #include "xiaotai_ai_protocol.h"
 
 #include <assert.h>
+#include <stdio.h>
 #include <string.h>
 
 int main(void)
@@ -11,15 +12,22 @@ int main(void)
                                          "dev-1", "role-1");
     assert(length > 0);
     assert(strstr(request, "\"method\":\"start_session\"") != NULL);
-    assert(strstr(request, "\"codec\":\"opus\"") != NULL);
+    assert(strstr(request, "\"input_audio\":{\"codec\":\"alaw\",\"sample_rate\":8000,\"channels\":1}") != NULL);
+    assert(strstr(request, "\"output_audio\":{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1}") != NULL);
     assert(strstr(request, "\"sample_rate\":16000") != NULL);
     assert(xiaotai_ai_encode_start(request, 8, "req-1", "dev-1", "role-1") < 0);
 
     const char accepted[] =
         "{\"id\":\"req-1\",\"result\":{\"session_id\":\"s\","
-        "\"input_audio\":{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1},"
+        "\"input_audio\":{\"codec\":\"alaw\",\"sample_rate\":8000,\"channels\":1},"
         "\"output_audio\":{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1}}}";
     assert(xiaotai_ai_decode_message(accepted, strlen(accepted), "req-1") ==
+           XIAOTAI_AI_MESSAGE_START_ACCEPTED);
+    const char alias[] =
+        "{\"id\":\"req-1\",\"result\":{\"session_id\":\"s\","
+        "\"input_audio\":{\"codec\":\"g711a\",\"sample_rate\":8000,\"channels\":1},"
+        "\"output_audio\":{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1}}}";
+    assert(xiaotai_ai_decode_message(alias, strlen(alias), "req-1") ==
            XIAOTAI_AI_MESSAGE_START_ACCEPTED);
     const char bad_profile[] =
         "{\"id\":\"req-1\",\"result\":{\"session_id\":\"s\","
@@ -27,6 +35,24 @@ int main(void)
         "\"output_audio\":{\"codec\":\"alaw\",\"sample_rate\":8000,\"channels\":1}}}";
     assert(xiaotai_ai_decode_message(bad_profile, strlen(bad_profile), "req-1") ==
            XIAOTAI_AI_MESSAGE_START_REJECTED);
+    /* Reject fractional JSON numbers, wrong directions and incomplete formats
+     * through the public decoder, rather than testing a private predicate. */
+    const char *invalid_profiles[] = {
+        "{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1}",
+        "{\"codec\":\"alaw\",\"sample_rate\":8000.5,\"channels\":1}",
+        "{\"codec\":\"alaw\",\"sample_rate\":8000,\"channels\":1.5}",
+        "{\"codec\":\"alaw\",\"sample_rate\":\"8000\",\"channels\":1}",
+        "{\"codec\":\"alaw\",\"sample_rate\":8000}",
+        "null",
+    };
+    for (size_t i = 0; i < sizeof(invalid_profiles) / sizeof(invalid_profiles[0]); ++i) {
+        snprintf(request, sizeof(request),
+            "{\"id\":\"req-1\",\"result\":{\"session_id\":\"s\",\"input_audio\":%s,"
+            "\"output_audio\":{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1}}}",
+            invalid_profiles[i]);
+        assert(xiaotai_ai_decode_message(request, strlen(request), "req-1") ==
+               XIAOTAI_AI_MESSAGE_START_REJECTED);
+    }
     const char caption[] = "{\"method\":\"caption\",\"params\":{}}";
     const char emotion[] =
         "{\"method\":\"emotion\",\"params\":{\"emotion\":\"angry\"}}";

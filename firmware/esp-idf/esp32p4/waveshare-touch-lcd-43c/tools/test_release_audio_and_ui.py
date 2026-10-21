@@ -84,10 +84,10 @@ class P4ReleaseContractTest(unittest.TestCase):
             task_setup.count("OPUS_WORKER_TASK_STACK_BYTES"), 2
         )
 
-    def test_ai_audio_is_opus_16k_and_calls_remain_alaw_8k(self) -> None:
+    def test_ai_uplink_is_alaw_8k_downlink_opus_16k(self) -> None:
         contract = json.loads((BOARD / "platform-media-contract.json").read_text())
-        self.assertEqual(contract["ai"]["audio_up"]["codec"], "opus")
-        self.assertEqual(contract["ai"]["audio_up"]["sample_rate_hz"], 16000)
+        self.assertEqual(contract["ai"]["audio_up"]["codec"], "alaw")
+        self.assertEqual(contract["ai"]["audio_up"]["sample_rate_hz"], 8000)
         self.assertEqual(contract["ai"]["audio_down"]["codec"], "opus")
         source = TIRTC.read_text()
         self.assertIn("starter_tirtc_send_opus", source)

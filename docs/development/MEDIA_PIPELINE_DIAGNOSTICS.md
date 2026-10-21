@@ -1,5 +1,61 @@
 # 音视频链路诊断
 
+## ESP UI 回调与屏幕刷新分开观测
+
+ESP-IDF v5.5.5 下，`UI refresh slow` 是 100 ms 产品 tick 的墙钟耗时；
+它包含抢占与等待，不是 CPU 独占时间，也不包含随后执行的 LVGL 屏幕渲染。
+超过 20 ms 才报告，仍最多每 5 秒一次。新增 `stages-us`：
+
+- `queue`：tick 入口到语音意图队列/提示处理结束。
+- `runtime`：轻量运行状态快照；`product`：产品快照，含获取互斥锁的等待。
+- `media`：媒体状态快照。
+- `expression`：原有表情绘制计时。
+- `view`：其余页面、文字、时钟和缓存更新；不包含上述阶段。
+
+这些阶段之和等于 `total`，但任一阶段变慢仍可能来自任务抢占。
+不能把 `expression=0` 的慢回调解释为嘴部绘制慢。
+
+两个 S3 工程还安装 LVGL 8 `monitor_cb`，每约 5 秒汇总一行
+`UI render window`。`refreshes` 是有脏区的刷新次数，`pixels` 是该窗口累计刷新
+像素数，`max-pixels` 是单次最大值。320×240 全屏为 76800 像素；累计值允许超过
+全屏大小，不能据此判断单帧全刷。
+
+`render-ms` / `max-render-ms` 是累计/单次最大
+渲染墙钟时间。当前 S3 PSRAM→SPI 驱动在 flush 内等待 DMA，因此包含这段同步传输，
+但不是独立 SPI 总线计时。无脏区不触发回调，空闲时不强制刷新或打印。
+这个统计由 LVGL 任务独占，不分配内存、不新增定时器、不更改绘制区域和媒体参数。
+P4 不安装该回调，避免把不同显示驱动的完成语义混为一谈。
+
+针对 M5 唱歌场景，保持同一会话、音量和距离，记录正常动画约 30 秒及
+`voice-diag 10`，然后执行 `face-animation off`，再记录约 30 秒及 `voice-diag 10`。
+最后执行 `face-animation on` 恢复。该开关只关闭播放波形嘴部动画，字幕、时钟与
+情绪切换仍会刷新。按时间对齐 `UI render window`、分段慢回调及音频窗口的
+`wall/audio-ms`、`capture-overflow`；不能用旧版日志与新版不同歌曲直接归因。
+
+主机回归 `test_ui_refresh_observation.py` 验证计时边界和统计口径，不证明实板
+卡顿已复现或解决。没有当前固件的对照日志，不能判定刷新面积、锁等待或调度谁是根因。
+
+### 短时任务采样
+
+当前 TiRTC 预编译 SDK 的 ABI 合同要求 `CONFIG_FREERTOS_USE_TRACE_FACILITY=n`，
+不能直接启用 FreeRTOS 标准任务运行计数器。S3 的 `task-diag` 改用 ESP-IDF v5.5.5
+官方 `esp_register_freertos_tick_hook_for_cpu`，在每核 tick 时观察当前任务句柄。
+只在执行命令的 5 秒内注册 hook，结束或部分注册失败时注销，不更改内核配置。
+
+输出按核列出采音/AEC、播放、上行编码、LVGL、产品 runtime、唤醒、摄像头及 idle。
+这些任务从初始化后存活到复位；其他动态 SDK/网络任务统一计入 `other`。
+缺失任务标为 `unavailable`。ISR 不读取 TCB 内容或任务名称，只在内部 RAM 的固定
+数组中比较句柄并计数；短临界区保护启动、停止和两核采样，ISR 不打印或分配内存。
+
+`share-permille=1000` 表示该核全部 tick 样本都观察到此任务，**不等于精确 CPU 时间**。
+周期采样可能与任务周期重合，也会受关中断和中断归属影响；它不能直接量出单次 AEC
+函数执行时间。每核 `total` 用于核对采样是否足够，零样本不能解释为 CPU 空闲。
+采样本身有少量 ISR 开销，因此与此前日志对比时仍须保留固件版本身份。
+
+命令只阻塞控制台任务 5 秒，音视频继续运行。空闲和持续播放时各采至少两次，结合
+`voice-diag` 的墙钟时间与溢出判断任务分布。它用于选择下一处测量边界，不以一次
+采样宣称某个库或任务是根因。P4/BK 未接入这个探针。
+
 build.74 起，ESP-IDF 公共 TiRTC 适配层提供固定容量、无媒体内容的统计。
 该功能用于开发阶段定位等待发生在哪个边界；不改变音视频参数、重试策略、
 socket 选项、任务优先级或队列容量。默认开机不采集，重启后需重新开启。
@@ -622,3 +678,90 @@ ELF SHA-256 为 `608710e17401bbc5a3a6dd5c4e5851a0476155cf477d047af53bd38454d08ce
 这段日志验证了该次设备互呼运行，不代表完整场景或长时间验收，也没有证明
 0°/90°/180°/270° 的实屏无裁切。后续应以两台同版设备记录通话双向日志、
 实际屏幕画面、微信 VoIP、H5、弱网恢复及资源回收。
+
+## CoreS3 持续对话采音观测
+
+适用工具链：ESP-IDF **v5.5.5**。CoreS3 build.15 增加只读关联观测，
+不调整 AEC、音量、麦克风增益、采样率、DMA 容量或任务优先级。
+这是一版诊断固件，不表示重复说话或双讲问题已经修复。
+
+进入 AI 对话后执行 `voice-diag 30`，在这 30 秒内正常提问、等待回复，
+并在回复期间尝试说一句话。无需记忆秒数或刻意重复唤醒词。
+命令结束后执行 `status`，保留从 Firmware 身份到两个命令结束的完整输出。
+`voice-diag` 不录制 PCM，不打印识别文本或凭证。
+
+新 `Audio window` 与紧邻的 `Voice levels` 使用同一个窗口 ID，包含 32 个
+成功 AEC 块，即当前 16 kHz / 512 样本配置下的 1024 ms 音频。
+相同 ID 重复打印表示尚无新完整窗口，不能重复计数。字段含义：
+
+| 字段 | 含义 |
+| --- | --- |
+| `read-ms`、`wall/audio-ms` | 第一块读取开始至最后一块读取结束的墙钟区间、累计处理音频时长；不是 ADC 硬件时间戳 |
+| `worker/dma-frames` | 32 块中，在读取前或后观察到播放 worker 活动、估算 DMA 尾音非零的块数；两项可能重叠 |
+| `pending-peak` | 读取边界采样得到的待播数量峰值，含 worker 持有槽；排队不等于已出声 |
+| `dma-tail-max-ms` | 已有播放时序模型估算的最大尾音余量；是保守边界，不是实测 DMA 填充量 |
+| `clipped-mic/ref` | 该窗口接近满量程的样本数，阈值沿用 ±32700；与整机累计数分开 |
+| `tx/rx/drop` | 相同读取区间内应用成功发送、下行入队、应用丢弃计数的增量；不证明服务器收到或识别 |
+| `capture-overflow` | CoreS3 I2S RX 驱动队列溢出事件增量，不等于丢失 PCM 样本数 |
+
+CoreS3 通过 IDF 的 `on_recv_q_ovf` 回调只计数，不在中断中打印或做音频处理。
+依据锁定版本的 [I2S 实现](https://github.com/espressif/esp-idf/blob/b774170ff46c393eeb5e495ea37936038d3f4f4f/components/esp_driver_i2s/i2s_common.c)：
+队列满时移除旧条目并触发回调。观测注册在通道初始化后、codec 启用之前。
+立创 S3 复用窗口统计，但未接入该硬件回调时显示 `unknown`；P4 未提供关联窗口，
+显示 `unavailable`。不能把未提供观测解释为没有溢出。
+
+会话代次、模式、激活状态变化会丢弃未完成的观测窗口，不改变实际采音和发送。
+会话计数清零与代次更新交错时，增量标记为 unknown，避免整数下溢制造巨量丢包。
+这些只是读取边界采样，不能识别是谁在说话，也不能为已经积压的 PCM 还原采集时刻。
+
+命令开始、结束会各打印已有的最多 8 条运行时事件。`ASR caption final`
+表示收到服务端用户最终识别字幕；`AI caption final` 表示 AI 最终字幕。
+它们是固定事件标签，没有对话原文；历史容量有限，早期事件可能被淘汰。
+事件时刻和读取区间共用设备单调时钟，用于缩小排查范围，不能代替声学听音验证。
+
+
+## CoreS3 build.16 上行 G.711A 对照
+
+工具链仍为 ESP-IDF **v5.5.5**。build.15 用户日志已确认播放时 I2S RX 队列溢出：
+例如窗口 147 的 wall/audio-ms=1558/1024、capture-overflow=10；多个无播放窗口
+接近实时且溢出为零。这证明存在本地采集丢失，但不能单独确定 AEC 计算、抢占或
+PSRAM 带宽各占多少，也不能由应用 dropped=0 否认底层采集溢出。
+
+按用户要求，build.16 仅把 M5Stack AI 上行切为 G.711 A-law / 8 kHz / 单声道，
+保留 Opus / 16 kHz 下行和原有硬件/AEC参数。会话声明、格式校验、160 字节帧、
+TiRTC 标记和 8 kHz 预录音衔接同时切换；不更改唤醒模型和识别阈值。
+本地开关是 `CONFIG_STARTER_AI_UPLINK_G711A=y`，其他板卡不启用。
+
+仍执行一次 `voice-diag 30` 后接 `status`。先确认日志中的
+`input=alaw/8000 output=opus/16000`（build.17 起） 及后续 AI audio admitted；
+若没有准入或出现 unsupported audio profile，保留该协商错误，不能继续声学对比。
+准入后比较相同音量下播放窗口的 capture-overflow、wall/audio-ms、aec-us-avg，
+以及 status 的 Audio encode timing。实际能否少重复、自然插话仍需听音验证。
+减少 CPU 编码开销是本次实验目的，不预先认定它一定解决采集丢失或削顶。
+
+
+### CoreS3 build.17：AI A-law 协议名称修正
+
+build.16 用户日志显示 start_session 响应被本地校验拒绝，错误 262 是
+`ESP_ERR_NOT_SUPPORTED`，尚未启动 AI 媒体，不能进行 CPU/AEC 对比。
+该片段未记录实际返回字段和固件身份，不据此断言服务端返回了什么。
+
+核对[官方 AI 接入协议](https://github.com/tangeai/tirtc-server-example/blob/fd70964a5ad3d7bd100c4241babb8f07d8d0c6fd/thing-connect/device-ai.md#2-发送-start_session)。
+
+规范名称是 `alaw`，`g711a` 为兼容别名。build.16 却只接受后者；生产响应
+分支回放已证实合法 `alaw/8000/1` 会被拒绝。build.17 请求使用 `alaw`，
+接收兼容两种名称，仍要求上行 8 kHz/1、下行 Opus 16 kHz/1。
+本次参照的是官方协议命名规则，没有复制 Linux 媒体线程实现。
+
+若再次拒绝，记录紧随其后的 `AI start response` 三行：result/session-id-present、
+input 和 output 的 codec/rate/channels/supported。missing/invalid/unknown 表示
+缺失、类型错误或非白名单名称；数值 -1 表示缺失或非数值。日志不输出原始 JSON。
+错误响应仍结束会话，不自动回退格式；AEC、增益和媒体工作线程保持 build.16。
+
+### ESP UI 周期任务的范围
+
+产品状态仍以 100 ms 刷新，但常规 UI 和输入处理使用 `starter_runtime_status_snapshot()`，
+只读原子状态，不再逐次扫描 FreeRTOS 栈水位；控制台 `status` 和诊断页仍按需测量。
+P4 的 30 ms 显示 timer 初始暂停，只在通话页且视频 owner 已就绪时运行；
+语音通话、AI、待机和 H5 首页不运行该显示轮询。离开视频或挂断时做一次显示清理。
+这项优化去除可确认的重复工作，不代表实板 `UI refresh slow` 或 AEC 超期已经消失。

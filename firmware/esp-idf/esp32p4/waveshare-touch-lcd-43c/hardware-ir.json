@@ -140,20 +140,10 @@
       {
         "name": "ALAW",
         "model": "software-pcm-to-g711",
-        "role": "16kHz PCM 重采样后编码 G.711 A-law 8 kHz 单声道（stream 10）",
+        "role": "16 kHz AEC/NS/AGC output low-pass downsampled to 8 kHz A-law for AI (stream 1); H5 (stream 10) and other modes retain their existing DSP path",
         "channels": 1,
         "sample_rates_hz": [
           8000
-        ],
-        "verification": "build_verified"
-      },
-      {
-        "name": "Opus",
-        "model": "software-opus-voip",
-        "role": "AI 16 kHz 单声道上行；AEC、NS、AGC 后编码",
-        "channels": 1,
-        "sample_rates_hz": [
-          16000
         ],
         "verification": "build_verified"
       }
@@ -293,31 +283,27 @@
     ]
   },
   "build_evidence": {
-    "firmware_version": "1.0.0+build.91",
+    "firmware_version": "1.0.1+build.7",
     "verification": "local_build_only",
-    "note": "ESP-IDF 5.5.5 compile and semantic gates passed; exact artifacts retained. No serial hardware verification in this run. Previous runtime observations remain historical.",
+    "note": "ESP-IDF v5.5.5 native build and exact BIN/ELF identity passed. P4 video display polling is paused outside live call video; media formats unchanged. UI ordinary reads skip stack scans; AI alaw/8000 uplink and opus/16000 downlink preserved. HIL pending for this artifact.",
     "artifacts": [
       {
-        "path": "artifacts/1.0.0+build.91/xiaotai_esp32p4.bin",
-        "label": "1.0.0+build.91 xiaotai_esp32p4.bin",
-        "size_bytes": 5814784,
-        "sha256": "cd2ebbd4972feba9d113ea4fe8b19a3d1d254704bd2e5734a6f648c6bc507653"
+        "path": "artifacts/1.0.1+build.7/xiaotai_esp32p4.bin",
+        "size_bytes": 5740672,
+        "sha256": "9c12d997f3d94f4ed1b13c1978169522c8f7c25ae878f63a01a47fdf61a2b820"
       },
       {
-        "path": "artifacts/1.0.0+build.91/xiaotai_esp32p4.elf",
-        "label": "1.0.0+build.91 xiaotai_esp32p4.elf",
-        "size_bytes": 38066932,
-        "sha256": "a7106067dfbd51949d23cd75d329827b6240e3df467911bc990a0ecbb3d3495e"
+        "path": "artifacts/1.0.1+build.7/xiaotai_esp32p4.elf",
+        "size_bytes": 38220744,
+        "sha256": "208925b1b7541e21a316d9820ea3a55f177b4ad1087887e910c9110885cb2b46"
       },
       {
-        "path": "artifacts/1.0.0+build.91/bootloader.bin",
-        "label": "1.0.0+build.91 bootloader.bin",
+        "path": "artifacts/1.0.1+build.7/bootloader.bin",
         "size_bytes": 21264,
-        "sha256": "2f65a7743e168c94343dcb4a6eaf8786a2605cd8522cf4ef00a86cc070d7076c"
+        "sha256": "da9699d17ffac74af4ae67bb12ea05c5552224585d7f972d53d9612d984d011c"
       },
       {
-        "path": "artifacts/1.0.0+build.91/partition-table.bin",
-        "label": "1.0.0+build.91 partition-table.bin",
+        "path": "artifacts/1.0.1+build.7/partition-table.bin",
         "size_bytes": 3072,
         "sha256": "b13484e793585a199222e1f3675f1d0563bb008e2f5913e5db874726913a3f90"
       }
@@ -390,5 +376,65 @@
         "classification": "implementation_resolvable"
       }
     ]
-  }
+  },
+  "build_history": [
+    {
+      "firmware_version": "1.0.0+build.91",
+      "verification": "local_build_only",
+      "note": "ESP-IDF 5.5.5 compile and semantic gates passed; exact artifacts retained. No serial hardware verification in this run. Previous runtime observations remain historical.",
+      "artifacts": [
+        {
+          "path": "artifacts/1.0.0+build.91/xiaotai_esp32p4.bin",
+          "label": "1.0.0+build.91 xiaotai_esp32p4.bin",
+          "size_bytes": 5814784,
+          "sha256": "cd2ebbd4972feba9d113ea4fe8b19a3d1d254704bd2e5734a6f648c6bc507653"
+        },
+        {
+          "path": "artifacts/1.0.0+build.91/xiaotai_esp32p4.elf",
+          "label": "1.0.0+build.91 xiaotai_esp32p4.elf",
+          "size_bytes": 38066932,
+          "sha256": "a7106067dfbd51949d23cd75d329827b6240e3df467911bc990a0ecbb3d3495e"
+        },
+        {
+          "path": "artifacts/1.0.0+build.91/bootloader.bin",
+          "label": "1.0.0+build.91 bootloader.bin",
+          "size_bytes": 21264,
+          "sha256": "2f65a7743e168c94343dcb4a6eaf8786a2605cd8522cf4ef00a86cc070d7076c"
+        },
+        {
+          "path": "artifacts/1.0.0+build.91/partition-table.bin",
+          "label": "1.0.0+build.91 partition-table.bin",
+          "size_bytes": 3072,
+          "sha256": "b13484e793585a199222e1f3675f1d0563bb008e2f5913e5db874726913a3f90"
+        }
+      ]
+    },
+    {
+      "firmware_version": "1.0.1+build.4",
+      "verification": "local_build_only",
+      "note": "ESP-IDF v5.5.5 native build and post-link checks passed. AI uplink alaw/8000/1, downlink opus/16000/1; hardware/AEC stays at 16 kHz. Exact BIN/ELF identity checked; no HIL on this version.",
+      "artifacts": [
+        {
+          "path": "artifacts/1.0.1+build.4/xiaotai_esp32p4.bin",
+          "size_bytes": 5740368,
+          "sha256": "ca90bda28c954ebc155d172c064825af3abe6c169ded523601c268801b5b209e"
+        },
+        {
+          "path": "artifacts/1.0.1+build.4/xiaotai_esp32p4.elf",
+          "size_bytes": 38217528,
+          "sha256": "671cdab1a6f8ec06ee559e04269aea8d399fcbcd27c45ed75fa47f350c7bdf5d"
+        },
+        {
+          "path": "artifacts/1.0.1+build.4/bootloader.bin",
+          "size_bytes": 21264,
+          "sha256": "da9699d17ffac74af4ae67bb12ea05c5552224585d7f972d53d9612d984d011c"
+        },
+        {
+          "path": "artifacts/1.0.1+build.4/partition-table.bin",
+          "size_bytes": 3072,
+          "sha256": "b13484e793585a199222e1f3675f1d0563bb008e2f5913e5db874726913a3f90"
+        }
+      ]
+    }
+  ]
 }

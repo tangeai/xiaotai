@@ -19,6 +19,8 @@
 #include "esp_heap_caps.h"
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "esp_attr.h"
+#include "esp_freertos_hooks.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs.h"
@@ -56,6 +58,50 @@ static int command_version(int argc, char **argv)
     return 0;
 }
 
+static void print_audio_observation(const starter_media_audio_diagnostics_t *audio)
+{
+    if (!audio->correlated) {
+        printf("Audio window correlation: unavailable (no complete supported window).\n");
+        return;
+    }
+    printf("Audio window: id=%lu read-ms=%lu..%lu generation=%lu mode=%lu active=%u "
+           "wall/audio-ms=%lu/%lu worker/dma-frames=%lu/%lu of=%lu "
+           "pending-peak=%lu dma-tail-max-ms=%lu clipped-mic/ref=%lu/%lu\n",
+           (unsigned long)audio->window, (unsigned long)audio->start_ms,
+           (unsigned long)audio->at_ms, (unsigned long)audio->generation,
+           (unsigned long)audio->mode, (unsigned)audio->media_active,
+           (unsigned long)audio->wall_ms, (unsigned long)audio->audio_ms,
+           (unsigned long)audio->worker_frames, (unsigned long)audio->dma_frames,
+           (unsigned long)audio->frames, (unsigned long)audio->pending_peak,
+           (unsigned long)audio->dma_peak_ms, (unsigned long)audio->mic_clipped,
+           (unsigned long)audio->reference_clipped);
+    printf("Audio window deltas: ");
+    if (audio->counters_valid) {
+        printf("tx/rx/drop=%lu/%lu/%lu ", (unsigned long)audio->tx_delta,
+               (unsigned long)audio->rx_delta, (unsigned long)audio->dropped_delta);
+    } else {
+        printf("tx/rx/drop=unknown (counter reset) ");
+    }
+    if (audio->capture_overflow_supported) {
+        printf("capture-overflow=%lu events\n", (unsigned long)audio->capture_overflow_delta);
+    } else {
+        printf("capture-overflow=unknown (board probe unavailable)\n");
+    }
+}
+
+static void print_ai_diagnostic_events(void)
+{
+    starter_runtime_diagnostics_t events = {0};
+    starter_runtime_diagnostics(&events);
+    printf("AI/runtime recent events (bounded history; no transcript):\n");
+    for (unsigned i = 0; i < events.count && i < STARTER_DIAGNOSTIC_EVENTS; ++i) {
+        const starter_diagnostic_event_t *event = &events.events[i];
+        printf("AI event: at-ms=%lu session=%lu label=%.32s value=%d\n",
+               (unsigned long)event->at_ms, (unsigned long)event->session,
+               event->label, event->value);
+    }
+}
+
 /* Console-only output: never print from the capture/model hot path. */
 static void print_wake_diagnostics(void)
 {
@@ -84,6 +130,106 @@ static void print_wake_diagnostics(void)
            (unsigned long)audio.at_ms, (unsigned long)(now - audio.at_ms),
            (unsigned long)audio.aec_avg_us, (unsigned long)audio.measurement_avg_us,
            (unsigned long)audio.measurement_max_us);
+    print_audio_observation(&audio);
+}
+
+#if CONFIG_IDF_TARGET_ESP32S3
+#define TASK_SAMPLE_COUNT 9U
+static const char *const s_task_sample_names[TASK_SAMPLE_COUNT] = {
+    "board_audio_tx", "board_audio_rx", "rtc_audio_tx", "taskLVGL",
+    "starter_session", "voicute_wake", "board_mjpeg", "IDLE0", "IDLE1",
+};
+/* ISR data stays internal. Only handle identity is compared; no TCB/name access.
+ * These selected tasks live from startup until reset. Dynamic SDK tasks are
+ * deliberately grouped under other rather than retaining their handles. */
+static DRAM_ATTR portMUX_TYPE s_task_sample_mux = portMUX_INITIALIZER_UNLOCKED;
+static DRAM_ATTR bool s_task_sampling;
+static DRAM_ATTR TaskHandle_t s_task_sample_handles[TASK_SAMPLE_COUNT];
+static DRAM_ATTR uint32_t s_task_samples[CONFIG_FREERTOS_NUMBER_OF_CORES][TASK_SAMPLE_COUNT + 1U];
+
+static void IRAM_ATTR task_sample_tick(void)
+{
+    unsigned core = xPortGetCoreID();
+    portENTER_CRITICAL_ISR(&s_task_sample_mux);
+    if (s_task_sampling) {
+        TaskHandle_t running = xTaskGetCurrentTaskHandleForCore(core);
+        unsigned slot = TASK_SAMPLE_COUNT;
+        for (unsigned i = 0; i < TASK_SAMPLE_COUNT; ++i) {
+            if (s_task_sample_handles[i] != NULL && s_task_sample_handles[i] == running) {
+                slot = i;
+                break;
+            }
+        }
+        ++s_task_samples[core][slot];
+    }
+    portEXIT_CRITICAL_ISR(&s_task_sample_mux);
+}
+#endif
+
+static int command_task_diag(int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) {
+        printf("Usage: task-diag\n");
+        return 1;
+    }
+#if CONFIG_IDF_TARGET_ESP32S3
+    TaskHandle_t handles[TASK_SAMPLE_COUNT];
+    uint32_t samples[CONFIG_FREERTOS_NUMBER_OF_CORES][TASK_SAMPLE_COUNT + 1U];
+    for (unsigned i = 0; i < TASK_SAMPLE_COUNT; ++i)
+        handles[i] = xTaskGetHandle(s_task_sample_names[i]);
+    portENTER_CRITICAL(&s_task_sample_mux);
+    s_task_sampling = false;
+    memcpy(s_task_sample_handles, handles, sizeof(handles));
+    memset(s_task_samples, 0, sizeof(s_task_samples));
+    portEXIT_CRITICAL(&s_task_sample_mux);
+    unsigned registered = 0;
+    for (; registered < CONFIG_FREERTOS_NUMBER_OF_CORES; ++registered) {
+        esp_err_t err = esp_register_freertos_tick_hook_for_cpu(task_sample_tick, registered);
+        if (err != ESP_OK) {
+            for (unsigned c = 0; c < registered; ++c)
+                esp_deregister_freertos_tick_hook_for_cpu(task_sample_tick, c);
+            printf("Task observation unavailable: hook registration failed core=%u error=%d\n",
+                   registered, (int)err);
+            return 1;
+        }
+    }
+    print_firmware_identity();
+    printf("Task observation: 5 seconds, tick sampling; no priority changes.\n");
+    const int64_t started = esp_timer_get_time();
+    portENTER_CRITICAL(&s_task_sample_mux);
+    s_task_sampling = true;
+    portEXIT_CRITICAL(&s_task_sample_mux);
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    portENTER_CRITICAL(&s_task_sample_mux);
+    s_task_sampling = false;
+    memcpy(samples, s_task_samples, sizeof(samples));
+    portEXIT_CRITICAL(&s_task_sample_mux);
+    const int64_t finished = esp_timer_get_time();
+    for (unsigned c = 0; c < registered; ++c)
+        esp_deregister_freertos_tick_hook_for_cpu(task_sample_tick, c);
+    printf("Task observation wall-us=%llu; shares are tick samples, NOT exact CPU time.\n",
+           (unsigned long long)(finished - started));
+    for (unsigned i = 0; i < TASK_SAMPLE_COUNT; ++i)
+        if (handles[i] == NULL)
+            printf("Task sample: task=%s unavailable\n", s_task_sample_names[i]);
+    for (unsigned c = 0; c < CONFIG_FREERTOS_NUMBER_OF_CORES; ++c) {
+        uint32_t total = 0;
+        for (unsigned i = 0; i <= TASK_SAMPLE_COUNT; ++i) total += samples[c][i];
+        printf("Task sample: core=%u total=%lu\n", c, (unsigned long)total);
+        for (unsigned i = 0; i <= TASK_SAMPLE_COUNT; ++i) {
+            if (i < TASK_SAMPLE_COUNT && handles[i] == NULL) continue;
+            uint32_t share = total == 0 ? 0 : (uint32_t)((uint64_t)samples[c][i] * 1000U / total);
+            printf("Task sample: core=%u task=%s samples=%lu share-permille=%lu\n",
+                   c, i == TASK_SAMPLE_COUNT ? "other" : s_task_sample_names[i],
+                   (unsigned long)samples[c][i], (unsigned long)share);
+        }
+    }
+    return 0;
+#else
+    printf("Task tick observation not available on this target.\n");
+    return 1;
+#endif
 }
 
 static int command_voice_diag(int argc, char **argv)
@@ -95,11 +241,15 @@ static int command_voice_diag(int argc, char **argv)
         return 1;
     }
     print_firmware_identity();
-    printf("Voicute observation only: say 你好小钛; no configuration changes.\n");
+    printf("Audio observation only: converse normally; no configuration changes.\n");
+    printf("Repeated window IDs are the same sample. DMA tail is estimated; "
+           "read boundaries are not hardware sample timestamps.\n");
+    print_ai_diagnostic_events();
     for (unsigned long i = 0; i <= seconds; ++i) {
         print_wake_diagnostics();
         if (i != seconds) vTaskDelay(pdMS_TO_TICKS(1000));
     }
+    print_ai_diagnostic_events();
     printf("Voice observation: complete; no configuration or model state changed.\n");
     return 0;
 }
@@ -566,6 +716,8 @@ esp_err_t starter_console_start(void)
                         "starter_console", "register voice-config");
     ESP_RETURN_ON_ERROR(register_command("voice-diag", "Observe audio levels for 5..30 seconds", command_voice_diag),
                         "starter_console", "register voice-diag");
+    ESP_RETURN_ON_ERROR(register_command("task-diag", "Sample selected tasks on each core for 5 seconds", command_task_diag),
+                        "starter_console", "register task-diag");
     ESP_RETURN_ON_ERROR(register_command("ai-start", "Start AI talk", command_ai_start),
                         "starter_console", "register ai-start");
     ESP_RETURN_ON_ERROR(register_command("ai-stop", "Stop AI talk", command_ai_stop),

@@ -14,4 +14,6 @@ void p4_video_submit(uint32_t generation, const starter_tirtc_frame_t *frame, co
 /* Called only on the LVGL task. The implementation owns presentation-frame
  * lifetime until reset, hide, or the next successful handoff. */
 void p4_video_ui_reset(void);
+/** Cheap media-owner readiness check; independent of local camera mute. */
+bool p4_video_ui_active(void);
 void p4_video_ui_tick(lv_obj_t *screen, bool call_page);

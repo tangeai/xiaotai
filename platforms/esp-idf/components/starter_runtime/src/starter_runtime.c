@@ -217,8 +217,8 @@ static char s_call_wx_session_token[257];
 static char s_call_wx_payload[513];
 static char s_call_id[65];
 static bool s_call_wechat;
-#if CONFIG_IDF_TARGET_ESP32P4
 static bool s_call_video;
+#if CONFIG_IDF_TARGET_ESP32P4
 static bool s_call_camera_enabled;
 static uint16_t s_call_remote_rotation;
 static bool s_call_remote_rotation_reported;
@@ -234,7 +234,6 @@ static bool s_voip_connect_inflight;
 static bool s_call_peer_answered;
 static bool s_call_p2p_connected;
 
-#if CONFIG_IDF_TARGET_ESP32P4
 static void reset_call_media_state(bool keep_pending_call)
 {
     /* A pending incoming call is signaling state, not the foreground media
@@ -242,12 +241,13 @@ static void reset_call_media_state(bool keep_pending_call)
      * AI, H5 or Room is stopped for an explicit answer. */
     if (!keep_pending_call) {
         s_call_video = false;
+#if CONFIG_IDF_TARGET_ESP32P4
         s_call_camera_enabled = false;
         s_call_remote_rotation = 0U;
         s_call_remote_rotation_reported = false;
+#endif
     }
 }
-#endif
 static bool s_voip_profile_ready;
 static bool s_voip_profile_inflight;
 static int64_t s_voip_profile_retry_at_ms;
@@ -416,8 +416,8 @@ static void product_set_call(bool incoming,
         s_product_snapshot.call_incoming = incoming;
         s_product_snapshot.call_wechat = wechat;
         s_product_snapshot.call_microphone_muted = microphone_muted;
-#if CONFIG_IDF_TARGET_ESP32P4
         s_product_snapshot.call_video = s_call_video;
+#if CONFIG_IDF_TARGET_ESP32P4
         s_product_snapshot.call_camera_enabled = s_call_camera_enabled;
 #endif
         (void)snprintf(s_product_snapshot.call_peer,
@@ -733,9 +733,7 @@ static void finish_session(int error)
         s_call_id[0] = '\0';
         s_call_wechat = false;
     }
-#if CONFIG_IDF_TARGET_ESP32P4
     reset_call_media_state(keep_pending_call);
-#endif
     if (!keep_pending_call) s_call_outgoing = false;
     s_call_waiting_confirm = false;
     s_voip_connect_inflight = false;
@@ -1474,9 +1472,6 @@ static bool begin_call_common(const starter_product_contact_t *contact)
 
 static void dial_contact(uint8_t index, bool video)
 {
-#if !CONFIG_IDF_TARGET_ESP32P4
-    video = false;
-#endif
     starter_product_contact_t contact = {0};
     if (s_product_mutex == NULL ||
         xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
@@ -1492,13 +1487,16 @@ static void dial_contact(uint8_t index, bool video)
                  valid ? 1 : 0);
         return;
     }
-#if CONFIG_IDF_TARGET_ESP32P4
+#if !CONFIG_IDF_TARGET_ESP32P4
+    video = false; /* All S3 peer and WeChat calls are audio-only. */
+#endif
     starter_media_set_call_video(video);
     s_call_video = video;
+#if CONFIG_IDF_TARGET_ESP32P4
     s_call_camera_enabled = video;
     if (video) configure_remote_video_presentation(NULL, s_call_wechat);
-    product_set_call(false, s_call_wechat, s_call_peer_name, false);
 #endif
+    product_set_call(false, s_call_wechat, s_call_peer_name, false);
 
     char body[512];
     platform_service_t service;
@@ -1550,9 +1548,10 @@ static void accept_call(void)
     }
     atomic_store_explicit(&s_last_error, 0, memory_order_release);
     starter_tirtc_accept_h5(false);
-#if CONFIG_IDF_TARGET_ESP32P4
-    starter_media_set_call_video(s_call_video);
+#if !CONFIG_IDF_TARGET_ESP32P4
+    s_call_video = false;
 #endif
+    starter_media_set_call_video(s_call_video);
     product_set_call(false, s_call_wechat, s_call_peer_name, false);
     publish_state();
     arm_session_timeout(CALL_CONNECT_TIMEOUT_MS);
@@ -1723,8 +1722,8 @@ static void reject_or_hangup_call(bool reject)
         s_call_id[0] = '\0';
         s_call_wechat = false;
         s_call_outgoing = false;
-#if CONFIG_IDF_TARGET_ESP32P4
         s_call_video = false;
+#if CONFIG_IDF_TARGET_ESP32P4
         s_call_camera_enabled = false;
 #endif
         product_set_call(false, false, "", false);
@@ -2053,6 +2052,13 @@ static void handle_call_http(const runtime_event_t *event)
 
 static void send_ai_start(void)
 {
+#if CONFIG_STARTER_AI_UPLINK_G711A
+    const char *input_codec = "alaw";
+    const unsigned input_rate = 8000;
+#else
+    const char *input_codec = "opus";
+    const unsigned input_rate = 16000;
+#endif
     /*
      * WHIP 连接成功后发送业务层 start_session。媒体仍保持关闭，直到
      * handle_ai_command() 收到匹配 request id 的 result。
@@ -2077,8 +2083,8 @@ static void send_ai_start(void)
               cJSON_AddStringToObject(root, "method", "start_session") &&
               cJSON_AddStringToObject(params, "device_id", s_device_id) &&
               cJSON_AddStringToObject(params, "role_id", s_ai_role_id) &&
-              cJSON_AddStringToObject(input, "codec", "opus") &&
-              cJSON_AddNumberToObject(input, "sample_rate", 16000) &&
+              cJSON_AddStringToObject(input, "codec", input_codec) &&
+              cJSON_AddNumberToObject(input, "sample_rate", input_rate) &&
               cJSON_AddNumberToObject(input, "channels", 1) &&
               cJSON_AddStringToObject(output, "codec", "opus") &&
               cJSON_AddNumberToObject(output, "sample_rate", 16000) &&
@@ -2108,7 +2114,8 @@ static void send_ai_start(void)
         return;
     }
     arm_session_timeout(AI_RESPONSE_TIMEOUT_MS);
-    ESP_LOGI(TAG, "AI start_session sent; audio remains stopped until accepted");
+    ESP_LOGI(TAG, "AI start_session sent; audio remains stopped until accepted; input=%s/%u output=opus/16000",
+             input_codec, input_rate);
 }
 
 static void send_room_join(void)
@@ -2136,8 +2143,18 @@ static void send_room_join(void)
     ESP_LOGI(TAG, "room join_room sent after data-channel settle");
 }
 
-static bool ai_audio_profile_valid(const cJSON *profile)
+static bool ai_audio_profile_valid(const cJSON *profile, bool uplink)
 {
+    const char *expected_codec = "opus";
+    unsigned expected_rate = 16000;
+#if CONFIG_STARTER_AI_UPLINK_G711A
+    if (uplink) {
+        expected_codec = "alaw";
+        expected_rate = 8000;
+    }
+#else
+    (void)uplink;
+#endif
     const cJSON *codec = cJSON_IsObject(profile)
                              ? cJSON_GetObjectItemCaseSensitive(profile, "codec")
                              : NULL;
@@ -2148,9 +2165,48 @@ static bool ai_audio_profile_valid(const cJSON *profile)
                                 ? cJSON_GetObjectItemCaseSensitive(profile, "channels")
                                 : NULL;
     bool codec_ok = cJSON_IsString(codec) && codec->valuestring != NULL &&
-                    strcmp(codec->valuestring, "opus") == 0;
-    return codec_ok && cJSON_IsNumber(rate) && rate->valueint == 16000 &&
-           cJSON_IsNumber(channels) && channels->valueint == 1;
+                    strcmp(codec->valuestring, expected_codec) == 0;
+#if CONFIG_STARTER_AI_UPLINK_G711A
+    /* AI uses canonical "alaw"; accept the documented legacy alias on uplink. */
+    if (uplink && cJSON_IsString(codec) && codec->valuestring != NULL &&
+        strcmp(codec->valuestring, "g711a") == 0) {
+        codec_ok = true;
+    }
+#endif
+    return codec_ok && cJSON_IsNumber(rate) && rate->valuedouble == expected_rate &&
+           cJSON_IsNumber(channels) && channels->valuedouble == 1;
+}
+
+static void ai_log_start_response(const cJSON *result)
+{
+    /* Only protocol metadata: never print raw JSON, session IDs or unknown strings. */
+    const cJSON *session = cJSON_GetObjectItemCaseSensitive(result, "session_id");
+    ESP_LOGE(TAG, "AI start response result=%d session-id-present=%d",
+             cJSON_IsObject(result), cJSON_IsString(session) &&
+             session->valuestring != NULL && session->valuestring[0] != '\0');
+    const char *fields[] = {"input_audio", "output_audio"};
+    const char *directions[] = {"input", "output"};
+    const char *known_codecs[] = {"opus", "alaw", "g711a", "pcm", "amr", "aac"};
+    for (unsigned i = 0; i < 2; ++i) {
+        const cJSON *profile = cJSON_GetObjectItemCaseSensitive(result, fields[i]);
+        const cJSON *codec = cJSON_GetObjectItemCaseSensitive(profile, "codec");
+        const cJSON *rate = cJSON_GetObjectItemCaseSensitive(profile, "sample_rate");
+        const cJSON *channels = cJSON_GetObjectItemCaseSensitive(profile, "channels");
+        const char *name = codec == NULL ? "missing" : "invalid";
+        if (cJSON_IsString(codec) && codec->valuestring != NULL) {
+            name = "unknown";
+            for (unsigned j = 0; j < sizeof(known_codecs) / sizeof(known_codecs[0]); ++j) {
+                if (strcmp(codec->valuestring, known_codecs[j]) == 0) {
+                    name = known_codecs[j];
+                    break;
+                }
+            }
+        }
+        ESP_LOGE(TAG, "AI start response %s codec=%s rate=%d channels=%d supported=%d",
+                 directions[i], name, cJSON_IsNumber(rate) ? rate->valueint : -1,
+                 cJSON_IsNumber(channels) ? channels->valueint : -1,
+                 ai_audio_profile_valid(profile, i == 0));
+    }
 }
 
 static void maybe_activate_outgoing_device_call(const char *source)
@@ -2612,8 +2668,8 @@ static void send_device_action_result(const cJSON *request_id,
     cJSON_Delete(root);
 }
 
-/* Default video applies to WeChat VoIP. A device contact may have an audio-only
- * peer, so its video call still requires an explicit request. */
+/* Only P4 supports video calls. Its default video applies to WeChat VoIP;
+ * device contacts require an explicit video request. */
 static bool call_video_for_request(const char *media, bool wechat)
 {
 #if CONFIG_IDF_TARGET_ESP32P4
@@ -2737,8 +2793,8 @@ static void handle_ai_command(const runtime_event_t *event)
                                     : NULL;
     bool accepted = id_matches && cJSON_IsString(session_id) &&
                     session_id->valuestring != NULL && session_id->valuestring[0] != '\0' &&
-                    ai_audio_profile_valid(input_audio) &&
-                    ai_audio_profile_valid(output_audio);
+                    ai_audio_profile_valid(input_audio, true) &&
+                    ai_audio_profile_valid(output_audio, false);
     starter_runtime_state_t state = session_state();
     if (rejected) {
         ESP_LOGE(TAG, "AI start_session was rejected");
@@ -2746,6 +2802,7 @@ static void handle_ai_command(const runtime_event_t *event)
         finish_session(ESP_FAIL);
     } else if (state == STARTER_RUNTIME_AI_CONNECTING && id_matches && !accepted) {
         ESP_LOGE(TAG, "AI start_session returned an unsupported audio profile");
+        ai_log_start_response(result);
         cJSON_Delete(root);
         finish_session(ESP_ERR_NOT_SUPPORTED);
     } else if (state == STARTER_RUNTIME_AI_CONNECTING && accepted) {
@@ -2983,8 +3040,8 @@ static void handle_platform_signal(const runtime_event_t *event)
                 s_call_wx_payload[0] = '\0';
                 s_call_id[0] = '\0';
                 s_call_wechat = false;
-#if CONFIG_IDF_TARGET_ESP32P4
                 s_call_video = false;
+#if CONFIG_IDF_TARGET_ESP32P4
                 s_call_camera_enabled = false;
 #endif
                 product_set_call(false, false, "", false);
@@ -3181,18 +3238,15 @@ static void handle_platform_signal(const runtime_event_t *event)
     }
     if (!outgoing_wechat) s_call_outgoing = false;
     s_call_wechat = wechat;
-#if CONFIG_IDF_TARGET_ESP32P4
     if (!s_call_outgoing) {
-        /* Mini-program incoming calls may omit the outbound correlation field
-         * wx_room_type. P4 advertises no_video=false in its VoIP profile, so
-         * that incoming default is video. Explicit voice/audio stays audio;
-         * outbound callbacks retain the user's selection above. */
-        s_call_video = strcmp(room_type, "video") == 0 ||
-                       (wechat && room_type[0] == '\0');
+        /* Missing media uses the advertised capability; explicit voice stays
+         * audio-only. Outbound callbacks preserve the user's selection. */
+        s_call_video = call_video_for_request(room_type, wechat);
+#if CONFIG_IDF_TARGET_ESP32P4
         s_call_camera_enabled = s_call_video;
         if (s_call_video) configure_remote_video_presentation(payload, wechat);
-    }
 #endif
+    }
     (void)snprintf(s_call_room_id, sizeof(s_call_room_id), "%s", room);
     (void)snprintf(s_call_peer_id, sizeof(s_call_peer_id), "%.64s",
                    wechat && wx_open_id[0] != '\0' ? wx_open_id : peer);
@@ -4217,18 +4271,18 @@ esp_err_t starter_runtime_call_contact(uint8_t index)
     return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
+esp_err_t starter_runtime_call_contact_video(uint8_t index)
+{
+    if (index >= STARTER_PRODUCT_CONTACTS_MAX) return ESP_ERR_INVALID_ARG;
+    const runtime_event_t event = {.type = EVENT_CALL_DIAL, .command = index, .flag = true};
+    return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
+}
+
 #if CONFIG_IDF_TARGET_ESP32P4
 esp_err_t starter_runtime_call_set_camera_enabled(uint32_t session_generation, bool enabled)
 {
     const runtime_event_t event = {.type = EVENT_CALL_CAMERA,
         .generation = session_generation, .flag = enabled};
-    return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
-}
-
-esp_err_t starter_runtime_call_contact_video(uint8_t index)
-{
-    if (index >= STARTER_PRODUCT_CONTACTS_MAX) return ESP_ERR_INVALID_ARG;
-    const runtime_event_t event = {.type = EVENT_CALL_DIAL, .command = index, .flag = true};
     return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 #endif
@@ -4256,7 +4310,7 @@ esp_err_t starter_runtime_call_set_microphone_muted(bool muted)
     return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
-starter_runtime_status_t starter_runtime_status(void)
+starter_runtime_status_t starter_runtime_status_snapshot(void)
 {
     return (starter_runtime_status_t) {
         .state = (starter_runtime_state_t)atomic_load_explicit(
@@ -4266,10 +4320,18 @@ starter_runtime_status_t starter_runtime_status(void)
         .connection_generation = (uint32_t)atomic_load_explicit(
             &s_public_connection_generation, memory_order_acquire),
         .last_error = atomic_load_explicit(&s_last_error, memory_order_acquire),
-        .stack_high_water_bytes = s_task == NULL
-                                      ? 0U
-                                      : (uint32_t)uxTaskGetStackHighWaterMark(s_task),
     };
+}
+
+starter_runtime_status_t starter_runtime_status(void)
+{
+    starter_runtime_status_t status = starter_runtime_status_snapshot();
+    /* FreeRTOS walks the unused stack byte-by-byte. Keep that diagnostic
+     * probe out of the 100 ms UI timer and ordinary input handlers. */
+    status.stack_high_water_bytes = s_task == NULL
+                                       ? 0U
+                                       : (uint32_t)uxTaskGetStackHighWaterMark(s_task);
+    return status;
 }
 
 void starter_runtime_copy_device_id(char *out, size_t out_size)

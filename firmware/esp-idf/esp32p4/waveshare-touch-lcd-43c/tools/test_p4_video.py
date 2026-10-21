@@ -317,7 +317,10 @@ product = (Path(__file__).resolve().parents[5] / "platforms/esp-idf/components/s
 product_tick = function(product, "static void product_tick(")
 video_tick = function(product, "static void product_video_tick(")
 assert "p4_video_ui_tick" not in product_tick
-assert "p4_video_ui_tick(lv_scr_act(), s_page == PAGE_CALL);" in video_tick
+assert "product_video_timer_sync();" in video_tick
+assert "if (s_video_timer_running) p4_video_ui_tick(lv_scr_act(), true);" in video_tick
+assert "product_video_timer_sync();" in product_tick
+assert "lv_timer_pause(s_video_timer);" in function(product, "static esp_err_t lvgl_init(")
 assert "#define PRODUCT_VIDEO_TICK_MS 30U" in product
 assert "lv_timer_create(product_video_tick, PRODUCT_VIDEO_TICK_MS, NULL)" in product
 print("PASS: video generation/stop/idempotence, SDK metadata and nonblocking ingress")

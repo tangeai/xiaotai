@@ -91,7 +91,7 @@ static bool visible;
 typedef int esp_err_t;
 typedef struct {int state;} starter_runtime_status_t;
 typedef struct {bool call_video,call_wechat;} starter_runtime_product_snapshot_t;
-static starter_runtime_status_t starter_runtime_status(void){return (starter_runtime_status_t){6};}
+static starter_runtime_status_t starter_runtime_status_snapshot(void){return (starter_runtime_status_t){6};}
 static starter_runtime_product_snapshot_t starter_runtime_product_snapshot(void){return (starter_runtime_product_snapshot_t){true,false};}
 static int p4_video_rotate_remote_clockwise(uint16_t *rotation){if(error)return error;angle=(angle+90)%360;*rotation=angle;return 0;}
 static int64_t monotonic_ms(void){return 100;}

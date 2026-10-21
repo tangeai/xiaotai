@@ -48,10 +48,14 @@ typedef struct {
 typedef struct { void *disp, *handle; } lvgl_port_touch_cfg_t;
 static void *s_display, *s_lcd_io=(void *)1, *s_lcd_panel=(void *)2;
 static void *s_touch=(void *)3, *s_call_ring_task;
-static unsigned registered, touch_registered;
+static unsigned registered, touch_registered, probe_installed;
+static bool locked;
 static int lvgl_port_init(const lvgl_port_cfg_t *p){return ESP_OK;}
-static int lvgl_port_lock(int t){return 1;}
-static void lvgl_port_unlock(void){}
+static int lvgl_port_lock(int t){locked=true;return 1;}
+static void lvgl_port_unlock(void){locked=false;}
+static void product_render_probe_install(void *display){
+    assert(locked && display==s_display);probe_installed++;
+}
 static void on_screen_event(void){}
 static void product_tick(void){}
 static void call_ring_task(void *arg){}
@@ -89,6 +93,7 @@ static void *lvgl_port_add_touch(const lvgl_port_touch_cfg_t *cfg) {{
 int main(void) {
     assert(lvgl_init()==ESP_OK);
     assert(registered==1 && touch_registered==1);
+    assert(probe_installed==1);
 }
 ''')
 

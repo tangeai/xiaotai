@@ -211,15 +211,15 @@ static void ai_call_intent_handoff(void)
                                     "dev-1", "role-1") > 0);
     const char accepted[] =
         "{\"id\":\"req-2\",\"result\":{\"session_id\":\"s\","
-        "\"input_audio\":{\"codec\":\"opus\",\"sample_rate\":16000,"
+        "\"input_audio\":{\"codec\":\"alaw\",\"sample_rate\":8000,"
         "\"channels\":1},\"output_audio\":{\"codec\":\"opus\","
         "\"sample_rate\":16000,\"channels\":1}}}";
     assert(xiaotai_ai_decode_message(accepted, strlen(accepted), "req-2") ==
            XIAOTAI_AI_MESSAGE_START_ACCEPTED);
     assert(xiaotai_runtime_media_started(&runtime, ai_generation));
     assert(xiaotai_media_contract_get(XIAOTAI_MEDIA_MODE_AI, &media));
-    assert(media.codec == XIAOTAI_MEDIA_CODEC_OPUS &&
-           media.sample_rate_hz == 16000U);
+    assert(media.codec == XIAOTAI_MEDIA_CODEC_ALAW &&
+           media.sample_rate_hz == 8000U);
     assert(xiaotai_contacts_resolve_call_intent_json(&contacts,
         "{\"method\":\"call_intent\",\"params\":{"
         "\"target_name\":\"爸爸\",\"channel\":\"wechat\","

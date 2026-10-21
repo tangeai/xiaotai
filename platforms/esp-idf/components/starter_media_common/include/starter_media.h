@@ -139,6 +139,14 @@ typedef struct {
     uint32_t rms_avg[3], rms_max[3], peak[3];
     int32_t dc_avg[3];
     uint32_t aec_avg_us, measurement_avg_us, measurement_max_us;
+    /* S3 capture-boundary observations, not acoustic speaker identification.
+     * Wall interval covers read boundaries; DMA is a conservative tail estimate.
+     * Context transitions discard partial windows. Other backends leave false. */
+    bool correlated, counters_valid, capture_overflow_supported, media_active;
+    uint32_t generation, mode, start_ms, wall_ms, audio_ms;
+    uint32_t worker_frames, dma_frames, pending_peak, dma_peak_ms;
+    uint32_t tx_delta, rx_delta, dropped_delta, capture_overflow_delta;
+    uint32_t mic_clipped, reference_clipped;
 } starter_media_audio_diagnostics_t;
 void starter_media_audio_diagnostics(starter_media_audio_diagnostics_t *out);
 
@@ -189,8 +197,9 @@ void starter_media_playback_waveform(starter_playback_waveform_t *out);
 /** Volatile diagnostic control: bypass PCM visualization and face animation. */
 void starter_media_set_face_animation_enabled(bool enabled);
 bool starter_media_face_animation_enabled(void);
-#if CONFIG_IDF_TARGET_ESP32P4
+/** Select call video before starting a confirmed media session. */
 void starter_media_set_call_video(bool video);
+#if CONFIG_IDF_TARGET_ESP32P4
 void starter_media_set_remote_video_presentation(uint16_t rotation,
                                                  bool remote_profile);
 esp_err_t starter_media_set_camera_enabled(uint32_t generation, bool enabled);

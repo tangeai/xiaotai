@@ -25,9 +25,13 @@ typedef struct {
     uint8_t up_video_stream_id;
     uint8_t down_audio_stream_id;
     uint8_t down_video_stream_id;
+    /* Existing rate/frame/codec fields describe uplink. */
     uint32_t sample_rate_hz;
     uint16_t frame_samples;
     xiaotai_media_codec_t codec;
+    uint32_t down_sample_rate_hz;
+    uint16_t down_frame_samples;
+    xiaotai_media_codec_t down_codec;
     bool has_video;
 } xiaotai_media_contract_t;
 

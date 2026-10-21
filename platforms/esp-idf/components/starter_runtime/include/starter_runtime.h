@@ -144,12 +144,12 @@ esp_err_t starter_runtime_ai_stop(void);
 /** Physical main-key gesture; the runtime resolves its current business state. */
 esp_err_t starter_runtime_main_key(bool double_click);
 
-/** 联系人同步与纯语音呼叫控制，均只把意图投递给统一状态任务。 */
+/** 联系人同步与呼叫控制，均只把意图投递给统一状态任务。 */
 esp_err_t starter_runtime_contacts_refresh(void);
 esp_err_t starter_runtime_wechat_quick_call(void);
 esp_err_t starter_runtime_call_contact(uint8_t index);
-#if CONFIG_IDF_TARGET_ESP32P4
 esp_err_t starter_runtime_call_contact_video(uint8_t index);
+#if CONFIG_IDF_TARGET_ESP32P4
 esp_err_t starter_runtime_call_set_camera_enabled(uint32_t session_generation, bool enabled);
 #endif
 esp_err_t starter_runtime_call_accept(void);
@@ -166,7 +166,11 @@ esp_err_t starter_runtime_room_join(const char *room_code, const char *password)
 esp_err_t starter_runtime_room_leave(void);
 esp_err_t starter_runtime_room_ptt(bool pressed);
 
-/** 返回线程安全的瞬时状态快照。 */
+/** Cheap atomic state reads for UI/control paths. Does not scan the task stack;
+ * stack_high_water_bytes is zero (not measured). */
+starter_runtime_status_t starter_runtime_status_snapshot(void);
+
+/** Explicit diagnostics, including a task stack scan. Not for periodic UI work. */
 starter_runtime_status_t starter_runtime_status(void);
 
 /** 复制当前 AI 字幕/阶段；内部使用互斥量，不返回运行时持有的指针。 */
