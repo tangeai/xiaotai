@@ -11,14 +11,14 @@ ROOT = Path(__file__).resolve().parents[2]
 PROJECT = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai'
 SDK = Path(os.environ.get('SDK_DIR', ROOT / '.tools/bk_avdk_smp-release-v3.1.1.10'))
 SOURCE = 'cp/middleware/driver/mailbox/mb_ipc_heartbeat.c'
-PATCH = PROJECT / 'tools/patches/bk-avdk-heartbeat-8s.patch'
+PATCH = ROOT / 'platforms/beken/tools/patches/bk-avdk-heartbeat-8s.patch'
 
 
 class BKHeartbeatTimeoutTest(unittest.TestCase):
     def test_cp_timeout_is_eight_seconds_when_watchdog_is_disabled(self):
         if not (SDK / SOURCE).is_file():
             self.skipTest('BK SDK checkout is required')
-        build_script = (PROJECT / 'tools/build.sh').read_text()
+        build_script = (ROOT / "platforms/beken/tools/build.sh").read_text()
         self.assertIn(PATCH.name, build_script)
         pristine = subprocess.run(
             ['git', '-C', str(SDK), 'show', f'HEAD:{SOURCE}'],

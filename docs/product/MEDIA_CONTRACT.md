@@ -200,7 +200,7 @@ AEC 还要分别测试远端单讲、近端单讲和双方同时说话。验收�
 - AI 默认协商结构：[`product/src/xiaotai_ai_protocol.c`](../../product/src/xiaotai_ai_protocol.c)
 - ESP32-S3 AEC：[`platforms/esp-idf/components/starter_media_common/src/starter_aec.c`](../../platforms/esp-idf/components/starter_media_common/src/starter_aec.c)
 - ESP32-P4 视频档位：对应工程的 `main/media/media_tuning.h`
-- BK7258 音频与 AEC：`firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_audio.c`
+- BK7258 音频与 AEC：`platforms/beken/runtime/src/xiaotai_audio.c`
 - 微信通话设备接入规范：<https://docs.tange.ai/products/wxvoip/guides/device-integration.html#七通话中信令与媒体>
 
 板卡参数以对应板卡使用页和当前源码为准。调整编码、采样率、分辨率或流编号时，必须同步更新

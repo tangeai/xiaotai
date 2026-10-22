@@ -7,6 +7,9 @@ typedef enum {
     XIAOTAI_BUTTON_SHORT,
     XIAOTAI_BUTTON_DOUBLE,
     XIAOTAI_BUTTON_LONG,
+    XIAOTAI_BUTTON_VOLUME_UP,
+    XIAOTAI_BUTTON_VOLUME_DOWN,
+    XIAOTAI_BUTTON_PROVISION,
 } xiaotai_button_event_t;
 
 typedef void (*xiaotai_button_event_fn)(xiaotai_button_event_t event,

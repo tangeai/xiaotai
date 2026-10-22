@@ -2,7 +2,7 @@
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
 
-UI = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_ui.c'
+UI = ROOT / 'platforms/beken/runtime/src/xiaotai_ui.c'
 
 class BindingGuidance(unittest.TestCase):
     def test_binding_steps_and_code_survive_voice_failure(self):

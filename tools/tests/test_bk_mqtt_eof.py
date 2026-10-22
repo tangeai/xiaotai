@@ -7,7 +7,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_platform_client.c'
+SOURCE = ROOT / 'platforms/beken/runtime/src/xiaotai_platform_client.c'
 
 
 def function(source, name):

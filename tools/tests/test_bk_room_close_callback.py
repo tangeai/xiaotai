@@ -20,7 +20,7 @@ class BKRoomCloseCallback(unittest.TestCase):
         gcc = str(prefix) + 'gcc'
         if not Path(gcc).exists():
             self.skipTest('Beken target compiler not installed')
-        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_tirtc.c').read_text()
         declaration = re.search(r'^static atomic_int s_pending_close_state\b[^;]*;',
                                 source, re.MULTILINE).group(0)
         unit = r'''
@@ -45,7 +45,7 @@ extern int rtos_push_to_queue(void **, const media_event_t *, unsigned);
                           'close CAS must not reserve ordinary kernel/DMA SRAM')
 
     def test_media_worker_uses_internal_sram_stack(self):
-        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_tirtc.c').read_text()
         run_c(r'''
 #include <assert.h>
 #include <stdint.h>
@@ -97,13 +97,13 @@ int main(void) {
 ''')
 
     def test_control_task_services_close_even_when_events_keep_arriving(self):
-        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_app.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_app.c').read_text()
         control = function(source, 'control_task')
         self.assertLess(control.index('xiaotai_tirtc_service_close_wakeup();'),
                         control.index('rtos_pop_from_queue(&s_control_queue'))
 
     def test_idle_worker_blocks_and_control_wakes_close(self):
-        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_tirtc.c').read_text()
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>
@@ -172,7 +172,7 @@ int main(void) {
 ''')
 
     def test_room_close_callback_clears_owner_and_queues_worker_event(self):
-        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_tirtc.c').read_text()
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>

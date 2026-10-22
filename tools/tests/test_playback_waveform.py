@@ -49,7 +49,7 @@ int main(void) {
 ''')
 
     def test_dot_mailbox_matches_bk_levels_and_drops_stale_audio(self):
-        bk = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_audio.c').read_text()
+        bk = (ROOT / 'platforms/beken/runtime/src/xiaotai_audio.c').read_text()
         run_c(f'#include "{INCLUDE / "starter_playback_scope.h"}"\n' +
               function(bk, 'playback_columns_pack') + r'''
 #include <assert.h>

@@ -25,7 +25,7 @@
 
 The local `bk_avdk_smp_v3.1.1.8_20260605` delivery is modified reference
 material and does not define this identity. The TiRTC package is vendored under
-`third_party/tirtc`. Its private media security implementation remains inside
+`platforms/beken/third_party/tirtc`（仓库根目录相对路径）. Its private media security implementation remains inside
 that package. A build with another platform SDK, compiler ABI, TiRTC archive,
 or memory map is a different artifact and must be validated again.
 

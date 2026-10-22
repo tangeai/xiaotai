@@ -18,9 +18,9 @@ existing framebuffer and requires no icon allocation or RGB bitmap copy.
 When the official QR or fixed copy changes, regenerate the file explicitly:
 
 ```bash
-python3 tools/generate_ui_assets.py \
+python3 firmware/beken/bk7258/lckfb-bk7258-xiaotai/tools/generate_ui_assets.py \
   --qr /path/to/official-mini-program-qr.png \
-  --output-dir ap/assets
+  --output-dir platforms/beken/runtime/assets
 ```
 
 Regenerate shared icon variants from the repository root:

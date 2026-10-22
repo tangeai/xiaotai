@@ -72,8 +72,8 @@ int main(void){
 ''')
 
     def test_beken_public_start_keeps_global_mute_and_explains_recovery(self):
-        source = (BK / 'ap/src/xiaotai_app.c').read_text()
-        ui = (BK / 'ap/src/xiaotai_ui.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_app.c').read_text()
+        ui = (ROOT / 'platforms/beken/runtime/src/xiaotai_ui.c').read_text()
         handler = function(source, 'handle_intent')
         handler = handler[handler.index('    if (s_runtime.owner == XIAOTAI_OWNER_AI) {'):]
         feedback = ROOT / 'product/include/xiaotai_ai_feedback.h'

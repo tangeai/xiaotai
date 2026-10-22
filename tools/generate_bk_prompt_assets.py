@@ -5,7 +5,7 @@ import struct
 import wave
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/assets/xiaotai_prompt_assets.h'
+OUTPUT = ROOT / 'platforms/beken/runtime/assets/xiaotai_prompt_assets.h'
 
 
 def generate():

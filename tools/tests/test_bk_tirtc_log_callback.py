@@ -7,7 +7,7 @@ from test_s3_product_regressions import ROOT, function, run_c
 
 class BKTirtcLogCallback(unittest.TestCase):
     def test_release_sdk_logging_has_explicit_info_ceiling(self):
-        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_tirtc.c').read_text()
         # Exercise the actual public start boundary's logging preamble.
         start = function(source, 'xiaotai_tirtc_start')
         begin = start.index('    TiRtcLogSetCallback(')
@@ -26,7 +26,7 @@ int main(void){
 ''')
 
     def test_sdk_log_callback_uses_nonblocking_console_and_chunks_output(self):
-        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_tirtc.c').read_text()
         run_c(r'''
 #include <assert.h>
 #include <stdarg.h>

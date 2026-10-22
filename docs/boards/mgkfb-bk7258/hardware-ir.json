@@ -1,0 +1,299 @@
+{
+  "schema_version": 1,
+  "record_type": "board-bringup-evidence",
+  "status": "BUILD_VERIFIED_HIL_PENDING",
+  "board": {
+    "candidate_id": "mgkfb-bk7258",
+    "vendor": "深圳觅感科技有限公司",
+    "model": "AI 玩具开发板",
+    "pcb_revision": null,
+    "soc": {
+      "value": "BK7258",
+      "state": "declared",
+      "source": "mig-spec-v1",
+      "pages": [
+        5,
+        12
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "mig-spec-v1",
+      "title": "觅感AI玩具开发板规格书_V1.0.pdf",
+      "version": "V1.0",
+      "date": "2026-03-31",
+      "url": null,
+      "sha256": "87ee7c0679f01fbc45185eae913033135fb6899d106dabab554b46495c1cf43c",
+      "method": "user-supplied PDF text and schematic visual inspection"
+    },
+    {
+      "id": "beken-schematic",
+      "title": "AIDK AI玩具开发板 原理图",
+      "url": "https://docs.bekencorp.com/HW/BK7258/AIDK_AI玩具开发板_原理图.pdf",
+      "sha256": "b10cf08785a1c8767d9b4c51d05e6c8685a4cb60a720b51022734d742149bb2d",
+      "method": "official hardware-reference linked schematic"
+    },
+    {
+      "id": "aidk-source",
+      "url": "https://github.com/bekencorp/bk_aidk",
+      "commit": "b72e1cb86831d8957fe40abb819aca526e7a01d2",
+      "branch_at_review": "ai_release/v2.0.1",
+      "bk_avdk_submodule_commit": "bce123d336b49097865a53186dd187543b3edff9",
+      "method": "pinned source inspection; not built or flashed"
+    }
+  ],
+  "product_scope": {
+    "state": "requested",
+    "enabled": [
+      "ai-intercom",
+      "wechat-voip-audio",
+      "h5-live-view"
+    ],
+    "disabled": [
+      "device-call",
+      "group-room"
+    ],
+    "presentation": "headless",
+    "input": "physical-buttons",
+    "interaction_profile": "headless-key",
+    "layout_profile": "none",
+    "note": "Implemented headless build selection and per-board business gates; all capabilities remain pending physical-board validation. Implement and verify dual screens last.",
+    "deferred": [
+      "dual-screen-eyes"
+    ]
+  },
+  "display": {
+    "value": {
+      "controller": "GC9D01",
+      "count": 2,
+      "width_each": 160,
+      "height_each": 160,
+      "interface": "SPI",
+      "touch_on_eye_panels": false,
+      "connectors": [
+        {
+          "name": "LCD1",
+          "clock_gpio": 2,
+          "cs_gpio": 3,
+          "data_gpio": 4,
+          "dc_gpio": 5,
+          "reset_gpio": 45
+        },
+        {
+          "name": "LCD2",
+          "clock_gpio": 21,
+          "cs_gpio": 22,
+          "data_gpio": 24,
+          "dc_gpio": 7,
+          "reset_gpio": 6
+        }
+      ],
+      "backlight_gpio": 25,
+      "peripheral_3v3_enable_gpio": 52,
+      "physical_left_connector": null,
+      "orientation": null
+    },
+    "state": "declared",
+    "source": "mig-spec-v1",
+    "pages": [
+      5,
+      12,
+      15
+    ],
+    "note": "CN5 is a separate optional touch/display connector, not proof of touch on the two eye panels."
+  },
+  "keys": {
+    "value": {
+      "S1": {
+        "gpio": 13,
+        "active_level": 0
+      },
+      "S2": {
+        "gpio": 12,
+        "active_level": 0
+      },
+      "S3": {
+        "gpio": 8,
+        "active_level": 0
+      },
+      "K1": {
+        "signal": "CEN",
+        "function": "hardware-reset"
+      }
+    },
+    "state": "declared",
+    "source": "mig-spec-v1",
+    "pages": [
+      8,
+      12,
+      14
+    ]
+  },
+  "audio": {
+    "value": {
+      "microphone_input": [
+        "MIC1P",
+        "MIC1N"
+      ],
+      "amplifier_schematic_label": "HT6873",
+      "amplifier_control_gpio": 50,
+      "amplifier_control_active_level": null,
+      "aec_reference_candidate": [
+        "MIC2P",
+        "MIC2N"
+      ],
+      "aec_reference_resistors": [
+        "R83",
+        "R84"
+      ],
+      "aec_reference_assembled": null,
+      "duplex_verified": false,
+      "aec_verified": false
+    },
+    "state": "declared",
+    "source": "mig-spec-v1",
+    "pages": [
+      5,
+      12,
+      15
+    ],
+    "note": "Second microphone path and playback reference population must be checked on the physical PCB; the reference schematic block diagram says HT6872 while the detailed U8 circuit says HT6873."
+  },
+  "camera": {
+    "value": {
+      "sensor": "GC2145",
+      "interface": "DVP",
+      "mclk_gpio": 27,
+      "reset_gpio": 28,
+      "pclk_gpio": 29,
+      "hsync_gpio": 30,
+      "vsync_gpio": 31,
+      "data_gpios": [
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "power_control_gpio": 49,
+      "sccb_scl_gpio": 42,
+      "sccb_sda_gpio": 43,
+      "assembled": null,
+      "detected_id": "0x2145",
+      "pwdn_gpio": null
+    },
+    "state": "detected",
+    "source": "mig-spec-v1",
+    "pages": [
+      5,
+      12,
+      14
+    ],
+    "note": "Specification wiring matches SCCB and DVP GPIOs. User build.4 log read GC2145 ID successfully; H5 subscribed but no frame sent. DVP default mux initialization was missing and is corrected in the subsequent build; image output still pending validation."
+  },
+  "memory": {
+    "program_flash_physical_bytes": 8388608,
+    "psram_physical_bytes": null,
+    "program_flash_jedec_id": null,
+    "sd_nand": {
+      "value": {
+        "capacity_label": "128 MB",
+        "part_label": "CSNP1GCR01",
+        "purpose": "resource-storage"
+      },
+      "state": "declared",
+      "source": "mig-spec-v1",
+      "pages": [
+        5,
+        14
+      ]
+    },
+    "aidk_reference_flash_address_space": {
+      "value": 8388608,
+      "state": "declared",
+      "source": "aidk-source",
+      "path": "projects/beken_genie/config/bk7258/partitions.csv",
+      "note": "Reference configuration only; not this physical board capacity or approved XiaoTai partition layout."
+    },
+    "program_flash_evidence": {
+      "state": "declared",
+      "source": "user-confirmation",
+      "date": "2026-10-22",
+      "value": "8M flash",
+      "note": "User-confirmed 8 MiB capacity; JEDEC ID and original image have not been read by the agent."
+    }
+  },
+  "runtime_evidence": {
+    "firmware_sha256": null,
+    "probe_report": null,
+    "tests": [
+      {
+        "name": "camera-identity",
+        "status": "PASS",
+        "firmware_version": "1.0.1+build.4",
+        "method": "user-supplied serial log, SCCB address 0x3c registers 0xf0=0x21 and 0xf1=0x45",
+        "source_log_sha256": "7175aa5863fd438bd3f6437e810e492f9952b12297a15ecbef662712d6f4748b"
+      },
+      {
+        "name": "h5-live-video",
+        "status": "FAIL",
+        "firmware_version": "1.0.1+build.4",
+        "method": "video subscription enabled, camera stop sent=0 dropped=1; missing VSYNC edge",
+        "next_action": "Flash DVP mux correction and confirm increasing video frames plus visible H5 image"
+      }
+    ]
+  },
+  "open_items": [
+    "Exact PCB revision and fitted panels/camera",
+    "Flash JEDEC ID, physical PSRAM and original bootloader/partition identity",
+    "U8 amplifier model, polarity, gain and timing",
+    "MIC2 reference resistor population and duplex/AEC measurement",
+    "Display orientation and left/right connector mapping",
+    "Headless provisioning/binding/AI/VoIP/H5 hardware validation and complete audible feedback"
+  ],
+  "implementation_baseline": {
+    "state": "build-verified",
+    "sdk": "bk_avdk_smp",
+    "version": "release/v3.1.1.10",
+    "commit": "398cab28b938e69ba2071a597daf00845dd080b6",
+    "architecture": "SMP AP/CP",
+    "tirtc_archive_sha256": "1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9",
+    "aidk_role": "hardware-and-driver-reference-only",
+    "native_project_registered": true,
+    "note": "Keep the existing SMP platform and matching TiRTC ABI; do not import AIDK binaries, CPU0/CPU1/CPU2 project or partition layout."
+  },
+  "indicators": {
+    "value": {
+      "red_gpio": 40,
+      "green_gpio": 41,
+      "active_level": 1
+    },
+    "state": "declared",
+    "source": "mig-spec-v1",
+    "pages": [
+      12,
+      14
+    ]
+  },
+  "build_evidence": {
+    "date": "2026-10-22",
+    "board_id": "mgkfb-bk7258",
+    "variant": "headless",
+    "build_version": "1.0.1+build.5",
+    "source_commit": "b8de258c23955c5c055256cd4090951c6f1b50dd",
+    "working_tree": "uncommitted feature branch changes",
+    "all_app_sha256": "91509cfa05876dc3c566b03c1c5295861af1acc8e583b5992ebce4ed728d7dd1",
+    "app_pack_sha256": "4698e224c78925fe87e7797e6c46e3e76b3655830348aa42573c92286203fdcc",
+    "all_app_bytes": 2699808,
+    "linked_ap_text_data_bss_bytes": [
+      1117522,
+      46044,
+      155849
+    ],
+    "note": "Native SMP build, SDK GPIO admission/default DVP mux regressions and package payload verification passed; 445 host tests and full tools/check.sh passed. Awaiting repeat H5 image test after DVP mux correction."
+  }
+}

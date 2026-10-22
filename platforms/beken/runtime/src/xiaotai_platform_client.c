@@ -97,9 +97,12 @@ static platform_services_t s_service_cache;
 static char s_service_token[MQTT_TOKEN_MAX];
 /* Publish the complete directional stream routing used by the H5 clients.
  * Device live media is 10/11; browser talkback media is 14/15. */
+#ifndef XIAOTAI_BOARD_ID
+#define XIAOTAI_BOARD_ID "lckfb-bk7258"
+#endif
 static const char s_device_profile[] =
     "{\"hardware\":{\"chip_model\":\"BK7258\","
-    "\"board_model\":\"lckfb-bk7258\"},"
+    "\"board_model\":\"" XIAOTAI_BOARD_ID "\"},"
     "\"firmware_version\":\"" XIAOTAI_BUILD_VERSION "\","
     "\"profiles\":{\"stream\":{\"up_audio_streamid\":10,"
     "\"up_video_streamid\":11,\"down_audio_streamid\":14,"
@@ -109,8 +112,10 @@ static const char s_device_profile[] =
     "\"aspect_ratio\":\"4:3\",\"hor_mirror\":false,"
     "\"vert_mirror\":false,\"object_fit\":\"contain\","
     "\"no_video\":false},"
+#if !XIAOTAI_DISABLE_DEVICE_CALL
     "\"call\":{\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"
     "\"audio_rate\":8000,\"audio_channels\":1,\"no_video\":true},"
+#endif
     "\"voip\":{\"screen_width\":1,\"screen_height\":1,"
     "\"audio_rate\":8000,\"audio_channels\":1,"
     "\"up_video_mt\":\"none\",\"down_video_mt\":\"none\","
@@ -1251,8 +1256,12 @@ static int report_capabilities_with_token(const platform_services_t *services,
     cJSON_Delete(root);
     BK_LOGD(TAG, "device profile JSON release complete\n");
     if (!accepted) return BK_FAIL;
+#if XIAOTAI_DISABLE_DEVICE_CALL
+    BK_LOGI(TAG, "device capabilities reported (stream=h264, voip=audio-only, call disabled)\n");
+#else
     BK_LOGI(TAG,
             "device capabilities reported (stream=h264, call/voip=audio-only)\n");
+#endif
     return BK_OK;
 }
 

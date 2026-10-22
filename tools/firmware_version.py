@@ -90,8 +90,8 @@ def read_board_version(root: Path, board_id: str) -> FirmwareVersion:
         "waveshare-esp32p4-touch-lcd-43c-v10":
             "firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c",
     }
-    if board_id == "lckfb-bk7258":
-        path = root / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/VERSION.md"
+    if board_id in ("lckfb-bk7258", "mgkfb-bk7258"):
+        path = root / f"firmware/beken/bk7258/{board_id}-xiaotai/VERSION.md"
         match = re.search(r"`([^`]+)`", path.read_text(encoding="utf-8"))
     elif board_id in projects:
         path = root / projects[board_id] / "CMakeLists.txt"

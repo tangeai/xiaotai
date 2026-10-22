@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+python3 "$repo_dir/tools/tests/test_mgkfb_headless.py"
 python3 "$repo_dir/tools/tests/test_cores3_board.py"
 python3 "$repo_dir/tools/tests/test_cores3_memory_config.py"
 python3 "$repo_dir/tools/tests/test_cores3_text_memory.py"

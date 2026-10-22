@@ -17,7 +17,7 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-manifest = (ROOT / "third_party/tirtc/manifest/build-info.env").read_text()
+manifest = (REPO_ROOT / "platforms/beken/third_party/tirtc/manifest/build-info.env").read_text()
 for fact in (
     "SDK_VERSION=v2.5.0",
     "TARGET=beken-bk7258",
@@ -34,7 +34,7 @@ for fact in (
 ):
     require(fact in manifest, f"missing locked TiRTC fact: {fact}")
 
-archive = ROOT / "third_party/tirtc/lib/libTiRTC.a"
+archive = REPO_ROOT / "platforms/beken/third_party/tirtc/lib/libTiRTC.a"
 require(archive.stat().st_size > 100_000,
         "TiRTC archive is missing or unexpectedly small")
 require(hashlib.sha256(archive.read_bytes()).hexdigest() ==
@@ -45,30 +45,30 @@ config = (ROOT / "ap/config/bk7258_ap/config").read_text()
 config_sha256 = hashlib.sha256(config.encode()).hexdigest()
 root_cmake = (ROOT / "CMakeLists.txt").read_text()
 makefile = (ROOT / "Makefile").read_text()
-build_script = (ROOT / "tools/build.sh").read_text()
+build_script = (REPO_ROOT / "platforms/beken/tools/build.sh").read_text()
 sdk_camera_patch = (
-    ROOT / "tools/patches/bk-avdk-dvp-sccb-diagnostics.patch"
+    REPO_ROOT / "platforms/beken/tools/patches/bk-avdk-dvp-sccb-diagnostics.patch"
 ).read_text()
 sdk_lwip_patch = (
-    ROOT / "tools/patches/bk-avdk-lwip-tcp-pcb-12.patch"
+    REPO_ROOT / "platforms/beken/tools/patches/bk-avdk-lwip-tcp-pcb-12.patch"
 ).read_text()
 sdk_captive_dns_patch = (
-    ROOT / "tools/patches/bk-avdk-captive-dns.patch"
+    REPO_ROOT / "platforms/beken/tools/patches/bk-avdk-captive-dns.patch"
 ).read_text()
 sdk_gc0308_patch = (
-    ROOT / "tools/patches/bk-avdk-gc0308-20fps.patch"
+    REPO_ROOT / "platforms/beken/tools/patches/bk-avdk-gc0308-20fps.patch"
 ).read_text()
 sdk_sensitive_log_patch = (
-    ROOT / "tools/patches/bk-avdk-redact-sensitive-logs.patch"
+    REPO_ROOT / "platforms/beken/tools/patches/bk-avdk-redact-sensitive-logs.patch"
 ).read_text()
 sdk_touch_release_patch_path = (
-    ROOT / "tools/patches/bk-avdk-touch-read-failure-release.patch"
+    REPO_ROOT / "platforms/beken/tools/patches/bk-avdk-touch-read-failure-release.patch"
 )
 require(sdk_touch_release_patch_path.exists(),
         "BK touch driver must distinguish controller read failures from an empty app queue")
 sdk_touch_release_patch = sdk_touch_release_patch_path.read_text()
 sdk_wifi_skb_patch_path = (
-    ROOT / "tools/patches/bk-avdk-wifi-skb-dequeue-guard.patch"
+    REPO_ROOT / "platforms/beken/tools/patches/bk-avdk-wifi-skb-dequeue-guard.patch"
 )
 require(sdk_wifi_skb_patch_path.exists(),
         "BK build must carry the CP Wi-Fi broken skb-list guard")
@@ -117,12 +117,12 @@ require(sdk_camera_patch.count("+\tbk_gpio_pull_up(HWD_GPIO_I2C_SDA);") == 2 and
         "config->i2c_config.scl_pin" in sdk_camera_patch and
         "config->i2c_config.sda_pin" in sdk_camera_patch,
         "SCCB patch must use pull-ups, propagate failures, and report active pins")
-require('"$project_dir/tools/patches/bk-avdk-lwip-tcp-pcb-12.patch"' in
+require('"$support_dir/tools/patches/bk-avdk-lwip-tcp-pcb-12.patch"' in
         build_script and
         "-#define MAX_SOCKETS_TCP 8" in sdk_lwip_patch and
         "+#define MAX_SOCKETS_TCP 12" in sdk_lwip_patch,
         "official SDK builds must reproducibly raise TCP PCB capacity to 12")
-require('"$project_dir/tools/patches/bk-avdk-captive-dns.patch"' in
+require('"$support_dir/tools/patches/bk-avdk-captive-dns.patch"' in
         build_script and
         "DNS_TYPE_A" in sdk_captive_dns_patch and
         "dhcps.router_ip" in sdk_captive_dns_patch and
@@ -130,14 +130,14 @@ require('"$project_dir/tools/patches/bk-avdk-captive-dns.patch"' in
         "rcode = ERROR_REFUSED" in sdk_captive_dns_patch and
         "+\thdr->flags.num = htons(0x8000U" in sdk_captive_dns_patch,
         "official SDK DHCP DNS must answer captive-portal A queries")
-require('"$project_dir/tools/patches/bk-avdk-gc0308-20fps.patch"' in
+require('"$support_dir/tools/patches/bk-avdk-gc0308-20fps.patch"' in
         build_script and
         "-    .clk = MCLK_24M" in sdk_gc0308_patch and
         "+    .clk = MCLK_20M" in sdk_gc0308_patch and
         "-    .def_fps = FPS25" in sdk_gc0308_patch and
         "+    .def_fps = FPS20" in sdk_gc0308_patch,
         "official SDK builds must reproducibly select the GC0308 20 fps profile")
-require('"$project_dir/tools/patches/bk-avdk-redact-sensitive-logs.patch"' in
+require('"$support_dir/tools/patches/bk-avdk-redact-sensitive-logs.patch"' in
         build_script and
         'apply --check --ignore-whitespace "$sdk_patch"' in build_script and
         'apply --ignore-whitespace "$sdk_patch"' in build_script and
@@ -147,7 +147,7 @@ require('"$project_dir/tools/patches/bk-avdk-redact-sensitive-logs.patch"' in
         'value redacted' in sdk_sensitive_log_patch and
         'BK_LOGD(TAG,"%.*s' in sdk_sensitive_log_patch,
         "official SDK builds must redact Wi-Fi passwords and HTTP headers")
-require('"$project_dir/tools/patches/bk-avdk-touch-read-failure-release.patch"' in
+require('"$support_dir/tools/patches/bk-avdk-touch-read-failure-release.patch"' in
         build_script and
         "TP_THREAD_STACK_SIZE (2048)" in sdk_touch_release_patch and
         "TP_READ_RETRY_COUNT (3)" in sdk_touch_release_patch and
@@ -179,13 +179,13 @@ require("CONFIG_FULL_MBEDTLS=y" in config and "CONFIG_WEBCLIENT_TLS=y" in config
         "the selected TiRTC/BK transport build requires full Mbed TLS support")
 require("CONFIG_LOG_LEVEL=4" in config,
         "development builds must default to DEBUG for complete network diagnostics")
-ap_cmake = (ROOT / "ap/CMakeLists.txt").read_text()
+ap_cmake = (REPO_ROOT / "platforms/beken/runtime/CMakeLists.txt").read_text()
 require("third_party/mbedtls" not in ap_cmake and
         "tirtc_mbedtls" not in ap_cmake and
         "hmac_sha_256" in ap_cmake and
         "psa_mbedtls" in ap_cmake and
         not (ROOT / "third_party/mbedtls").exists() and
-        '"mbedtls/' not in (ROOT / "ap/src/xiaotai_platform_client.c").read_text(),
+        '"mbedtls/' not in (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_platform_client.c").read_text(),
         "application transport must not compile or link a separate Mbed TLS")
 require(all(component in ap_cmake for component in
             ("bk_vfs", "bk_rtos", "psa_mbedtls", "zlib")) and
@@ -230,7 +230,7 @@ require(psram_total == 16 * 1024 * 1024,
 
 ap_sources = "\n".join(
     path.read_text(errors="ignore")
-    for path in (ROOT / "ap").rglob("*")
+    for path in (REPO_ROOT / "platforms/beken/runtime").rglob("*")
     if path.is_file() and path.suffix in {".c", ".h", ".txt"}
 )
 cp_sources = "\n".join(
@@ -238,8 +238,8 @@ cp_sources = "\n".join(
     for path in (ROOT / "cp").rglob("*")
     if path.is_file() and path.suffix in {".c", ".h", ".txt"}
 )
-probe_source = (ROOT / "ap/src/tirtc_bk_probe.c").read_text()
-audio_probe_source = (ROOT / "ap/src/xiaotai_probe.c").read_text()
+probe_source = (ROOT / "ap/tirtc_bk_probe.c").read_text()
+audio_probe_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_probe.c").read_text()
 require(f'#define BOARD_CONFIG_SHA256 "{config_sha256}"' in probe_source,
         "boot probe board_config_sha256 must match the compiled AP config")
 require("out->playback_reference = true;" in audio_probe_source and
@@ -248,27 +248,27 @@ require("out->playback_reference = true;" in audio_probe_source and
         "boot probe must advertise compiled AEC without claiming acoustic validation")
 require("TiRtcInit" in ap_sources and "TiRtcStart" in ap_sources,
         "AP does not own the TiRTC lifecycle")
-app_source = (ROOT / "ap/src/xiaotai_app.c").read_text()
+app_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_app.c").read_text()
 ai_view_source = (REPO_ROOT / "product/src/xiaotai_ai_view.c").read_text()
 call_protocol_source = (
     REPO_ROOT / "product/src/xiaotai_call_protocol.c"
 ).read_text()
 room_source = (REPO_ROOT / "product/src/xiaotai_room.c").read_text()
 signal_source = (REPO_ROOT / "product/src/xiaotai_signal.c").read_text()
-tirtc_source = (ROOT / "ap/src/xiaotai_tirtc.c").read_text()
-platform_source = (ROOT / "ap/src/xiaotai_platform_client.c").read_text()
-audio_source = (ROOT / "ap/src/xiaotai_audio.c").read_text()
-audio_agc_source = (ROOT / "ap/src/xiaotai_audio_agc.c").read_text()
-audio_policy_source = (ROOT / "ap/src/xiaotai_audio_policy.c").read_text()
-storage_source = (ROOT / "ap/src/xiaotai_storage.c").read_text()
-board_audio_source = (REPO_ROOT / "boards/lckfb/bk7258/board_audio.c").read_text()
+tirtc_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_tirtc.c").read_text()
+platform_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_platform_client.c").read_text()
+audio_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_audio.c").read_text()
+audio_agc_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_audio_agc.c").read_text()
+audio_policy_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_audio_policy.c").read_text()
+storage_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_storage.c").read_text()
+board_audio_source = (REPO_ROOT / "boards/lckfb/bk7258/board_audio.c").read_text() + (REPO_ROOT / "platforms/beken/src/xiaotai_onboard_audio.c").read_text()
 board_audio_adapter = (
     REPO_ROOT / "platforms/common/include/xiaotai_board_audio.h"
 ).read_text()
-network_source = (ROOT / "ap/src/xiaotai_network.c").read_text()
-metrics_source = (ROOT / "ap/src/xiaotai_metrics.c").read_text()
-ui_assets_source = (ROOT / "ap/assets/xiaotai_ui_assets.c").read_text()
-ui_hit_test_source = (ROOT / "ap/src/xiaotai_ui_hit_test.c").read_text()
+network_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_network.c").read_text()
+metrics_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_metrics.c").read_text()
+ui_assets_source = (REPO_ROOT / "platforms/beken/runtime/assets/xiaotai_ui_assets.c").read_text()
+ui_hit_test_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_ui_hit_test.c").read_text()
 phone_asset_source = (REPO_ROOT / "product/assets/icons/wechat_call/icon_small.h").read_text()
 require("#define CONTROL_TASK_STACK_SIZE (12U * 1024U)" in app_source and
         "control_task, CONTROL_TASK_STACK_SIZE" in app_source,
@@ -384,7 +384,7 @@ require(platform_prepare_at >= 0 and
         "clock sync and capability reporting must precede TiRTC startup")
 require("#define TIRTC_LOG_LEVEL_MAX 17" in tirtc_source and
         "#define XIAOTAI_TIRTC_LOG_LEVEL_SDK_DEFAULT (-1)" in
-        (ROOT / "ap/include/xiaotai_tirtc.h").read_text() and
+        (REPO_ROOT / "platforms/beken/runtime/include/xiaotai_tirtc.h").read_text() and
         "static void tirtc_sdk_log_callback" in tirtc_source and
         "bk_printf_raw_nonblock(BK_LOG_NONE, NULL, \"%s\", chunk);" in tirtc_source and
         "TiRtcLogSetCallback(tirtc_sdk_log_callback);" in tirtc_source and
@@ -397,7 +397,7 @@ require("#define TIRTC_LOG_LEVEL_MAX 17" in tirtc_source and
         "TiRtcLogSetLevel(11);" not in tirtc_source and
         "TiRtcLogSetLevel(5);" not in tirtc_source and
         "tirtc 0..17" in
-        (ROOT / "ap/src/xiaotai_console.c").read_text(),
+        (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_console.c").read_text(),
         "TiRTC must stream SDK diagnostics to UART, preserve the SDK default level at boot, and expose runtime override")
 require("HTTP_JSON_POST_EMPTY" in platform_source and
         "webclient_post(session, url, NULL, 0)" in platform_source and
@@ -489,7 +489,7 @@ require("device profile rejected http=%d code=%d message-bytes=%u" in
         platform_source,
         "profile rejection diagnostics must retain HTTP and platform codes")
 require('XIAOTAI_PLATFORM_DISCOVERY_URL "http://ep-open.tangeopen.com/services"' in
-        (ROOT / "ap/include/xiaotai_platform_client.h").read_text() and
+        (REPO_ROOT / "platforms/beken/runtime/include/xiaotai_platform_client.h").read_text() and
         'copy_json_string(root, "tirtc-srv"' in platform_source and
         'has_prefix(services->device, "http://")' in platform_source and
         'has_prefix(services->tirtc, "http://")' in platform_source and
@@ -499,9 +499,9 @@ require('XIAOTAI_PLATFORM_DISCOVERY_URL "http://ep-open.tangeopen.com/services"'
         platform_source and
         '.service_endpoint = s_tirtc_endpoint' in app_source,
         "open-platform discovery must use the requested plain transports")
-video_source = (ROOT / "ap/src/xiaotai_video.c").read_text()
+video_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_video.c").read_text()
 main_source = (ROOT / "ap/ap_main.c").read_text()
-ui_source = (ROOT / "ap/src/xiaotai_ui.c").read_text()
+ui_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_ui.c").read_text()
 board_root = REPO_ROOT / "boards/lckfb/bk7258"
 board_camera_source = (board_root / "board_camera.c").read_text()
 board_display_source = (board_root / "board_display.c").read_text()
@@ -539,7 +539,7 @@ require('xiaotai_ui_show_status("REMOTE")' in ap_sources and
         '"远程查看中"' in ui_source,
         "320x240 UI must represent implemented product session states")
 network_state_source = (
-    ROOT / "ap/src/xiaotai_network_state.c"
+    REPO_ROOT / "platforms/beken/runtime/src/xiaotai_network_state.c"
 ).read_text()
 require("xiaotai_network_link_changed(s_ready, true)" in network_source and
         "xiaotai_network_link_changed(s_ready, false)" in network_source and
@@ -591,7 +591,7 @@ require("SESSION_INCOMING_TIMEOUT_MS 45000U" in app_source and
         "xiaotai_runtime_expire" in app_source and
         'xiaotai_ui_show_status("TIMEOUT")' in app_source,
         "pending and asynchronous sessions require monotonic deadlines")
-recovery_source = (ROOT / "ap/src/xiaotai_tirtc_recovery.c").read_text()
+recovery_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_tirtc_recovery.c").read_text()
 recovery_doc = (ROOT / "docs/TIRTC_RUNTIME_RECOVERY.md").read_text()
 require("OUTGOING_CLEANUP_GRACE_MS 3000U" in tirtc_source and
         "OUTGOING_RETAINED_HEAP_LIMIT (12U * 1024U)" in tirtc_source and
@@ -610,7 +610,7 @@ contacts_source = (REPO_ROOT / "product/src/xiaotai_contacts.c").read_text()
 ai_protocol_source = (REPO_ROOT / "product/src/xiaotai_ai_protocol.c").read_text()
 call_state_header = (REPO_ROOT / "product/include/xiaotai_call_state.h").read_text()
 call_state_source = (REPO_ROOT / "product/src/xiaotai_call_state.c").read_text()
-platform_source = (ROOT / "ap/src/xiaotai_platform_client.c").read_text()
+platform_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_platform_client.c").read_text()
 require("xiaotai_platform_service_request" in app_source and
         "xiaotai_tirtc_service_request(" not in app_source and
         app_source.count("xiaotai_tirtc_service_request_json(") == 1 and
@@ -672,7 +672,7 @@ require(".max_connections = 1" in app_source and
         "AI WHIP connect failed rc=" in ap_sources and
         "AI WHIP memory before submit heap=" in ap_sources,
         "AI WHIP setup must match the one-session ESP reference contract and preserve DTLS headroom")
-tirtc_source = (ROOT / "ap/src/xiaotai_tirtc.c").read_text()
+tirtc_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_tirtc.c").read_text()
 audio_callback = re.search(
     r"static void on_audio\(tirtc_conn_t connection,.*?\n}\n\nstatic int on_subscribe_audio",
     tirtc_source,
@@ -875,7 +875,7 @@ require('"%s/v1/device/tts?code=%s"' in platform_source and
         "repeat < s_prompt_repeats" in audio_source and
         "psram_free(s_prompt_pcm)" in audio_source and
         "binding_digits" not in ap_sources and
-        not (ROOT / "ap/assets/binding_digits.c").exists(),
+        not (REPO_ROOT / "platforms/beken/runtime/assets/binding_digits.c").exists(),
         "binding voice must use authenticated server PCM three times without a local fallback")
 require("xiaotai_ui_show_wechat_qr();" in app_source and
         "platform contact list is empty" in app_source and
@@ -884,7 +884,7 @@ require("xiaotai_ui_show_wechat_qr();" in app_source and
         "if (s_ui_page == UI_PAGE_WECHAT_QR" in app_source and
         "WeChat QR dismissed by KEY" in app_source and
         "XIAOTAI_WX_QR_MODULES 37U" in
-        (ROOT / "ap/assets/xiaotai_ui_assets.h").read_text() and
+        (REPO_ROOT / "platforms/beken/runtime/assets/xiaotai_ui_assets.h").read_text() and
         "xiaotai_wx_qr_bits" in ui_assets_source and
         'centered_cjk_text(frame, 191, "微信扫码添加联系人"' in ui_source,
         "missing fixed mini-program QR fallback for empty quick-call contacts")
@@ -904,9 +904,9 @@ require('strcmp(status, "CONTACT OFFLINE") == 0' in ui_source and
         "offline call rejection must be shown as a business result, not an error")
 require("phone_shortcut(frame);" in ui_source and
         "XIAOTAI_UI_HOME_QUICK_CALL_ICON_X 276U" in
-        (ROOT / "ap/include/xiaotai_ui_hit_test.h").read_text() and
+        (REPO_ROOT / "platforms/beken/runtime/include/xiaotai_ui_hit_test.h").read_text() and
         "XIAOTAI_UI_HOME_QUICK_CALL_ICON_Y 150U" in
-        (ROOT / "ap/include/xiaotai_ui_hit_test.h").read_text() and
+        (REPO_ROOT / "platforms/beken/runtime/include/xiaotai_ui_hit_test.h").read_text() and
         ("Source SHA-256: " + json.loads((REPO_ROOT /
         "product/assets/icons/wechat_call/manifest.json").read_text())["source_sha256"]) in
         phone_asset_source and
@@ -920,7 +920,7 @@ require("phone_shortcut(frame);" in ui_source and
         "x >= 270U && x < 312U" in ui_hit_test_source and
         (ROOT / "tools/test_ui_hit_test.sh").exists(),
         "touch UI must expose distinct, tested home quick-call and volume controls")
-ui_hit_header = (ROOT / "ap/include/xiaotai_ui_hit_test.h").read_text()
+ui_hit_header = (REPO_ROOT / "platforms/beken/runtime/include/xiaotai_ui_hit_test.h").read_text()
 require("XIAOTAI_UI_ROOM_LEAVE_X 8U" in ui_hit_header and
         "XIAOTAI_UI_ROOM_TALK_X 164U" in ui_hit_header and
         "XIAOTAI_UI_ROOM_BUTTON_WIDTH 148U" in ui_hit_header and
@@ -1091,8 +1091,8 @@ require("FATAL_MARKERS" in runtime_log_source and
 subprocess.run([
     sys.executable, str(ROOT / "tools/test_analyze_runtime_log.py"), "-q"
 ], cwd=ROOT / "tools", check=True)
-touch_source = (ROOT / "ap/src/xiaotai_touch.c").read_text()
-touch_policy_source = (ROOT / "ap/src/xiaotai_touch_policy.c").read_text()
+touch_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_touch.c").read_text()
+touch_policy_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_touch_policy.c").read_text()
 require("CONFIG_SIM_I2C=y" in config and
         "CONFIG_SIM_I2C_HW_BOARD_V3=y" in config and
         "CONFIG_SIM_I2C1_SCL_GPIO=42" in config and
@@ -1141,7 +1141,7 @@ press_branch = None if joined_ptt is None else re.search(
 require(press_branch is not None and
         "XIAOTAI_ROOM_ACTION_TALK_START" in press_branch.group("body"),
         "joined room PTT must enable uplink on button press, not after the long-press delay")
-console_source = (ROOT / "ap/src/xiaotai_console.c").read_text()
+console_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_console.c").read_text()
 for command in (
     '"status"', '"ai-start"', '"ai-stop"', '"wifi-set"',
     '"wifi-clear"', '"wificlear"', '"wifi-change"', '"tirtc-clear"',
@@ -1196,7 +1196,7 @@ require(profile_match is not None, "unified device profile JSON is missing")
 profile_text = "".join(
     ast.literal_eval(token)
     for token in re.findall(r'"(?:\\.|[^"\\])*"',
-                            profile_match.group(1).replace('XIAOTAI_BUILD_VERSION',
+                            profile_match.group(1).replace('XIAOTAI_BOARD_ID', '"lckfb-bk7258"').replace('XIAOTAI_BUILD_VERSION',
                                                          '"0.0.0+build.0"'))
 )
 profile = json.loads(profile_text)
@@ -1310,8 +1310,8 @@ board_config_source = (
 ).read_text()
 board_audio_source = (
     REPO_ROOT / "boards/lckfb/bk7258/board_audio.c"
-).read_text()
-audio_pipeline_source = (ROOT / "ap/src/xiaotai_audio.c").read_text()
+).read_text() + (REPO_ROOT / "platforms/beken/src/xiaotai_onboard_audio.c").read_text()
+audio_pipeline_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_audio.c").read_text()
 for board_operation in (
     "xiaotai_board_amplifier_idle(void)",
     "xiaotai_board_amplifier_set_playing(bool playing)",
@@ -1350,14 +1350,14 @@ common_audio_contract = (
 require("int (*request_stop)(void *context);" in common_audio_contract and
         "int (*stop)(void *context);" in common_audio_contract and
         '"${XIAOTAI_COMMON_ROOT}/include"' in
-        (ROOT / "ap/CMakeLists.txt").read_text(),
+        (REPO_ROOT / "platforms/beken/runtime/CMakeLists.txt").read_text(),
         "BK7258 must consume the common two-phase audio lifecycle")
-require('"${XIAOTAI_BOARD_ROOT}/board_audio.c"' in (ROOT / "ap/CMakeLists.txt").read_text(),
+require('"${XIAOTAI_BOARD_ROOT}/board_audio.c"' in (REPO_ROOT / "platforms/beken/runtime/CMakeLists.txt").read_text(),
         "AP build must link the selected board amplifier implementation")
 board_button_source = (
     REPO_ROOT / "boards/lckfb/bk7258/board_button.c"
 ).read_text()
-button_pipeline_source = (ROOT / "ap/src/xiaotai_button.c").read_text()
+button_pipeline_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_button.c").read_text()
 require("gpio_dev_unmap(AI_BUTTON)" in board_button_source and
         "bk_gpio_get_input(AI_BUTTON)" in board_button_source,
         "selected board must own button GPIO")
@@ -1365,7 +1365,7 @@ require("xiaotai_board_button_init()" in button_pipeline_source and
         "xiaotai_board_button_released()" in button_pipeline_source and
         "bk_gpio_get_input(" not in button_pipeline_source,
         "button event logic must consume the board input")
-require('"${XIAOTAI_BOARD_ROOT}/board_button.c"' in (ROOT / "ap/CMakeLists.txt").read_text(),
+require('"${XIAOTAI_BOARD_ROOT}/board_button.c"' in (REPO_ROOT / "platforms/beken/runtime/CMakeLists.txt").read_text(),
         "AP build must link the selected board button implementation")
 require(all(operation in board_camera_source for operation in (
             "bk_camera_dvp_ctlr_new",
@@ -1379,10 +1379,10 @@ require(all(operation in board_camera_source for operation in (
         "bk_camera_open(" not in video_source,
         "selected board must own camera controller, pins, power, and open/close")
 require("xiaotai_board_touch_open()" in
-        (ROOT / "ap/src/xiaotai_touch.c").read_text() and
+        (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_touch.c").read_text() and
         "drv_tp_open(" in board_touch_source and
         "drv_tp_read(" in board_touch_source and
-        "drv_tp_" not in (ROOT / "ap/src/xiaotai_touch.c").read_text(),
+        "drv_tp_" not in (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_touch.c").read_text(),
         "selected board must own touch-controller I/O")
 require("xiaotai_board_display_init()" in ui_source and
         "xiaotai_board_display_flush(" in ui_source and
@@ -1392,7 +1392,7 @@ require("xiaotai_board_display_init()" in ui_source and
         "selected board must own display controller, panel profile, and backlight")
 for source_name in ("board_camera.c", "board_touch.c", "board_display.c"):
     require(f'"${{XIAOTAI_BOARD_ROOT}}/{source_name}"' in
-            (ROOT / "ap/CMakeLists.txt").read_text(),
+            (REPO_ROOT / "platforms/beken/runtime/CMakeLists.txt").read_text(),
             f"AP build must link the selected board source: {source_name}")
 for board_fact in (
     "AI_BUTTON GPIO_7",
@@ -1516,8 +1516,8 @@ int main(void) {
 ''')
     subprocess.run([
         "cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
-        "-I", str(ROOT / "ap/include"),
-        str(ROOT / "ap/src/xiaotai_tirtc_recovery.c"),
+        "-I", str(REPO_ROOT / "platforms/beken/runtime/include"),
+        str(REPO_ROOT / "platforms/beken/runtime/src/xiaotai_tirtc_recovery.c"),
         str(test_source), "-o", str(output),
     ], check=True)
     subprocess.run([str(output)], check=True)

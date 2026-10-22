@@ -42,7 +42,7 @@ int main(void) {
 ''')
 
     def test_adapter_allocation_and_queue_failure_recover_on_deadline(self):
-        src=(ROOT/'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_app.c').read_text()
+        src=(ROOT/'platforms/beken/runtime/src/xiaotai_app.c').read_text()
         replay(r'''
 #include <stdlib.h>
 #define BK_OK 0
@@ -117,7 +117,7 @@ int main(void) {
 ''')
 
     def test_closed_notification_matches_room_and_version(self):
-        src=(ROOT/'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_app.c').read_text()
+        src=(ROOT/'platforms/beken/runtime/src/xiaotai_app.c').read_text()
         start=src.index('} else if (signal->type == XIAOTAI_SIGNAL_ROOM_CLOSED) {')
         end=src.index('} else if (signal->type == XIAOTAI_SIGNAL_CALL_ENDED)',start)
         branch=src[start+7:end]+'}'

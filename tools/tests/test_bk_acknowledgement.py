@@ -1,7 +1,7 @@
 """Replay prompt ownership/repetition through the BK production API."""
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
-BASE = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap'
+BASE = ROOT / 'platforms/beken/runtime'
 
 class BkAcknowledgement(unittest.TestCase):
     def replay(self, scenario):

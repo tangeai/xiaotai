@@ -29,13 +29,16 @@ def next_build_number(counter_file):
 
 
 def prepare(directory, version, source_commit, counter_file,
-            profile='development', purpose='Local development and debugging'):
+            profile='development', purpose='Local development and debugging',
+            board_id='lckfb-bk7258'):
     if not source_commit or any(c not in "0123456789abcdef" for c in source_commit):
         raise ValueError("source commit must be lowercase hexadecimal")
     if re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version) is None:
         raise ValueError('firmware version must be major.minor.patch')
     if profile not in ('development', 'release'):
         raise ValueError('build profile must be development or release')
+    if re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", board_id) is None:
+        raise ValueError("invalid board ID")
     directory.mkdir(parents=True, exist_ok=True)
     number = next_build_number(counter_file)
     build_id = str(number)
@@ -44,6 +47,7 @@ def prepare(directory, version, source_commit, counter_file,
         f'#define XIAOTAI_BUILD_ID "{build_id}"\n'
         f'#define XIAOTAI_BUILD_VERSION "{build_version}"\n')
     write_json(directory / "build_identity.json", {
+        "board_id": board_id,
         "build_id": build_id,
         "build_number": number,
         "build_version": build_version,
@@ -95,7 +99,7 @@ def finalize(directory, artifact, ap_elf):
             raise ValueError(f"packaged {label} payload differs from the linked binary")
     digest = hashlib.sha256(image).hexdigest()
     named = artifact.with_name(
-        f"lckfb-bk7258-{value['build_version']}-all-app.bin")
+        f"{value['board_id']}-{value['build_version']}-all-app.bin")
     if named.exists():
         if hashlib.sha256(named.read_bytes()).hexdigest() != digest:
             raise ValueError("versioned flash image already exists with different contents")
@@ -118,10 +122,10 @@ def finalize(directory, artifact, ap_elf):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) in (6, 8) and sys.argv[1] == "prepare":
+    if len(sys.argv) in (6, 8, 9) and sys.argv[1] == "prepare":
         prepare(Path(sys.argv[2]), sys.argv[3], sys.argv[4], Path(sys.argv[5]),
                 *sys.argv[6:])
     elif len(sys.argv) == 5 and sys.argv[1] == "finalize":
         finalize(Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4]))
     else:
-        raise SystemExit("usage: build_identity.py prepare DIR VERSION COMMIT BUILD_NUMBER [PROFILE PURPOSE] | finalize DIR IMAGE AP_ELF")
+        raise SystemExit("usage: build_identity.py prepare DIR VERSION COMMIT BUILD_NUMBER [PROFILE PURPOSE [BOARD_ID]] | finalize DIR IMAGE AP_ELF")

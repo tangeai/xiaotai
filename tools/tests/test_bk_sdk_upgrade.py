@@ -17,18 +17,18 @@ TIRTC_SHA256 = "1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9
 
 class BKSDKUpgradeTest(unittest.TestCase):
     def test_native_build_selects_matching_tirtc_package(self):
-        archive = PROJECT / "third_party/tirtc/lib/libTiRTC.a"
+        archive = ROOT / "platforms/beken/third_party/tirtc/lib/libTiRTC.a"
         self.assertEqual(TIRTC_SHA256, hashlib.sha256(archive.read_bytes()).hexdigest())
-        manifest = (PROJECT / "third_party/tirtc/manifest/build-info.env").read_text()
+        manifest = (ROOT / "platforms/beken/third_party/tirtc/manifest/build-info.env").read_text()
         self.assertIn("BUILD_PLATFORM_SDK_VERSION=3.1.1.10-official-398cab28", manifest)
         self.assertIn("CRYPTO_COMPONENT=psa_mbedtls", manifest)
         self.assertIn("CRYPTO_VERSION=3.5.2", manifest)
         board = json.loads((ROOT / "boards/lckfb/bk7258/board.json").read_text())
         self.assertEqual("release/v3.1.1.10", board["sdk"]["version"])
         self.assertIn("release/v3.1.1.10", (PROJECT / "ap/ap_main.c").read_text())
-        self.assertIn("release/v3.1.1.10", (PROJECT / "ap/src/tirtc_bk_probe.c").read_text())
+        self.assertIn("release/v3.1.1.10", (PROJECT / "ap/tirtc_bk_probe.c").read_text())
         self.assertIn("bk_avdk_smp-release-v3.1.1.10", (PROJECT / "Makefile").read_text())
-        self.assertIn("bk_avdk_smp-release-v3.1.1.10", (PROJECT / "tools/build.sh").read_text())
+        self.assertIn("bk_avdk_smp-release-v3.1.1.10", (ROOT / "platforms/beken/tools/build.sh").read_text())
         setup = (PROJECT / "tools/setup_build_env.sh").read_text()
         self.assertIn(SDK_COMMIT, setup)
         self.assertIn("https://gitee.com/bekencorp/bk_avdk_smp.git", setup)

@@ -38,6 +38,11 @@ flowchart TB
 
 `firmware/` 是组合入口。ESP-IDF 与 Beken 保持为独立 SDK 工程；根目录 `tools/build.py` 只选择一块板和一个变体，然后转调原生构建命令。
 
+Beken 的公共会话、平台协议和音视频实现位于 `platforms/beken/runtime`，公共构建及
+SDK 补丁位于 `platforms/beken/tools`。立创和觅感 BK7258 各自保留独立原生工程、
+AP/CP 配置、入口、分区与版本计数，板级 GPIO 和供电分别由各自 `boards/` 适配器管理。
+觅感无屏工程不从立创原生工程取源文件。
+
 新增板卡或平台时，目录依赖和板卡清单仍遵守本页分层，并按[参与开发](CONTRIBUTING.md)
 中的接入流程补齐资料、测试和实板证据。
 

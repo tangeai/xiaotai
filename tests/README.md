@@ -35,6 +35,49 @@ API 或 MQTT 地址；原有绑定显示、存储失败和重试测试继续覆�
 - 板级静态与主机仿真测试：BK7258、ESP32-P4 4.3、立创·实战派 ESP32-S3；
 - 重构约束：仓库布局、构建调度、验证包和板卡 registry。
 
+## 2026-10-22 觅感 H5 无帧的 DVP 复用缺失
+
+用户 build.4 串口日志在 SCCB 0x3c 读出 GC2145 ID 0x2145，H5 视频订阅已开启，
+但停止时 sent=0，并报告未等待到 YUV VSYNC 边沿。对照觅感规格书第 12、14 页确认
+GPIO27 为 MCLK，29/30/31 为 PCLK/HSYNC/VSYNC，32…39 为 D0…D7。
+SMP SDK 开启默认 GPIO 表时跳过 dvp_camera_io_init；build.4 的表只登记引脚、全部
+INIT_DISABLE，缺少 DVP 功能复用。修正本板 AP/CP 表的 12 个 DVP 引脚为 JPEG 功能及
+INIT_ENABLE；其他控制、串口和指示引脚继续由适配器/驱动管理，LCD 不启用。
+
+`test_mgkfb_headless.py` 使用 SDK 实际 gpio_hal_default_map_init 函数的固定副本，
+分别编译 AP/CP 表并捕获寄存器映射。修改前在每个表的 DVP 路由断言失败，修正后通过，
+同时确认不会改动复位、按键、指示灯、电源及串口。该测试已随文件登记到 tools/check.sh。
+这验证了缺失配置的修正，H5 画面和连续帧仍需修复版的实板复测。
+
+## 2026-10-22 觅感无热点的 GPIO 启动阻断
+
+首轮实板反馈为心跳仍在运行，METRICS 长期停在 BOOT，未出现热点。检查发现本板 AP/CP
+开启 `CONFIG_GPIO_DEFAULT_SET_SUPPORT`，但 `GPIO_DEFAULT_DEV_CONFIG` 为空。
+SDK `gpio_dev_unmap` 在查不到引脚时返回错误，按键初始化失败使 app_start 在 network_start
+之前退出。此前 GPIO 模拟无条件成功，遗漏了这一 SDK 契约。
+
+`test_mgkfb_headless.py` 使用固定 SMP SDK 的实际查表和 unmap 函数（来源记录在
+`tools/tests/fixtures/bk7258_gpio_admission.c`），分别编译本板 AP/CP 配置和实际按键入口。
+修复前两个配置都在按键初始化成功断言处失败；登记本板使用的引脚后通过，且未登记
+引脚继续拒绝。使用 INIT_DISABLE 保留启动和串口状态，由板级适配器及 SDK 驱动配置
+实际复用和方向；不引入屏幕初始化。完整测试仍由 tools/check.sh 调用。
+修复版仍需用户重新烧录确认 SoftAP 出现；当前反馈日志未附固件启动身份。
+
+## 2026-10-22 觅感 BK7258 无屏 SMP 接入
+
+`tools/tests/test_mgkfb_headless.py` 已登记到 `tools/check.sh`。新增工程前，构建选择与
+禁用业务的公开请求接口用例失败；适配后通过。用实际 CMake 组合入口检查选源不含
+立创原生路径、LCD、触摸和字库，同时保留 H5 摄像头；编译能力上报代码核对本板身份
+及 stream/voip，禁用设备互呼和多人对讲。按键采样用例覆盖去抖、上电按住、单击、
+双击、长按和时钟回绕；GPIO 模拟覆盖功放控制不能关闭共享电源及初始化失败。
+无屏状态接口的指示灯回归在实现前失败，随后通过。打包命名回归先复现固定立创前缀，
+修复后分别核对觅感、立创产物的板卡名及内容。
+
+原立创公共源文件、TiRTC 及构建支持移入 `platforms/beken`，原有音频、播放波形、
+网络、绑定、房间、版本、SDK 补丁和原生 contract 用例改为读取新路径，断言继续保留。
+两块板均运行完整原生 SMP 编译，验证最终链接；上述检查不能替代觅感实板验证。
+仍需验证 Flash/原厂分区、按键和指示电平、收放与 AEC、GC2145、配网绑定和 AI/VoIP/H5。
+
 ## 2026-10-22 同组歌曲字幕的旧 Tag 清除
 
 用户日志在 at-ms=29698 收到 `happy final=1`，随后 32444..51020 连续十条

@@ -3,7 +3,7 @@ import re
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
 
-RTC = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c'
+RTC = ROOT / 'platforms/beken/runtime/src/xiaotai_tirtc.c'
 
 
 class BKDisconnectPlayback(unittest.TestCase):

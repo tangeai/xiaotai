@@ -3,7 +3,7 @@ import re
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
 
-AUDIO = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_audio.c'
+AUDIO = ROOT / 'platforms/beken/runtime/src/xiaotai_audio.c'
 
 
 class BKAIPlayback(unittest.TestCase):

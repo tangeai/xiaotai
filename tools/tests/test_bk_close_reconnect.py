@@ -7,7 +7,7 @@ from test_s3_product_regressions import ROOT, function, run_c
 
 class BKCloseReconnect(unittest.TestCase):
     def test_close_holds_admission_until_media_cleanup_finishes(self):
-        project = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap'
+        project = ROOT / 'platforms/beken/runtime'
         source = (project / 'src/xiaotai_tirtc.c').read_text()
         header = (project / 'include/xiaotai_tirtc.h').read_text()
         types = source[source.index('typedef enum {'):source.index('static beken_queue_t')]

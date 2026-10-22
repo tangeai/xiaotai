@@ -6,7 +6,7 @@ from test_s3_product_regressions import function, run_c
 
 
 ROOT = Path(__file__).resolve().parents[2]
-AP = ROOT / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap"
+AP = ROOT / "platforms/beken/runtime"
 
 
 class TestBkRssiCache(unittest.TestCase):

@@ -2,6 +2,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[5] / "platforms/beken/tools"))
 from prepare_release_config import prepare_release_config
 
 

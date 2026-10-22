@@ -32,7 +32,7 @@ int main(void){
 
     def test_platform_public_remaining_time_uses_current_deadline(self):
         paths = [
-            ('firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_platform_client.c', 'xiaotai_platform'),
+            ('platforms/beken/runtime/src/xiaotai_platform_client.c', 'xiaotai_platform'),
             ('platforms/esp-idf/components/platform_client/src/platform_client.c', 'platform_client'),
         ]
         for path, prefix in paths:
@@ -61,7 +61,7 @@ int main(void){
 ''')
 
     def test_bk_refresh_is_independent_of_binding_network_and_preserves_voice_error(self):
-        ui = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_ui.c'
+        ui = ROOT / 'platforms/beken/runtime/src/xiaotai_ui.c'
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>

@@ -10,7 +10,7 @@ PROJECT = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai'
 class BKReleaseTraces(unittest.TestCase):
     def test_heartbeat_profiles_preserve_delivery(self):
         fixture = ROOT / 'tools/tests/fixtures/bk_heartbeat/mb_ipc_task.c'
-        patch = PROJECT / 'tools/patches/bk-avdk-heartbeat-debug-level.patch'
+        patch = ROOT / 'platforms/beken/tools/patches/bk-avdk-heartbeat-debug-level.patch'
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'ap/middleware/driver/mailbox/mb_ipc_heartbeat.c'
             path.parent.mkdir(parents=True)
@@ -42,7 +42,7 @@ int main(void){if(!setjmp(done))mb_ipc_task(0);
 ''')
 
     def test_metrics_preserves_info_sample_without_release_trace(self):
-        source = (PROJECT / 'ap/src/xiaotai_metrics.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_metrics.c').read_text()
         for level in (3, 4):
             run_c(f'#define CONFIG_LOG_LEVEL {level}\n' + r'''
 #include <assert.h>

@@ -44,7 +44,7 @@ int main(void){int16_t pcm=0;
 ''')
 
     def test_bk_cancel_during_gap_is_bounded_and_frees_audio(self):
-        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_audio.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_audio.c').read_text()
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>

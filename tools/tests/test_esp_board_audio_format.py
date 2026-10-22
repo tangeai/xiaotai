@@ -68,10 +68,10 @@ class BoardAudioFormatTest(unittest.TestCase):
 
     def test_bk7258_uses_common_two_phase_audio_lifecycle(self) -> None:
         board = (
-            ROOT / "boards/lckfb/bk7258/board_audio.c"
+            ROOT / "platforms/beken/src/xiaotai_onboard_audio.c"
         ).read_text()
-        pipeline = (BK7258_PROJECT / "ap/src/xiaotai_audio.c").read_text()
-        cmake = (BK7258_PROJECT / "ap/CMakeLists.txt").read_text()
+        pipeline = (ROOT / "platforms/beken/runtime/src/xiaotai_audio.c").read_text()
+        cmake = (ROOT / "platforms/beken/runtime/CMakeLists.txt").read_text()
         self.assertIn("xiaotai_board_audio_adapter_t", board)
         self.assertIn(".capture_layout = XIAOTAI_CAPTURE_MONO_MIC", board)
         self.assertIn(".request_stop = audio_adapter_request_stop", board)

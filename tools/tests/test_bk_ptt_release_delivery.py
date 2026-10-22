@@ -2,7 +2,7 @@
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
 
-APP = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_app.c'
+APP = ROOT / 'platforms/beken/runtime/src/xiaotai_app.c'
 
 class BkPttReleaseDelivery(unittest.TestCase):
     def test_release_survives_full_control_queue(self):

@@ -3,10 +3,10 @@ import unittest
 
 from test_s3_product_regressions import ROOT, function, run_c
 
-UI_INCLUDE = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/include'
-AUDIO = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_audio.c'
+UI_INCLUDE = ROOT / 'platforms/beken/runtime/include'
+AUDIO = ROOT / 'platforms/beken/runtime/src/xiaotai_audio.c'
 BOARD = ROOT / 'boards/lckfb/bk7258/board_display.c'
-UI = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_ui.c'
+UI = ROOT / 'platforms/beken/runtime/src/xiaotai_ui.c'
 
 
 class BKFaceAnimation(unittest.TestCase):

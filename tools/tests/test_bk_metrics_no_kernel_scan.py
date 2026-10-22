@@ -5,7 +5,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-METRICS = ROOT / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_metrics.c"
+METRICS = ROOT / "platforms/beken/runtime/src/xiaotai_metrics.c"
 
 
 class TestBkMetricsNoKernelScan(unittest.TestCase):

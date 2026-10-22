@@ -24,7 +24,7 @@ product and do not define the TiRTC business API.
 
 - Source package:
   `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini`
-- Vendored destination: `third_party/tirtc`
+- Vendored destination: `platforms/beken/third_party/tirtc`（仓库根目录相对路径）
 - Archive SHA-256:
   `1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9`
 - Package target: `beken-bk7258`

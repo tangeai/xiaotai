@@ -6,7 +6,7 @@ from test_s3_product_regressions import ROOT, function, run_c
 
 class BKCloseErrorCallback(unittest.TestCase):
     def test_closing_error_preserves_local_exit_and_remote_error_still_dispatches(self):
-        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_tirtc.c').read_text()
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>

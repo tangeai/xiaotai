@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
 
-PATCH = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/tools/patches/bk-avdk-touch-active-release-poll.patch'
+PATCH = ROOT / 'platforms/beken/tools/patches/bk-avdk-touch-active-release-poll.patch'
 FIXTURE = ROOT / 'tools/tests/fixtures/bk_touch/tp_process_task.c'
 SDK_FILE = 'ap/middleware/driver/tp/tp_driver.c'
 

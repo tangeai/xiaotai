@@ -1,0 +1,11 @@
+#pragma once
+/* Declared wiring: MGKFB specification V1.0 pp.12,14,15. HIL pending. */
+#define AI_BUTTON GPIO_12
+#define VOLUME_UP_BUTTON GPIO_13
+#define VOLUME_DOWN_BUTTON GPIO_8
+#define PERIPHERAL_POWER_GPIO GPIO_52
+#define AMPLIFIER_MUTE_GPIO GPIO_50
+#define CAMERA_PWDN_GPIO 0xffU
+#define CAMERA_RESET_GPIO GPIO_28
+#define CAMERA_SCCB_SCL_GPIO GPIO_42
+#define CAMERA_SCCB_SDA_GPIO GPIO_43

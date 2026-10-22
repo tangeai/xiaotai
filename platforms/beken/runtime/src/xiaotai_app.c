@@ -341,6 +341,11 @@ static void refresh_contacts(void)
 
 static void show_wechat_qr_waiting(bool wechat_only)
 {
+#if XIAOTAI_HEADLESS
+    (void)wechat_only;
+    xiaotai_ui_show_wechat_qr();
+    return;
+#endif
     s_qr_waiting_for_wechat = wechat_only;
     s_ui_page = UI_PAGE_WECHAT_QR;
     xiaotai_ui_show_wechat_qr();
@@ -398,6 +403,11 @@ static void button_pressed(xiaotai_button_event_t button_event, void *context)
 {
     (void)context;
     static const xiaotai_intent_t intents[] = {
+#if XIAOTAI_HEADLESS
+        [XIAOTAI_BUTTON_VOLUME_UP] = XIAOTAI_INTENT_VOLUME_UP,
+        [XIAOTAI_BUTTON_VOLUME_DOWN] = XIAOTAI_INTENT_VOLUME_DOWN,
+        [XIAOTAI_BUTTON_PROVISION] = XIAOTAI_INTENT_PROVISION,
+#endif
         [XIAOTAI_BUTTON_SHORT] = XIAOTAI_INTENT_PRIMARY,
         [XIAOTAI_BUTTON_DOUBLE] = XIAOTAI_INTENT_QUICK_CALL,
         [XIAOTAI_BUTTON_LONG] = XIAOTAI_INTENT_PTT_HOLD,
@@ -816,6 +826,33 @@ static void request_reject_pending(void)
 static void handle_intent(xiaotai_intent_t intent)
 {
     input_activity();
+#if XIAOTAI_HEADLESS
+    if (intent == XIAOTAI_INTENT_VOLUME_UP || intent == XIAOTAI_INTENT_VOLUME_DOWN) {
+        unsigned before = s_settings.volume;
+        if (intent == XIAOTAI_INTENT_VOLUME_UP && before < 10U) ++s_settings.volume;
+        if (intent == XIAOTAI_INTENT_VOLUME_DOWN && before > 0U) --s_settings.volume;
+        if (before != s_settings.volume) {
+            xiaotai_audio_set_volume(s_settings.volume);
+            save_settings();
+        }
+        return;
+    }
+    if (intent == XIAOTAI_INTENT_PROVISION) {
+        rtos_lock_mutex(&s_runtime_mutex);
+        bool idle = s_runtime.owner == XIAOTAI_OWNER_NONE &&
+                    !xiaotai_runtime_has_incoming(&s_runtime);
+        rtos_unlock_mutex(&s_runtime_mutex);
+        if (!idle) { xiaotai_ui_show_status("BUSY"); return; }
+        xiaotai_audio_cancel_prompt();
+        int rc = xiaotai_network_enter_provisioning();
+        if (rc != BK_OK) xiaotai_ui_show_status("ERROR");
+        return;
+    }
+#endif
+#if XIAOTAI_DISABLE_GROUP_ROOM
+    if (intent == XIAOTAI_INTENT_PTT_PRESS || intent == XIAOTAI_INTENT_PTT_RELEASE ||
+        intent == XIAOTAI_INTENT_PTT_HOLD) return;
+#endif
     if (s_ui_page == UI_PAGE_WECHAT_QR &&
         intent == XIAOTAI_INTENT_PRIMARY) {
         rtos_lock_mutex(&s_runtime_mutex);
@@ -1835,6 +1872,10 @@ static int room_service_request(const char *path, const char *body,
                                 xiaotai_room_service_response_fn callback,
                                 void *callback_context, uint32_t request_id, void *context)
 {
+#if XIAOTAI_DISABLE_GROUP_ROOM
+    return BK_ERR_NOT_SUPPORT;
+#endif
+
     (void)context;
     if (path == NULL || callback == NULL) return BK_ERR_PARAM;
     room_response_work_t *response = psram_malloc(sizeof(*response));
@@ -2346,6 +2387,12 @@ static void handle_outbound_call(control_event_t *event)
 static void dial_contact(const xiaotai_contact_t *contact)
 {
     if (contact == NULL) return;
+#if XIAOTAI_DISABLE_DEVICE_CALL
+    if (contact->type != XIAOTAI_CONTACT_VOIP) {
+        xiaotai_ui_show_status("UNSUPPORTED CONTACT");
+        return;
+    }
+#endif
     xiaotai_session_owner_t owner = contact->type == XIAOTAI_CONTACT_DEVICE ?
         XIAOTAI_OWNER_DEVICE_CALL : XIAOTAI_OWNER_WECHAT_VOIP;
     rtos_lock_mutex(&s_runtime_mutex);
@@ -2409,6 +2456,15 @@ static void handle_ai_call_intent(control_event_t *event)
     xiaotai_contact_match_t match =
         xiaotai_contacts_resolve_call_intent_json(
             &s_contacts, event->text, &contact);
+#if XIAOTAI_DISABLE_DEVICE_CALL
+    if (match == XIAOTAI_CONTACT_MATCH_OK && contact.type != XIAOTAI_CONTACT_VOIP) {
+        char response[512];
+        int length = xiaotai_ai_encode_call_action_result(response, sizeof(response),
+            event->text, false, "unsupported", "本设备只支持微信通话", NULL, NULL, NULL);
+        if (length > 0) (void)xiaotai_tirtc_send_command(XIAOTAI_AI_COMMAND, response, (uint32_t)length);
+        return;
+    }
+#endif
     if (match != XIAOTAI_CONTACT_MATCH_OK) {
         char response[512];
         const char *status = match == XIAOTAI_CONTACT_MATCH_AMBIGUOUS ?
@@ -2664,6 +2720,10 @@ static void handle_decoded_platform_signal(const xiaotai_signal_view_t *signal,
         BK_LOGE(TAG, "cannot clear stored device credentials\n");
         return;
     } else if (signal->type == XIAOTAI_SIGNAL_DEVICE_CALL_INCOMING) {
+#if XIAOTAI_DISABLE_DEVICE_CALL
+        if (signal->room_id[0] != '\0') reject_device_call(signal->room_id, "unsupported");
+        return;
+#endif
         const char *room_id = signal->room_id;
         const char *caller_id = signal->caller_id;
         const char *call_type = signal->call_type;
@@ -2761,9 +2821,15 @@ static void handle_decoded_platform_signal(const xiaotai_signal_view_t *signal,
         refresh_contacts();
         BK_LOGI(TAG, "contact refresh scheduled by platform\n");
     } else if (signal->type == XIAOTAI_SIGNAL_ROOM_ASSIGNMENT_CHANGED) {
+#if XIAOTAI_DISABLE_GROUP_ROOM
+        return;
+#endif
         xiaotai_room_assignment_changed(&s_room);
         BK_LOGI(TAG, "room assignment refresh scheduled by platform\n");
     } else if (signal->type == XIAOTAI_SIGNAL_ROOM_CLOSED) {
+#if XIAOTAI_DISABLE_GROUP_ROOM
+        return;
+#endif
         if (signal->assignment_version_valid) {
             xiaotai_room_handle_closed(&s_room, signal->room_id,
                                        signal->assignment_version);
@@ -3687,8 +3753,12 @@ int xiaotai_app_start(void)
         BK_LOGE(TAG, "AI button initialization failed rc=%d\n", rc);
         return rc;
     }
+#if XIAOTAI_HEADLESS
+    BK_LOGI(TAG, "S2 short=AI/answer/hangup double=contacts[0]; S1/S3 volume; S1 hold=idle provisioning\n");
+#else
     BK_LOGI(TAG,
             "KEY map: short=answer/hangup/AI, double=contacts[0], long=room PTT\n");
+#endif
 #if XIAOTAI_BOARD_TOUCH_AVAILABLE
     rc = xiaotai_touch_start(touch_event, NULL);
     if (rc != BK_OK) {
@@ -3772,6 +3842,10 @@ static int queue_console_event(control_event_type_t type, const char *text,
 
 int xiaotai_app_request_call(const char *contact_name, bool wechat)
 {
+#if XIAOTAI_DISABLE_DEVICE_CALL
+    if (!wechat) return BK_ERR_NOT_SUPPORT;
+#endif
+
     if (!wechat && (contact_name == NULL || contact_name[0] == '\0')) {
         return BK_ERR_PARAM;
     }
@@ -3823,6 +3897,10 @@ static bool decimal_string(const char *value, size_t length)
 int xiaotai_app_request_room_join(const char *room_code,
                                   const char *password)
 {
+#if XIAOTAI_DISABLE_GROUP_ROOM
+    return BK_ERR_NOT_SUPPORT;
+#endif
+
     if (!decimal_string(room_code, 6U) ||
         (password != NULL && password[0] != '\0' &&
          !decimal_string(password, 4U))) return BK_ERR_PARAM;
@@ -3840,18 +3918,30 @@ int xiaotai_app_request_room_join(const char *room_code,
 
 int xiaotai_app_request_room_leave(void)
 {
+#if XIAOTAI_DISABLE_GROUP_ROOM
+    return BK_ERR_NOT_SUPPORT;
+#endif
+
     return queue_console_event(CONTROL_CONSOLE_ROOM, NULL,
                                CONSOLE_ROOM_LEAVE, 0);
 }
 
 int xiaotai_app_request_room_talk(bool enabled)
 {
+#if XIAOTAI_DISABLE_GROUP_ROOM
+    return BK_ERR_NOT_SUPPORT;
+#endif
+
     return queue_console_event(CONTROL_CONSOLE_ROOM, NULL,
         enabled ? CONSOLE_ROOM_TALK_START : CONSOLE_ROOM_TALK_STOP, 0);
 }
 
 int xiaotai_app_request_room_sync(void)
 {
+#if XIAOTAI_DISABLE_GROUP_ROOM
+    return BK_ERR_NOT_SUPPORT;
+#endif
+
     return queue_console_event(CONTROL_CONSOLE_ROOM, NULL,
                                CONSOLE_ROOM_SYNC, 0);
 }

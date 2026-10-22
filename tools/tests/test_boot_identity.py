@@ -27,7 +27,7 @@ class BootIdentityTest(unittest.TestCase):
             for cache in caches:
                 cache.parent.mkdir()
                 cache.write_text('APP_VERSION was configured from the old environment\n')
-            subprocess.run([sys.executable, str(BK / 'tools/build_identity.py'),
+            subprocess.run([sys.executable, str(ROOT / 'platforms/beken/tools/build_identity.py'),
                             'prepare', str(directory), '1.0.0', 'abcdef',
                             str(counter)], check=True)
             for cache in caches:
@@ -38,7 +38,7 @@ class BootIdentityTest(unittest.TestCase):
             directory = Path(temporary)
             counter = directory / 'BUILD_NUMBER'
             counter.write_text('43\n')
-            tool = BK / 'tools/build_identity.py'
+            tool = ROOT / 'platforms/beken/tools/build_identity.py'
             subprocess.run([sys.executable, str(tool), 'prepare', str(directory),
                             '1.0.0', 'abcdef', str(counter)], check=True)
             artifact = directory / 'all-app.bin'
@@ -57,7 +57,7 @@ class BootIdentityTest(unittest.TestCase):
             directory = Path(temporary)
             counter = directory / 'BUILD_NUMBER'
             counter.write_text('43\n')
-            tool = BK / 'tools/build_identity.py'
+            tool = ROOT / 'platforms/beken/tools/build_identity.py'
             subprocess.run([sys.executable, str(tool), 'prepare', str(directory),
                             '1.0.0', 'abcdef', str(counter)], check=True)
             elf = directory / 'app.elf'
@@ -77,8 +77,8 @@ class BootIdentityTest(unittest.TestCase):
             self.assertIn('packaged AP payload', result.stderr)
 
     def test_bk_boot_uses_selected_version_in_ap_image(self):
-        cmake = (BK / 'ap/CMakeLists.txt').read_text()
-        build = (BK / 'tools/build.sh').read_text()
+        cmake = (ROOT / 'platforms/beken/runtime/CMakeLists.txt').read_text()
+        build = (ROOT / 'platforms/beken/tools/build.sh').read_text()
         entry = (BK / 'ap/ap_main.c').read_text()
         self.assertIn('VERSION.md', cmake)
         self.assertIn('XIAOTAI_FIRMWARE_VERSION', cmake)
@@ -91,8 +91,8 @@ class BootIdentityTest(unittest.TestCase):
         self.assertLess(entry.index('XIAOTAI_BOOT'), entry.index('media_service_init();'))
 
     def test_bk_build_identity_matches_boot_and_artifact(self):
-        build = (BK / 'tools/build.sh').read_text()
-        cmake = (BK / 'ap/CMakeLists.txt').read_text()
+        build = (ROOT / 'platforms/beken/tools/build.sh').read_text()
+        cmake = (ROOT / 'platforms/beken/runtime/CMakeLists.txt').read_text()
         entry = (BK / 'ap/ap_main.c').read_text()
         self.assertIn('build=%s', entry)
         self.assertIn('XIAOTAI_BUILD_ID', entry)
@@ -111,7 +111,7 @@ class BootIdentityTest(unittest.TestCase):
             counter.write_text('39\n')
             artifact = directory / 'all-app.bin'
             ap_elf = directory / 'app.elf'
-            tool = BK / 'tools/build_identity.py'
+            tool = ROOT / 'platforms/beken/tools/build_identity.py'
             subprocess.run([sys.executable, str(tool), 'prepare',
                             str(identity), '1.2.3', 'abcdef0123456789',
                             str(counter)],
@@ -161,18 +161,18 @@ class BootIdentityTest(unittest.TestCase):
                                check=True, capture_output=True)
 
     def test_bk_platform_payload_reports_the_embedded_build_version(self):
-        source = (BK / 'ap/src/xiaotai_platform_client.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/src/xiaotai_platform_client.c').read_text()
         declaration = re.search(r'static const char s_device_profile\[\].*?;',
                                 source, re.S).group(0)
         with tempfile.TemporaryDirectory() as temp:
             temp = Path(temp)
             counter = temp / 'BUILD_NUMBER'
             counter.write_text('39\n')
-            subprocess.run([sys.executable, str(BK / 'tools/build_identity.py'),
+            subprocess.run([sys.executable, str(ROOT / 'platforms/beken/tools/build_identity.py'),
                             'prepare', str(temp), '1.2.3', 'abcdef', str(counter)],
                            check=True)
             harness = temp / 'profile.c'
-            harness.write_text('#include <stdio.h>\n'
+            harness.write_text('#include <stdio.h>\n#define XIAOTAI_BOARD_ID "lckfb-bk7258"\n'
                                '#include "xiaotai_build_identity.h"\n' +
                                declaration + '\nint main(void) { puts(s_device_profile); }\n')
             executable = temp / 'profile'

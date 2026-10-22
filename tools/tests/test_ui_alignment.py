@@ -9,7 +9,7 @@ ESP = ROOT / 'platforms/esp-idf/components/starter_product/src/starter_product.c
 
 class UiAlignment(unittest.TestCase):
     def test_bk_settings_touch_adjusts_only_selected_value(self):
-        base = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap'
+        base = ROOT / 'platforms/beken/runtime'
         source = (base / 'src/xiaotai_app.c').read_text()
         touch = function(source, 'handle_touch')
         branch = touch[touch.index('    if (s_ui_page == UI_PAGE_SETTINGS) {'):]

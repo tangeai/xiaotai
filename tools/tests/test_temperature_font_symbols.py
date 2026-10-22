@@ -55,7 +55,7 @@ class TemperatureFontSymbols(unittest.TestCase):
                     self.assertGreater(metrics['box_w'] * metrics['box_h'], 0)
 
     def test_beken_ai_caption_font_has_visible_symbols(self):
-        source = (ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/assets/xiaotai_ui_assets.c').read_text()
+        source = (ROOT / 'platforms/beken/runtime/assets/xiaotai_ui_assets.c').read_text()
         for character in '°℃':
             with self.subTest(character=character):
                 glyph = re.search(r'\{0x%04xU, \{(.*?)\}\}' % ord(character), source, re.S)

@@ -12,11 +12,11 @@ BK7258 与 ESP-IDF 工程保持独立，只通过稳定的产品接口复用业�
 
 主要入口如下：
 
-- `ap/src/xiaotai_app.c`：产品会话和媒体资源所有权；
-- `ap/src/xiaotai_tirtc.c`：TiRTC 生命周期、连接和媒体路由；
-- `ap/src/xiaotai_audio.c`：麦克风、扬声器、A-law、Opus 和 AEC；
-- `ap/src/xiaotai_video.c`：GC0308 与 H.264 上行；
-- `ap/src/xiaotai_ui.c`：显示、触摸和产品状态；
+- `platforms/beken/runtime/src/xiaotai_app.c`：产品会话和媒体资源所有权；
+- `platforms/beken/runtime/src/xiaotai_tirtc.c`：TiRTC 生命周期、连接和媒体路由；
+- `platforms/beken/runtime/src/xiaotai_audio.c`：麦克风、扬声器、A-law、Opus 和 AEC；
+- `platforms/beken/runtime/src/xiaotai_video.c`：GC0308 与 H.264 上行；
+- `platforms/beken/runtime/src/xiaotai_ui.c`：显示、触摸和产品状态；
 - `HARDWARE_ACCEPTANCE.md`：实板验收步骤和关键日志。
 
 ## 当前能力

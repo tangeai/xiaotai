@@ -78,7 +78,7 @@ int main(void){
 ''')
 
     def test_bk_draws_shared_artwork_without_rgb_bitmap_or_extra_heap(self):
-        source=(BK / 'ap/src/xiaotai_ui.c').read_text()
+        source=(ROOT / 'platforms/beken/runtime/src/xiaotai_ui.c').read_text()
         draw=function(source,'phone_shortcut')
         self.assertNotIn('xiaotai_phone_shortcut_rgb565',draw)
         self.assertNotIn('malloc',draw)

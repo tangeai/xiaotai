@@ -5,7 +5,7 @@ import test_s3_opus_media as opus
 COMMON = opus.COMMON
 
 P4=ROOT/'firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/starter_media/src/starter_media.c'
-BK=ROOT/'firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src'
+BK=ROOT/'platforms/beken/runtime/src'
 RESAMPLER=ROOT/'platforms/common'
 FIR=(RESAMPLER/'src/starter_audio_resampler.c').read_text()
 

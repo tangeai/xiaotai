@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "firmware/beken/bk7258/lckfb-bk7258-xiaotai/tools/instrument_critical_lr.py"
+SCRIPT = ROOT / "platforms/beken/tools/instrument_critical_lr.py"
 NM_LINES = {
     "debug_event_fault": 0x28009200,
     "debug_queue_wait": 0x28009300,

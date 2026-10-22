@@ -155,22 +155,21 @@ Beken 工程保持独立的 AP/CP（应用处理器/协处理器）、分区、T
 
 ```text
 xiaotai/
-├── boards/lckfb/bk7258/                板级引脚和外设适配
-├── product/                                  跨芯片复用的产品状态与协议
+├── boards/lckfb/bk7258/                       立创板级引脚和外设适配
+├── product/                                  跨芯片产品状态与协议
 ├── platforms/common/                         公共板级 C 接口
+├── platforms/beken/
+│   ├── runtime/{src,include,assets}/          BK 公共业务、网络、音视频和显示实现
+│   ├── src/                                  公共音频生命周期和交互适配
+│   ├── third_party/tirtc/                     固定 TiRTC 头文件、库及来源记录
+│   └── tools/                                公共构建、版本与 SDK 补丁
 └── firmware/beken/bk7258/lckfb-bk7258-xiaotai/
-    ├── ap/                                   AP 应用核，小钛主要功能代码
-    │   ├── ap_main.c                         AP 启动入口
-    │   ├── include/                          AP 模块公开头文件
-    │   ├── src/                              业务协调、网络、媒体和界面适配
-    │   ├── assets/                           界面字体、图像和二维码资源
-    │   └── config/                           AP 工程配置
+    ├── ap/                                   立创 AP 启动入口、探针与工程配置
     ├── cp/                                   CP 通信核及 AP 拉起入口
-    ├── partitions/                           BK7258 分区配置
-    ├── third_party/tirtc/                    固定版本 TiRTC 头文件和静态库
-    ├── tools/                                环境、构建、诊断和主机测试脚本
+    ├── partitions/                           本工程分区配置
+    ├── tools/                                原生构建封装、诊断和主机测试
     ├── CMakeLists.txt、Makefile、pj_config.mk 工程构建入口
-    └── probe-report.*.json                   硬件探测与构建前检查结果
+    └── probe-report.*.json                    硬件探测与构建前检查结果
 ```
 
 `build/`、`output/` 和 `tools/__pycache__/` 是生成目录，不是源码入口。不要直接修改其中
@@ -183,15 +182,15 @@ xiaotai/
 | 开发板型号、构建入口和能力声明 | [`boards/lckfb/bk7258/board.json`](../../../boards/lckfb/bk7258/board.json) | 只记录构建元数据，不作为硬件接线证据 |
 | GPIO、电源、按键、触摸、显示、摄像头和音频接线 | [`boards/lckfb/bk7258/`](../../../boards/lckfb/bk7258/) | `board_config.h` 保存板级常量，`board_*.c` 实现具体外设适配 |
 | AP/CP 启动顺序或组件装配 | [`ap/ap_main.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/ap_main.c)、[`cp/cp_main.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/cp/cp_main.c)、[`ap/CMakeLists.txt`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/CMakeLists.txt) | CP 负责平台启动，主要产品功能运行在 AP |
-| H5、AI、设备呼叫、微信 VoIP 和多人对讲的优先级 | [`product/src/xiaotai_runtime.c`](../../../product/src/xiaotai_runtime.c)、[`ap/src/xiaotai_app.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_app.c) | 前者维护跨芯片会话规则，后者串行执行 BK7258 上的状态切换 |
+| H5、AI、设备呼叫、微信 VoIP 和多人对讲的优先级 | [`product/src/xiaotai_runtime.c`](../../../product/src/xiaotai_runtime.c)、[`platforms/beken/runtime/src/xiaotai_app.c`](../../../platforms/beken/runtime/src/xiaotai_app.c) | 前者维护跨芯片会话规则，后者串行执行 BK7258 上的状态切换 |
 | 联系人、呼叫协议、多人房间和 AI 协议 | [`product/src/`](../../../product/src/) | 先改公共模块及对应 `product/tests/`，不要在 BK 适配层复制一套协议 |
-| 配网热点和 `192.168.6.1` 页面 | [`xiaotai_network.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_network.c) | 管理 STA（连接路由器的工作模式）、SoftAP（设备配网热点）和配网页 |
-| 设备绑定、服务发现、HTTP 和 MQTT | [`xiaotai_platform_client.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_platform_client.c) | 负责平台接口和消息通道，不负责媒体资源所有权 |
-| TiRTC 连接、流编号、回调和异常恢复 | [`xiaotai_tirtc.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc.c)、[`xiaotai_tirtc_recovery.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_tirtc_recovery.c) | SDK 回调只投递有界事件，不能直接修改产品状态 |
-| 麦克风、扬声器、编解码和 AEC | [`xiaotai_audio.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_audio.c)、[`board_audio.c`](../../../boards/lckfb/bk7258/board_audio.c) | 通用媒体流程放 AP 适配层，ADC、DAC、DMA 和功放控制放板级代码 |
-| 摄像头采集、H.264 和视频发送 | [`xiaotai_video.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_video.c)、[`board_camera.c`](../../../boards/lckfb/bk7258/board_camera.c) | 业务节流规则复用 `product/src/xiaotai_video_pacer.c` |
-| 屏幕页面、触摸区域和按键意图 | [`xiaotai_ui.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_ui.c)、[`xiaotai_touch.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_touch.c)、[`xiaotai_button.c`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/xiaotai_button.c) | 页面渲染留在适配层，业务状态仍由产品运行时管理 |
-| 持久化、串口命令、运行指标和硬件探针 | [`ap/src/`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/src/) | 分别从 `xiaotai_storage.c`、`xiaotai_console.c`、`xiaotai_metrics.c` 和 `xiaotai_probe.c` 开始 |
+| 配网热点和 `192.168.6.1` 页面 | [`xiaotai_network.c`](../../../platforms/beken/runtime/src/xiaotai_network.c) | 管理 STA（连接路由器的工作模式）、SoftAP（设备配网热点）和配网页 |
+| 设备绑定、服务发现、HTTP 和 MQTT | [`xiaotai_platform_client.c`](../../../platforms/beken/runtime/src/xiaotai_platform_client.c) | 负责平台接口和消息通道，不负责媒体资源所有权 |
+| TiRTC 连接、流编号、回调和异常恢复 | [`xiaotai_tirtc.c`](../../../platforms/beken/runtime/src/xiaotai_tirtc.c)、[`xiaotai_tirtc_recovery.c`](../../../platforms/beken/runtime/src/xiaotai_tirtc_recovery.c) | SDK 回调只投递有界事件，不能直接修改产品状态 |
+| 麦克风、扬声器、编解码和 AEC | [`xiaotai_audio.c`](../../../platforms/beken/runtime/src/xiaotai_audio.c)、[`board_audio.c`](../../../boards/lckfb/bk7258/board_audio.c) | 通用媒体流程放 AP 适配层，ADC、DAC、DMA 和功放控制放板级代码 |
+| 摄像头采集、H.264 和视频发送 | [`xiaotai_video.c`](../../../platforms/beken/runtime/src/xiaotai_video.c)、[`board_camera.c`](../../../boards/lckfb/bk7258/board_camera.c) | 业务节流规则复用 `product/src/xiaotai_video_pacer.c` |
+| 屏幕页面、触摸区域和按键意图 | [`xiaotai_ui.c`](../../../platforms/beken/runtime/src/xiaotai_ui.c)、[`xiaotai_touch.c`](../../../platforms/beken/runtime/src/xiaotai_touch.c)、[`xiaotai_button.c`](../../../platforms/beken/runtime/src/xiaotai_button.c) | 页面渲染留在适配层，业务状态仍由产品运行时管理 |
+| 持久化、串口命令、运行指标和硬件探针 | [`platforms/beken/runtime/src/`](../../../platforms/beken/runtime/src/) | 分别从 `xiaotai_storage.c`、`xiaotai_console.c`、`xiaotai_metrics.c` 和 `xiaotai_probe.c` 开始 |
 | 分区、编译环境和打包 | [`partitions/`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/partitions/)、[`tools/`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/tools/) | 修改后同时验证 AP、CP、整包和 Flash 布局 |
 
 ### 推荐修改顺序

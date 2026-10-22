@@ -1,0 +1,2 @@
+#pragma once
+#define XIAOTAI_BOARD_TOUCH_AVAILABLE 0

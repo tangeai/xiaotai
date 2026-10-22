@@ -23,7 +23,7 @@ build.48 还记录到队列解锁后 PRIMASK 仍为 1、PendSV pending。
 `s_pending_close_state` 原子状态；后续控制任务周期检查该状态并执行 CAS，
 但变量原先落在普通 `.bss`。build.49 将它移入固定 SDK 的
 `.sram_spinlock_section`，遵守该 SDK 独占监视器的内存区域限制。
-入口是 BK 的 `ap/src/xiaotai_tirtc.c`。不能以 C11 原子操作在主机上正确，
+入口是 BK 的 `platforms/beken/runtime/src/xiaotai_tirtc.c`。不能以 C11 原子操作在主机上正确，
 推断它在目标芯片的任意 SRAM 区域都可安全使用。
 
 **证据边界**：段归属回归已先失败后通过；用户后续日志的 uptime 达到约 62 分 48 秒，

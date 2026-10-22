@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "mgkfb-bk7258",
+  "vendor": "MGKFB",
+  "model": "觅感 AI 玩具开发板 BK7258",
+  "revision": null,
+  "platform": "beken",
+  "target": "bk7258",
+  "sdk": {
+    "name": "bk_avdk_smp",
+    "version": "release/v3.1.1.10"
+  },
+  "project_dir": "firmware/beken/bk7258/mgkfb-bk7258-xiaotai",
+  "capabilities": [
+    "audio",
+    "buttons",
+    "camera-h264",
+    "wifi"
+  ],
+  "resources": {
+    "flash_bytes": 8388608,
+    "psram_bytes": null
+  },
+  "evidence": {
+    "hardware_ir": "docs/boards/mgkfb-bk7258/hardware-ir.json"
+  },
+  "variants": [
+    {
+      "name": "headless",
+      "default": true,
+      "interaction_profile": "headless-key",
+      "layout_profile": "none"
+    }
+  ],
+  "migration": {
+    "stage": "board-adapter"
+  }
+}

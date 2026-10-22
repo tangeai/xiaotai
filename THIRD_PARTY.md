@@ -6,7 +6,7 @@
 
 | 资产 | 授权状态 | 当前来源线索 | 发布前动作 |
 | --- | --- | --- | --- |
-| `firmware/**/third_party/tirtc/` 和 `components/tirtc_sdk/` 内的 TiRTC 静态库及头文件 | **需单独授权** | 各 SDK 包的 README/manifest；当前板卡包版本并不完全相同，BK7258 包标记为 2.5.0 | 逐包取得二进制、头文件、商业使用及再分发许可；无法公开源码分发时改为授权用户自行下载 |
+| `firmware/**/third_party/tirtc/`、`platforms/beken/third_party/tirtc/` 和 `components/tirtc_sdk/` 内的 TiRTC 静态库及头文件 | **需单独授权** | 各 SDK 包的 README/manifest；当前板卡包版本并不完全相同，BK7258 包标记为 2.5.0 | 逐包取得二进制、头文件、商业使用及再分发许可；无法公开源码分发时改为授权用户自行下载 |
 | `platforms/esp-idf/components/starter_voice/vendor/` | **许可证待确认** | Voicute onnx-wakeword 的 ESP32 前处理/后处理子集，实际提交见下一段 | 核实固定提交的 LICENSE、NOTICE 和署名要求；无明确许可证则替换或取得权利人书面授权 |
 | `product/assets/models/nihaoxiaotai/` 及固件工程中的目标模型副本 | **需单独授权** | 用户提供的唤醒模型和配套 head 数据 | 确认模型、训练数据和导出产物权利人，并取得源码仓库及固件再分发许可 |
 | ESP32-P4 工程中保留的 `main/ui/font/lv_font_cn_14.c` | **当前不可公开分发** | 生成注释包含 Windows 字体（包括 `simhei.ttf`）等来源 | 换用 OFL 等许可明确字体并完成字形/UI 回归，或取得字体权利人的明确再分发授权；未参与当前构建的文件也需核对源码分发权利 |
