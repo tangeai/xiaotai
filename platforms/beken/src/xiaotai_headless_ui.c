@@ -118,9 +118,9 @@ void xiaotai_ui_show_network_setup(const char *ssid)
     atomic_store(&s_indicator,4);
 #if XIAOTAI_DUAL_EYES
     char text[96];snprintf(text,sizeof text,"等待配网\n热点名称\n%s",ssid?ssid:"");
-    xiaotai_eyes_ui_text(text,"手机连接热点\n浏览器打开\n192.168.4.1");
+    xiaotai_eyes_ui_text(text,"手机连接热点\n浏览器打开\n192.168.6.1");
 #endif
-    BK_LOGI(TAG, "配网热点=%s；连接热点后打开 192.168.4.1\n", ssid ? ssid : "");
+    BK_LOGI(TAG, "配网热点=%s；连接热点后打开 192.168.6.1\n", ssid ? ssid : "");
 }
 
 void xiaotai_ui_show_launcher(unsigned selected)

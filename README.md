@@ -50,26 +50,28 @@
 
 ### ESP32 开发板
 
-有两种文件组织方式，**任选一种，不要混用**。乐鑫的 `write-flash` 按地址写入多个 BIN，
-`merge-bin` 可将它们合成一个镜像；具体文件数与地址由工程决定，不能固定理解为“三个 BIN”。
-参见[乐鑫合并镜像指引](https://docs.espressif.com/projects/esptool/en/latest/esp32s3/esptool/basic-commands.html#merge-binaries-for-flashing-merge-bin)。
+可以选择以下两种方式烧录，**任选一种即可**：
 
-| 开发板 | 单文件：网页中选择的完整文件名 | 地址 | 分文件：从同版 ZIP 解压 |
+- **分文件烧录**：解压固件包，将多个 BIN 按清单分别写入对应地址。
+- **合并镜像烧录**：下载完整的 `-merged.bin`，只添加这一个文件，从 `0x0` 写入。
+
+完整镜像由同一版本的分文件 BIN 合并生成，制作方法见[乐鑫官方指引](https://docs.espressif.com/projects/esptool/en/latest/esp32s3/esptool/basic-commands.html#merge-binaries-for-flashing-merge-bin)。
+
+| 开发板 | 合并镜像：只选择这一个 BIN | 烧录地址 | 分文件：从同版 ZIP 解压 |
 |---|---|---|---|
 | 立创 ESP32-S3 | `lckfb-esp32s3-1.0.1+build.2-merged.bin` | `0x0` | **3 个 BIN**：bootloader、分区表、应用 |
 | 微雪 ESP32-P4 | `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-merged.bin` | `0x0` | **4 个 BIN**：bootloader、分区表、OTA 初始化数据、应用 |
 | M5Stack CoreS3-Lite | `m5stack-cores3-lite-1.0.1+build.42-merged.bin` | `0x0` | **3 个 BIN**：bootloader、分区表、应用 |
 
-完整 `-merged.bin` 只添加一行，烧录会覆盖 Wi-Fi、绑定等 NVS 配置。
+完整 `-merged.bin` 只添加一行，烧录会覆盖保存的 Wi-Fi 和绑定信息。
 分文件方式按下方各板指南的“文件名 → 地址”表逐项填写，不能漏文件；
 应用 BIN 不能当作合并镜像写到 `0x0`，ZIP、ELF 和 JSON 不能直接烧录。
 
-普通操作不额外要求校验 ZIP。分文件 BIN 的 SHA-256 在包内 `MANIFEST.json` 中；
-merged.bin 的 SHA-256 在对应烧录指南及发布页中，按需核验。
-写入完成校验与文件来源核对是两件事，正常解压不代表板型、版本和烧录地址正确。
+下载后，先确认固件对应的开发板型号和版本，再按指南填写烧录地址。
+怀疑文件下载损坏时，可以用发布页或包内清单中的 SHA-256 校验值检查文件。
 
-提供两种方式：**网页烧录**无需安装开发环境，适合直接体验；**工程烧录**通过
-ESP-IDF 编译并执行 `idf.py flash monitor`，适合修改源码与调试。
+不修改源码时，可以直接用**网页烧录**，无需安装开发环境。
+需要修改和调试固件时，使用**工程烧录**，在 ESP-IDF 中编译并执行 `idf.py flash monitor`。
 网页工具使用 Chrome 或 Edge 打开[乐鑫 ESP Web Tool](https://espressif.github.io/esptool-js/)。
 
 按板型打开图文指南，截图中的红框标出了需要点击或修改的位置：
@@ -78,18 +80,34 @@ ESP-IDF 编译并执行 `idf.py flash monitor`，适合修改源码与调试。
 - [微雪 ESP32-P4：网页与工程烧录](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录)
 - [M5Stack CoreS3-Lite：网页与工程烧录](docs/boards/m5stack-cores3-lite/README.md#烧录)
 
-分文件 ZIP 需要按 `MANIFEST.json` 的 `flash_files` 完整添加文件和地址，不能只写
-应用镜像，也不能把所有文件都填成 `0x0`。下载模式、串口和重启步骤见上述指南。
-
 ### BK7258 开发板
 
-下载 `lckfb-bk7258-` 开头的发布包，使用包内以 `-all-app.bin` 结尾的文件，从地址 `0x0` 完整烧录。以 `-app_pack.rbl` 结尾的文件是 OTA（无线升级）镜像，不能代替首次完整烧录。烧录工具、下载模式和串口设置见[立创·实战派 BK7258 烧录指南](docs/boards/lckfb-bk7258/README.md#烧录)。
+两块板使用各自的固件，通过 Beken 下载工具串口烧录，不使用 ESP32 网页烧录工具。
+先按下面的准确型号选择；芯片相同不代表固件可以互刷。
 
-觅感板下载 `mgkfb-bk7258-1.0.1+build.11-validation.zip`，解压后使用
-`mgkfb-bk7258-1.0.1+build.11-all-app.bin`，地址同为 `0x0`；不能使用立创板镜像。
-具体步骤见[觅感 BK7258 烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录)。
+#### 立创·实战派 BK7258
 
-量产或升级前，再次核对板卡 ID、PCB（印刷电路板）版本和 SHA-256。校准区、密钥区和设备身份数据不能被通用固件覆盖。
+板卡 ID：`lckfb-bk7258`，发布版本：v1.0.1 · build.56。
+
+1. 下载并解压 [`lckfb-bk7258-1.0.1+build.56-validation.zip`](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.1/lckfb-bk7258-1.0.1%2Bbuild.56-validation.zip)。
+2. 在 Beken 下载工具中选择 **`lckfb-bk7258-1.0.1+build.56-all-app.bin`**，起始地址 **`0x00000000`**，用于首次完整烧录。
+
+`lckfb-bk7258-1.0.1+build.56-app_pack.rbl` 仅用于 OTA（无线升级），不能用于首次完整烧录。
+
+连接方式、下载模式、串口设置与重启检查见[立创·实战派 BK7258 烧录指南](docs/boards/lckfb-bk7258/README.md#烧录)。
+
+#### 觅感 AI 玩具开发板 BK7258
+
+板卡 ID：`mgkfb-bk7258`，发布版本：v1.0.1 · build.11，适用于 **8 MiB Flash、双屏眼睛**的觅感板。
+
+1. 下载并解压 [`mgkfb-bk7258-1.0.1+build.11-validation.zip`](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.1/mgkfb-bk7258-1.0.1%2Bbuild.11-validation.zip)。
+2. 用本板通讯 Type-C 连接电脑，在 Beken 下载工具中选择 **`mgkfb-bk7258-1.0.1+build.11-all-app.bin`**，起始地址 **`0x00000000`**，用于首次完整烧录。
+
+`mgkfb-bk7258-1.0.1+build.11-app_pack.rbl` 仅用于 OTA，不能用于首次串口烧录；本板 OTA 尚未专项验收。
+
+连接、复位和烧录后的检查步骤见[觅感 BK7258 烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录)。
+
+请保留设备原有的校准数据和身份信息，按对应指南操作，不要随意全片擦除。
 
 ## 首次体验
 
@@ -118,7 +136,7 @@ ESP-IDF 编译并执行 `idf.py flash monitor`，适合修改源码与调试。
 且没有异常重启。
 
 触摸屏设备需要更换网络或重新绑定时，在“设备设置”中选择“重置设备”，确认后重新配网
-并绑定；无触摸屏设备按对应开发板指南使用串口命令。不要使用全片擦除。遇到音视频问题时，
+并绑定；无触摸屏设备按对应开发板指南使用实体按键或串口命令。不要使用全片擦除。遇到音视频问题时，
 应记录板卡 ID、固件版本、问题方向和完整日志，
 例如明确说明是“网页到设备无声”还是“设备到网页无声”。
 

@@ -164,8 +164,10 @@ int main(void){uint16_t a[25600],b[25600];
 
     def test_runtime_ai_tags_and_provisioning_reach_eye_presentation(self):
         source=(ROOT/'platforms/beken/src/xiaotai_headless_ui.c').read_text()
+        network=(ROOT/'platforms/beken/runtime/src/xiaotai_network.c').read_text()
+        setup_ip=re.search(r'^#define SETUP_IP "([^"]+)"',network,re.M).group(1)
         funcs='\n'.join(function(source,n) for n in ['xiaotai_ui_show_ai','xiaotai_ui_update_ai_mouth','xiaotai_ui_show_network_setup'])
-        run_c(r'''
+        run_c('#define EXPECTED_SETUP_IP "'+setup_ip+'"\n'+r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -186,7 +188,7 @@ int main(void){
  xiaotai_ui_update_ai_mouth(0x1234);assert(calls==1);
  xiaotai_ui_show_ai(1,"happy","caption",true,false);assert(!tagged && phase_seen==1);
  xiaotai_ui_show_network_setup("XiaoTai-1234");
- assert(strstr(left,"XiaoTai-1234") && strstr(right,"192.168.4.1"));
+ assert(strstr(left,"XiaoTai-1234") && strstr(right,EXPECTED_SETUP_IP));
 }
 ''')
 

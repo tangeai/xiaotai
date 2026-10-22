@@ -28,7 +28,7 @@
 
 ## 我想维护、测试或发布项目
 
-- [开发板问题与需求清单](boards/ISSUES_AND_REQUIREMENTS.md)：按四块板整理实际问题、功能需求和实板验收缺口。
+- [开发板问题与需求清单](boards/ISSUES_AND_REQUIREMENTS.md)：按开发板整理实际问题、功能需求和实板验收缺口。
 - [约束规则索引](../CONTRIBUTING.md#约束规则索引)：命名、目录、开发、编译、测试和发布规则的权威出处。
 - [固件版本与发布](../CONTRIBUTING.md#固件版本与发布)：产品版本、构建身份、Release 名称及发布出口检查。
 - [测试与硬件验证](../tests/README.md)：主机测试、驱动 probe（探针测试）和产品业务 HIL（硬件在环测试）。
