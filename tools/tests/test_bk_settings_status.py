@@ -20,7 +20,7 @@ static bool reset, network, sleep_full;
 static frame_buffer_t *page_frame(const char *s){return &frame;}
 static void rectangle(frame_buffer_t *f,int x,int y,int w,int h,int color){
  if(y==40 || y==82){assert((x==8 || x==270) && w==42 && h==38);}
- if(y==160){assert(x==8 && w==304 && h==30);sleep_full=true;}
+ if(y==160){assert((x==8 || x==164) && w==148 && h==30);sleep_full=true;}
  if(y==196){assert((x==8 || x==164) && w==148 && h==30);rectangles++;}
 }
 static void centered_mixed_in(frame_buffer_t *f,int x,int y,const char *s,int scale,int color,int w){
@@ -29,7 +29,7 @@ static void centered_mixed_in(frame_buffer_t *f,int x,int y,const char *s,int sc
 }
 static void flush_page(frame_buffer_t *f){}
 ''' + function(source, 'xiaotai_ui_show_settings') + r'''
-int main(void){xiaotai_ui_show_settings(8,false,false,5,"从不");assert(reset && network && sleep_full && rectangles==2);}
+int main(void){xiaotai_ui_show_settings(8,false,false,5,"从不",false,false);assert(reset && network && sleep_full && rectangles==2);}
 ''')
 
     def test_reset_confirmation_cancel_failure_retry_and_duplicate(self):
@@ -94,7 +94,7 @@ int main(void){
         source = (BASE / 'src/xiaotai_app.c').read_text()
         touch = function(source, 'handle_touch')
         start = touch.index('    if (s_ui_page == UI_PAGE_RESET_CONFIRM) {')
-        end = touch.index('    if (event->y < 40U && s_ui_page != UI_PAGE_HOME)', start)
+        end = touch.index('    if (s_ui_page == UI_PAGE_AI_CHAT) {', start)
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>
@@ -102,6 +102,7 @@ int main(void){
 #define UI_PAGE_RESET_CONFIRM 1
 #define UI_PAGE_SETTINGS 2
 #define UI_PAGE_NETWORK 3
+#define UI_PAGE_SETTINGS_PREVIEW_ERROR 5
 #define UI_PAGE_DIAGNOSTICS 4
 typedef struct {unsigned x,y;} control_event_t;
 static int s_ui_page,s_reset_status,last_action=-1,actions,rendered;

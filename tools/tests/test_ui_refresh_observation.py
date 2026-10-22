@@ -41,6 +41,15 @@ typedef int starter_voice_result_t;
 typedef struct {int state;} starter_runtime_status_t;
 typedef int starter_runtime_product_snapshot_t;
 typedef int starter_media_status_t;
+#include <stdatomic.h>
+#define PREFERENCES_FAILED 3
+#define PAGE_SETTINGS 10
+static atomic_int s_preferences_save_status;
+static void preferences_poll(void){}
+static int page_renders;
+static bool expect_feedback;
+static void render_page(void){page_renders++;}
+static void set_voice_feedback(const char *t,int64_t n){}
 static int64_t s_ui_refresh_slow_last_us;
 static char s_voice_feedback[2];
 static int s_voice_feedback_hide_ms, s_wifi_notice, s_page;
@@ -57,7 +66,7 @@ static starter_runtime_status_t starter_runtime_status_snapshot(void){
 static starter_runtime_product_snapshot_t starter_runtime_product_snapshot(void){clock_us+=25000;return 0;}
 static starter_media_status_t starter_media_status(void){clock_us+=300;return 0;}
 ''' + prefix + r'''
-    (void)voice_state_changed;(void)product;(void)media;
+    assert(voice_state_changed==expect_feedback);(void)product;(void)media;
     /* Remaining view work, including expression, injected independently. */
     clock_us += 5400; expression_elapsed_us = 1000;
 ''' + tail + r'''
@@ -68,6 +77,11 @@ int main(void){
  assert(strstr(output,"queue=100 runtime=200 product=25000 media=300 view=4400")!=NULL);
  assert(strstr(output,"expression=1000 us")!=NULL);
  product_tick(NULL);assert(logs==1); /* keep the existing 5-second log budget */
+ s_page=PAGE_SETTINGS;atomic_store(&s_preferences_save_status,PREFERENCES_FAILED);
+ expect_feedback=true;product_tick(NULL);assert(page_renders==1);
+ expect_feedback=false;atomic_store(&s_preferences_save_status,2);
+ product_tick(NULL);assert(page_renders==2);
+ atomic_store(&s_preferences_save_status,1);product_tick(NULL);assert(page_renders==2);
 }
 ''')
 

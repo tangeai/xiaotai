@@ -17,7 +17,7 @@ class BKContactsRefreshOnEntry(unittest.TestCase):
 #include <stdint.h>
 #include <stddef.h>
 typedef enum {
-    UI_PAGE_HOME, UI_PAGE_CONTACTS, UI_PAGE_ROOM,
+    UI_PAGE_HOME, UI_PAGE_AI_CHAT, UI_PAGE_CONTACTS, UI_PAGE_ROOM,
     UI_PAGE_EXPRESSIONS, UI_PAGE_SETTINGS, UI_PAGE_DIAGNOSTICS
 } ui_page_t;
 static ui_page_t s_ui_page;
@@ -26,6 +26,7 @@ static unsigned s_contact_selected,s_room_participant_page,s_diagnostics_tab;
 static int s_room,requests,renders;
 #define XIAOTAI_ROOM_ACTION_SYNC 1
 static void navigate_to(ui_page_t page){s_ui_page=page;}
+static void render_ai_history(void){}
 static void render_contacts(void){renders++;}
 static void refresh_contacts(void){requests++;}
 static int xiaotai_room_action(int *room,int action,void *arg){

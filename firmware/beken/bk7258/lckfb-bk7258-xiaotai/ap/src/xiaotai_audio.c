@@ -1,4 +1,5 @@
 #include "xiaotai_audio.h"
+#include "xiaotai_prompt_assets.h"
 #include "starter_audio_resampler.h"
 #include "xiaotai_audio_agc.h"
 #include "xiaotai_audio_ns.h"
@@ -135,6 +136,8 @@ static beken_semaphore_t s_prompt_stopped;
 static bool s_prompt_sync_ready;
 static int16_t *s_prompt_pcm;
 static size_t s_prompt_samples;
+static unsigned s_prompt_repeats;
+static atomic_int s_prompt_result;
 
 static xiaotai_audio_uplink_fn s_uplink;
 static void *s_uplink_context;
@@ -178,13 +181,17 @@ static bool play_prompt_pcm(void)
 static void prompt_task(beken_thread_arg_t argument)
 {
     (void)argument;
-    bool ready = xiaotai_board_prompt_audio_start() == BK_OK;
+    int result = xiaotai_board_prompt_audio_start();
+    bool ready = result == BK_OK;
     if (!ready) BK_LOGE(TAG, "cannot open speaker for binding prompt\n");
 
     if (ready) {
-        for (unsigned repeat = 0; repeat < 3U && s_prompt_run; ++repeat) {
-            if (!play_prompt_pcm()) break;
-            if (repeat + 1U < 3U) {
+        for (unsigned repeat = 0; repeat < s_prompt_repeats && s_prompt_run; ++repeat) {
+            if (!play_prompt_pcm()) {
+                result = BK_FAIL;
+                break;
+            }
+            if (repeat + 1U < s_prompt_repeats) {
                 for (unsigned waited = 0; waited < 700U && s_prompt_run; waited += 20U)
                     rtos_delay_milliseconds(20);
             }
@@ -197,12 +204,20 @@ static void prompt_task(beken_thread_arg_t argument)
         s_prompt_pcm = NULL;
         s_prompt_samples = 0U;
     }
+    atomic_store(&s_prompt_result, result);
     atomic_store_explicit(&s_prompt_run, false, memory_order_release);
-    atomic_store_explicit(&s_prompt_active, false, memory_order_release);
     s_prompt_thread = NULL;
     rtos_set_semaphore(&s_prompt_stopped);
+    atomic_store_explicit(&s_prompt_active, false, memory_order_release);
     BK_LOGI(TAG, "binding prompt stopped\n");
     rtos_delete_thread(NULL);
+}
+
+bool xiaotai_audio_prompt_result(int *result)
+{
+    if (result == NULL || atomic_load(&s_prompt_active)) return false;
+    *result = atomic_load(&s_prompt_result);
+    return true;
 }
 
 void xiaotai_audio_cancel_prompt(void)
@@ -215,8 +230,7 @@ void xiaotai_audio_cancel_prompt(void)
     }
 }
 
-int xiaotai_audio_announce_verification_pcm(int16_t *pcm,
-                                            size_t sample_count)
+static int start_prompt(int16_t *pcm, size_t sample_count, unsigned repeats)
 {
     /* 250 ms to 20 seconds is deliberately bounded.  The API contract is
      * 8 kHz mono S16LE, so longer or empty responses are not accepted. */
@@ -236,6 +250,7 @@ int xiaotai_audio_announce_verification_pcm(int16_t *pcm,
     }
     s_prompt_pcm = pcm;
     s_prompt_samples = sample_count;
+    s_prompt_repeats = repeats;
     atomic_store_explicit(&s_prompt_run, true, memory_order_release);
     atomic_store_explicit(&s_prompt_active, true, memory_order_release);
     int rc = rtos_create_psram_thread(&s_prompt_thread, AUDIO_TASK_PRIORITY,
@@ -247,6 +262,25 @@ int xiaotai_audio_announce_verification_pcm(int16_t *pcm,
         s_prompt_pcm = NULL;
         s_prompt_samples = 0U;
     }
+    return rc;
+}
+
+int xiaotai_audio_announce_verification_pcm(int16_t *pcm, size_t sample_count)
+{
+    return start_prompt(pcm, sample_count, 3U);
+}
+
+int xiaotai_audio_preview_acknowledgement(bool male)
+{
+    if (s_running || s_speaker_muted || atomic_load(&s_prompt_active))
+        return BK_ERR_BUSY;
+    const int16_t *source = male ? xiaotai_ack_male : xiaotai_ack_female;
+    size_t bytes = male ? sizeof(xiaotai_ack_male) : sizeof(xiaotai_ack_female);
+    int16_t *pcm = psram_malloc(bytes);
+    if (pcm == NULL) return BK_ERR_NO_MEM;
+    memcpy(pcm, source, bytes);
+    int rc = start_prompt(pcm, bytes / sizeof(*pcm), 1U);
+    if (rc != BK_OK) psram_free(pcm);
     return rc;
 }
 

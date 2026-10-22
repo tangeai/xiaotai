@@ -152,7 +152,10 @@ xiaotai_ui_action_t xiaotai_ui_settings_action(uint16_t x, uint16_t y)
         return x < 156U ? XIAOTAI_UI_ACTION_SPEAKER_TOGGLE :
                x >= 164U ? XIAOTAI_UI_ACTION_MIC_TOGGLE : XIAOTAI_UI_ACTION_NONE;
     }
-    if (y >= 160U && y < 190U) return XIAOTAI_UI_ACTION_SLEEP;
+    if (y >= 160U && y < 190U) {
+        return x < 156U ? XIAOTAI_UI_ACTION_SLEEP :
+               x >= 164U ? XIAOTAI_UI_ACTION_ACK_VOICE : XIAOTAI_UI_ACTION_NONE;
+    }
     if (y >= 196U && y < 226U) {
         return x < 156U ? XIAOTAI_UI_ACTION_NETWORK :
                x >= 164U ? XIAOTAI_UI_ACTION_RESET : XIAOTAI_UI_ACTION_NONE;

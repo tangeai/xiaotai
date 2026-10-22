@@ -32,6 +32,8 @@ void xiaotai_ui_update_ai_mouth(uint32_t columns);
 /** Show the product AP setup page with the actual advertised SSID. */
 void xiaotai_ui_show_network_setup(const char *ssid);
 void xiaotai_ui_show_launcher(unsigned selected);
+void xiaotai_ui_show_ai_history(const char *text, bool from_ai,
+                                unsigned page, unsigned count, bool available);
 void xiaotai_ui_show_contacts(const char *const *names,
                               const bool *online, const bool *wechat,
                               size_t count,
@@ -40,13 +42,16 @@ void xiaotai_ui_show_contact_detail(const char *name, bool online,
                                     bool wechat);
 void xiaotai_ui_show_expressions(unsigned selected,
                                  const char *active_emotion);
+void xiaotai_ui_show_expression_preview(unsigned selected);
 void xiaotai_ui_show_reset_confirmation(unsigned status);
 void xiaotai_ui_show_diagnostics(unsigned tab, const char *details);
 void xiaotai_ui_show_network(int wifi_rssi, const char *ip_address);
+void xiaotai_ui_show_settings_preview_error(void);
 void xiaotai_ui_show_settings(uint8_t volume, bool speaker_muted,
                               bool microphone_muted,
                               uint8_t microphone_sensitivity,
-                              const char *screen_timeout);
+                              const char *screen_timeout, bool acknowledgement_male,
+                              bool save_failed);
 void xiaotai_ui_show_room(const xiaotai_room_snapshot_t *room, size_t page);
 void xiaotai_ui_show_room_entry(bool request_pending);
 void xiaotai_ui_show_room_join_code(const char *room_code);

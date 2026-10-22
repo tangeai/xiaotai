@@ -1051,7 +1051,7 @@ void xiaotai_ui_show_launcher(unsigned selected)
     frame_buffer_t *frame = page_frame("功能菜单");
     if (frame == NULL) return;
     const char *labels[6] = {
-        "AI聊天", "通讯录", "多人对讲", "表情包",
+        "AI 聊天", "通讯录", "多人对讲", "表情包",
         "设备设置", "运行状态"
     };
     for (int i = 0; i < 6; ++i) {
@@ -1067,6 +1067,49 @@ void xiaotai_ui_show_launcher(unsigned selected)
     flush_page(frame);
 }
 
+void xiaotai_ui_show_ai_history(const char *text, bool from_ai,
+                                unsigned page, unsigned count, bool available)
+{
+    frame_buffer_t *frame = page_frame("AI 聊天");
+    if (frame == NULL) return;
+    if (text == NULL || text[0] == '\0') {
+        centered_mixed_text(frame, 80, available ? "暂无聊天记录" : "聊天记录暂不可用", 1, 0xbdf7);
+    } else {
+        mixed_text(frame, 16, 42, from_ai ? "AI：" : "你：", 1, 0x2d7f);
+        /* A page contains one bounded utterance, wrapped only at UTF-8
+         * boundaries. Eight lines fit a 255-byte utterance, including ASCII. */
+        const unsigned char *cursor = (const unsigned char *)text;
+        for (unsigned row = 0U; row < 8U && *cursor; ++row) {
+            char line[112];
+            size_t used = 0U;
+            unsigned width = 0U;
+            while (*cursor) {
+                unsigned n = *cursor < 0x80 ? 1U : (*cursor & 0xe0) == 0xc0 ? 2U :
+                             (*cursor & 0xf0) == 0xe0 ? 3U : 4U;
+                unsigned advance = n == 1U ? 8U : 16U;
+                if (width + advance > 288U || used + n >= sizeof(line)) break;
+                bool complete = true;
+                for (unsigned i = 1U; i < n; ++i)
+                    if (cursor[i] == 0U || (cursor[i] & 0xc0) != 0x80) {complete = false; break;}
+                if (!complete) break;
+                if (n == 1U && (*cursor == '\n' || *cursor == '\r')) line[used] = ' ';
+                else memcpy(line + used, cursor, n);
+                cursor += n;used += n;width += advance;
+            }
+            line[used] = '\0';
+            mixed_text(frame, 16, 62 + (int)row * 16, line, 1, 0xffff);
+        }
+    }
+    rectangle(frame, 8, 196, 100, 38, 0x10a4);
+    centered_mixed_in(frame, 58, 207, "上一条", 1, page > 0U ? 0xffff : 0x7bef, 96);
+    rectangle(frame, 212, 196, 100, 38, 0x10a4);
+    centered_mixed_in(frame, 262, 207, "下一条", 1, page + 1U < count ? 0xffff : 0x7bef, 96);
+    char position[24];
+    snprintf(position, sizeof(position), "%u/%u", count == 0U ? 0U : page + 1U, count);
+    centered_mixed_in(frame, 160, 207, position, 1, 0xffff, 100);
+    flush_page(frame);
+}
+
 void xiaotai_ui_show_contacts(const char *const *names,
                               const bool *online, const bool *wechat,
                               size_t count,
@@ -1074,33 +1117,38 @@ void xiaotai_ui_show_contacts(const char *const *names,
 {
     frame_buffer_t *frame = page_frame("通讯录");
     if (frame == NULL) return;
-    size_t start = page * 4U;
-    for (size_t row = 0; row < 4U; ++row) {
-        int y = 43 + (int)row * 46;
-        size_t index = start + row;
-        bool focused = index < count && index == selected;
-        if (focused) rectangle(frame, 8, y, 304, 40, 0x18e3);
-        rectangle_outline(frame, 8, y, 304, 40, focused ? 2 : 1,
-                          focused ? 0x2d7f : 0x3186);
-        if (index < count) {
-            circle(frame, 24, y + 20, 6,
-                   wechat[index] ? 0x07e0 :
-                   (online[index] ? 0x2d7f : 0x7bef));
-            mixed_text_clipped(frame, 42, y + 12, names[index], 1,
-                               0xffff, 190);
-            mixed_text(frame, 267, y + 12,
-                       wechat[index] ? "微信" : "设备", 1,
-                       wechat[index] || online[index] ? 0x2d7f : 0x7bef);
-        }
+    size_t pages = count == 0U ? 1U : (count + 2U) / 3U;
+    if (page >= pages) page = pages - 1U;
+    if (count == 0U) {
+        centered_mixed_text(frame, 66, "暂无联系人", 1, 0xffff);
+        centered_mixed_text(frame, 96, "绑定设备或完成微信授权后重新进入", 1, 0xbdf7);
     }
-    mixed_text(frame, 258, 220, "下一页", 1, 0xbdf7);
+    size_t start = page * 3U;
+    for (size_t row = 0; row < 3U && start + row < count; ++row) {
+        int y = 40 + (int)row * 43;
+        size_t index = start + row;
+        bool focused = index == selected;
+        rectangle(frame, 16, y, 288, 37, focused ? 0x18e3 : 0x10a4);
+        circle(frame, 30, y + 18, 6,
+               wechat[index] ? 0x07e0 : (online[index] ? 0x2d7f : 0x7bef));
+        mixed_text_clipped(frame, 46, y + 10, names[index], 1, 0xffff, 170);
+        mixed_text(frame, 236, y + 10, wechat[index] ? "微信" :
+                   (online[index] ? "设备在线" : "设备离线"), 1, 0xbdf7);
+    }
+    rectangle(frame, 8, 196, 100, 38, page > 0U ? 0x2470 : 0x10a4);
+    centered_mixed_in(frame, 58, 207, "上一页", 1, page > 0U ? 0xffff : 0x7bef, 96);
+    rectangle(frame, 212, 196, 100, 38, page + 1U < pages ? 0x2470 : 0x10a4);
+    centered_mixed_in(frame, 262, 207, "下一页", 1, page + 1U < pages ? 0xffff : 0x7bef, 96);
+    char text[24];
+    snprintf(text, sizeof(text), "%u/%u 页", (unsigned)page + 1U, (unsigned)pages);
+    centered_mixed_in(frame, 160, 207, text, 1, 0xffff, 100);
     flush_page(frame);
 }
 
 void xiaotai_ui_show_contact_detail(const char *name, bool online,
                                     bool wechat)
 {
-    frame_buffer_t *frame = page_frame("联系人");
+    frame_buffer_t *frame = page_frame("联系人详情");
     if (frame == NULL) return;
     circle(frame, 160, 88, 35, wechat ? 0x07e0 : 0x2d7f);
     centered_mixed_text(frame, 137, name == NULL ? "未知联系人" : name,
@@ -1114,24 +1162,41 @@ void xiaotai_ui_show_contact_detail(const char *name, bool online,
     flush_page(frame);
 }
 
-void xiaotai_ui_show_expressions(unsigned selected,
-                                 const char *active_emotion)
+void xiaotai_ui_show_expressions(unsigned page, const char *active_emotion)
 {
     frame_buffer_t *frame = page_frame("表情包");
     if (frame == NULL) return;
     size_t count = xiaotai_ai_emotion_count();
-    size_t index = count == 0U ? 0U : (size_t)selected % count;
-    const char *emotion = xiaotai_ai_emotion_at(index);
-    if (emotion == NULL) emotion = "happy";
+    size_t pages = count == 0U ? 1U : (count + 5U) / 6U;
+    if (page >= pages) page = (unsigned)(pages - 1U);
+    for (size_t slot = 0U; slot < 6U && page * 6U + slot < count; ++slot) {
+        const char *emotion = xiaotai_ai_emotion_at(page * 6U + slot);
+        int x = 8 + (int)(slot % 2U) * 156;
+        int y = 42 + (int)(slot / 2U) * 48;
+        bool active = active_emotion != NULL && strcmp(active_emotion, emotion) == 0;
+        rectangle(frame, x, y, 148, 40, active ? 0x2470 : 0x10a4);
+        centered_mixed_in(frame, x + 74, y + 12,
+                          xiaotai_ai_emotion_label_zh(emotion), 1, 0xffff, 140);
+    }
+    rectangle(frame, 8, 196, 100, 38, page > 0U ? 0x2470 : 0x10a4);
+    centered_mixed_in(frame, 58, 207, "上一页", 1, page > 0U ? 0xffff : 0x7bef, 96);
+    rectangle(frame, 212, 196, 100, 38, page + 1U < pages ? 0x2470 : 0x10a4);
+    centered_mixed_in(frame, 262, 207, "下一页", 1, page + 1U < pages ? 0xffff : 0x7bef, 96);
+    char text[24];
+    snprintf(text, sizeof(text), "%u/%u 页", page + 1U, (unsigned)pages);
+    centered_mixed_in(frame, 160, 207, text, 1, 0xffff, 100);
+    flush_page(frame);
+}
+
+void xiaotai_ui_show_expression_preview(unsigned selected)
+{
+    const char *emotion = xiaotai_ai_emotion_at(selected);
+    if (emotion == NULL) return;
+    frame_buffer_t *frame = page_frame(xiaotai_ai_emotion_label_zh(emotion));
+    if (frame == NULL) return;
     ai_face(frame, XIAOTAI_AI_UI_SPEAKING, emotion, 0x2d7f, false);
-    centered_mixed_text(frame, 154, xiaotai_ai_emotion_label_zh(emotion),
-                        2, 0xffff);
-    centered_mixed_text(frame, 188,
-                        active_emotion != NULL &&
-                        strcmp(active_emotion, emotion) == 0 ?
-                        "当前使用" : "按键应用", 1, 0x07e0);
-    mixed_text(frame, 18, 216, "上一个", 1, 0x7bef);
-    mixed_text(frame, 270, 216, "下一个", 1, 0x7bef);
+    rectangle(frame, 89, 174, 142, 44, 0x2470);
+    centered_mixed_in(frame, 160, 188, "应用到主页", 1, 0xffff, 136);
     flush_page(frame);
 }
 
@@ -1156,12 +1221,23 @@ void xiaotai_ui_show_network(int wifi_rssi, const char *ip_address)
     flush_page(frame);
 }
 
+void xiaotai_ui_show_settings_preview_error(void)
+{
+    frame_buffer_t *frame = page_frame("设备设置");
+    if (frame == NULL) return;
+    centered_mixed_text(frame, 80, "回应声已保存，试听暂不可用", 1, 0xffff);
+    centered_mixed_text(frame, 112, "请开启扬声器并结束其他播放", 1, 0xbdf7);
+    centered_mixed_text(frame, 180, "点击返回继续设置", 1, 0xbdf7);
+    flush_page(frame);
+}
+
 void xiaotai_ui_show_settings(uint8_t volume, bool speaker_muted,
                               bool microphone_muted,
                               uint8_t microphone_sensitivity,
-                              const char *screen_timeout)
+                              const char *screen_timeout, bool acknowledgement_male,
+                              bool save_failed)
 {
-    frame_buffer_t *frame = page_frame("设备设置");
+    frame_buffer_t *frame = page_frame(save_failed ? XIAOTAI_UI_SAVE_RETRY : "设备设置");
     if (frame == NULL) return;
     char value[64];
     const unsigned values[2] = {volume, microphone_sensitivity};
@@ -1182,9 +1258,12 @@ void xiaotai_ui_show_settings(uint8_t volume, bool speaker_muted,
         speaker_muted ? "扬声器：已关闭" : "扬声器：已开启", 1, 0xffff, 140);
     centered_mixed_in(frame, 238, 131,
         microphone_muted ? "麦克风：已关闭" : "麦克风：已开启", 1, 0xffff, 140);
-    rectangle(frame, 8, 160, 304, 30, 0x10a4);
+    rectangle(frame, 8, 160, 148, 30, 0x10a4);
     snprintf(value, sizeof(value), "自动息屏 %s", screen_timeout);
-    centered_mixed_in(frame, 160, 167, value, 1, 0xffff, 296);
+    centered_mixed_in(frame, 82, 167, value, 1, 0xffff, 140);
+    rectangle(frame, 164, 160, 148, 30, 0x10a4);
+    centered_mixed_in(frame, 238, 167,
+        acknowledgement_male ? "回应声：男声" : "回应声：女声", 1, 0xffff, 140);
     rectangle(frame, 8, 196, 148, 30, 0x10a4);
     centered_mixed_in(frame, 82, 203, "网络信息", 1, 0xffff, 140);
     rectangle(frame, 164, 196, 148, 30, 0x10a4);

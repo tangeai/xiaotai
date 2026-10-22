@@ -122,7 +122,27 @@ int main(void){
         run_c(f'#include "{INCLUDE / "starter_playback_scope.h"}"\n' + r'''
 #include <assert.h>
 #include <stdio.h>
+#include <stdarg.h>
 static starter_playback_scope_t s_playback_scope={.lock=ATOMIC_FLAG_INIT};
+#define STARTER_RUNTIME_AI_CONNECTING 2
+#define STARTER_RUNTIME_AI_ACTIVE 3
+typedef struct {int state;} starter_runtime_status_t;
+typedef struct {int ai_phase;bool emotion_tag_present;char emotion[16];bool valid;} starter_runtime_face_snapshot_t;
+static starter_runtime_status_t runtime;
+static starter_runtime_face_snapshot_t product={.valid=true};
+static unsigned snapshot_reads;
+static starter_runtime_status_t starter_runtime_status_snapshot(void){snapshot_reads++;return runtime;}
+static starter_runtime_face_snapshot_t starter_runtime_face_snapshot(void){return product;}
+static void starter_media_playback_waveform(starter_playback_waveform_t *out){
+    starter_playback_scope_read(&s_playback_scope,100,1,runtime.state==STARTER_RUNTIME_AI_ACTIVE,out);
+}
+static char output[2048];
+static int capture(const char *format,...){
+    va_list args;va_start(args,format);
+    int n=vsnprintf(output+strlen(output),sizeof(output)-strlen(output),format,args);
+    va_end(args);return n;
+}
+#define printf capture
 ''' + function(source, 'starter_media_set_face_animation_enabled')
               + function(source, 'starter_media_face_animation_enabled')
               + function(console, 'command_face_animation') + r'''
@@ -139,6 +159,65 @@ int main(void){
     assert(starter_media_face_animation_enabled());
     assert(command_face_animation(1,on)==0);
     assert(command_face_animation(3,on)!=0);
+    // Query is read-only and exposes the actual live inputs, even with a TAG.
+    runtime.state=STARTER_RUNTIME_AI_ACTIVE;
+    product.ai_phase=3;product.emotion_tag_present=true;strcpy(product.emotion,"happy");
+    int16_t pcm[320];for(unsigned i=0;i<320;i++)pcm[i]=32767;
+    starter_playback_scope_publish_dots(&s_playback_scope,pcm,320,100,1);
+    output[0]=0;snapshot_reads=0;
+    assert(command_face_animation(1,on)==0 && starter_media_face_animation_enabled());
+    assert(strstr(output,"ai=1 phase=3 tag=1 emotion=happy pcm=1 columns=7777777"));
+    assert(snapshot_reads==1 && s_playback_scope.valid && s_playback_scope.at_ms==100);
+    product.emotion_tag_present=false;
+    output[0]=0;assert(command_face_animation(1,on)==0);
+    assert(strstr(output,"tag=0 emotion=happy pcm=1 columns=7777777"));
+    runtime.state=0;output[0]=0;
+    assert(command_face_animation(1,on)==0);
+    assert(strstr(output,"ai=0") && strstr(output,"pcm=0 columns=0000000"));
+    runtime.state=STARTER_RUNTIME_AI_ACTIVE;output[0]=0;
+    assert(command_face_animation(2,off)==0);
+    assert(strstr(output,"Face animation: off") && strstr(output,"pcm=0 columns=0000000"));
+    unsigned reads=snapshot_reads;output[0]=0;
+    assert(command_face_animation(2,bad)!=0 && snapshot_reads==reads);
+    product.valid=false;output[0]=0;
+    assert(command_face_animation(1,on)==0);
+    assert(strstr(output,"snapshot=unavailable") && !strstr(output,"tag="));
+}
+''')
+
+    def test_face_snapshot_reports_lock_failure_without_copying_large_product_view(self):
+        source = (ROOT / 'platforms/esp-idf/components/starter_runtime/src/starter_runtime.c').read_text()
+        header = (ROOT / 'platforms/esp-idf/components/starter_runtime/include/starter_runtime.h').read_text()
+        end = header.index('} starter_runtime_face_snapshot_t;') + len('} starter_runtime_face_snapshot_t;')
+        start = header.rfind('typedef struct {', 0, end)
+        run_c(r'''
+#include <stdbool.h>
+#include <string.h>
+#include <assert.h>
+typedef int starter_ai_ui_phase_t;
+''' + header[start:end] + r'''
+static struct {int ai_phase;bool emotion_tag_present;char emotion[16];char unused_contacts[8192];} s_product_snapshot;
+static void *s_product_mutex;
+static bool lock_ok;
+static unsigned takes,gives;
+#define pdTRUE 1
+#define pdMS_TO_TICKS(n) (n)
+static int xSemaphoreTake(void *mutex,unsigned wait){takes++;return lock_ok;}
+static void xSemaphoreGive(void *mutex){gives++;}
+''' + function(source, 'starter_runtime_face_snapshot') + r'''
+int main(void){
+    starter_runtime_face_snapshot_t out=starter_runtime_face_snapshot();
+    assert(!out.valid && takes==0 && gives==0);
+    s_product_mutex=(void*)1;
+    out=starter_runtime_face_snapshot();assert(!out.valid && takes==1 && gives==0);
+    lock_ok=true;s_product_snapshot.ai_phase=3;s_product_snapshot.emotion_tag_present=true;
+    strcpy(s_product_snapshot.emotion,"happy");
+    out=starter_runtime_face_snapshot();
+    assert(out.valid && out.ai_phase==3 && out.emotion_tag_present && !strcmp(out.emotion,"happy"));
+    assert(gives==1 && sizeof(out)<=32);
+    out.emotion[0]='x';assert(s_product_snapshot.emotion[0]=='h');
+    lock_ok=false;out=starter_runtime_face_snapshot();
+    assert(!out.valid && !out.emotion_tag_present && !out.emotion[0] && gives==1);
 }
 ''')
 
@@ -295,8 +374,12 @@ int main(void){
     }
     s_face_tag_active=true;
     unsigned lines_before=lines;
+    s_playback_waveform.points[0]=0;
     apply_expression("sad",3,0);
-    assert(lines==lines_before && eye_h==tag_eye_h); /* full TAG face wins */
+    assert(lines==lines_before && eye_h==tag_eye_h); /* explicit TAG owns the whole face */
+    s_playback_waveform.points[0]=9;
+    apply_expression("sad",3,0);
+    assert(lines==lines_before && eye_h==tag_eye_h); /* PCM changes cannot override TAG */
     s_face_tag_active=false;
     s_playback_waveform.active=false;
     apply_expression("sad",0,0);
@@ -319,6 +402,8 @@ int main(void){
         source = (ROOT / 'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()
         end = source.index('} expression_geometry_t;') + len('} expression_geometry_t;')
         start = source.rfind('typedef struct {', 0, end)
+        input_start = source.index('    starter_media_playback_waveform(&s_playback_waveform);')
+        input_end = source.index('    const char *emotion = product.emotion;', input_start)
         run_c(f'#include "{INCLUDE / "starter_playback_waveform.h"}"\n' + r'''
 #define CONFIG_IDF_TARGET_ESP32S3 1
 #include <assert.h>
@@ -341,6 +426,12 @@ char s_rendered_expression[16];
 starter_playback_waveform_t s_playback_waveform;
 static bool s_face_default_ai;
 static bool s_face_tag_active;
+static starter_playback_waveform_t live_pcm;
+static void starter_media_playback_waveform(starter_playback_waveform_t *out){*out=live_pcm;}
+static void tick_inputs(bool ai_now,bool tag){
+    struct {bool emotion_tag_present;} product={tag};
+''' + source[input_start:input_end] + r'''
+}
 typedef unsigned lv_color_t;
 typedef struct {unsigned bg_color;int bg_opa,radius;} lv_draw_rect_dsc_t;
 typedef struct {unsigned color;int width,opa,round_start,round_end;} lv_draw_line_dsc_t;
@@ -415,7 +506,38 @@ int main(void){
     unsigned tag_eyes=eye_draws;
     apply_expression("sad",3,3);
     assert(eye_draws==tag_eyes); /* TAG face ignores audio level */
+    // Explicit happy TAG owns the full face, even while music PCM changes.
+    live_pcm=(starter_playback_waveform_t){.active=true,.columns=0x6566566};
+    tick_inputs(true,true);
+    assert(!s_playback_waveform.active && s_face_tag_active && !s_face_default_ai);
+    apply_expression("happy",3,0);
+    assert(eye_h==22 && lines==0);
+    unsigned happy_eyes=eye_draws,tag_areas=area_invalidations;
+    memcpy(before,canvas,sizeof(before));
+    live_pcm.columns=0x1234321;tick_inputs(true,true);
+    apply_expression("happy",3,0);
+    assert(area_invalidations==tag_areas && eye_draws==happy_eyes);
+    assert(memcmp(before,canvas,sizeof(before))==0);
+    // Same happy fallback without a server TAG: squint and show actual PCM.
+    tick_inputs(true,false);
+    assert(s_playback_waveform.active && !s_face_tag_active && s_face_default_ai);
+    apply_expression("happy",3,0);
+    assert(eye_h==6 && lines==0);
+    unsigned default_eyes=eye_draws,default_areas=area_invalidations;
+    memcpy(before,canvas,sizeof(before));
+    live_pcm.columns=0x6566566;tick_inputs(true,false);
+    apply_expression("happy",3,0);
+    assert(area_invalidations==default_areas+1 && eye_draws==default_eyes);
+    assert(memcmp(before,canvas,sizeof(before))!=0);
+    for(unsigned y=0;y<108;y++)for(unsigned x=0;x<220;x++)
+        if(x<77 || x>=143 || y<70 || y>=106)
+            assert(canvas[y*220+x]==before[y*220+x]);
+    live_pcm.active=false;tick_inputs(true,false);
+    apply_expression("happy",3,0);
+    assert(eye_draws==default_eyes && canvas[72*220+137]==HOME_BACKGROUND_COLOR);
+    assert(canvas[102*220+137]==0x55B8C4); /* stopped -> static base */
     s_face_tag_active=false;
+    s_face_default_ai=true;
     apply_expression("happy",0,0);
     assert(eye_h==6);
     s_page=1;

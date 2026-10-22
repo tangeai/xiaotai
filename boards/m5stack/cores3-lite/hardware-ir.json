@@ -443,31 +443,31 @@
   "build_evidence": {
     "artifacts": [
       {
-        "path": "artifacts/1.0.1+build.29/m5stack_cores3_lite_xiaotai.bin",
-        "size_bytes": 4020784,
-        "sha256": "45dbb13b749e4d0892d6a602e9a117bc969b307634b82347919a9ea7dd205d2b"
+        "path": "build/m5stack_cores3_lite_xiaotai.bin",
+        "size_bytes": 4023008,
+        "sha256": "339a547337d437bde25f69f21f62a6e3fb32e2ac1a258b866bb9aa56aa1b5992"
       },
       {
-        "path": "artifacts/1.0.1+build.29/m5stack_cores3_lite_xiaotai.elf",
-        "size_bytes": 29081692,
-        "sha256": "5cd0e940bf2ca2594488d8e5d3d2e16491b416e2b269f8d5b1fa903e200135b1"
+        "path": "build/m5stack_cores3_lite_xiaotai.elf",
+        "size_bytes": 29095812,
+        "sha256": "4d60e843d6ba761b58a2d0316b5a678f74e449e7643970d231636c56f78f15a5"
       },
       {
-        "path": "artifacts/1.0.1+build.29/bootloader/bootloader.bin",
+        "path": "build/bootloader/bootloader.bin",
         "size_bytes": 20848,
         "sha256": "baec2960de2b8d802c1417e7c399f1cd09c96c03d18ed12eba72bcffdbf650ef"
       },
       {
-        "path": "artifacts/1.0.1+build.29/partition_table/partition-table.bin",
+        "path": "build/partition_table/partition-table.bin",
         "size_bytes": 3072,
         "sha256": "1edad21a69d0791cb6fe8a4f47ea7c64cfd302031f8db2c9f68cdc9568ca124c"
       }
     ],
     "status": "COMPILE_PASS",
     "variant": "ili9342e",
-    "version": "1.0.1+build.29",
+    "version": "1.0.1+build.41",
     "idf_version": "v5.5.5",
-    "note": "ESP-IDF v5.5.5 native build and exact BIN/ELF identity passed. Post-encoding S3 uplink revalidates session, mute epoch, microphone, PTT/uplink and transport readiness; frames invalidated during encoding are not submitted and queue slots are returned. S3 calls remain audio-only, H5 MJPEG retained, AI up alaw/8k down opus/16k. No AEC/gain or memory/cache tuning in this patch. Current artifact has not been flashed; prior runtime observations apply only to their named artifacts. Artifact paths relative to native project."
+    "note": "Native development build fixes stale emotion TAG across completed same-group AI caption segments in the shared S3/P4/BK parser. Explicit neutral, partial-to-final TAG preservation, pending standalone TAG and round-end tail semantics retained. Public-interface regression failed before fix and passed after. Full tools/check.sh passed: 433 tool tests, product ASan/UBSan, five board manifests. Native compile and BIN/ELF identity passed. Only M5 rebuilt; no serial device, no local flash or hardware acceptance. Exact build.40 retained in artifacts. Voice-record remains withdrawn; short-phrase/onset-loss work remains deferred."
   },
   "runtime_evidence": [
     {
@@ -544,6 +544,48 @@
         "cores3-build25-DOUBLETALK.md"
       ],
       "notes": "Native three-image flash verified, boot version/ELF prefix match, PSRAM test and bound Wi-Fi/MQTT startup pass. Six AI cycles generations 2..7 enter active then waiting/wake, last-error=0. Final idle internal-free=53895 and largest=29696 stable at 92/122/152 seconds, PSRAM-free=6587944. 61 sampled sustained-playback windows: mean wall/audio=1086.95/1024 ms, AEC wrapper=31866.11 us, one observed capture overflow; realtime target not met. Initial playback RX/decoded/written=10157, decode/I2S/RX-overflow=0. One reconnect generation recorded media dropped=1, cause unresolved. Visual captions/touch, subjective audio, double-talk, NVS save/unbind and other media modes not certified. No L6 claim. Device left build.25 waiting with wake enabled; serial observer closed. Subsequent user session 8 feedback: interruption difficult and recognition often poor even with playback stopped; acoustic acceptance FAIL (user reported). Read-only status confirmed same firmware and session, no decode/I2S errors; historical counters cannot localize the near-end speech loss. Follow-up controlled tests: quiet complete-sentence recognition 3/3 correct; one complete-sentence barge-in correct. At about 30 cm, formula short-phrase barge-in required two repetitions and only the final part was recognized. Subsequent controlled quiet formula recognized correctly once. Double-talk acceptance remains FAIL; these limited quiet passes do not certify all speech. No tuning applied."
+    },
+    {
+      "label": "User build.36 AI face observation, 2026-10-22",
+      "artifact_sha256": "2bdef58d4f9acee244eb94da4b1478e4015dc7932856ded43e2fc2d3100a43f9",
+      "elf_sha256": "e2bcb5dd18d99ab05e6422b6adaff421d96c6545ed0951a0777465cea444aada",
+      "verification": "user_reported",
+      "acceptance_levels": [],
+      "features": [
+        "ai_talk"
+      ],
+      "source_refs": [
+        "VALIDATION.md"
+      ],
+      "notes": "User status version/time/ELF prefix match retained build.36. Two face snapshots: ai=1 phase=3 tag=1 emotion=happy pcm=1, columns=6775666 then 5555555; mouth reported static. Consistent with explicit TAG priority. No inference whether this TAG belongs to song or introduction; no full hardware acceptance."
+    },
+    {
+      "label": "User build.38 short-phrase observations, 2026-10-22",
+      "artifact_sha256": "d42d19f468356458f4f499a8b5bd7bdb19e433324ea26d9a30c72247746e98d8",
+      "elf_sha256": "b1b3d28387a815706fb7d7f294385681e68da0e40c88891bf3232666dc255163",
+      "verification": "user_reported",
+      "acceptance_levels": [],
+      "features": [
+        "ai_talk"
+      ],
+      "source_refs": [
+        "VALIDATION.md"
+      ],
+      "notes": "Version and ELF prefix match retained artifacts/1.0.1+build.38. User reports short phrases missed at about 30 cm and long phrases better. Several quiet voice windows preserve mic/AEC RMS, continuous SDK submissions, no recorded capture overflow; repeated same-group final ASR events lack transcript/mode. Does not localize onset loss or certify network/cloud receipt."
+    },
+    {
+      "label": "User build.41 music mouth and performance observation, 2026-10-22",
+      "artifact_sha256": "339a547337d437bde25f69f21f62a6e3fb32e2ac1a258b866bb9aa56aa1b5992",
+      "elf_sha256": "4d60e843d6ba761b58a2d0316b5a678f74e449e7643970d231636c56f78f15a5",
+      "verification": "user_reported",
+      "acceptance_levels": [],
+      "features": [
+        "ai_talk"
+      ],
+      "source_refs": [
+        "VALIDATION.md"
+      ],
+      "notes": "User confirms music mouth restored; subsequent status version/time/ELF prefix match build.41. Generation 2 active, RX/decoded/played 1870/1868/1867, pending 3; decode/I2S/RX-overflow/application drops zero. Window 357 wall/audio 1179/1024 ms, AEC average 34385 us, capture overflow and clipping zero. Cumulative AEC misses 485, processed 1387, mic clipped 5356. UI 26 refreshes per 5005 ms, total wall render/transfer 1060 ms, max 165 ms. Real-time headroom remains limited; no full acoustic, long-run, other-board or product acceptance claim."
     }
   ],
   "features": {
@@ -598,6 +640,6 @@
       "tools/tests/test_cores3_text_memory.py"
     ],
     "standalone_skill_build_assessment": "not certified; repository-native shared AI alaw/8k uplink and opus/16k downlink",
-    "runtime": "Current build.29: not flashed; HIL pending. Build.25 observations and known double-talk failure remain historical."
+    "runtime": "Build.41 user reports music mouth restored and provides matching firmware identity in subsequent performance status. Real-time AEC/UI headroom remains limited. Full acoustic, long-run and other-board validation pending. Recording experiment withdrawn; short-phrase/onset-loss work deferred."
   }
 }

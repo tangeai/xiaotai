@@ -254,6 +254,7 @@ static int command_voice_diag(int argc, char **argv)
     return 0;
 }
 
+
 /* 汇总各深模块的只读快照，不读取或打印 device_secret。 */
 static void print_audio_timing(starter_media_status_t media)
 {
@@ -679,6 +680,23 @@ static int command_face_animation(int argc, char **argv)
     }
     printf("Face animation: %s\n",
            starter_media_face_animation_enabled() ? "on" : "off");
+    /* Read the same public inputs as the face renderer. Do not mask PCM when
+     * a TAG wins: seeing both is what distinguishes policy from lost audio.
+     * These snapshots are independent; query again across session changes. */
+    starter_runtime_status_t runtime = starter_runtime_status_snapshot();
+    starter_runtime_face_snapshot_t product = starter_runtime_face_snapshot();
+    starter_playback_waveform_t playback;
+    starter_media_playback_waveform(&playback);
+    bool ai = runtime.state == STARTER_RUNTIME_AI_CONNECTING ||
+              runtime.state == STARTER_RUNTIME_AI_ACTIVE;
+    if (!product.valid) {
+        printf("Face inputs: ai=%d snapshot=unavailable pcm=%d columns=%07lx\n",
+               (int)ai, (int)playback.active, (unsigned long)playback.columns);
+        return 0;
+    }
+    printf("Face inputs: ai=%d phase=%d tag=%d emotion=%.15s pcm=%d columns=%07lx\n",
+           (int)ai, (int)product.ai_phase, (int)product.emotion_tag_present,
+           product.emotion, (int)playback.active, (unsigned long)playback.columns);
     return 0;
 }
 

@@ -296,7 +296,8 @@ static bool settings_valid(const xiaotai_product_settings_t *value)
     return value != NULL && value->volume <= 10U &&
            value->screen_timeout_index <= 4U && value->home_face <= 2U &&
            value->microphone_sensitivity >= XIAOTAI_MIC_SENSITIVITY_MIN &&
-           value->microphone_sensitivity <= XIAOTAI_MIC_SENSITIVITY_MAX;
+           value->microphone_sensitivity <= XIAOTAI_MIC_SENSITIVITY_MAX &&
+           value->expression_index < 21U;
 }
 
 int xiaotai_storage_load_settings(xiaotai_product_settings_t *out)
@@ -306,20 +307,17 @@ int xiaotai_storage_load_settings(xiaotai_product_settings_t *out)
     size_t saved = 0;
     size_t read = ef_get_env_blob(XIAOTAI_SETTINGS_KEY, &record,
                                   sizeof(record), &saved);
-    if (read == sizeof(record) && saved == sizeof(record) &&
+    /* v1 had five bytes, v2 added sensitivity. Their padded record sizes
+     * equal v3; use payload_size and CRC, never reinterpret padding as fields. */
+    size_t legacy_size = record.header.payload_size;
+    if (read >= sizeof(record.header) + legacy_size &&
+        saved == sizeof(record) &&
         record.header.magic == XIAOTAI_RECORD_MAGIC &&
         record.header.version == XIAOTAI_RECORD_VERSION &&
-        record.header.payload_size == sizeof(xiaotai_product_settings_v1_t) &&
-        record.header.payload_crc == ef_calc_crc32(
-            0, &record.payload, sizeof(xiaotai_product_settings_v1_t))) {
-        xiaotai_product_settings_v1_t legacy = {0};
-        memcpy(&legacy, &record.payload, sizeof(legacy));
+        (legacy_size == sizeof(xiaotai_product_settings_v1_t) || legacy_size == 6U) &&
+        record.header.payload_crc == ef_calc_crc32(0, &record.payload, legacy_size)) {
         xiaotai_product_settings_default(out);
-        out->volume = legacy.volume;
-        out->speaker_muted = legacy.speaker_muted;
-        out->microphone_muted = legacy.microphone_muted;
-        out->screen_timeout_index = legacy.screen_timeout_index;
-        out->home_face = legacy.home_face;
+        memcpy(out, &record.payload, legacy_size);
         if (settings_valid(out)) return BK_OK;
         xiaotai_product_settings_default(out);
         return BK_FAIL;

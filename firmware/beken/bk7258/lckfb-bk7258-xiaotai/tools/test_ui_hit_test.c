@@ -124,7 +124,7 @@ int main(void)
     assert(xiaotai_ui_settings_action(40U, 210U) == XIAOTAI_UI_ACTION_NETWORK);
     assert(xiaotai_ui_settings_action(230U, 210U) == XIAOTAI_UI_ACTION_RESET);
     assert(xiaotai_ui_settings_action(160U, 210U) == XIAOTAI_UI_ACTION_NONE);
-    assert(xiaotai_ui_settings_action(230U, 172U) == XIAOTAI_UI_ACTION_SLEEP);
+    assert(xiaotai_ui_settings_action(230U, 172U) == XIAOTAI_UI_ACTION_ACK_VOICE);
     assert(xiaotai_ui_settings_action(8U, 54U) == XIAOTAI_UI_ACTION_VOLUME_DOWN);
     assert(xiaotai_ui_settings_action(311U, 54U) == XIAOTAI_UI_ACTION_VOLUME_UP);
     assert(xiaotai_ui_settings_action(319U, 210U) == XIAOTAI_UI_ACTION_NONE);

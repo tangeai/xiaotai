@@ -182,7 +182,8 @@ BK7258、ESP32-S3、ESP32-P4 是同一产品的硬件适配，不是三个独立
 - 一对一通话页的麦克风按钮显示当前状态“麦克风已开”或“麦克风已关”，点击后切换；状态文案不写成“静音/开麦”动作。
 - 本地表情目录使用 21 个稳定 tag：`neutral`、`happy`、`laughing`、`funny`、`sad`、`angry`、`crying`、`loving`、`embarrassed`、`surprised`、`shocked`、`thinking`、`winking`、`cool`、`relaxed`、`delicious`、`kissy`、`confident`、`sleepy`、`silly`、`confused`。AI 回复和本地表情浏览页共用这一目录。
 - 平台 `caption.params.emotion` 使用中文协议值。设备必须映射：`中性→neutral`、`开心→happy`、`兴奋→laughing`、`温和→relaxed`、`安慰→loving`、`思考→thinking`、`惊讶→surprised`、`严肃→confident`、`困倦→sleepy`、`困惑→confused`。为兼容旧消息，也接受英文 tag、`round_start.params.emotion`、独立 `emotion`/`ai_emotion`/`expression` 消息、`event.params.data.emotion` 以及旧版 `ai_reply.emotion`。设备日志必须记录最终表情切换，平台未下发 emotion 时不得伪造变化。
-- AI 明确返回的有效表情 Tag 优先于本地默认表情和播放动效；有 Tag 时暂停播放动效。没有 Tag 的 AI 回复可按屏幕布局呈现音频动效：BK 和 S3 紧凑屏使用固定眯眼与随实际播放 PCM 跳动的七列点阵嘴，动态刷新只覆盖嘴巴区域；无新播放帧、扬声器静音或播放音量为零时回到静态点阵。BK 和 S3 点阵按高度固定使用青、绿、暖黄三档颜色，不添加变色动画。切换 Tag 或离开 AI 页面时不得在旧页面继续画嘴巴。
+- AI 明确返回的有效情绪 Tag 控制完整表情，优先于本地默认表情，并关闭嘴部示波。未收到有效 Tag、使用本地默认表情时，AI 播放采用固定眯眼与真实 PCM 驱动的嘴部动效；不以表情字符串是否为 `happy` 判断 Tag 来源。BK 和 S3 紧凑屏使用七列点阵，P4 使用波形；无有效播放、扬声器静音或音量为零时停止随音变化。点阵按高度固定使用青、绿、暖黄三档颜色，不添加变色动画，无播放时回到静态点阵。切换到明确 Tag 或离开 AI 页面时不得继续画播放嘴型。
+- Tag 按字幕段生效：同段局部字幕到最终字幕保留已收到的 Tag；上一条字幕已标记 `is_final=true` 后，下一条 AI 字幕开启新的表情段，即使 `utterance_id` 相同也不继承旧 Tag。新段没有 Tag 时恢复默认表情与播放示波；明确 `neutral` 仍是有效 Tag。独立情绪消息只交给随后第一条 AI 字幕；`round_end` 保留当前段尾音表情，不按固定超时强制清除。
 - AI 和通话的编码、采样率、AEC、NS、AGC 按各板卡的[音视频参数](MEDIA_CONTRACT.md)执行，不从交互形态推断音频处理能力。实机验收需覆盖静音房、风扇噪声、0.5/1/2 m 拾音和双讲。
 - `touch-full` 设置页提供持久化的 1–5 档“麦克风灵敏度”，控制板级 ADC 前端增益并同时作用于 H5、AI、设备呼叫、微信 VoIP 和多人对讲。默认 4 档“增强”；3 档保留各板卡的标准增益，具体寄存器值由板级适配定义。调高后须同时检查近讲削波和远讲识别。
 - 收到 AI `end_session` 时，必须先停止上行，并至少保留 1.5 秒的尾音包到达窗口；随后等待软件包队列和按已写 PCM 时长估算的 BK 播放 DMA 尾音排空，整个结束流程最多等待 5 秒。传输先被远端关闭时，仍须排空已经收到的尾音，最多等待 3 秒；不得仅以软件队列瞬时为空判断播完。

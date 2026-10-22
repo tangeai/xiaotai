@@ -91,7 +91,7 @@ static void check_page(unsigned count,unsigned requested){
         if(o->action==11)next=o;
     }
     unsigned remaining=count-expected*3;
-    assert(rows==(remaining<3?remaining:3) && calls==rows);
+    assert(rows==(remaining<3?remaining:3) && calls==0);
     assert(prev && next && prev->y>=180 && next->y>=180);
     assert(prev->disabled==(expected==0));assert(next->disabled==(expected+1>=pages));
 }

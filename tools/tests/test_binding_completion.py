@@ -59,6 +59,9 @@ int main(void){int16_t pcm=0;
 #define AUDIO_TASK_STOP_TIMEOUT_MS 2000
 typedef int beken_thread_arg_t;
 static atomic_bool s_prompt_run=true,s_prompt_active=true;
+static unsigned s_prompt_repeats=3;
+static atomic_int s_prompt_result;
+#define BK_FAIL -1
 static int s_prompt_stopped;
 static void *s_prompt_thread=(void*)1;
 static int16_t pcm[320], *s_prompt_pcm=pcm;

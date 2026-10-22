@@ -134,19 +134,16 @@ static void caption_copy(char *destination, size_t capacity,
     size_t available = capacity - used - 1U;
     size_t source_length = strlen(source);
     size_t length = source_length > available ? available : source_length;
-    memcpy(destination + used, source, length);
-    destination[used + length] = '\0';
     if (length < source_length) {
+        /* The first excluded byte tells us whether the cut splits a code
+         * point. A complete character ending at capacity must be retained. */
         while (length > 0U &&
-               (((unsigned char)destination[used + length - 1U] & 0xc0U) ==
-                0x80U)) {
-            destination[used + --length] = '\0';
-        }
-        if (length > 0U &&
-            (unsigned char)destination[used + length - 1U] >= 0xc0U) {
-            destination[used + length - 1U] = '\0';
+               (((unsigned char)source[length] & 0xc0U) == 0x80U)) {
+            --length;
         }
     }
+    memcpy(destination + used, source, length);
+    destination[used + length] = '\0';
 }
 
 void xiaotai_ai_view_init(xiaotai_ai_view_t *view)
@@ -225,7 +222,11 @@ bool xiaotai_ai_view_apply(xiaotai_ai_view_t *view, const char *json,
         int type = caption_type->valueint;
         bool same_group = type == view->caption_type &&
                           strcmp(utterance_id, view->utterance_id) == 0;
-        if (type == 1 && !same_group && view->caption_type != -1 &&
+        /* Music can reuse one utterance ID for many completed captions.
+         * Grouping controls text merging, not indefinite emotion ownership.
+         * Preserve partial -> final emotion within a segment and an independent
+         * TAG waiting for its first AI caption (including round_start's TAG). */
+        if (type == 1 && (!same_group || view->caption_final) && view->caption_type != -1 &&
             !view->emotion_tag_pending_caption) {
             view->emotion_tag_present = false;
             snprintf(view->emotion, sizeof(view->emotion), "happy");
@@ -241,6 +242,7 @@ bool xiaotai_ai_view_apply(xiaotai_ai_view_t *view, const char *json,
         const char *emotion = json_emotion(params);
         if (emotion[0] != '\0') xiaotai_ai_view_set_emotion(view, emotion);
         bool is_final = cJSON_IsBool(final) && cJSON_IsTrue(final);
+        view->caption_final = is_final;
         view->phase = type == 1 ? XIAOTAI_AI_UI_SPEAKING :
             (is_final ? XIAOTAI_AI_UI_THINKING : XIAOTAI_AI_UI_LISTENING);
         present = is_final || now_ms - view->last_present_ms >= 100U;
@@ -249,6 +251,7 @@ bool xiaotai_ai_view_apply(xiaotai_ai_view_t *view, const char *json,
         view->emotion_tag_present = false;
         snprintf(view->emotion, sizeof(view->emotion), "happy");
         view->caption_type = -1;
+        view->caption_final = false;
         view->utterance_id[0] = '\0';
         const char *emotion = json_emotion(params);
         if (emotion[0] != '\0') xiaotai_ai_view_set_emotion(view, emotion);

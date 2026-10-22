@@ -22,12 +22,18 @@ class UiAlignment(unittest.TestCase):
               (base / 'src/xiaotai_ui_hit_test.c').read_text().replace('#include "xiaotai_ui_hit_test.h"', '') + r'''
 #define UI_PAGE_SETTINGS 1
 #define UI_PAGE_NETWORK 2
+#define UI_PAGE_SETTINGS_PREVIEW_ERROR 3
+#define BK_OK 0
+static bool s_settings_save_failed,s_ack_preview_pending;
+static int xiaotai_audio_preview_acknowledgement(bool male){return 0;}
+static void xiaotai_ui_show_settings_preview_error(void){}
 #define XIAOTAI_MIC_SENSITIVITY_MAX 5
 #define TAG "test"
 #define BK_LOGE(...) ((void)0)
+#define BK_LOGW(...) ((void)0)
 typedef struct {unsigned x,y;} control_event_t;
 static int s_ui_page=UI_PAGE_SETTINGS, saved, volume_calls, sensitivity_calls, rejected, reset_requests;
-static struct {uint8_t volume,microphone_sensitivity,screen_timeout_index;bool speaker_muted,microphone_muted;} s_settings={5,4,0,false,false};
+static struct {uint8_t volume,microphone_sensitivity,screen_timeout_index;bool speaker_muted,microphone_muted,acknowledgement_male;} s_settings={5,4,0,false,false};
 static void xiaotai_audio_set_volume(unsigned v){volume_calls++;}
 static void xiaotai_audio_set_speaker_muted(bool v){}
 static void xiaotai_audio_set_microphone_muted(bool v){}
@@ -36,7 +42,7 @@ static bool xiaotai_audio_commit_sensitivity(uint8_t *value,uint8_t next,int (*f
  sensitivity_calls++;if(rejected)return false;*value=next;return true;
 }
 static void xiaotai_ui_show_status(const char *s){}
-static int xiaotai_storage_save_settings(void *s){saved++;return 0;}
+static void save_settings(void){saved++;}
 static void render_settings(void){}
 static void render_network(void){}
 static void handle_reset_action(unsigned action){assert(action==0);reset_requests++;}
@@ -56,6 +62,7 @@ int main(void){
  press(40,132);assert(s_settings.speaker_muted && !s_settings.microphone_muted);
  press(230,132);assert(s_settings.microphone_muted);
  press(40,172);assert(s_settings.screen_timeout_index==1);
+ press(230,172);assert(s_settings.acknowledgement_male && s_ack_preview_pending);
  press(230,210);assert(reset_requests==1 && s_ui_page==UI_PAGE_SETTINGS);
  press(160,210);assert(reset_requests==1);
  press(40,210);assert(s_ui_page==UI_PAGE_NETWORK);
@@ -92,6 +99,9 @@ int main(void){
 #include <string.h>
 typedef struct {char text[128];int x,y,w,h;} lv_obj_t;
 ''' + enums + r'''
+#include <stdatomic.h>
+#define PREFERENCES_FAILED 3
+static atomic_int s_preferences_save_status;
 #define lv_color_hex(c) (c)
 static struct {unsigned volume,microphone_sensitivity,sleep_index;bool speaker_muted,microphone_muted,acknowledgement_male;} s_preferences;
 static const char *s_sleep_names[]={"5 分钟"};
@@ -119,6 +129,9 @@ int main(void){
  s_preferences.volume=0;s_preferences.microphone_sensitivity=1;refresh_settings_controls();
  assert(strstr(s_settings_volume->text,"扬声器音量") && strstr(s_settings_volume->text,"0 / 10"));
  assert(strstr(s_settings_microphone_sensitivity->text,"麦克风灵敏度") && strstr(s_settings_microphone_sensitivity->text,"1 / 5"));
+ count=0;atomic_store(&s_preferences_save_status,PREFERENCES_FAILED);render_settings(NULL);
+ bool retry=false;for(unsigned i=0;i<count;i++)if(!strcmp(pool[i].text,"保存失败，重试"))retry=true;
+ assert(retry);
 }
 ''')
 

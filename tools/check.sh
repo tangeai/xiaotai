@@ -15,6 +15,8 @@ python3 "$repo_dir/tools/tests/test_tip_layout.py"
 python3 "$repo_dir/tools/tests/test_room_keypad.py"
 python3 "$repo_dir/tools/tests/test_s3_touch_targets.py"
 python3 "$repo_dir/tools/tests/test_ui_alignment.py"
+# Includes 1,000 coalesced-save cycles and reset at each NVS write boundary.
+python3 "$repo_dir/tools/tests/test_preferences_persistence.py"
 python3 "$repo_dir/tools/tests/test_reset_only_prototype.py"
 python3 "$repo_dir/tools/tests/test_binding_guidance.py"
 python3 "$repo_dir/tools/tests/test_binding_countdown.py"
@@ -26,6 +28,10 @@ python3 "$repo_dir/tools/tests/test_call_error_reset.py"
 python3 "$repo_dir/tools/tests/test_release_logging.py"
 python3 "$repo_dir/tools/tests/test_unbind_flash_stack.py"
 python3 "$repo_dir/tools/tests/test_bk_settings_status.py"
+python3 "$repo_dir/tools/tests/test_bk_product_gaps.py"
+# Includes per-chunk write failure/cancellation and semaphore failure recovery.
+python3 "$repo_dir/tools/tests/test_bk_acknowledgement.py"
+python3 "$repo_dir/tools/generate_bk_prompt_assets.py" --check
 python3 "$repo_dir/tools/tests/test_bk_ptt_release_delivery.py"
 python3 "$repo_dir/tools/tests/test_bk_touch_release_poll.py"
 python3 "$repo_dir/tools/tests/test_ui_font_selection.py"
@@ -35,7 +41,10 @@ python3 "$repo_dir/tools/tests/test_esp_signal_recovery.py"
 python3 "$repo_dir/tools/tests/test_esp_package_identity.py"
 python3 "$repo_dir/tools/tests/test_esp_merged_firmware.py"
 python3 "$repo_dir/tools/tests/test_p4_ai_playback.py"
+# Includes face diagnostics and TAG priority: tagged music stays static, default PCM animates.
 python3 "$repo_dir/tools/tests/test_playback_waveform.py"
+# Received vs retained emotion, protocol boundaries and snapshot synchronization.
+python3 "$repo_dir/tools/tests/test_ai_face_trace.py"
 python3 "$repo_dir/tools/tests/test_wake_audio_boundary.py"
 python3 "$repo_dir/tools/tests/test_wake_ack_overlap.py"
 python3 "$repo_dir/tools/tests/test_bk_release_traces.py"
@@ -133,6 +142,9 @@ python3 "$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools/test_f
 python3 "$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools/test_video_pack.py"
 python3 "$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools/test_voip_profile.py"
 python3 "$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools/verify_downlink_capture.py"
+# Includes 504 emotion segment combinations, captured same-group music TAG expiry,
+# partial/neutral preservation,
+# 2,048 UTF-8 caption boundaries and 10,000 protocol/history rounds.
 python3 "$repo_dir/tools/run_c_sanitizers.py"
 python3 "$repo_dir/tools/product_coverage.py"
 python3 "$repo_dir/tools/build.py" --validate

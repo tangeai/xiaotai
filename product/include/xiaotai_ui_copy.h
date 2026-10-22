@@ -18,5 +18,6 @@
 #define XIAOTAI_UI_ROOM_ALL_MEMBERS "已显示全部成员"
 #define XIAOTAI_UI_VOLUME "扬声器音量"
 #define XIAOTAI_UI_SENSITIVITY "麦克风灵敏度"
+#define XIAOTAI_UI_SAVE_RETRY "保存失败，重试"
 
 #endif

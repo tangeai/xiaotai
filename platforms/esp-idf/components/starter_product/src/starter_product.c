@@ -185,6 +185,7 @@ typedef enum {
     ACTION_ROOM_INPUT_DELETE,
     ACTION_ROOM_INPUT_SUBMIT,
     ACTION_ROOM_INPUT_SKIP,
+    ACTION_PREFERENCES_RETRY,
     ACTION_ROOM_LEAVE_CONFIRM = 60,
     ACTION_ROOM_LEAVE_CANCEL,
     ACTION_ROOM_PREVIOUS,
@@ -433,43 +434,74 @@ static void note_interaction(void)
     }
 }
 
+/* PREFERENCE_SAVE_STATE */
+typedef enum {
+    PREFERENCES_IDLE, PREFERENCES_SAVING, PREFERENCES_SAVED, PREFERENCES_FAILED
+} preferences_save_status_t;
+static atomic_int s_preferences_save_status;
+/* UI-owned pending flag; the worker reads only its immutable snapshot. */
+static bool s_preferences_dirty;
+static product_preferences_t s_preferences_saving;
+/* PREFERENCE_SAVE_STATE_END */
+
 static void preferences_save_task(void *argument)
 {
     (void)argument;
-    if (atomic_load(&s_factory_reset_requested)) {
-        vTaskDelete(NULL);
-        return;
-    }
+    esp_err_t err = ESP_ERR_INVALID_STATE;
     nvs_handle_t nvs = 0;
-    if (nvs_open(PRODUCT_NVS, NVS_READWRITE, &nvs) != ESP_OK) {
-        vTaskDelete(NULL);
-        return;
-    }
-    (void)nvs_set_u8(nvs, "volume", s_preferences.volume);
-    (void)nvs_set_u8(nvs, "spk_mute", s_preferences.speaker_muted ? 1U : 0U);
-    (void)nvs_set_u8(nvs, "mic_mute", s_preferences.microphone_muted ? 1U : 0U);
-    (void)nvs_set_u8(nvs, "mic_sens", s_preferences.microphone_sensitivity);
-    (void)nvs_set_u8(nvs, "ack_voice", s_preferences.acknowledgement_male ? 1U : 0U);
-    (void)nvs_set_u8(nvs, "sleep", s_preferences.sleep_index);
-    (void)nvs_set_u8(nvs, "emoji", s_preferences.emoji_index);
     if (!atomic_load(&s_factory_reset_requested)) {
-        (void)nvs_commit(nvs);
+        err = nvs_open(PRODUCT_NVS, NVS_READWRITE, &nvs);
+        const char *keys[] = {"volume", "spk_mute", "mic_mute", "mic_sens",
+                              "ack_voice", "sleep", "emoji"};
+        const uint8_t values[] = {
+            s_preferences_saving.volume, s_preferences_saving.speaker_muted,
+            s_preferences_saving.microphone_muted,
+            s_preferences_saving.microphone_sensitivity,
+            s_preferences_saving.acknowledgement_male,
+            s_preferences_saving.sleep_index, s_preferences_saving.emoji_index,
+        };
+        for (size_t i = 0; err == ESP_OK && i < sizeof(values); ++i) {
+            err = nvs_set_u8(nvs, keys[i], values[i]);
+        }
+        if (err == ESP_OK) {
+            err = atomic_load(&s_factory_reset_requested)
+                ? ESP_ERR_INVALID_STATE : nvs_commit(nvs);
+        }
+        if (nvs != 0) nvs_close(nvs);
     }
-    nvs_close(nvs);
+    if (err != ESP_OK) ESP_LOGE(TAG, "settings save failed rc=%d", err);
+    /* Publish only after the last storage access; reset uses this boundary. */
+    atomic_store(&s_preferences_save_status,
+                 err == ESP_OK ? PREFERENCES_SAVED : PREFERENCES_FAILED);
     vTaskDelete(NULL);
 }
 
 static void preferences_save(void)
 {
-    /* NVS may disable the flash cache; never call it from the PSRAM-backed
-     * LVGL task, whose stack is invalid while cache is disabled. */
-    (void)xTaskCreatePinnedToCore(preferences_save_task,
-                                  "product_nvs",
-                                  3072,
-                                  NULL,
-                                  1,
-                                  NULL,
-                                  0);
+    if (atomic_load(&s_factory_reset_requested)) return;
+    if (atomic_load(&s_preferences_save_status) == PREFERENCES_SAVING) {
+        s_preferences_dirty = true;
+        return;
+    }
+    s_preferences_saving = s_preferences;
+    s_preferences_dirty = false;
+    atomic_store(&s_preferences_save_status, PREFERENCES_SAVING);
+    /* The internal-stack worker owns flash I/O. UI may use a PSRAM stack. */
+    if (xTaskCreatePinnedToCore(preferences_save_task, "product_nvs", 3072,
+                                NULL, 1, NULL, 0) != pdPASS) {
+        atomic_store(&s_preferences_save_status, PREFERENCES_FAILED);
+    }
+}
+
+static void preferences_poll(void)
+{
+    if (atomic_load(&s_factory_reset_requested)) {
+        return;
+    }
+    if (s_preferences_dirty &&
+        atomic_load(&s_preferences_save_status) != PREFERENCES_SAVING) {
+        preferences_save();
+    }
 }
 
 static void preferences_load(void)
@@ -1008,6 +1040,13 @@ static esp_err_t clear_product_preferences(void)
 static void factory_reset_task(void *argument)
 {
     (void)argument;
+    /* Do not erase while a previously accepted save can still commit. The UI
+     * has already closed admission; fail for retry rather than block forever. */
+    if (atomic_load(&s_preferences_save_status) == PREFERENCES_SAVING) {
+        atomic_store(&s_factory_reset_status, FACTORY_RESET_FAILED);
+        vTaskDelete(NULL);
+        return;
+    }
     esp_err_t config_err = runtime_config_clear_tirtc();
     esp_err_t wifi_err = wifi_manager_forget_credentials();
     /* Product preferences are cleared last so an already-queued async save
@@ -1072,6 +1111,9 @@ static void on_action(lv_event_t *event)
         (void)enter_page(PAGE_EMOJIS);
     } else if (action == ACTION_SETTINGS) {
         enter_settings_page();
+    } else if (action == ACTION_PREFERENCES_RETRY) {
+        if (atomic_load(&s_preferences_save_status) == PREFERENCES_FAILED)
+            preferences_save();
     } else if (action == ACTION_FACTORY_RESET) {
         atomic_store(&s_factory_reset_requested, false);
         atomic_store(&s_factory_reset_status, FACTORY_RESET_IDLE);
@@ -2182,27 +2224,18 @@ static void render_contacts(lv_obj_t *screen)
         lv_obj_set_style_text_font(name, product_ui_font(), 0);
         lv_obj_set_style_text_color(name, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_pos(name, 42, 7);
-        lv_obj_set_width(name, 146);
+        lv_obj_set_width(name, 190);
         lv_obj_set_height(name, 18);
         lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
         if (contact->source != STARTER_CONTACT_WECHAT) {
             lv_obj_t *status = lv_obj_create(row);
-            lv_obj_set_pos(status, 206, 14);
+            lv_obj_set_pos(status, 258, 14);
             lv_obj_set_size(status, 8, 8);
             set_bg(status, contact->online ? lv_color_hex(0x55D88A)
                                            : lv_color_hex(0x71808A));
             lv_obj_set_style_radius(status, LV_RADIUS_CIRCLE, 0);
             lv_obj_clear_flag(status, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
         }
-        lv_obj_t *call = make_button(row, "", 228, 3, 54, 31,
-                                     (product_action_t)(ACTION_CONTACT_CALL_BASE + i));
-        lv_obj_set_style_radius(call, 10, 0);
-        lv_obj_t *call_icon = lv_label_create(call);
-        /* FontAwesome phone handset in the LVGL built-in symbol font. */
-        lv_label_set_text(call_icon, "\xEF\x82\x95");
-        lv_obj_set_style_text_font(call_icon, product_symbol_font(), 0);
-        lv_obj_set_style_text_color(call_icon, lv_color_hex(0x72DEF8), 0);
-        lv_obj_center(call_icon);
     }
     char page[12];
     (void)snprintf(page, sizeof(page), "%u/%u",
@@ -2466,7 +2499,10 @@ static void render_settings(lv_obj_t *screen)
     (void)snprintf(microphone, sizeof(microphone), "麦克风：%s",
                    s_preferences.microphone_muted ? "已关闭" : "已开启");
     (void)make_header_back_button(screen, ACTION_MENU);
-    render_header(screen, "设备设置");
+    bool failed = atomic_load(&s_preferences_save_status) == PREFERENCES_FAILED;
+    render_header(screen, failed ? "" : "设备设置");
+    if (failed) (void)make_button(screen, XIAOTAI_UI_SAVE_RETRY, 50, 2, 158, 32,
+                                 ACTION_PREFERENCES_RETRY);
     s_settings_volume = make_settings_stepper(
         screen, volume, 40, ACTION_VOLUME_DOWN, ACTION_VOLUME_UP);
     s_settings_speaker = make_button(screen, speaker, 8, 124, 148, 30,
@@ -3007,8 +3043,8 @@ static void apply_expression(const char *emotion,
     }
     const char *effective = emotion == NULL || emotion[0] == '\0'
                                 ? "neutral" : emotion;
-    /* An explicit server emotion wins.  Phase is status text, not a reason to
-     * overwrite the expression tag returned by AI. */
+    /* An explicit server emotion owns the whole face. Only the default AI
+     * face uses squinting eyes and a playback-driven mouth. */
     if (strcmp(effective, "calm") == 0) {
         effective = "neutral";
     } else if (strcmp(effective, "excited") == 0) {
@@ -3408,6 +3444,19 @@ static void product_tick(lv_timer_t *timer)
     int64_t expression_elapsed_us = 0;
     int64_t now = monotonic_ms();
     bool voice_state_changed = false;
+    preferences_poll();
+    static int rendered_save_status;
+    int save_status = atomic_load(&s_preferences_save_status);
+    if (save_status != rendered_save_status) {
+        bool was_failed = rendered_save_status == PREFERENCES_FAILED;
+        rendered_save_status = save_status;
+        if (s_page == PAGE_SETTINGS &&
+            (was_failed || save_status == PREFERENCES_FAILED)) render_page();
+        if (save_status == PREFERENCES_FAILED) {
+            set_voice_feedback("设置未保存，请在设置中重试", now);
+            voice_state_changed = true;
+        }
+    }
     starter_voice_result_t voice_result;
     for (uint8_t i = 0; i < PRODUCT_VOICE_QUEUE_LENGTH &&
                         xQueueReceive(s_voice_queue, &voice_result, 0) == pdTRUE;

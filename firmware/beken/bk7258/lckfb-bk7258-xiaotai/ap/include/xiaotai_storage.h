@@ -23,6 +23,8 @@ typedef struct {
     uint8_t screen_timeout_index;
     uint8_t home_face;
     uint8_t microphone_sensitivity;
+    bool acknowledgement_male;
+    uint8_t expression_index;
 } xiaotai_product_settings_t;
 
 bool xiaotai_wifi_credentials_valid(const xiaotai_wifi_credentials_t *value);

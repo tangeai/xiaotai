@@ -17,8 +17,9 @@ typedef struct {
     int caption_type;
     char utterance_id[65];
     char emotion[16];
-    bool emotion_tag_present; /**< Valid server TAG for this reply, not a default. */
+    bool emotion_tag_present; /**< Valid server TAG for this segment, not a default. */
     bool emotion_tag_pending_caption; /**< Independent TAG awaiting one AI caption. */
+    bool caption_final; /**< Previous accepted caption completed its segment. */
     char caption[256];
     uint32_t last_present_ms;
 } xiaotai_ai_view_t;

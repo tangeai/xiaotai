@@ -577,8 +577,8 @@ require('strcmp(method->valuestring, "caption")' in ai_view_source and
         '"CAPTION RECEIVED"' not in ui_source,
         "AI captions, phases and emotion expressions must reach the 320x240 UI")
 require("xiaotai_ai_emotion_count()" in app_source and
-        "xiaotai_ai_emotion_at(index)" in app_source and
-        "xiaotai_ai_emotion_at(index)" in ui_source and
+        "xiaotai_ai_emotion_at(s_settings.expression_index)" in app_source and
+        "xiaotai_ai_emotion_at(page * 6U + slot)" in ui_source and
         "xiaotai_ai_emotion_label_zh(emotion)" in ui_source and
         'emotion_is(emotion, "neutral")' in ui_source and
         'emotion_is(emotion, "silly")' in ui_source and
@@ -647,8 +647,9 @@ require("response, (uint32_t)response_length) < 0)" in ai_call_handoff and
         "AI call handoff must accept TiRtcSendCommand positive byte counts")
 require("xiaotai_contacts_grouped_indices" in contacts_source and
         "s_contact_display_indices" in app_source and
-        'wechat[index] ? "微信" : "设备"' in ui_source,
-        "contact pages must show all contacts grouped and labeled by device/WeChat source")
+        'wechat[index] ? "微信" :' in ui_source and
+        '"设备在线" : "设备离线"' in ui_source,
+        "contact pages must show all contacts labeled by device/WeChat source")
 require('"/v1/call/request"' in app_source and
         '"/v1/voip/device/call"' in app_source and
         "xiaotai_call_encode_voip_dial" in app_source and
@@ -870,7 +871,8 @@ require('"%s/v1/device/tts?code=%s"' in platform_source and
         platform_source.find("xiaotai_ui_show_verification_code(") <
         platform_source.find("download_verification_tts(services, report") and
         "no local fallback" in platform_source and
-        "for (unsigned repeat = 0; repeat < 3U" in audio_source and
+        "start_prompt(pcm, sample_count, 3U)" in audio_source and
+        "repeat < s_prompt_repeats" in audio_source and
         "psram_free(s_prompt_pcm)" in audio_source and
         "binding_digits" not in ap_sources and
         not (ROOT / "ap/assets/binding_digits.c").exists(),
@@ -888,7 +890,7 @@ require("xiaotai_ui_show_wechat_qr();" in app_source and
         "missing fixed mini-program QR fallback for empty quick-call contacts")
 require('mixed_text(frame, 12, 8, "小钛"' in ui_source and
         'page_frame("功能菜单")' in ui_source and
-        '"AI聊天", "通讯录", "多人对讲", "表情包"' in ui_source and
+        '"AI 聊天", "通讯录", "多人对讲", "表情包"' in ui_source and
         'page_frame("设备设置")' in ui_source and
         'page_frame("网络信息")' in ui_source and
         '"XIAOTAI"' not in ui_source and

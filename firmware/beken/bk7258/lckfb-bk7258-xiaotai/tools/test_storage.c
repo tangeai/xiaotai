@@ -97,11 +97,25 @@ int main(void)
 
     attempt_reset_during_write = true;
     settings.microphone_sensitivity = 5;
+    settings.acknowledgement_male = true;
+    settings.expression_index = 20;
     assert(xiaotai_storage_save_settings(&settings) == 0);
     attempt_reset_during_write = false;
     memset(&settings, 0, sizeof(settings));
     assert(xiaotai_storage_load_settings(&settings) == 0);
     assert(settings.microphone_sensitivity == 5);
+    assert(settings.acknowledgement_male && settings.expression_index == 20);
+    /* v2's sixth byte is sensitivity, never the newly added response voice. */
+    header_t *header = (header_t *)blob;
+    header->payload_size = 6;
+    header->payload_crc = ef_calc_crc32(0, blob + sizeof(*header), 6);
+    assert(xiaotai_storage_load_settings(&settings) == 0);
+    assert(settings.microphone_sensitivity == 5 && settings.volume == 6);
+    assert(!settings.acknowledgement_male && settings.expression_index == 0);
+    settings.expression_index = 21;
+    assert(xiaotai_storage_save_settings(&settings) != 0);
+    settings.expression_index = 20;
+    assert(xiaotai_storage_save_settings(&settings) == 0);
 
     blob[0] ^= 1U;
     assert(xiaotai_storage_load_settings(&settings) != 0);

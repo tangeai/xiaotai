@@ -26,6 +26,7 @@
 #include "xiaotai_call_protocol.h"
 #include "xiaotai_call_state.h"
 #include "xiaotai_contacts.h"
+#include "xiaotai_ai_history.h"
 #include "xiaotai_intent.h"
 #include "xiaotai_tirtc.h"
 #include "xiaotai_tirtc_recovery.h"
@@ -94,6 +95,7 @@ typedef struct {
 typedef enum {
     UI_PAGE_HOME = 0,
     UI_PAGE_LAUNCHER,
+    UI_PAGE_AI_CHAT,
     UI_PAGE_CONTACTS,
     UI_PAGE_CONTACT_DETAIL,
     UI_PAGE_ROOM,
@@ -101,7 +103,9 @@ typedef enum {
     UI_PAGE_ROOM_PASSWORD,
     UI_PAGE_ROOM_LEAVE_CONFIRM,
     UI_PAGE_EXPRESSIONS,
+    UI_PAGE_EXPRESSION_PREVIEW,
     UI_PAGE_SETTINGS,
+    UI_PAGE_SETTINGS_PREVIEW_ERROR,
     UI_PAGE_NETWORK,
     UI_PAGE_DIAGNOSTICS,
     UI_PAGE_RESET_CONFIRM,
@@ -127,6 +131,8 @@ static xiaotai_contacts_t s_contacts;
 static xiaotai_contact_t s_pending_contact;
 static uint32_t s_pending_dial_generation;
 static xiaotai_ai_view_t s_ai_view;
+static xiaotai_ai_history_t *s_ai_history;
+static unsigned s_ai_history_page;
 static xiaotai_ai_end_drain_t s_ai_end_drain;
 static uint32_t s_home_last_refresh_ms;
 static uint32_t s_home_defer_until_ms;
@@ -140,6 +146,9 @@ static size_t s_contact_display_indices[XIAOTAI_CONTACTS_MAX];
 static size_t s_contact_display_count;
 static unsigned s_launcher_selected = 6U;
 static unsigned s_expression_selected;
+static unsigned s_expression_page;
+static bool s_settings_save_failed;
+static bool s_ack_preview_pending;
 static bool s_clock_face;
 static bool s_qr_waiting_for_wechat;
 static xiaotai_product_settings_t s_settings;
@@ -269,9 +278,10 @@ static void finish_ai(uint32_t generation, int error)
             error = 0;
         }
         xiaotai_ai_view_init(&s_ai_view);
-        s_ui_page = UI_PAGE_HOME;
+        bool keep_menu = s_ui_page == UI_PAGE_LAUNCHER;
+        if (!keep_menu) s_ui_page = UI_PAGE_HOME;
         if (error != 0) s_home_defer_until_ms = rtos_get_time() + 5000U;
-        if (!show_pending_incoming()) {
+        if (!show_pending_incoming() && !keep_menu) {
             xiaotai_ui_show_status(error == 0 ? "READY" : "ERROR");
         }
         BK_LOGI(TAG, "AI session finished generation=%u error=%d\n",
@@ -471,8 +481,14 @@ static void render_contacts(void)
     bool online[XIAOTAI_CONTACTS_MAX] = {0};
     bool wechat[XIAOTAI_CONTACTS_MAX] = {0};
     size_t selected_display = 0U;
-    s_contact_display_count = xiaotai_contacts_grouped_indices(
-        &s_contacts, s_contact_display_indices, XIAOTAI_CONTACTS_MAX);
+    s_contact_display_count = s_contacts.count;
+    if (s_contact_display_count > XIAOTAI_CONTACTS_MAX)
+        s_contact_display_count = XIAOTAI_CONTACTS_MAX;
+    for (size_t i = 0; i < s_contact_display_count; ++i)
+        s_contact_display_indices[i] = i;
+    size_t pages = s_contact_display_count == 0U ? 1U :
+                   (s_contact_display_count + 2U) / 3U;
+    if (s_contact_page >= pages) s_contact_page = pages - 1U;
     for (size_t i = 0; i < s_contact_display_count; ++i) {
         size_t source = s_contact_display_indices[i];
         names[i] = s_contacts.entries[source].name;
@@ -492,7 +508,14 @@ static void render_settings(void)
     xiaotai_ui_show_settings(s_settings.volume, s_settings.speaker_muted,
                              s_settings.microphone_muted,
                              s_settings.microphone_sensitivity,
-                             s_screen_timeout_names[index]);
+                             s_screen_timeout_names[index],
+                             s_settings.acknowledgement_male, s_settings_save_failed);
+}
+
+static void save_settings(void)
+{
+    s_settings_save_failed = xiaotai_storage_save_settings(&s_settings) != BK_OK;
+    if (s_settings_save_failed) BK_LOGE(TAG, "settings save failed; retry available\n");
 }
 
 static void render_contact_detail(void)
@@ -509,7 +532,13 @@ static void render_contact_detail(void)
 
 static void render_expressions(void)
 {
-    xiaotai_ui_show_expressions(s_expression_selected, s_ai_view.emotion);
+    xiaotai_ui_show_expressions(s_expression_page,
+                                 xiaotai_ai_emotion_at(s_settings.expression_index));
+}
+
+static void render_expression_preview(void)
+{
+    xiaotai_ui_show_expression_preview(s_expression_selected);
 }
 
 static void render_network(void)
@@ -608,11 +637,23 @@ static void return_home_from_room(void)
     xiaotai_ui_show_status("ROOM PAUSED");
 }
 
+static void render_ai_history(void)
+{
+    unsigned count = s_ai_history == NULL ? 0U : s_ai_history->count;
+    if (s_ai_history_page >= count) s_ai_history_page = count == 0U ? 0U : count - 1U;
+    const xiaotai_ai_history_entry_t *entry = count == 0U ? NULL :
+        &s_ai_history->entries[s_ai_history_page];
+    xiaotai_ui_show_ai_history(entry == NULL ? NULL : entry->text,
+                               entry != NULL && entry->speaker == 1,
+                               s_ai_history_page, count, s_ai_history != NULL);
+}
+
 static bool open_launcher_item(unsigned item)
 {
     switch (item % 6U) {
     case 0:
-        navigate_to(UI_PAGE_HOME);
+        navigate_to(UI_PAGE_AI_CHAT);
+        render_ai_history();
         return true;
     case 1:
         navigate_to(UI_PAGE_CONTACTS);
@@ -1313,7 +1354,8 @@ static void handle_touch(const control_event_t *event)
         }
         return;
     }
-    if (s_ui_page == UI_PAGE_NETWORK && event->x < 40U && event->y < 34U) {
+    if ((s_ui_page == UI_PAGE_NETWORK || s_ui_page == UI_PAGE_SETTINGS_PREVIEW_ERROR) &&
+        event->x < 40U && event->y < 34U) {
         navigate_to(UI_PAGE_SETTINGS);
         render_settings();
         return;
@@ -1329,7 +1371,45 @@ static void handle_touch(const control_event_t *event)
         }
         return;
     }
-    if (event->y < 40U && s_ui_page != UI_PAGE_HOME) {
+    if (s_ui_page == UI_PAGE_AI_CHAT) {
+        if (event->x < 40U && event->y < 34U) {
+            rtos_lock_mutex(&s_runtime_mutex);
+            bool active = s_runtime.owner == XIAOTAI_OWNER_AI;
+            uint32_t generation = s_runtime.generation;
+            rtos_unlock_mutex(&s_runtime_mutex);
+            navigate_to(UI_PAGE_LAUNCHER);
+            if (active) stop_ai(generation);
+            xiaotai_ui_show_launcher(s_launcher_selected);
+        } else if (event->y >= 196U && event->y < 234U && s_ai_history != NULL) {
+            if (event->x >= 8U && event->x < 108U && s_ai_history_page > 0U)
+                --s_ai_history_page;
+            else if (event->x >= 212U && event->x < 312U &&
+                     s_ai_history_page + 1U < s_ai_history->count)
+                ++s_ai_history_page;
+            else return;
+            render_ai_history();
+        }
+        return;
+    }
+    if (s_ui_page == UI_PAGE_SETTINGS && s_settings_save_failed &&
+        event->x >= 50U && event->x < 208U && event->y < 34U) {
+        save_settings();
+        render_settings();
+        return;
+    }
+    if (event->x < 40U && event->y < 34U &&
+        s_ui_page == UI_PAGE_EXPRESSION_PREVIEW) {
+        navigate_to(UI_PAGE_EXPRESSIONS);
+        render_expressions();
+        return;
+    }
+    if (event->x < 40U && event->y < 34U &&
+        s_ui_page == UI_PAGE_CONTACT_DETAIL) {
+        navigate_to(UI_PAGE_CONTACTS);
+        render_contacts();
+        return;
+    }
+    if (event->x < 40U && event->y < 34U && s_ui_page != UI_PAGE_HOME) {
         navigate_to(s_ui_page == UI_PAGE_LAUNCHER ? UI_PAGE_HOME :
                                                     UI_PAGE_LAUNCHER);
         if (s_ui_page == UI_PAGE_HOME) s_home_last_refresh_ms = 0U;
@@ -1357,17 +1437,28 @@ static void handle_touch(const control_event_t *event)
         unsigned row = (event->y - 42U) / 64U;
         unsigned item = row * 2U + column;
         s_launcher_selected = item;
-        if (open_launcher_item(item)) handle_intent(XIAOTAI_INTENT_PRIMARY);
+        if (open_launcher_item(item)) {
+            rtos_lock_mutex(&s_runtime_mutex);
+            bool idle = s_runtime.owner == XIAOTAI_OWNER_NONE;
+            rtos_unlock_mutex(&s_runtime_mutex);
+            if (idle) handle_intent(XIAOTAI_INTENT_PRIMARY);
+            render_ai_history();
+        }
         return;
     }
     if (s_ui_page == UI_PAGE_CONTACTS) {
-        if (event->y >= 220U && s_contact_display_count > 4U) {
-            size_t pages = (s_contact_display_count + 3U) / 4U;
-            s_contact_page = (s_contact_page + 1U) % pages;
+        size_t pages = (s_contact_display_count + 2U) / 3U;
+        if (event->y >= 196U && event->y < 234U) {
+            if (event->x >= 8U && event->x < 108U && s_contact_page > 0U)
+                --s_contact_page;
+            else if (event->x >= 212U && event->x < 312U && s_contact_page + 1U < pages)
+                ++s_contact_page;
+            else return;
             render_contacts();
-        } else if (event->y >= 43U && event->y < 220U) {
-            size_t index = s_contact_page * 4U +
-                           (size_t)((event->y - 43U) / 46U);
+        } else if (event->x >= 16U && event->x < 304U &&
+                   event->y >= 40U && event->y < 169U &&
+                   (event->y - 40U) % 43U < 37U) {
+            size_t index = s_contact_page * 3U + (event->y - 40U) / 43U;
             if (index < s_contact_display_count) {
                 s_contact_selected = s_contact_display_indices[index];
                 s_ui_page = UI_PAGE_CONTACT_DETAIL;
@@ -1377,7 +1468,9 @@ static void handle_touch(const control_event_t *event)
         return;
     }
     if (s_ui_page == UI_PAGE_CONTACT_DETAIL) {
-        if (event->y >= 195U && s_contact_selected < s_contacts.count) {
+        if (event->x >= 72U && event->x < 248U &&
+            event->y >= 204U && event->y < 233U &&
+            s_contact_selected < s_contacts.count) {
             const xiaotai_contact_t *contact =
                 &s_contacts.entries[s_contact_selected];
             if (contact->online || contact->type == XIAOTAI_CONTACT_VOIP) {
@@ -1388,25 +1481,44 @@ static void handle_touch(const control_event_t *event)
     }
     if (s_ui_page == UI_PAGE_EXPRESSIONS) {
         size_t count = xiaotai_ai_emotion_count();
-        if (count == 0U) return;
-        if (event->x < 110U) {
-            s_expression_selected =
-                (unsigned)(((size_t)s_expression_selected + count - 1U) %
-                           count);
-        } else if (event->x > 210U) {
-            s_expression_selected =
-                (unsigned)(((size_t)s_expression_selected + 1U) % count);
-        } else {
-            size_t index = (size_t)s_expression_selected % count;
-            const char *emotion = xiaotai_ai_emotion_at(index);
-            if (emotion != NULL) {
-                xiaotai_ai_view_set_emotion(&s_ai_view, emotion);
-            }
+        size_t pages = (count + 5U) / 6U;
+        if (event->y >= 196U && event->y < 234U) {
+            if (event->x >= 8U && event->x < 108U && s_expression_page > 0U)
+                --s_expression_page;
+            else if (event->x >= 212U && event->x < 312U && s_expression_page + 1U < pages)
+                ++s_expression_page;
+            else return;
+            render_expressions();
+        } else if (event->y >= 42U && event->y < 186U &&
+                   event->x >= 8U && event->x < 312U) {
+            unsigned column = event->x >= 164U;
+            if ((event->x >= 156U && event->x < 164U) ||
+                (event->y - 42U) % 48U >= 40U) return;
+            size_t index = s_expression_page * 6U +
+                           (event->y - 42U) / 48U * 2U + column;
+            if (index >= count) return;
+            s_expression_selected = (unsigned)index;
+            navigate_to(UI_PAGE_EXPRESSION_PREVIEW);
+            render_expression_preview();
         }
-        render_expressions();
         return;
     }
-    if (s_ui_page == UI_PAGE_NETWORK) return;
+    if (s_ui_page == UI_PAGE_EXPRESSION_PREVIEW) {
+        if (event->x >= 89U && event->x < 231U &&
+            event->y >= 174U && event->y < 218U) {
+            s_settings.expression_index = (uint8_t)s_expression_selected;
+            save_settings();
+            if (s_settings_save_failed) {
+                navigate_to(UI_PAGE_SETTINGS);
+                render_settings();
+            } else {
+                navigate_to(UI_PAGE_HOME);
+                s_home_last_refresh_ms = 0U;
+            }
+        }
+        return;
+    }
+    if (s_ui_page == UI_PAGE_NETWORK || s_ui_page == UI_PAGE_SETTINGS_PREVIEW_ERROR) return;
     if (s_ui_page == UI_PAGE_SETTINGS) {
         xiaotai_ui_action_t action =
             xiaotai_ui_settings_action(event->x, event->y);
@@ -1414,11 +1526,13 @@ static void handle_touch(const control_event_t *event)
         if (action == XIAOTAI_UI_ACTION_VOLUME_DOWN ||
             action == XIAOTAI_UI_ACTION_VOLUME_UP) {
             if (action == XIAOTAI_UI_ACTION_VOLUME_DOWN) {
-                if (s_settings.volume > 0U) s_settings.volume--;
+                if (s_settings.volume == 0U) return;
+                s_settings.volume--;
                 xiaotai_audio_set_volume(s_settings.volume);
                 changed = true;
             } else if (action == XIAOTAI_UI_ACTION_VOLUME_UP) {
-                if (s_settings.volume < 10U) s_settings.volume++;
+                if (s_settings.volume == 10U) return;
+                s_settings.volume++;
                 xiaotai_audio_set_volume(s_settings.volume);
                 changed = true;
             }
@@ -1447,6 +1561,9 @@ static void handle_touch(const control_event_t *event)
                 return;
             }
             changed = true;
+        } else if (action == XIAOTAI_UI_ACTION_ACK_VOICE) {
+            s_settings.acknowledgement_male = !s_settings.acknowledgement_male;
+            changed = true;
         } else if (action == XIAOTAI_UI_ACTION_SLEEP) {
             s_settings.screen_timeout_index =
                 (uint8_t)((s_settings.screen_timeout_index + 1U) % 5U);
@@ -1462,7 +1579,17 @@ static void handle_touch(const control_event_t *event)
             return;
         }
         if (!changed) return;
-        (void)xiaotai_storage_save_settings(&s_settings);
+        save_settings();
+        if (action == XIAOTAI_UI_ACTION_ACK_VOICE && !s_settings_save_failed) {
+            int rc = xiaotai_audio_preview_acknowledgement(s_settings.acknowledgement_male);
+            if (rc != BK_OK) {
+                BK_LOGW(TAG, "response preview unavailable rc=%d\n", rc);
+                navigate_to(UI_PAGE_SETTINGS_PREVIEW_ERROR);
+                xiaotai_ui_show_settings_preview_error();
+                return;
+            }
+            s_ack_preview_pending = true;
+        }
         render_settings();
     }
 }
@@ -1979,8 +2106,13 @@ static void handle_ai_ui(control_event_t *event)
     char previous_emotion[sizeof(s_ai_view.emotion)];
     snprintf(previous_emotion, sizeof(previous_emotion), "%s",
              s_ai_view.emotion);
+    unsigned previous_count = s_ai_history == NULL ? 0U : s_ai_history->count;
+    bool follow_latest = previous_count == 0U || s_ai_history_page + 1U == previous_count;
     bool present_now = xiaotai_ai_view_apply(&s_ai_view, event->text,
                                               rtos_get_time());
+    xiaotai_ai_history_update(s_ai_history, &s_ai_view, event->generation);
+    if (follow_latest && s_ai_history != NULL && s_ai_history->count != 0U)
+        s_ai_history_page = s_ai_history->count - 1U;
     if (strcmp(previous_emotion, s_ai_view.emotion) != 0) {
         BK_LOGI(TAG, "AI emotion changed %s -> %s\n",
                 previous_emotion, s_ai_view.emotion);
@@ -1989,7 +2121,9 @@ static void handle_ai_ui(control_event_t *event)
         rtos_lock_mutex(&s_runtime_mutex);
         bool incoming_waiting = xiaotai_runtime_has_incoming(&s_runtime);
         rtos_unlock_mutex(&s_runtime_mutex);
-        if (!incoming_waiting) {
+        if (!incoming_waiting && s_ui_page == UI_PAGE_AI_CHAT) {
+            render_ai_history();
+        } else if (!incoming_waiting && s_ui_page == UI_PAGE_HOME) {
             xiaotai_ui_show_ai(s_ai_view.phase, s_ai_view.emotion,
                                s_ai_view.caption,
                                s_ai_view.caption_type == 1,
@@ -2832,7 +2966,7 @@ static void refresh_idle_home(void)
     snprintf(date_text, sizeof(date_text), "%04d-%02d-%02d",
              calendar.tm_year + 1900, calendar.tm_mon + 1, calendar.tm_mday);
     xiaotai_ui_show_home(time_text, date_text, rssi, s_clock_face,
-                         s_ai_view.emotion,
+                         xiaotai_ai_emotion_at(s_settings.expression_index),
                          XIAOTAI_BOARD_TOUCH_AVAILABLE != 0);
     s_home_last_refresh_ms = now_ms;
 }
@@ -2968,6 +3102,17 @@ static void service_ai_end_drain(void)
     (void)xiaotai_tirtc_disconnect();
 }
 
+static void service_ack_preview(void)
+{
+    int result = BK_OK;
+    if (!s_ack_preview_pending || !xiaotai_audio_prompt_result(&result)) return;
+    s_ack_preview_pending = false;
+    if (result != BK_OK && s_ui_page == UI_PAGE_SETTINGS) {
+        navigate_to(UI_PAGE_SETTINGS_PREVIEW_ERROR);
+        xiaotai_ui_show_settings_preview_error();
+    }
+}
+
 static void control_maintenance(void)
 {
     xiaotai_ui_refresh_verification_countdown();
@@ -2978,6 +3123,7 @@ static void control_maintenance(void)
     service_tirtc_recovery();
     service_after_room_pending();
     service_ai_end_drain();
+    service_ack_preview();
     if (s_stream_media_diagnostic_due_ms != 0U &&
         (int32_t)(rtos_get_time() - s_stream_media_diagnostic_due_ms) >= 0) {
         s_stream_media_diagnostic_due_ms = 0U;
@@ -2990,7 +3136,7 @@ static void control_maintenance(void)
     bool animate_ai = s_runtime.owner == XIAOTAI_OWNER_AI &&
                       !xiaotai_runtime_has_incoming(&s_runtime);
     rtos_unlock_mutex(&s_runtime_mutex);
-    if (animate_ai)
+    if (animate_ai && s_ui_page == UI_PAGE_HOME)
         xiaotai_ui_update_ai_mouth(xiaotai_audio_playback_columns());
 }
 
@@ -3276,7 +3422,7 @@ static void on_ai_command(uint32_t generation, uint32_t command,
         return;
     }
     xiaotai_ai_view_init(&s_ai_view);
-    xiaotai_ui_show_ai(s_ai_view.phase, s_ai_view.emotion,
+    if (s_ui_page == UI_PAGE_HOME) xiaotai_ui_show_ai(s_ai_view.phase, s_ai_view.emotion,
                        s_ai_view.caption, false,
                        s_ai_view.emotion_tag_present);
     BK_LOGI(TAG, "AI talk active generation=%u\n", (unsigned)generation);
@@ -3496,6 +3642,8 @@ int xiaotai_app_start(void)
     xiaotai_tirtc_recovery_init(&s_tirtc_recovery);
     xiaotai_ai_view_init(&s_ai_view);
     xiaotai_contacts_init(&s_contacts);
+    s_ai_history = psram_malloc(sizeof(*s_ai_history));
+    if (s_ai_history != NULL) memset(s_ai_history, 0, sizeof(*s_ai_history));
     xiaotai_product_settings_default(&s_settings);
     (void)xiaotai_storage_load_settings(&s_settings);
     xiaotai_audio_set_volume(s_settings.volume);

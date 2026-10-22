@@ -462,14 +462,15 @@ static void product_set_ai_start_pending(bool pending, const char *message)
 }
 
 static bool supported_emotion(const char *emotion);
-static void product_set_emotion(const char *emotion, bool tag_present)
+static bool product_set_emotion(const char *emotion, bool tag_present)
 {
     if (!supported_emotion(emotion) || s_product_mutex == NULL ||
-        xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(50)) != pdTRUE) return;
+        xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(50)) != pdTRUE) return false;
     (void)snprintf(s_product_snapshot.emotion,
                    sizeof(s_product_snapshot.emotion), "%s", emotion);
     s_product_snapshot.emotion_tag_present = tag_present;
     xSemaphoreGive(s_product_mutex);
+    return true;
 }
 
 static bool supported_emotion(const char *emotion)
@@ -2758,6 +2759,96 @@ static void service_ai_media_admission(void)
     diagnostic_event("AI ready ms", (int)(now_ms() - s_diagnostic_ai_started_ms));
 }
 
+/* Describe input without logging arbitrary server strings, captions or IDs.
+ * This follows the presentation parser's field precedence, and uses its public
+ * emotion mapping so Chinese aliases and explicit neutral have one meaning. */
+static const char *ai_face_input_emotion(const cJSON *object, char canonical[16])
+{
+    static const char *const names[] = {"emotion", "emotion_tag", "expression", "tag"};
+    const cJSON *objects[] = {object,
+        cJSON_IsObject(object) ? cJSON_GetObjectItemCaseSensitive(object, "data") : NULL};
+    for (size_t i = 0; i < sizeof(objects) / sizeof(objects[0]); ++i) {
+        if (!cJSON_IsObject(objects[i])) continue;
+        for (size_t j = 0; j < sizeof(names) / sizeof(names[0]); ++j) {
+            const cJSON *value = cJSON_GetObjectItemCaseSensitive(objects[i], names[j]);
+            if (!cJSON_IsString(value) || value->valuestring == NULL ||
+                value->valuestring[0] == '\0') continue;
+            xiaotai_ai_view_t mapped = {0};
+            xiaotai_ai_view_set_emotion(&mapped, value->valuestring);
+            if (!mapped.emotion_tag_present) return "invalid";
+            (void)snprintf(canonical, 16, "%s", mapped.emotion);
+            return canonical;
+        }
+    }
+    return "none";
+}
+
+/* State-owner task only. Trace boundaries and emotion-bearing inputs, not PCM
+ * frames or every untagged partial. Repeated TAGs are still new wire evidence. */
+static void ai_face_apply_event(const cJSON *root, const char *json, uint32_t at_ms)
+{
+    static const char *const methods[] = {
+        "caption", "round_start", "round_end", "emotion", "ai_emotion",
+        "expression", "event", "end_session",
+    };
+    const cJSON *method = cJSON_GetObjectItemCaseSensitive(root, "method");
+    const cJSON *legacy = cJSON_GetObjectItemCaseSensitive(root, "type");
+    const cJSON *params = cJSON_GetObjectItemCaseSensitive(root, "params");
+    const char *kind = NULL;
+    bool legacy_reply = false;
+    if (cJSON_IsString(legacy) && legacy->valuestring != NULL) {
+        if (strcmp(legacy->valuestring, "ai_reply") == 0) kind = "ai_reply";
+        else if (strcmp(legacy->valuestring, "AI_EMOTION") == 0) kind = "AI_EMOTION";
+        else if (strcmp(legacy->valuestring, "ai_emotion") == 0) kind = "ai_emotion";
+        legacy_reply = kind != NULL;
+    }
+    if (kind == NULL && cJSON_IsString(method) && method->valuestring != NULL) {
+        for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); ++i) {
+            if (strcmp(method->valuestring, methods[i]) == 0) { kind = methods[i]; break; }
+        }
+    }
+    bool caption = kind != NULL && strcmp(kind, "caption") == 0;
+    bool new_group = false, final = false, caption_valid = false;
+    int speaker = -1;
+    if (caption && cJSON_IsObject(params)) {
+        const cJSON *type = cJSON_GetObjectItemCaseSensitive(params, "caption_type");
+        const cJSON *text = cJSON_GetObjectItemCaseSensitive(params, "text");
+        const cJSON *id = cJSON_GetObjectItemCaseSensitive(params, "utterance_id");
+        final = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(params, "is_final"));
+        caption_valid = cJSON_IsNumber(type) && cJSON_IsString(text) && text->valuestring != NULL;
+        if (caption_valid) {
+            const char *group = cJSON_IsString(id) && id->valuestring != NULL ? id->valuestring : "";
+            new_group = type->valueint != s_ai_view.caption_type ||
+                        strcmp(group, s_ai_view.utterance_id) != 0;
+            speaker = type->valueint == 1 ? 1 : (type->valueint == 0 ? 0 : -1);
+        }
+    }
+    char canonical[16] = "";
+    const char *input = kind != NULL ?
+        ai_face_input_emotion(legacy_reply ? root : params, canonical) : "none";
+    bool previous_tag = s_ai_view.emotion_tag_present;
+    char previous_emotion[16];
+    memcpy(previous_emotion, s_ai_view.emotion, sizeof(previous_emotion));
+    bool present = xiaotai_ai_view_apply(&s_ai_view, json, at_ms);
+    int synced = -1; /* -1: no UI presentation requested, e.g. caption throttle */
+    if (present) {
+        synced = product_set_emotion(s_ai_view.emotion, s_ai_view.emotion_tag_present) ? 1 : 0;
+        product_set_phase(product_phase_from_ai_view(s_ai_view.phase));
+    }
+    bool changed = previous_tag != s_ai_view.emotion_tag_present ||
+                   strcmp(previous_emotion, s_ai_view.emotion) != 0;
+    if (kind == NULL || (strcmp(kind, "event") == 0 && strcmp(input, "none") == 0)) return;
+    if (caption && !new_group && !final && !changed && synced != 0 &&
+        strcmp(input, "none") == 0) return;
+    ESP_LOGI(TAG, "AI face trace: generation=%lu at-ms=%lu event=%s input=%s "
+             "group=%s speaker=%d valid=%d final=%d tag=%d->%d emotion=%s pending=%d sync=%d",
+             (unsigned long)s_connection_generation, (unsigned long)at_ms, kind, input,
+             caption ? (new_group ? "new" : "same") : "-", speaker,
+             (int)(!caption || caption_valid), (int)final,
+             (int)previous_tag, (int)s_ai_view.emotion_tag_present, s_ai_view.emotion,
+             (int)s_ai_view.emotion_tag_pending_caption, synced);
+}
+
 static void handle_ai_command(const runtime_event_t *event)
 {
     /* 当前 AI 连接上的 start_session 响应与 UI 通知都在状态任务串行处理。 */
@@ -2815,11 +2906,7 @@ static void handle_ai_command(const runtime_event_t *event)
             ESP_LOGI(TAG, "AI accepted; waiting for local acknowledgement audio boundary");
         service_ai_media_admission();
     } else if (state == STARTER_RUNTIME_AI_ACTIVE) {
-        if (xiaotai_ai_view_apply(&s_ai_view, event->text,
-                                  (uint32_t)now_ms())) {
-            product_set_emotion(s_ai_view.emotion, s_ai_view.emotion_tag_present);
-            product_set_phase(product_phase_from_ai_view(s_ai_view.phase));
-        }
+        ai_face_apply_event(root, event->text, (uint32_t)now_ms());
         const cJSON *method = cJSON_GetObjectItemCaseSensitive(root, "method");
         const cJSON *params = cJSON_GetObjectItemCaseSensitive(root, "params");
         if (cJSON_IsString(method) && method->valuestring != NULL) {
@@ -4340,6 +4427,21 @@ void starter_runtime_copy_device_id(char *out, size_t out_size)
         return;
     }
     (void)snprintf(out, out_size, "%s", s_device_id[0] == '\0' ? "未绑定" : s_device_id);
+}
+
+starter_runtime_face_snapshot_t starter_runtime_face_snapshot(void)
+{
+    starter_runtime_face_snapshot_t snapshot = {0};
+    if (s_product_mutex != NULL &&
+        xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        snapshot.ai_phase = s_product_snapshot.ai_phase;
+        snapshot.emotion_tag_present = s_product_snapshot.emotion_tag_present;
+        memcpy(snapshot.emotion, s_product_snapshot.emotion, sizeof(snapshot.emotion));
+        snapshot.emotion[sizeof(snapshot.emotion) - 1U] = '\0';
+        snapshot.valid = true;
+        xSemaphoreGive(s_product_mutex);
+    }
+    return snapshot;
 }
 
 starter_runtime_product_snapshot_t starter_runtime_product_snapshot(void)

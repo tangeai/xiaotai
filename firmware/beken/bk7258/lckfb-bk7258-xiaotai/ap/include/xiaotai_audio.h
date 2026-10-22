@@ -61,6 +61,10 @@ bool xiaotai_audio_uplink_enabled(void);
  */
 int xiaotai_audio_announce_verification_pcm(int16_t *pcm,
                                             size_t sample_count);
+/** Preview the selected response once; reject active media and muted output. */
+int xiaotai_audio_preview_acknowledgement(bool male);
+/** Read completion without waiting or touching the audio driver. */
+bool xiaotai_audio_prompt_result(int *result);
 void xiaotai_audio_cancel_prompt(void);
 
 #endif

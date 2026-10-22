@@ -122,6 +122,16 @@ typedef struct {
     starter_product_contact_t contacts[STARTER_PRODUCT_CONTACTS_MAX];
 } starter_runtime_product_snapshot_t;
 
+/** Small on-demand face diagnostic; no subtitle/contact data or task scanning. */
+typedef struct {
+    starter_ai_ui_phase_t ai_phase;
+    bool emotion_tag_present;
+    char emotion[16];
+    bool valid; /**< False when the product snapshot lock was unavailable. */
+} starter_runtime_face_snapshot_t;
+
+starter_runtime_face_snapshot_t starter_runtime_face_snapshot(void);
+
 /**
  * 创建状态任务并注册平台/TiRTC 回调。必须在 platform_client_start() 和
  * starter_tirtc_start() 前完成；重复调用安全。
