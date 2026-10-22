@@ -1,20 +1,22 @@
-# CoreS3-Lite 本地封版记录
+# CoreS3-Lite 发布与封版记录
 
-## M5 Release：1.0.1+build.42（2026-10-22）
+## M5 正式 Release：1.0.1+build.42（2026-10-22）
 
 本次发布面向 **M5Stack CoreS3-Lite / ILI9342E**，独立标签为
 `m5stack-cores3-lite-v1.0.1`，标题为 `M5Stack CoreS3-Lite v1.0.1 · build.42`。
 发布构建由 main 的 `dbc262c` 执行统一 `--release` 入口生成，保留以下 build.41
-功能与修复。用户已补充确认 M5 完成实板验证，待补齐本次确认的构建号；
-build.41 的既有记录不转记为 build.42 验收，精确产物状态为
-`BUILD_VERIFIED_HIL_PENDING`。
+功能与修复。用户已确认 M5 完成实板验证，本版本按正式 Release 发布。
+
+ZIP 清单中的 `BUILD_VERIFIED_HIL_PENDING` 是打包时的验证快照，不是 GitHub
+发布阶段。保留已发布附件及校验值；用户确认和既有 build.41 日志分别记录在
+[验证记录](../../../boards/m5stack/cores3-lite/VALIDATION.md)，不补造 build.42 串口或全场景验收记录。
 
 交付包含同版分文件 ZIP、从 `0x0` 烧录的 merged BIN 和 `SHA256SUMS`。
 完整镜像覆盖 Wi-Fi、绑定等 NVS 配置；网页 Flash 参数可选 Keep，保留固件内的
 DIO / 80 MHz / 16 MB。固件仅适用于本板 ILI9342E 变体，不能刷入立创 S3 或 P4。
 
 功能列表、已修复问题和限制沿用下方开发基线；短句/吞句首暂缓，录音实验已撤回，
-AEC/UI 余量与打断能力、设置持久化、完整业务切换及长稳仍待实板验证。
+收音、AI 打断和 AEC/UI 实时性余量仍需持续测试，弱网与长稳等专项不视为全部通过。
 最新构建身份见[验证记录](../../../boards/m5stack/cores3-lite/VALIDATION.md)。
 
 ## 已验证开发基线：1.0.1+build.41（2026-10-22）
