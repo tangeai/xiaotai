@@ -30,33 +30,86 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 
 ## 烧录
 
-### 直接烧录发布包
+提供两种方式：**网页烧录**适合直接体验，无需安装开发环境；**工程烧录**适合修改源码后编译、调试。
+两种方式任选其一。先核对完整板型，不能只按 `ESP32-P4` 选择固件。
 
-发布页如提供 `-merged.bin` 完整镜像，首次烧录只需选择该文件并填写地址 `0x0`。
-完整镜像会覆盖 NVS 中的 Wi-Fi、绑定等持久配置；保留配置的升级使用下面的分文件包，
-并核对分区布局与配置兼容性。两种附件及校验规则见[发布规范](../../../CONTRIBUTING.md#esp32-分文件与完整镜像)。
+使用 USB 数据线连接板上的 **USB TO UART** Type-C 接口（供电、烧录和调试），
+不要连接 USB OTG 接口或 C6 烧录焊盘。连接失败时按住 BOOT，按一下 RESET，
+再松开 BOOT。接口和按键位置见[微雪硬件说明](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/)。
+本页只烧录 P4 主芯片；连接日志若显示 ESP32-C6，立即断开并检查接口。
 
-从 [P4 v1.0.1 · build.2 固件发布页](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1)
-下载名称以 `waveshare-esp32p4-touch-lcd-43c-v10-` 开头的压缩包。本次发布包已通过构建
-和主机检查，同版实板验收仍待完成；下文旧版设备互呼日志仅作历史证据，具体范围见发布说明。解压后先核对 `MANIFEST.json`
-中的板卡 ID、SHA-256 和 `flash_files`（烧录文件及地址列表），再按包内 `README.txt` 的命令烧录。
+### 方式一：网页烧录（推荐首次体验）
 
-也可以使用[乐鑫官方 ESP Web Tool](https://espressif.github.io/esptool-js/)。在 Chrome 或
-Edge 中连接 P4 的烧录串口，按 `flash_files` 逐项添加文件和地址后执行 `Program`。
-该工具不会自动识别板型或地址，必须烧录完整文件集合；Safari 不支持。这里烧录的是
-P4 主芯片，不要把同一组文件写入板载 C6。
+#### 1. 下载完整镜像
 
-### 从源码编译后烧录
+下载 [v1.0.1 · build.2 完整 merged.bin](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.2-merged.bin)。
 
-`idf.py` 会调用 ESP-IDF 自带的 `esptool`：
+下载同一发布页的 [SHA256SUMS](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/SHA256SUMS)，核对下载文件的 SHA-256。
+
+文件名应为 `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-merged.bin`。
+
+版本内容与限制见[发布说明](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1)。
+
+**完整镜像会覆盖 NVS 中的 Wi-Fi、绑定等持久配置，烧录后需要重新配网、绑定。**
+需要保留配置的升级请使用本节末尾的分文件方法，并核对分区布局与配置兼容性。
+
+#### 2. 连接开发板
+
+1. 关闭串口助手、`idf.py monitor` 和其他占用设备串口的网页。
+2. 在电脑 Chrome 或 Edge 中打开[乐鑫 ESP Web Tool](https://espressif.github.io/esptool-js/)；Safari 不支持。
+3. 使用 **Program** 区域的 `Baudrate`，可先保留 `921600`；传输不稳定时改为 `115200` 重试。桌面串口方式不勾选 `WebUSB (CH340)`。
+4. 点击红框中的 **Connect**，在浏览器弹出的串口列表中选中本板，再点击“连接”。端口名可能是 COM、USB Serial 或 USB JTAG/serial；通过拔插前后的变化确认。
+5. 等待日志识别出 **ESP32-P4**，再添加固件。若一直连接失败，按上面的板级步骤进入下载模式后重连。
+
+![网页连接步骤：红框标出 Program 波特率和 Connect 按钮](../../images/flashing/web-connect.png)
+
+#### 3. 选文件、改地址并烧录
+
+1. 在 `File` 一栏点击 **Choose File / 选择文件**，选择上面下载的本板 `-merged.bin`，不要选 ZIP、ELF 或单独的应用 BIN。
+2. 将 **Flash Address 从默认值改为 `0x0`**。完整镜像只添加这一行，不再同时添加 bootloader、分区表或应用文件。
+3. 将 **Flash Mode、Flash Frequency、Flash Size 都选为 `keep`**，保留发布固件中的参数。`keep` 不表示保留 Wi-Fi 或绑定数据。
+4. 再次核对芯片、文件名和 `0x0`，点击 **Program**。等待全部写入和校验完成；烧录期间保持供电和数据线连接，不点击 `Erase Flash`。
+
+![完整镜像参数示意：红框标出地址、文件、keep 参数和 Program 按钮](../../images/flashing/web-waveshare-esp32p4-touch-lcd-43c-v10.png)
+
+红框依次标出地址、文件、Flash 参数与烧录按钮。
+图中参数区为未连接设备时展开的操作示意，不是实板烧录成功截图。
+
+#### 4. 重启并检查
+
+完成后点击 **Disconnect** 释放串口，按开发板复位键重启。
+看到小钛启动及配网界面后，继续下方“首次使用”。需要日志时，可在网页 Console
+区域以 `115200` 点击 `Start`，或打开本地串口工具，检查启动版本和报错。
+只有烧录进度完成而设备不能正常启动时，应先核对板型、镜像和下载地址。
+
+#### 已有设备：使用分文件包升级
+
+从[同版发布页](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1)下载 `-validation.zip` 并解压。
+按 `MANIFEST.json` 的 `flash_files` 逐项添加文件和地址，缺少行时点击 `Add File`，
+不要套用完整镜像的单行 `0x0` 设置。烧录文件必须齐全；P4 和 S3 的地址布局不能互用。
+不执行全片擦除，并确认新旧分区布局和配置兼容后，才能保留原配置。
+
+### 方式二：工程烧录（源码编译与调试）
+
+1. 按根目录[源码获取说明](../../../README.md#从源码编译)下载仓库；未安装工具链时，先完成本页“环境与依赖”和“编译”。
+2. 连接本板并关闭网页烧录连接。在仓库根目录执行下列命令，编译成功后进入对应工程目录烧录。
+3. **将 `<串口>` 替换为本机实际端口**，例如 Linux 的 `/dev/ttyACM0`、`/dev/ttyUSB0` 或 Windows ESP-IDF 终端的 `COM5`；不要照抄示例端口。
 
 ```bash
+. tools/activate_esp_idf.sh
+python3 tools/build.py --board waveshare-esp32p4-touch-lcd-43c-v10
 cd firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c
 idf.py -p <串口> flash monitor
 ```
 
-烧录前核对完整型号和 PCB V1.0。普通升级不执行 `erase-flash`；C6 slave
-固件如需单独升级，必须使用工程锁定版本并按厂商接口操作。
+![工程命令示意：红框标出本板 ID、工程目录和需要替换的串口](../../images/flashing/project-waveshare-esp32p4-touch-lcd-43c-v10.png)
+
+上图为命令示意，不是已执行编译或烧录的终端记录。可复制的命令见上方代码块。
+
+以上环境激活命令适用于 Linux/WSL；WSL 还需将 USB 设备接入该环境。
+`idf.py` 按工程生成的烧录清单调用 esptool，不必手填地址。
+出现启动日志后核对版本与板型，使用 `Ctrl+]` 退出监视器；不能连接时按本页下载模式步骤重试。
+普通升级不执行 `erase-flash`。修改屏幕等硬件配置前，先核对本板支持的变体。
 
 ## 首次使用
 

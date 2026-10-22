@@ -5,11 +5,11 @@
 本次发布面向 **M5Stack CoreS3-Lite / ILI9342E**，独立标签为
 `m5stack-cores3-lite-v1.0.1`，标题为 `M5Stack CoreS3-Lite v1.0.1 · build.42`。
 发布构建由 main 的 `dbc262c` 执行统一 `--release` 入口生成，保留以下 build.41
-功能与修复。用户已确认 M5 完成实板验证，本版本按正式 Release 发布。
+功能与修复。本版本为正式 Release。
 
 ZIP 清单中的 `BUILD_VERIFIED_HIL_PENDING` 是打包时的验证快照，不是 GitHub
-发布阶段。保留已发布附件及校验值；用户确认和既有 build.41 日志分别记录在
-[验证记录](../../../boards/m5stack/cores3-lite/VALIDATION.md)，不补造 build.42 串口或全场景验收记录。
+发布阶段。构建身份与实板验证范围见
+[验证记录](../../../boards/m5stack/cores3-lite/VALIDATION.md)。
 
 交付包含同版分文件 ZIP、从 `0x0` 烧录的 merged BIN 和 `SHA256SUMS`。
 完整镜像覆盖 Wi-Fi、绑定等 NVS 配置；网页 Flash 参数可选 Keep，保留固件内的

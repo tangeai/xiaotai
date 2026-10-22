@@ -11,5 +11,5 @@ python3 tools/build.py --board m5stack-cores3-lite --variant ili9342e
 
 旧屏选择 `ili9342c`。板级代码负责 PMIC/扩展器、GC0308、ES7210/AW88298、LCD 与触摸，
 公共产品代码负责配网、绑定、AI、通话和房间。GPIO0 是音频时钟，不是业务按键。
-用户已确认本板完成实板验证，当前正式发布为 ILI9342E 变体的 v1.0.1 · build.42。
+当前正式发布为 ILI9342E 变体的 v1.0.1 · build.42。
 验证来源和遗留事项见[验证记录](VALIDATION.md)，不能使用立创板或 CoreS3-SE 的固件与验证结论。

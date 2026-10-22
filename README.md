@@ -4,7 +4,7 @@
 
 小钛是面向带屏和无屏音视频设备的开源固件。当前版本支持 H5（网页端）实时查看与双向对讲、AI（人工智能）对话、设备呼叫和微信网络通话。
 
-这份 README 只解决三个问题：应该下载哪个固件、怎样烧录、上电后怎样体验。若要阅读实现原理或新增开发板，请使用页首的其他入口。
+从下表选择开发板、下载固件，再按对应指南烧录和配网。二次开发见页首的架构与开发文档。
 
 本仓库提供设备固件，不包含完整的云端服务和微信小程序。在线功能还依赖设备绑定与
 信令平台、TiRTC 服务，以及所选业务的 AI 或微信服务配置。使用发布包可按下文体验；
@@ -26,8 +26,8 @@
 固件包包含对应板卡的烧录文件、烧录配置和校验信息。ESP32 按清单完整烧录多个文件；
 BK7258 首次烧录使用包内以 `-all-app.bin` 结尾的文件，以 `-app_pack.rbl` 结尾的文件用于 OTA（无线升级）。
 
-M5 已由用户确认完成实板验证，v1.0.1 · build.42 为正式发布；已知问题见[封版记录](docs/boards/m5stack-cores3-lite/FREEZE.md)。
-本发布包仅适用于上表的 ILI9342E 屏幕变体。
+M5 v1.0.1 · build.42 为正式发布，仅适用于 ILI9342E 屏幕变体；
+功能与已知问题见[发布记录](docs/boards/m5stack-cores3-lite/FREEZE.md)。
 
 其他已经适配的开发板及其型号、固件名称和使用说明统一收录在
 [完整开发板目录](docs/boards/README.md)。
@@ -47,9 +47,18 @@ M5 已由用户确认完成实板验证，v1.0.1 · build.42 为正式发布；�
 `0x0`。它与分文件 ZIP 并列，内容包含启动所需的全部烧录镜像；烧录会覆盖 NVS 中的
 Wi-Fi、绑定等持久配置。需要保留配置时，使用下述分文件方式并核对版本兼容性。
 
-ESP32 发布包包含多个烧录文件。使用 Chrome 或 Edge 打开[乐鑫官方 ESP Web Tool](https://espressif.github.io/esptool-js/)，连接开发板串口，然后按照 `MANIFEST.json` 的 `flash_files` 逐项选择文件并填写地址。不能只写入应用镜像，也不要自行猜测地址。Safari 不支持该工具。
+提供两种方式：**网页烧录**无需安装开发环境，适合直接体验；**工程烧录**通过
+ESP-IDF 编译并执行 `idf.py flash monitor`，适合修改源码与调试。
+网页工具使用 Chrome 或 Edge 打开[乐鑫 ESP Web Tool](https://espressif.github.io/esptool-js/)。
 
-如果电脑已经安装 ESP-IDF（乐鑫物联网开发框架），也可以使用发布包记录的参数，通过 `esptool.py` 烧录。各开发板的下载模式、串口连接和操作步骤见上表中的“开发板指南”。
+按板型打开图文指南，截图中的红框标出了需要点击或修改的位置：
+
+- [立创 ESP32-S3：网页与工程烧录](docs/boards/lckfb-esp32s3/README.md#烧录)
+- [微雪 ESP32-P4：网页与工程烧录](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录)
+- [M5Stack CoreS3-Lite：网页与工程烧录](docs/boards/m5stack-cores3-lite/README.md#烧录)
+
+分文件 ZIP 需要按 `MANIFEST.json` 的 `flash_files` 完整添加文件和地址，不能只写
+应用镜像，也不能把所有文件都填成 `0x0`。下载模式、串口和重启步骤见上述指南。
 
 ### BK7258 开发板
 

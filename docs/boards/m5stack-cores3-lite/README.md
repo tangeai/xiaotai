@@ -1,23 +1,90 @@
 # M5Stack CoreS3-Lite 探鸽小钛
 
-板卡 ID：`m5stack-cores3-lite`，商品编号 K128-Lite。用户已确认 M5 完成实板验证；具体构建身份及验证范围见[验证记录](../../../boards/m5stack/cores3-lite/VALIDATION.md)。
+板卡 ID：`m5stack-cores3-lite`，商品编号 K128-Lite。当前正式固件为 v1.0.1 · build.42（ILI9342E）。
 ESP32-S3 与立创相同，但接线、电源、功放、屏幕和触摸方向不同，固件不能互刷。
 
 ## 烧录
 
-先按下文选择屏幕变体并编译，再在工程目录用原生 USB Serial/JTAG 烧录：
+提供两种方式：**网页烧录**适合直接体验，无需安装开发环境；**工程烧录**适合修改源码后编译、调试。
+两种方式任选其一。先核对完整板型，不能只按 `ESP32-S3` 选择固件。
+
+发布固件仅适用于 **CoreS3-Lite（K128-Lite）的 ILI9342E 屏幕变体**。
+使用 USB 数据线连接本机 Type-C 接口。长按底侧复位键约 3 秒，绿色灯亮后松开，
+灯熄灭后进入下载模式；烧录后单击底侧 RST 重启。
+按键位置与操作见[M5Stack 官方说明](https://docs.m5stack.com/en/core/CoreS3-Lite)。
+
+### 方式一：网页烧录（推荐首次体验）
+
+#### 1. 下载完整镜像
+
+下载 [v1.0.1 · build.42 完整 merged.bin](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-merged.bin)。
+
+下载同一发布页的 [SHA256SUMS](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/SHA256SUMS)，核对下载文件的 SHA-256。
+
+文件名应为 `m5stack-cores3-lite-1.0.1+build.42-merged.bin`。
+
+版本内容与限制见[发布说明](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1)。
+
+**完整镜像会覆盖 NVS 中的 Wi-Fi、绑定等持久配置，烧录后需要重新配网、绑定。**
+需要保留配置的升级请使用本节末尾的分文件方法，并核对分区布局与配置兼容性。
+
+#### 2. 连接开发板
+
+1. 关闭串口助手、`idf.py monitor` 和其他占用设备串口的网页。
+2. 在电脑 Chrome 或 Edge 中打开[乐鑫 ESP Web Tool](https://espressif.github.io/esptool-js/)；Safari 不支持。
+3. 使用 **Program** 区域的 `Baudrate`，可先保留 `921600`；传输不稳定时改为 `115200` 重试。桌面串口方式不勾选 `WebUSB (CH340)`。
+4. 点击红框中的 **Connect**，在浏览器弹出的串口列表中选中本板，再点击“连接”。端口名可能是 COM、USB Serial 或 USB JTAG/serial；通过拔插前后的变化确认。
+5. 等待日志识别出 **ESP32-S3**，再添加固件。若一直连接失败，按上面的板级步骤进入下载模式后重连。
+
+![网页连接步骤：红框标出 Program 波特率和 Connect 按钮](../../images/flashing/web-connect.png)
+
+#### 3. 选文件、改地址并烧录
+
+1. 在 `File` 一栏点击 **Choose File / 选择文件**，选择上面下载的本板 `-merged.bin`，不要选 ZIP、ELF 或单独的应用 BIN。
+2. 将 **Flash Address 从默认值改为 `0x0`**。完整镜像只添加这一行，不再同时添加 bootloader、分区表或应用文件。
+3. 将 **Flash Mode、Flash Frequency、Flash Size 都选为 `keep`**，保留发布固件中的参数。`keep` 不表示保留 Wi-Fi 或绑定数据。
+4. 再次核对芯片、文件名和 `0x0`，点击 **Program**。等待全部写入和校验完成；烧录期间保持供电和数据线连接，不点击 `Erase Flash`。
+
+![完整镜像参数示意：红框标出地址、文件、keep 参数和 Program 按钮](../../images/flashing/web-m5stack-cores3-lite.png)
+
+红框依次标出地址、文件、Flash 参数与烧录按钮。
+图中参数区为未连接设备时展开的操作示意，不是实板烧录成功截图。
+
+#### 4. 重启并检查
+
+完成后点击 **Disconnect** 释放串口，按开发板复位键重启。
+看到小钛启动及配网界面后，继续下方“首次使用”。需要日志时，可在网页 Console
+区域以 `115200` 点击 `Start`，或打开本地串口工具，检查启动版本和报错。
+只有烧录进度完成而设备不能正常启动时，应先核对板型、镜像和下载地址。
+
+#### 已有设备：使用分文件包升级
+
+从[同版发布页](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1)下载 `-validation.zip` 并解压。
+按 `MANIFEST.json` 的 `flash_files` 逐项添加文件和地址，缺少行时点击 `Add File`，
+不要套用完整镜像的单行 `0x0` 设置。烧录文件必须齐全；P4 和 S3 的地址布局不能互用。
+不执行全片擦除，并确认新旧分区布局和配置兼容后，才能保留原配置。
+
+### 方式二：工程烧录（源码编译与调试）
+
+1. 按根目录[源码获取说明](../../../README.md#从源码编译)下载仓库；未安装工具链时，先完成本页“环境与依赖”和“编译”。
+2. 连接本板并关闭网页烧录连接。在仓库根目录执行下列命令，编译成功后进入对应工程目录烧录。
+3. **将 `<串口>` 替换为本机实际端口**，例如 Linux 的 `/dev/ttyACM0`、`/dev/ttyUSB0` 或 Windows ESP-IDF 终端的 `COM5`；不要照抄示例端口。
 
 ```bash
 . tools/activate_esp_idf.sh
+python3 tools/build.py --board m5stack-cores3-lite --variant ili9342e
 cd firmware/esp-idf/esp32s3/m5stack-cores3-lite
-idf.py -p <确认过的串口> flash monitor
+idf.py -p <串口> flash monitor
 ```
 
-按官方说明，长按底侧复位键约 3 秒，绿色灯亮后松开进入下载模式；单击底侧 RST 复位。
-左侧电源键单击开机、长按约 6 秒关机。首次烧录前核对产品型号和串口。
-当前正式发布为 [v1.0.1 · build.42（ILI9342E）](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1)。
-用户已确认 M5 完成实板验证，开发基线 build.41 的歌曲嘴部恢复和运行日志保留；
-完整功能范围、构建状态和已知问题见[封版记录](FREEZE.md)。
+![工程命令示意：红框标出本板 ID、工程目录和需要替换的串口](../../images/flashing/project-m5stack-cores3-lite.png)
+
+上图为命令示意，不是已执行编译或烧录的终端记录。可复制的命令见上方代码块。
+
+以上环境激活命令适用于 Linux/WSL；WSL 还需将 USB 设备接入该环境。
+`idf.py` 按工程生成的烧录清单调用 esptool，不必手填地址。
+出现启动日志后核对版本与板型，使用 `Ctrl+]` 退出监视器；不能连接时按本页下载模式步骤重试。
+普通升级不执行 `erase-flash`。修改屏幕等硬件配置前，先核对本板支持的变体。
 
 ## 首次使用
 
@@ -28,7 +95,6 @@ idf.py -p <确认过的串口> flash monitor
 
 Wi-Fi 连接失败时返回配网页重填；验证码过期等待刷新。更换网络或身份时从设置页选择
 “重置设备”并确认，清除 Wi-Fi、绑定凭证和本机设置后重新配网绑定。凭证保存在 NVS，源码不带账号或密码。
-上述为复用产品流程，仍需本板逐项验证。
 
 ## 规格
 
@@ -71,10 +137,10 @@ ES7210 前两线槽是 MIC1 人声和 MIC3 扬声器电气回采，板级整理�
 官方源码核对、驱动增益量化及当前证据边界见
 [音频核查](../../../boards/m5stack/cores3-lite/OFFICIAL_AUDIO_REVIEW.md)。
 
-持续对话需要重复或播放时难以打断时，build.15 可用 `voice-diag 30` 后接 `status`
+持续对话需要重复或播放时难以打断时，可用 `voice-diag 30` 后接 `status`
 采集同窗口播放、削顶、上行与 I2S 溢出观测，详见
 [采音诊断](../../development/MEDIA_PIPELINE_DIAGNOSTICS.md#cores3-持续对话采音观测)。
-该版本只增加观测，不代表声学问题已经修复。
+诊断命令只读取统计数据，不修改音频参数。
 
 AI 上行格式由 ESP 共享内部配置 `CONFIG_STARTER_AI_UPLINK_G711A=y` 固定。
 AI start_session 请求使用官方协议名 `alaw`，响应兼容 `g711a` 别名。
@@ -104,7 +170,6 @@ esp_audio_codec 2.4.0、esp_lcd_ili9341 2.1.0；全部实际解析版本及哈�
 官方入口：[CoreS3-Lite](https://docs.m5stack.com/zh_CN/core/CoreS3-Lite)。
 [原理图 v1.0](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/490/Sch_M5_CoreS3_v1.0.pdf)、
 数据手册、BSP 及下载 SHA-256 见[资料与参考取舍](../../../boards/m5stack/cores3-lite/SOURCES.md)。
-已保存用户原有资料和新增官方资料的本地副本。
 
 当前官方页面的音频 GPIO13/14 方向与原理图冲突；实现采用原理图和官方 BSP 一致的
 RX14/TX13。2026-08-07 起官方屏幕由 C 改 E，不能从产品名确定实物屏幕。
@@ -169,7 +234,7 @@ python3 -m unittest discover -s tools/tests -v
 bash tools/check.sh
 ```
 
-新增测试覆盖构建变体与版本、真实电源接口的位保护及失败传播、MIC/回采槽位整理、
+主机测试覆盖构建变体与版本、真实电源接口的位保护及失败传播、MIC/回采槽位整理、
 两版面板命令和 GPIO0 排他性。PSRAM 回归检查新建工程默认值，并执行真实 CMake
 检查入口，确认旧 Octal 配置、关闭 PSRAM 和冲突配置均被拒绝。
 公共 S3 回归覆盖既有会话、音频、尾音和 UI 行为；
@@ -194,27 +259,12 @@ bash tools/check.sh
 
 ## 验证状态与已知限制
 
-当前主机检查和默认 E 屏目标编译记录见下方验证记录。用户 build.9 日志已确认
-8 MB PSRAM / 80 MHz、内存测试通过和应用启动，但照片仍有花屏。
-build.10 修正共享 UI 覆盖面板方向；用户已绑定并进入 AI，随后反馈触摸暂时无响应和
-偶发自回声。四角触摸及声学验收仍未完成。build.11 修正串口绑定网址，
-与屏幕统一为 `https://xiaotai.chat`；build.12 按用户要求旋转显示与触摸 180°。
-AEC、增益或调度配置未修改。
+M5 已完成实板验证，当前正式发布为 **v1.0.1 · build.42 / ILI9342E**。
+功能与修复列表见[发布记录](FREEZE.md)，具体构建身份、验证范围和历史日志见
+[验证记录](../../../boards/m5stack/cores3-lite/VALIDATION.md)。
 
-偶发自回声先对照麦克风灵敏度 4（33 dB）与 2（24 dB），其余条件不变。
-AI 播放期间执行 `voice-diag 10`，前后各取一次 `status`，核对削顶和超时增量；
-先测远端独自播放，再测人声和双讲。具体参考与未采用项见
-[音频比较](../../../boards/m5stack/cores3-lite/SOURCES.md#build10-自回声反馈后的专项比较)。
-
-准确路径、BIN/ELF 校验值和验证范围见
-[验证记录](../../../boards/m5stack/cores3-lite/VALIDATION.md)。旧 build.6 / build.7 不应再烧录。
-本次未由代理烧录、未发布 Release，不能继承其他板卡的通过结论。
-
-TODO：确认 PCB/屏幕实物型号；同一固件 SHA-256 下验证启动、屏幕颜色及四角触摸、
-配网绑定、GC0308 画面方向、H5 双向音频、AI、设备/微信语音通话、房间 PTT、
-AEC 远端单讲/近端单讲/双讲、重复切换、断网恢复及长时间内存稳定性。
-SD 卡、IMU、磁力计、接近传感器和 RTC 不属于当前小钛业务接入范围。
-
-build.23 播放期间的任务采样、缓存/内部 RAM 预算、官方性能资料和后续单变量
-验证顺序见[音频性能排查](AUDIO_PERFORMANCE_REVIEW.md)。该报告使用 ESP-IDF v5.5.5、
-ESP-SR 2.4.7 的证据，尚未宣称解决播放期间的采集溢出或 UI 卡顿。
+- 收音、AI 打断和双讲效果仍需持续测试；短句“好的”识别不稳定、可能丢失句首的问题尚未修复。
+- 本版不提供录音导出到 TF 卡的实验功能。诊断使用 `voice-diag`、`status` 和 `face-animation`。
+- 播放期间的 AEC 与 UI 实时处理余量仍偏紧；弱网、反复切换和长时间运行需持续回归。分析见[音频性能排查](AUDIO_PERFORMANCE_REVIEW.md)。
+- ILI9342C 旧屏需要单独选择 `ili9342c` 变体编译，不能使用当前 ILI9342E 发布镜像。
+- SD 卡、IMU、磁力计、接近传感器和 RTC 尚未接入小钛产品功能。
