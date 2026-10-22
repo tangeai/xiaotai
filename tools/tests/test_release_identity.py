@@ -47,6 +47,21 @@ class ReleaseIdentityTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn('release validation failed', result.stderr)
 
+    def test_m5_release_uses_board_namespace_and_validates_payload(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for number in (41, 42):
+                result = self.plan(directory, 'm5stack-cores3-lite', f'1.0.1+build.{number}')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                plan = json.loads(result.stdout)
+                self.assertEqual(plan['tag'], 'm5stack-cores3-lite-v1.0.1')
+                self.assertEqual(plan['title'], f'M5Stack CoreS3-Lite v1.0.1 · build.{number}')
+                self.assertEqual(plan['board_id'], 'm5stack-cores3-lite')
+                self.assertEqual(plan['verification_status'], 'BUILD_VERIFIED_HIL_PENDING')
+            corrupt = self.plan(directory, 'm5stack-cores3-lite', '1.0.1+build.42', corrupt=True)
+            self.assertNotEqual(corrupt.returncode, 0)
+            self.assertIn('artifact checksum mismatch', corrupt.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()
