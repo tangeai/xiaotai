@@ -10,6 +10,8 @@ toolchain_bin="${XIAOTAI_TOOLCHAIN_DIR:-$workspace_dir/.tools/gcc-arm-none-eabi-
 python_bin="${XIAOTAI_PYTHON_BIN:-$workspace_dir/.tools/bk-python/bin}"
 sdk_dir="${SDK_DIR:-$workspace_dir/.tools/bk_avdk_smp-release-v3.1.1.10}"
 expected_sdk_commit="398cab28b938e69ba2071a597daf00845dd080b6"
+board_variant="${2:-}"
+export XIAOTAI_BOARD_VARIANT="$board_variant"
 ap_config="$project_dir/ap/config/bk7258_ap/config"
 cp_config="$project_dir/cp/config/bk7258/config"
 ap_release_config="$project_dir/ap/config/bk7258_ap/release.config"
@@ -61,6 +63,20 @@ fi
 config_args=()
 artifact_project_name="$(basename "$project_dir")"
 board_id="${artifact_project_name%-xiaotai}"
+config_name=""
+if [ -n "$board_variant" ] && [ "$board_variant" != headless ]; then
+    if [[ ! "$board_variant" =~ ^[a-z][a-z0-9-]*$ ]]; then exit 2; fi
+    config_name="$board_variant"
+    ap_config="$project_dir/ap/config/bk7258_ap/$config_name.config"
+    cp_config="$project_dir/cp/config/bk7258/$config_name.config"
+    test -f "$ap_config"
+    test -f "$cp_config"
+    config_args+=(BK_CONFIG_FILE="$config_name")
+    artifact_project_name="${artifact_project_name}_$config_name"
+    ap_release_config="$project_dir/ap/config/bk7258_ap/${config_name}_release.config"
+    cp_release_config="$project_dir/cp/config/bk7258/${config_name}_release.config"
+fi
+
 snapshot_source=""
 cleanup_build() {
     if [ -n "$snapshot_source" ]; then
@@ -83,7 +99,7 @@ if [ "$build_profile" = release ]; then
         "$ap_config" "$ap_release_config"
     python3 "$support_dir/tools/prepare_release_config.py" \
         "$cp_config" "$cp_release_config"
-    config_args+=(BK_CONFIG_FILE=release)
+    config_args=(BK_CONFIG_FILE="${config_name:+${config_name}_}release")
     artifact_project_name="${artifact_project_name}_release"
     build_purpose="${XIAOTAI_BUILD_PURPOSE:-Online release candidate}"
 elif [ "$build_profile" != development ]; then
@@ -180,7 +196,7 @@ if [ "$build_profile" = development ] &&
         --contract "$build_root/heartbeat.symbols" \
         --expected-source-sha256 "$snapshot_source_sha"
     snapshot_source="$snapshot_candidate"
-    make -C "$project_dir" bk7258 SDK_DIR="$sdk_dir" APP_VERSION="$build_version"
+    make -C "$project_dir" bk7258 SDK_DIR="$sdk_dir" APP_VERSION="$build_version" "${config_args[@]}"
     "$nm_tool" "$ap_elf" > "$ap_nm"
     python3 "$support_dir/tools/instrument_critical_lr.py" verify \
         --sdk-file "$snapshot_source" --nm-file "$ap_nm" \

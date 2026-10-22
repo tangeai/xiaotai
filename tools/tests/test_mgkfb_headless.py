@@ -1,4 +1,5 @@
 """Build selection and public admission contracts for the headless SMP board."""
+import os
 import json
 import re
 import tempfile
@@ -203,6 +204,57 @@ int main(void) {
 }
 ''')
 
+    def test_real_key_worker_delivers_each_volume_click_without_double_window(self):
+        gesture=(ROOT/'product/interaction/src/xiaotai_key_gesture.c').read_text()
+        worker=(ROOT/'platforms/beken/src/xiaotai_key_input.c').read_text()
+        sources='\n'.join(re.sub(r'^#include.*$','',x,flags=re.M) for x in (gesture,worker))
+        run_c(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <setjmp.h>
+#include <stddef.h>
+#include "xiaotai_key_gesture.h"
+#include "xiaotai_button.h"
+#define BK_LOGD(...) ((void)0)
+#define BK_LOGI(...) ((void)0)
+#define BK_ERR_PARAM -1
+#define BK_ERR_BUSY -2
+#define BK_OK 0
+typedef void *beken_thread_t;
+typedef void *beken_thread_arg_t;
+static uint32_t now;
+static jmp_buf done;
+static void (*task)(beken_thread_arg_t);
+static unsigned up,down,primary_double,first_up;
+static unsigned rtos_get_time(void){return now;}
+static void rtos_delay_milliseconds(unsigned ms){now+=ms;if(now>=1400)longjmp(done,1);}
+static int xiaotai_board_button_init(void){return 0;}
+static bool xiaotai_board_key_released(unsigned i){
+ bool press=(now>=100 && now<200)||(now>=280 && now<380);
+ if(i==1)press=press||(now>=600 && now<700);
+ if(i==2)press=press||(now>=1000 && now<1100);
+ return !press;
+}
+static int rtos_create_thread(beken_thread_t *t,int priority,const char *name,
+ void (*fn)(beken_thread_arg_t),unsigned stack,beken_thread_arg_t arg){
+ (void)priority;(void)name;(void)stack;(void)arg;*t=(void *)1;task=fn;return 0;
+}
+'''+sources+r'''
+static void got(xiaotai_button_event_t e,void *ctx){
+ assert(ctx==(void *)42);
+ if(e==XIAOTAI_BUTTON_VOLUME_UP){if(!up)first_up=now;up++;}
+ if(e==XIAOTAI_BUTTON_VOLUME_DOWN)down++;
+ if(e==XIAOTAI_BUTTON_DOUBLE)primary_double++;
+}
+int main(void){
+ assert(xiaotai_button_start(got,(void *)42)==0);
+ if(setjmp(done)==0)task(NULL);
+ assert(up==3 && down==3 && primary_double==1);
+ assert(first_up>=200 && first_up<=260);
+}
+''',include_dirs=[ROOT/'product/interaction/include',ROOT/'platforms/beken/runtime/include'])
+
     def test_key_debounce_double_long_boot_hold_and_clock_wrap(self):
         header = (ROOT/'product/interaction/include/xiaotai_key_gesture.h').read_text()
         source = (ROOT/'product/interaction/src/xiaotai_key_gesture.c').read_text()
@@ -253,7 +305,8 @@ function(add_prebuilt_library)
 endfunction()
 ''' + f'set(CMAKE_BINARY_DIR "{temp}/build")\n' +
                 f'include("{PROJECT}/ap/CMakeLists.txt")\n')
-            subprocess.run(['cmake','-P',str(script)],check=True,capture_output=True)
+            subprocess.run(['cmake','-P',str(script)],check=True,capture_output=True,
+                           env={**os.environ,'XIAOTAI_BOARD_VARIANT':'headless'})
             sources=(temp/'sources.txt').read_text().split(';')
             self.assertTrue(all(Path(s).is_file() for s in sources))
             self.assertFalse(any('lckfb-bk7258-xiaotai' in s for s in sources))
@@ -285,9 +338,8 @@ endfunction()
         self.assertEqual(board.data['platform'], 'beken')
         data = json.loads((ROOT / 'boards/mgkfb/bk7258/board.json').read_text())
         self.assertEqual(data['sdk'], {'name': 'bk_avdk_smp', 'version': 'release/v3.1.1.10'})
-        self.assertEqual(data['variants'], [{'name': 'headless', 'default': True,
-            'interaction_profile': 'headless-key', 'layout_profile': 'none'}])
-        self.assertNotIn('display', data['capabilities'])
+        self.assertIn({'name': 'headless', 'default': False,
+            'interaction_profile': 'headless-key', 'layout_profile': 'none'}, data['variants'])
         self.assertNotIn('touch', data['capabilities'])
         self.assertIn('camera-h264', data['capabilities'])
         self.assertEqual(str(read_board_version(ROOT, board.id)), '1.0.1')

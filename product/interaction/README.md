@@ -19,6 +19,7 @@ interaction adapter ── intent ──> product runtime
 
 - `touch-full`：有屏且有触摸，提供完整菜单和功能。小屏与大屏只改变
   布局，不改变核心功能集。
+- `eyes-key`：两个小屏分别呈现左/右眼，AI Tag 改变眼形，不绘制嘴巴；配网、绑定和通话临时显示短文字，操作来自实体按键或 Web。
 - `display-key`：有屏无触摸；屏幕显示表情、字幕、二维码和业务状态，
   选择来自语音、实体按键或 Web。
 - `headless-key`：无屏；使用语音、实体按键、提示音和可选 LED，不创建

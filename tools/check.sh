@@ -4,6 +4,7 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 python3 "$repo_dir/tools/tests/test_mgkfb_headless.py"
+python3 "$repo_dir/tools/tests/test_mgkfb_eyes.py"
 python3 "$repo_dir/tools/tests/test_cores3_board.py"
 python3 "$repo_dir/tools/tests/test_cores3_memory_config.py"
 python3 "$repo_dir/tools/tests/test_cores3_text_memory.py"
@@ -131,9 +132,10 @@ python3 "$repo_dir/tools/tests/test_p4_video_submit_probe.py"
 python3 "$repo_dir/tools/tests/test_p4_video_stale.py"
 python3 "$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools/test_p4_video.py"
 python3 "$repo_dir/tools/tests/test_firmware_versions.py"
-# Includes M5-specific release namespace and corrupt-asset rejection.
+# Includes M5/MGKFB release namespaces and corrupt-asset rejection.
 python3 "$repo_dir/tools/tests/test_release_identity.py"
 python3 "$repo_dir/tools/tests/test_boot_identity.py"
+# Includes MGKFB eyes/headless output isolation in development/release packaging.
 python3 "$repo_dir/tools/tests/test_validation_packaging.py"
 bash "$repo_dir/tools/run_host_tests.sh"
 python3 "$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools/test_video_regions.py"

@@ -835,6 +835,10 @@ static void handle_intent(xiaotai_intent_t intent)
             xiaotai_audio_set_volume(s_settings.volume);
             save_settings();
         }
+        BK_LOGI(TAG,"volume key=%s level=%u->%u muted=%u save-error=%u\n",
+                intent==XIAOTAI_INTENT_VOLUME_UP?"S1/up":"S3/down",before,
+                (unsigned)s_settings.volume,(unsigned)s_settings.speaker_muted,
+                (unsigned)s_settings_save_failed);
         return;
     }
     if (intent == XIAOTAI_INTENT_PROVISION) {

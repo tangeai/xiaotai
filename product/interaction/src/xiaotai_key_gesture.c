@@ -1,7 +1,7 @@
 #include "xiaotai_key_gesture.h"
 
-xiaotai_key_event_t xiaotai_key_sample(xiaotai_key_gesture_t *k,
-                                     bool released, uint32_t now)
+static xiaotai_key_event_t sample_key(xiaotai_key_gesture_t *k,
+                                     bool released, uint32_t now, bool double_click)
 {
     if (!k) return XIAOTAI_KEY_NONE;
     if (!k->initialized) {
@@ -20,6 +20,7 @@ xiaotai_key_event_t xiaotai_key_sample(xiaotai_key_gesture_t *k,
         }
         if (!released) { k->pressed_at = now; k->long_sent = false; }
         else if (!k->long_sent) {
+            if (!double_click) return XIAOTAI_KEY_SHORT;
             if (k->pending && (uint32_t)(now-k->released_at) <= 320U) {
                 k->pending = false;
                 return XIAOTAI_KEY_DOUBLE;
@@ -37,4 +38,15 @@ xiaotai_key_event_t xiaotai_key_sample(xiaotai_key_gesture_t *k,
         return XIAOTAI_KEY_SHORT;
     }
     return XIAOTAI_KEY_NONE;
+}
+
+xiaotai_key_event_t xiaotai_key_sample(xiaotai_key_gesture_t *k,
+                                     bool released, uint32_t now)
+{
+    return sample_key(k,released,now,true);
+}
+xiaotai_key_event_t xiaotai_key_sample_single(xiaotai_key_gesture_t *k,
+                                            bool released, uint32_t now)
+{
+    return sample_key(k,released,now,false);
 }

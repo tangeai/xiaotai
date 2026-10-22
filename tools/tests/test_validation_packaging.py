@@ -16,6 +16,47 @@ from package_validation_firmware import beken_build_root, package_beken, verific
 
 
 class ValidationPackagingTests(unittest.TestCase):
+    def test_beken_variant_delivery_selects_default_eyes_and_explicit_headless(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            project = root / 'firmware/mgkfb-bk7258-xiaotai'
+            project.mkdir(parents=True)
+            (project/'VERSION.md').write_text('`1.0.1`\n')
+            board = Board(root/'board.json', {
+                'id': 'mgkfb-bk7258', 'project_dir': 'firmware/mgkfb-bk7258-xiaotai',
+                'target': 'bk7258', 'vendor': 'MGKFB', 'model': 'BK7258',
+                'sdk': {'name': 'bk_avdk_smp', 'version': 'release/v3.1.1.10'},
+                'variants': [{'name': 'eyes', 'default': True},
+                             {'name': 'headless', 'default': False}],
+            })
+            for variant, suffix, number in [('eyes', '_eyes', 11), ('headless', '', 8)]:
+                build = project/'build/bk7258'/f'{project.name}{suffix}_release'
+                image = variant.encode()
+                for relative in ('package/app_pack.rbl', 'package/build_summary.txt',
+                                 'bk7258/app.elf', 'partitions/bk_package.json',
+                                 'partitions/partitions.json', 'package/all-app.bin'):
+                    path = build/relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(image)
+                (build/'bk7258_ap').mkdir()
+                (build/'bk7258_ap/app.elf').write_bytes(f'1.0.1+build.{number}'.encode())
+                (build/'build_identity.json').write_text(json.dumps({
+                    'version': '1.0.1', 'build_id': str(number),
+                    'build_version': f'1.0.1+build.{number}', 'build_profile': 'release',
+                    'all_app_sha256': hashlib.sha256(image).hexdigest(),
+                }))
+            for requested, expected in [(None, 'eyes'), ('eyes', 'eyes'), ('headless', 'headless')]:
+                output = root/str(requested)
+                output.mkdir()
+                with mock.patch('package_validation_firmware.git_output', return_value=''):
+                    archive = package_beken(root, board, output, 'release', variant=requested)
+                with zipfile.ZipFile(archive) as zipped:
+                    manifest = json.loads(zipped.read('MANIFEST.json'))
+                    self.assertEqual(manifest['variant'], expected)
+                    self.assertEqual(zipped.read(manifest['application']['path']), expected.encode())
+            with self.assertRaises(ValueError):
+                package_beken(root, board, root, 'release', variant='other')
+
     def test_beken_delivery_uses_full_version_and_rejects_wrong_profile(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

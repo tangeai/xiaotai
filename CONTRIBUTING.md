@@ -180,6 +180,7 @@ S3/P4 首次启用从 1 开始，BK 延续原有计数。构建号从本次产�
 | 立创·实战派 ESP32-S3 | `esp32s3-v<产品版本>` | `立创·实战派 ESP32-S3 v<产品版本> · build.<本次构建号>` |
 | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 | `esp32p4-v<产品版本>` | `微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 v<产品版本> · build.<本次构建号>` |
 | 立创·实战派 BK7258 | `bk7258-v<产品版本>` | `立创·实战派 BK7258 v<产品版本> · build.<本次构建号>` |
+| 觅感 AI 玩具开发板 BK7258 | `mgkfb-bk7258-v<产品版本>` | `觅感 AI 玩具开发板 BK7258 v<产品版本> · build.<本次构建号>` |
 | M5Stack CoreS3-Lite（ESP32-S3） | `m5stack-cores3-lite-v<产品版本>` | `M5Stack CoreS3-Lite v<产品版本> · build.<本次构建号>` |
 
 M5 使用独立板卡标签，不能覆盖立创 S3 的 `esp32s3-v...` 发布。M5 附件名称仍以
@@ -243,6 +244,10 @@ BK7258 打包命令必须再加 `--beken-build-profile release`，否则工具�
 产物。ESP-IDF 使用原生 `build/`；BK 开发目录为 `build/bk7258/<project>/`，
 发布目录为 `build/bk7258/<project>_release/`，烧录文件在相应 `package/` 下。
 默认打包保留在这些原生目录；`--output` 只用于显式导出副本。
+
+觅感发布选择 `--variant eyes`，构建与打包必须使用同一个变体；双屏发布目录为
+`build/bk7258/mgkfb-bk7258-xiaotai_eyes_release/`。`headless` 为独立无屏变体，
+不得把它的镜像当作双屏固件发布。打包省略 `--variant` 时使用板卡清单的默认变体。
 
 ESP32 打包需先激活该工程的 ESP-IDF Python 环境以提供 esptool；统一打包入口会
 同时输出 ZIP、完整 BIN 和包含两者的校验文件。只给已有 ZIP 补充完整镜像时执行：

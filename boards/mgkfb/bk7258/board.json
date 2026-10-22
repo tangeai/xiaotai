@@ -15,7 +15,8 @@
     "audio",
     "buttons",
     "camera-h264",
-    "wifi"
+    "wifi",
+    "display"
   ],
   "resources": {
     "flash_bytes": 8388608,
@@ -27,9 +28,15 @@
   "variants": [
     {
       "name": "headless",
-      "default": true,
+      "default": false,
       "interaction_profile": "headless-key",
       "layout_profile": "none"
+    },
+    {
+      "name": "eyes",
+      "default": true,
+      "interaction_profile": "eyes-key",
+      "layout_profile": "compact"
     }
   ],
   "migration": {

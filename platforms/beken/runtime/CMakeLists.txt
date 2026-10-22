@@ -160,3 +160,13 @@ if(XIAOTAI_HEADLESS)
         XIAOTAI_HEADLESS=1 ${XIAOTAI_FEATURE_DEFINITIONS}
         XIAOTAI_BOARD_ID="${XIAOTAI_BOARD_ID}")
 endif()
+
+if(XIAOTAI_DUAL_EYES)
+    target_sources(${COMPONENT_LIB} PRIVATE
+        "${XIAOTAI_BOARD_ROOT}/board_eyes.c"
+        "${XIAOTAI_REPO_ROOT}/platforms/beken/src/xiaotai_eyes_ui.c"
+        "${XIAOTAI_PRODUCT_ROOT}/src/xiaotai_eyes.c"
+        "${XIAOTAI_PRODUCT_ROOT}/src/xiaotai_eye_text.c"
+        "${CMAKE_CURRENT_LIST_DIR}/assets/xiaotai_ui_assets.c")
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE XIAOTAI_DUAL_EYES=1)
+endif()

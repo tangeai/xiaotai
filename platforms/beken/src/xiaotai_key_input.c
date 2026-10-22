@@ -2,6 +2,8 @@
 #include "board_button.h"
 #include "xiaotai_key_gesture.h"
 #include <os/os.h>
+#include "xiaotai_log.h"
+#define TAG "xiaotai_keys"
 static beken_thread_t thread;
 static xiaotai_button_event_fn callback;
 static void *context;
@@ -12,7 +14,13 @@ static void key_task(beken_thread_arg_t arg)
     for (;;) {
         uint32_t now = rtos_get_time();
         for (unsigned i=0; i<3; ++i) {
-            xiaotai_key_event_t e = xiaotai_key_sample(&keys[i], xiaotai_board_key_released(i), now);
+            bool released=xiaotai_board_key_released(i);
+            if (!keys[i].initialized || released!=keys[i].candidate)
+                BK_LOGD(TAG,"key input index=%u released=%u at-ms=%u\n",i,(unsigned)released,(unsigned)now);
+            xiaotai_key_event_t e = i==0?xiaotai_key_sample(&keys[i],released,now):
+                xiaotai_key_sample_single(&keys[i],released,now);
+            if (e!=XIAOTAI_KEY_NONE)
+                BK_LOGD(TAG,"key gesture index=%u event=%u at-ms=%u\n",i,(unsigned)e,(unsigned)now);
             if (i==0 && e==XIAOTAI_KEY_SHORT) callback(XIAOTAI_BUTTON_SHORT, context);
             else if (i==0 && e==XIAOTAI_KEY_DOUBLE) callback(XIAOTAI_BUTTON_DOUBLE, context);
             else if (i==1 && e==XIAOTAI_KEY_SHORT) callback(XIAOTAI_BUTTON_VOLUME_UP, context);
@@ -28,6 +36,9 @@ int xiaotai_button_start(xiaotai_button_event_fn cb, void *ctx)
     if (thread) return BK_ERR_BUSY;
     int rc=xiaotai_board_button_init();
     if (rc!=BK_OK) return rc;
+    BK_LOGI(TAG,"key inputs S2/GPIO12=%u S1/GPIO13=%u S3/GPIO8=%u (1=released)\n",
+            (unsigned)xiaotai_board_key_released(0),(unsigned)xiaotai_board_key_released(1),
+            (unsigned)xiaotai_board_key_released(2));
     callback=cb; context=ctx;
     return rtos_create_thread(&thread,4,"xiaotai_keys",key_task,2048, NULL);
 }

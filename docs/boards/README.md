@@ -15,7 +15,7 @@
 | `lckfb-bk7258` | 立创·实战派 BK7258 | BK7258 / Beken AVDK | 8 MiB Flash / 16 MiB PSRAM / 640 KiB SRAM（构建配置） | 音频、屏幕、触摸、H.264 摄像头、Wi-Fi | 实板已跑通 | [下载 v1.0.1 · build.56](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.1) · [开发板指南](lckfb-bk7258/README.md) |
 | `m5stack-cores3-lite` | M5Stack CoreS3-Lite (K128-Lite) | ESP32-S3 / ESP-IDF 5.5.5 | 16 MB Flash / 8 MB PSRAM | AEC、音频、触摸屏、GC0308、Wi-Fi | 已实板验证；v1.0.1 正式发布 | [下载 v1.0.1 · build.42](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1) · [开发板指南](m5stack-cores3-lite/README.md) |
 
-| `mgkfb-bk7258` | 觅感 AI 玩具开发板 BK7258（PCB 版本待核对） | BK7258 / AVDK SMP | 8 MiB Flash（用户确认）/ PSRAM 待测 | 无屏按键、音频、H.264 摄像头、Wi-Fi | 已编译，实板待验；无正式下载 | [开发板指南](mgkfb-bk7258/README.md) |
+| `mgkfb-bk7258` | 觅感 AI 玩具开发板 BK7258（PCB 版本待核对） | BK7258 / AVDK SMP | 8 MiB Flash（用户确认）/ PSRAM 待测 | 双屏眼睛/无屏变体、按键、音频、H.264 摄像头、Wi-Fi | 已编译，双屏实板待验；无正式下载 | [开发板指南](mgkfb-bk7258/README.md) |
 
 固件下载、功能范围和已知问题见各板发布说明；烧录、配网和开发步骤见对应开发板指南。
 具体构建的测试范围与历史日志保存在各板验证记录中。

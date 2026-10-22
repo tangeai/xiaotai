@@ -20,6 +20,14 @@
       ],
       "presentation": "complete-touch-ui",
       "navigation": "touch-and-common-intents"
+    },
+    "eyes-key": {
+      "required_capabilities": [
+        "display",
+        "buttons"
+      ],
+      "presentation": "tag-eyes-and-onboarding-text",
+      "navigation": "voice-and-physical-intents"
     }
   },
   "layouts": {

@@ -16,9 +16,10 @@ typedef void (*xiaotai_button_event_fn)(xiaotai_button_event_t event,
                                         void *context);
 
 /**
- * Start the board KEY (GPIO7, active-low) worker.
+ * Start the board-selected active-low key worker.
  * DOWN/UP are immediate debounced edges. SHORT is delayed for the double-click
- * window; LONG is emitted once while the key remains held.
+ * window for the primary key; volume keys report on release without merging.
+ * LONG is emitted once while the key remains held.
  */
 int xiaotai_button_start(xiaotai_button_event_fn callback, void *context);
 

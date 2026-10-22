@@ -12,3 +12,8 @@ typedef struct {
  * 700 ms long. A key held at boot must be released before any action. */
 xiaotai_key_event_t xiaotai_key_sample(xiaotai_key_gesture_t *key,
                                      bool released, uint32_t now);
+
+/* Volume-style key: report a short press on debounced release immediately.
+ * The same boot guard and long-press rule apply; never merge two clicks. */
+xiaotai_key_event_t xiaotai_key_sample_single(xiaotai_key_gesture_t *key,
+                                            bool released, uint32_t now);

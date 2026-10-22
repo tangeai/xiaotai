@@ -54,13 +54,15 @@
       "device-call",
       "group-room"
     ],
-    "presentation": "headless",
+    "presentation": "dual-eyes-with-setup-text",
     "input": "physical-buttons",
-    "interaction_profile": "headless-key",
-    "layout_profile": "none",
-    "note": "Implemented headless build selection and per-board business gates; all capabilities remain pending physical-board validation. Implement and verify dual screens last.",
-    "deferred": [
-      "dual-screen-eyes"
+    "interaction_profile": "eyes-key",
+    "layout_profile": "compact",
+    "note": "eyes is the default software variant; headless remains selectable. AI tags drive one eye per screen, no mouth. Setup and binding use short text. Dual-panel hardware validation pending.",
+    "deferred": [],
+    "variants": [
+      "eyes",
+      "headless"
     ]
   },
   "display": {
@@ -82,8 +84,8 @@
         },
         {
           "name": "LCD2",
-          "clock_gpio": 21,
-          "cs_gpio": 22,
+          "clock_gpio": 22,
+          "cs_gpio": 23,
           "data_gpio": 24,
           "dc_gpio": 7,
           "reset_gpio": 6
@@ -92,7 +94,9 @@
       "backlight_gpio": 25,
       "peripheral_3v3_enable_gpio": 52,
       "physical_left_connector": null,
-      "orientation": null
+      "orientation": null,
+      "logical_left_connector": "LCD1",
+      "backlight_active_level": 1
     },
     "state": "declared",
     "source": "mig-spec-v1",
@@ -101,7 +105,7 @@
       12,
       15
     ],
-    "note": "CN5 is a separate optional touch/display connector, not proof of touch on the two eye panels."
+    "note": "CN5 is a separate optional touch/display connector. Re-inspection of U1 p.12 and LCD2 p.15 corrects the earlier note: FL_QSPI_CLK=GPIO22, FL_QSPI_CS=GPIO23. LCD1 logical left, LCD2 logical right; physical positions and orientation pending HIL."
   },
   "keys": {
     "value": {
@@ -282,18 +286,18 @@
   "build_evidence": {
     "date": "2026-10-22",
     "board_id": "mgkfb-bk7258",
-    "variant": "headless",
-    "build_version": "1.0.1+build.5",
-    "source_commit": "b8de258c23955c5c055256cd4090951c6f1b50dd",
-    "working_tree": "uncommitted feature branch changes",
-    "all_app_sha256": "91509cfa05876dc3c566b03c1c5295861af1acc8e583b5992ebce4ed728d7dd1",
-    "app_pack_sha256": "4698e224c78925fe87e7797e6c46e3e76b3655830348aa42573c92286203fdcc",
-    "all_app_bytes": 2699808,
+    "variant": "eyes",
+    "build_version": "1.0.1+build.10",
+    "source_commit": "e445b463203aeb4316bb32893c3a732a3182d95c",
+    "working_tree": "uncommitted dual-eye implementation after headless baseline e445b46",
+    "all_app_sha256": "79ae419c02dae757cc1e19a6542227eaad8a34507099f6a64767e68ae4caa4d2",
+    "app_pack_sha256": "d9e718a4a3537d8f7b347866ec0aa33ac36e2934edf6ac4accd32dd2cdf1cec9",
+    "all_app_bytes": 3572032,
     "linked_ap_text_data_bss_bytes": [
-      1117522,
-      46044,
-      155849
+      1938294,
+      46164,
+      156277
     ],
-    "note": "Native SMP build, SDK GPIO admission/default DVP mux regressions and package payload verification passed; 445 host tests and full tools/check.sh passed. Awaiting repeat H5 image test after DVP mux correction."
+    "note": "eyes build.10 includes immediate per-click volume gestures and key/runtime diagnostics; native SMP build and package verification passed, 452 host tests passed at build time. User subsequently confirmed volume adjustment works, without a fresh firmware identity log; limits, persistence and per-media behavior remain pending. Dual screens remain pending HIL."
   }
 }

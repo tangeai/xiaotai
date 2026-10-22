@@ -1,4 +1,8 @@
 #include "xiaotai_ui.h"
+#if XIAOTAI_DUAL_EYES
+#include "xiaotai_eyes_ui.h"
+#include <stdio.h>
+#endif
 #include "xiaotai_log.h"
 #include "board_indicator.h"
 #include <os/os.h>
@@ -10,7 +14,16 @@ static atomic_uint s_indicator;
 
 int xiaotai_ui_init(void)
 {
-    BK_LOGI(TAG, "headless-key: LCD/touch disabled; binding uses spoken code\n"); return xiaotai_board_indicator_init();
+#if XIAOTAI_DUAL_EYES
+    int rc=xiaotai_eyes_ui_start();
+    if(rc!=0) BK_LOGE(TAG,"eye display unavailable rc=%d; keys/network remain available\n",rc);
+#endif
+#if XIAOTAI_DUAL_EYES
+    BK_LOGI(TAG,"eyes-key: dual eyes and setup text; touch disabled\n");
+#else
+    BK_LOGI(TAG,"headless-key: LCD/touch disabled; binding uses spoken code\n");
+#endif
+    return xiaotai_board_indicator_init();
 }
 
 void xiaotai_ui_show_status(const char *status)
@@ -23,17 +36,30 @@ void xiaotai_ui_show_status(const char *status)
     else if (strcmp(status,"ERROR")==0 || strcmp(status,"TIMEOUT")==0 ||
              strcmp(status,"BUSY")==0 || strcmp(status,"UNSUPPORTED CONTACT")==0) mode=3;
     atomic_store(&s_indicator,mode);
+#if XIAOTAI_DUAL_EYES
+    if(mode==1) xiaotai_eyes_ui_idle();
+    else if(mode==2) xiaotai_eyes_ui_text("微信来电","单击接听\n双击拒接");
+    else if(mode==3) xiaotai_eyes_ui_text("操作未完成","请重试\n或查看手机提示");
+    else xiaotai_eyes_ui_text("正在连接",status);
+#endif
 }
 
 void xiaotai_ui_show_call_active(bool wechat, bool microphone_muted)
 {
     atomic_store(&s_indicator,2);
+#if XIAOTAI_DUAL_EYES
+    xiaotai_eyes_ui_text("微信通话中","单击挂断");
+#endif
     (void)wechat; (void)microphone_muted;
 }
 
 void xiaotai_ui_show_verification_code(const char *code)
 {
     atomic_store(&s_indicator,5);
+#if XIAOTAI_DUAL_EYES
+    char text[80];snprintf(text,sizeof text,"绑定验证码\n%s",code?code:"");
+    xiaotai_eyes_ui_text(text,"手机打开\nxiaotai.chat\n添加设备\n输入验证码");
+#endif
     BK_LOGI(TAG, "打开 https://xiaotai.chat 添加设备，输入语音播报的验证码；串口备用验证码=%s\n", code ? code : "");
 }
 
@@ -64,6 +90,9 @@ void xiaotai_ui_show_home(const char *time_text,
                           const char *emotion, bool touch_enabled)
 {
     atomic_store(&s_indicator,1);
+#if XIAOTAI_DUAL_EYES
+    xiaotai_eyes_ui_idle();
+#endif
     (void)time_text; (void)date_text; (void)wifi_rssi; (void)clock_face; (void)emotion; (void)touch_enabled;
 }
 
@@ -73,6 +102,9 @@ void xiaotai_ui_show_ai(xiaotai_ai_ui_phase_t phase,
                         bool caption_from_ai,
                         bool emotion_tag_present)
 {
+#if XIAOTAI_DUAL_EYES
+    xiaotai_eyes_ui_tag(emotion,emotion_tag_present,(int)phase);
+#endif
     (void)phase; (void)emotion; (void)caption; (void)caption_from_ai; (void)emotion_tag_present;
 }
 
@@ -84,6 +116,10 @@ void xiaotai_ui_update_ai_mouth(uint32_t columns)
 void xiaotai_ui_show_network_setup(const char *ssid)
 {
     atomic_store(&s_indicator,4);
+#if XIAOTAI_DUAL_EYES
+    char text[96];snprintf(text,sizeof text,"等待配网\n热点名称\n%s",ssid?ssid:"");
+    xiaotai_eyes_ui_text(text,"手机连接热点\n浏览器打开\n192.168.4.1");
+#endif
     BK_LOGI(TAG, "配网热点=%s；连接热点后打开 192.168.4.1\n", ssid ? ssid : "");
 }
 

@@ -300,5 +300,5 @@ def build_command(root: Path, board: Board, variant: str) -> tuple[list[str], Pa
             return ["idf.py", f"-DXIAOTAI_BOARD_VARIANT={variant}", "build"], project_dir
         return ["idf.py", "build"], project_dir
     if board.data["platform"] == "beken":
-        return ["bash", "tools/build.sh"], project_dir
+        return ["bash", "tools/build.sh", *([variant] if len(board.data["variants"]) > 1 else [])], project_dir
     raise ManifestError(f"unsupported platform: {board.data['platform']}")

@@ -19,12 +19,18 @@ from package_esp_validation import (add_file, git_output, package_board, sha256,
 
 
 
-def beken_build_root(project_dir: Path, target: str, profile: str) -> Path:
+def beken_build_root(project_dir: Path, target: str, profile: str,
+                     variant: str | None = None) -> Path:
     """Resolve a Beken output tree without silently mixing build profiles."""
+    project_name = project_dir.name
+    if variant and variant not in ('default', 'headless'):
+        if not re.fullmatch(r'[a-z][a-z0-9-]*', variant):
+            raise ValueError('invalid Beken variant')
+        project_name += f'_{variant}'
     if profile == "release":
-        project_name = f"{project_dir.name}_release"
+        project_name += '_release'
     elif profile == "development":
-        project_name = project_dir.name
+        pass
     else:
         raise ValueError(f"unsupported Beken build profile: {profile}")
     return project_dir / "build" / target / project_name
@@ -32,10 +38,15 @@ def beken_build_root(project_dir: Path, target: str, profile: str) -> Path:
 
 def package_beken(root: Path, board: Board, output_dir: Path,
                   build_profile: str = "development",
-                  verification_status: str = "BUILD_VERIFIED_HIL_PENDING") -> Path:
+                  verification_status: str = "BUILD_VERIFIED_HIL_PENDING",
+                  variant: str | None = None) -> Path:
     project_dir = board.project_path(root)
     target = board.data["target"]
-    build_root = beken_build_root(project_dir, target, build_profile)
+    if board.data.get('variants'):
+        variant = variant or board.default_variant()
+        if not board.has_variant(variant):
+            raise ValueError(f'{board.id}: unknown variant {variant}')
+    build_root = beken_build_root(project_dir, target, build_profile, variant)
     package_dir = build_root / "package"
     application = package_dir / "all-app.bin"
     ota_image = package_dir / "app_pack.rbl"
@@ -98,6 +109,7 @@ def package_beken(root: Path, board: Board, output_dir: Path,
             "project_version": full_version,
             "build_id": identity["build_id"],
             "build_profile": build_profile,
+            "variant": variant,
             "purpose": identity.get('purpose', ''),
             "platform": "beken",
             "target": target,
@@ -162,6 +174,9 @@ def main() -> int:
         help="package one registered board; defaults to every registered board",
     )
     parser.add_argument(
+        '--variant', help='package one explicit board variant; defaults to its manifest default',
+    )
+    parser.add_argument(
         "--beken-build-profile",
         choices=("release", "development"),
         default="development",
@@ -174,6 +189,8 @@ def main() -> int:
         help="artifact verification evidence recorded in the package manifest",
     )
     args = parser.parse_args()
+    if args.variant and not args.board:
+        parser.error('--variant requires --board')
 
     root = Path(__file__).resolve().parents[1]
     boards = load_boards(root)
@@ -183,9 +200,12 @@ def main() -> int:
         if args.output:
             output_dir = (root / args.output).resolve()
         elif board.data['platform'] == 'beken':
+            variant = args.variant or board.default_variant()
+            if not board.has_variant(variant):
+                parser.error(f'{board.id}: unknown variant {variant}')
             output_dir = beken_build_root(board.project_path(root),
                                           board.data['target'],
-                                          args.beken_build_profile) / 'package'
+                                          args.beken_build_profile, variant) / 'package'
         else:
             output_dir = board.project_path(root) / 'build'
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -201,6 +221,7 @@ def main() -> int:
                     output_dir,
                     args.beken_build_profile,
                     args.verification_status,
+                    variant=args.variant,
                 )
             )
     for directory in {path.parent for path in archives}:
