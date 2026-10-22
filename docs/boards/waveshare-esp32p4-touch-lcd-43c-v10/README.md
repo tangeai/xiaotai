@@ -38,13 +38,27 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 再松开 BOOT。接口和按键位置见[微雪硬件说明](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/)。
 本页只烧录 P4 主芯片；连接日志若显示 ESP32-C6，立即断开并检查接口。
 
+### 先选烧录文件：单文件与分文件二选一
+
+网页烧录和工程烧录是操作方式；**单文件与分文件是两种文件组织方式**。
+本页文件名和地址对应 **v1.0.1 · build.2**；其他版本必须重新核对该版本清单。
+
+| 文件方式 | 下载文件的完整名称 | 网页中应添加的内容 |
+|---|---|---|
+| 单文件（首次体验推荐） | `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-merged.bin` | 只添加这个 BIN，地址 `0x0` |
+| 分文件（也可首次烧录） | `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-validation.zip` | 先解压，再添加下文列出的 **4 个 BIN**，各填各的地址 |
+
+乐鑫支持按“地址 + 文件”写入多个 BIN，也支持用 `merge-bin` 合并后写入。
+**分文件数量不是固定三个，地址也不能直接照抄官方示例**；以本工程生成的清单为准。
+参见[乐鑫写入与合并镜像说明](https://docs.espressif.com/projects/esptool/en/latest/esp32p4/esptool/basic-commands.html#merge-binaries-for-flashing-merge-bin)。
+
 ### 方式一：网页烧录（推荐首次体验）
 
 #### 1. 下载完整镜像
 
 下载 [v1.0.1 · build.2 完整 merged.bin](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.2-merged.bin)。
 
-下载同一发布页的 [SHA256SUMS](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/SHA256SUMS)，核对下载文件的 SHA-256。
+下载后先核对下方完整文件名；BIN 的 SHA-256 及核对方法见本节“文件与写入校验”。
 
 文件名应为 `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-merged.bin`。
 
@@ -65,7 +79,7 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 
 #### 3. 选文件、改地址并烧录
 
-1. 在 `File` 一栏点击 **Choose File / 选择文件**，选择上面下载的本板 `-merged.bin`，不要选 ZIP、ELF 或单独的应用 BIN。
+1. 在 `File` 一栏点击 **Choose File / 选择文件**，选择 **`waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-merged.bin`**，不要选 ZIP、ELF 或单独的应用 BIN。
 2. 将 **Flash Address 从默认值改为 `0x0`**。完整镜像只添加这一行，不再同时添加 bootloader、分区表或应用文件。
 3. 将 **Flash Mode、Flash Frequency、Flash Size 都选为 `keep`**，保留发布固件中的参数。`keep` 不表示保留 Wi-Fi 或绑定数据。
 4. 再次核对芯片、文件名和 `0x0`，点击 **Program**。等待全部写入和校验完成；烧录期间保持供电和数据线连接，不点击 `Erase Flash`。
@@ -82,12 +96,53 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 区域以 `115200` 点击 `Start`，或打开本地串口工具，检查启动版本和报错。
 只有烧录进度完成而设备不能正常启动时，应先核对板型、镜像和下载地址。
 
-#### 已有设备：使用分文件包升级
+#### 另一种选择：分文件烧录（4 个 BIN）
 
-从[同版发布页](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1)下载 `-validation.zip` 并解压。
-按 `MANIFEST.json` 的 `flash_files` 逐项添加文件和地址，缺少行时点击 `Add File`，
-不要套用完整镜像的单行 `0x0` 设置。烧录文件必须齐全；P4 和 S3 的地址布局不能互用。
-不执行全片擦除，并确认新旧分区布局和配置兼容后，才能保留原配置。
+下载 [waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-validation.zip](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.2-validation.zip)，解压到独立目录。
+不要将不同板卡或不同版本的解压文件放在一起；即使同名 `bootloader.bin`，内容也可能不同。
+
+以下路径相对于 ZIP 的解压目录，已与本版 `MANIFEST.json` 和 `flasher_args.json` 核对：
+
+| File：选择的 BIN 文件 | Flash Address：填写地址 | 用途 |
+|---|---|---|
+| `bootloader/bootloader.bin` | `0x2000` | 启动引导程序 |
+| `partition_table/partition-table.bin` | `0x8000` | 分区表 |
+| `ota_data_initial.bin` | `0xd000` | OTA 初始化数据，不能遗漏 |
+| `xiaotai_esp32p4.bin` | `0x10000` | 小钛应用程序，不能当作完整镜像 |
+
+1. 按前面的步骤连接开发板；清空此前的文件行，不保留 `-merged.bin`。
+2. 首行选择表中第一个 BIN 并填写对应地址，点击 **Add File** 添加其余行，直到总共 **4 行**。
+3. 逐行检查完整文件名与地址。三项 Flash 参数仍选 `keep`，点击 **Program**，等待所有文件写入和校验完成后重启。
+
+**应用 BIN 的地址是 `0x10000`，不是 `0x0`。** ZIP、ELF、JSON、`flash_args` 和 `SHA256SUMS`
+均不是可直接烧录的文件，不要在 File 栏中选择它们。分文件清单中不能再加 merged.bin。
+
+**本板是 4 个 BIN：`ota_data_initial.bin` 必须写入 `0xd000`；bootloader 写入 `0x2000`。**
+不能套用 S3 的三文件方案或 bootloader 的 `0x0` 地址。
+
+![分文件参数示意：红框标出每个 BIN、地址及 Add File 和 Program](../../images/flashing/web-split-waveshare-esp32p4-touch-lcd-43c-v10.png)
+
+上图为未连接设备时展开的参数示意。分文件方式也适用于首次烧录；用于升级时，不执行全片擦除，
+并核对分区布局与配置兼容性。它不会像 raw merged.bin 那样写入镜像间的填充区域。
+
+#### 文件与写入校验
+
+解压成功只说明压缩包可以读取，不能证明板型和版本正确。本指南不要求额外校验 ZIP 本身。
+烧录前核对本板 ID、版本、BIN 文件名和地址；需要核对文件内容时，使用以下 SHA-256：
+
+- 分文件 BIN：打开包内 `MANIFEST.json`，按 `files[].path` 找到对应文件，比较其 `sha256`。
+- 单文件 `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-merged.bin`：本版 SHA-256 如下，也可在[发布页](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1)的 `SHA256SUMS` 中查找同名 BIN 的条目。
+
+```text
+086360ba88853eace66c44c7935265ecd082ce87c0e7e96fcb861f87b4cee2d0
+```
+
+Windows PowerShell 执行 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 执行
+`sha256sum "实际BIN路径"`；macOS 执行 `shasum -a 256 "实际BIN路径"`，再对照上述值或清单。
+
+文件 SHA-256 与烧录后的写入校验用途不同。乐鑫 esptool 的 `write-flash` 自动进行 MD5 写入校验，
+通常不需要另跑 `verify-flash`；网页操作仍须等待写入及校验完成。参见
+[乐鑫写入校验说明](https://docs.espressif.com/projects/esptool/en/latest/esp32p4/esptool/advanced-commands.html#verify-flash-data-verify-flash)。
 
 ### 方式二：工程烧录（源码编译与调试）
 

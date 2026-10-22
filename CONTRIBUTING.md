@@ -195,6 +195,16 @@ M5 使用独立板卡标签，不能覆盖立创 S3 的 `esp32s3-v...` 发布。
 
 ESP32-S3、ESP32-P4 采用下表的附件规则；BK 保持现有打包方式。
 这是本项目的文件命名约定；镜像格式和合并流程使用乐鑫 esptool。
+乐鑫官方支持[按地址写入多个 BIN 并合并镜像](https://docs.espressif.com/projects/esptool/en/latest/esp32s3/esptool/basic-commands.html#merge-binaries-for-flashing-merge-bin)，
+输入应取自工程生成的 `flash_args` / `flasher_args.json`；官方示例的文件数和地址不是通用配置。
+
+当前发布的立创 S3 / M5 分文件包各含 3 个烧录 BIN，微雪 P4 含 4 个（包括
+`ota_data_initial.bin`）。文件数随分区和工程配置而变，不能在打包时固定只收集三个文件。
+本仓库明确生成 **raw BIN、基址 `0x0`**；不要依赖不同 esptool 版本的默认输出格式。
+
+ZIP 内 `MANIFEST.json` 的 `files` 保存每个 BIN 的路径、尺寸与 SHA-256。
+普通烧录文档聚焦 BIN 文件名、内容与地址，不要求再单独核验 ZIP；Release 保留外部
+`SHA256SUMS` 作为下载核验资料，README 不单列其下载入口。ZIP 是分发容器，不是烧录镜像。
 
 | 附件 | 内容与用途 |
 |---|---|
