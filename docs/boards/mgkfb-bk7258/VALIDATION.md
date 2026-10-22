@@ -14,9 +14,8 @@
 | 完整镜像 SHA-256 | `5a8d24a9d058822e41b2700c325b924c6958385ce2d54e0aa4bbf05511dc90fb` |
 | OTA 镜像 SHA-256 | `478b1a760b1ab7e7758ddc5fbb2a9a6dab0b45ae9085d899ffc8ca2d513ce7ac` |
 
-原生产物目录为
-`firmware/beken/bk7258/mgkfb-bk7258-xiaotai/build/bk7258/mgkfb-bk7258-xiaotai_eyes_release/package/`。
-ZIP 中具名 BIN 为原生 `all-app.bin` 的相同副本；AP/CP ELF、分区、构建身份及校验清单随包提供。
+ZIP 中具名 BIN 为 SDK 原生 `all-app.bin` 的相同副本；AP/CP ELF、分区、构建身份及校验清单随包提供。
+本记录用于核对已发布 build.11 的准确内容；当前源码的构建目录见开发板指南。
 
 ## 验证结果
 

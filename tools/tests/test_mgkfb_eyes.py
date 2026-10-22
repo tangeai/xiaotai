@@ -194,12 +194,43 @@ int main(void){
         script=(ROOT/'platforms/beken/tools/build.sh').read_text().replace('\\\n',' ')
         commands=[line.strip() for line in script.splitlines() if line.strip().startswith('make -C')]
         self.assertEqual(len(commands),2)
-        for config in ('eyes','eyes_release'):
-            harness='make(){ printf "%s\\n" "$*"; }; project_dir=/tmp/board; sdk_dir=/tmp/sdk; build_version=1.0.1; config_args=(BK_CONFIG_FILE='+config+');\n'+'\n'.join(commands)
+        for config in ('config','eyes.config','eyes_release.config','release.config'):
+            harness='make(){ printf "%s\\n" "$*"; }; project_dir=/tmp/board; sdk_dir=/tmp/sdk; build_version=1.0.1; config_args=(CONFIG_SUBTITUTE_FILE='+config+');\n'+'\n'.join(commands)
             result=subprocess.run(['bash','-c',harness],check=True,capture_output=True,text=True)
             calls=result.stdout.splitlines()
             self.assertEqual(len(calls),2)
-            for call in calls:self.assertIn('BK_CONFIG_FILE='+config,call)
+            for call in calls:
+                self.assertIn('CONFIG_SUBTITUTE_FILE='+config,call)
+                self.assertNotIn('BK_CONFIG_FILE=',call)
+
+    def test_sdk_configuration_selection_keeps_one_project_directory(self):
+        script=(ROOT/'platforms/beken/tools/build.sh').read_text()
+        selection=script[script.index('unset BK_CONFIG_FILE'):script.index('# Lock the prebuilt SDK')]
+        for variant in ('', 'headless', 'eyes'):
+            for profile in ('development', 'release'):
+                with self.subTest(variant=variant, profile=profile), tempfile.TemporaryDirectory() as temp:
+                    project=Path(temp)/'demo'
+                    for core,soc in (('ap','bk7258_ap'),('cp','bk7258')):
+                        directory=project/core/'config'/soc
+                        directory.mkdir(parents=True)
+                        for name in ('config','eyes.config'):
+                            (directory/name).write_text('CONFIG_LOG_LEVEL=4\n')
+                    setup=f'''project_dir="{project}"
+support_dir="{ROOT}/platforms/beken"
+board_variant="{variant}"
+build_profile="{profile}"
+ap_config="$project_dir/ap/config/bk7258_ap/config"
+cp_config="$project_dir/cp/config/bk7258/config"
+ap_release_config="$project_dir/ap/config/bk7258_ap/release.config"
+cp_release_config="$project_dir/cp/config/bk7258/release.config"
+'''
+                    result=subprocess.run(['bash','-eu','-c',setup+selection+
+                        '\nprintf "%s\\n" "$artifact_project_name" "${config_args[@]}"'],
+                        check=True,capture_output=True,text=True,
+                        env={**os.environ,'BK_CONFIG_FILE':'stale','CONFIG_SUBTITUTE_FILE':'stale'})
+                    config='eyes.config' if variant=='eyes' else 'config'
+                    if profile=='release':config='eyes_release.config' if variant=='eyes' else 'release.config'
+                    self.assertEqual(result.stdout.splitlines(),['demo','CONFIG_SUBTITUTE_FILE='+config])
 
     def test_build_variants_select_eyes_or_headless_explicitly(self):
         board=next(b for b in load_boards(ROOT) if b.id=='mgkfb-bk7258')

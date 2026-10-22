@@ -29,8 +29,8 @@ class ValidationPackagingTests(unittest.TestCase):
                 'variants': [{'name': 'eyes', 'default': True},
                              {'name': 'headless', 'default': False}],
             })
-            for variant, suffix, number in [('eyes', '_eyes', 11), ('headless', '', 8)]:
-                build = project/'build/bk7258'/f'{project.name}{suffix}_release'
+            for variant, number in [('eyes', 12), ('headless', 13)]:
+                build = project/'build/bk7258'/project.name
                 image = variant.encode()
                 for relative in ('package/app_pack.rbl', 'package/build_summary.txt',
                                  'bk7258/app.elf', 'partitions/bk_package.json',
@@ -38,22 +38,30 @@ class ValidationPackagingTests(unittest.TestCase):
                     path = build/relative
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_bytes(image)
-                (build/'bk7258_ap').mkdir()
+                (build/'bk7258_ap').mkdir(exist_ok=True)
                 (build/'bk7258_ap/app.elf').write_bytes(f'1.0.1+build.{number}'.encode())
                 (build/'build_identity.json').write_text(json.dumps({
                     'version': '1.0.1', 'build_id': str(number),
-                    'build_version': f'1.0.1+build.{number}', 'build_profile': 'release',
+                    'build_version': f'1.0.1+build.{number}', 'build_profile': 'release', 'variant': variant,
                     'all_app_sha256': hashlib.sha256(image).hexdigest(),
                 }))
-            for requested, expected in [(None, 'eyes'), ('eyes', 'eyes'), ('headless', 'headless')]:
-                output = root/str(requested)
-                output.mkdir()
+                for requested in (None, variant):
+                    output = root/f'{variant}-{requested}'
+                    output.mkdir()
+                    with mock.patch('package_validation_firmware.git_output', return_value=''):
+                        if requested is None and variant != 'eyes':
+                            with self.assertRaisesRegex(ValueError, 'variant'):
+                                package_beken(root, board, output, 'release', variant=requested)
+                            continue
+                        archive = package_beken(root, board, output, 'release', variant=requested)
+                    with zipfile.ZipFile(archive) as zipped:
+                        manifest = json.loads(zipped.read('MANIFEST.json'))
+                        self.assertEqual(manifest['variant'], variant)
+                        self.assertEqual(zipped.read(manifest['application']['path']), variant.encode())
                 with mock.patch('package_validation_firmware.git_output', return_value=''):
-                    archive = package_beken(root, board, output, 'release', variant=requested)
-                with zipfile.ZipFile(archive) as zipped:
-                    manifest = json.loads(zipped.read('MANIFEST.json'))
-                    self.assertEqual(manifest['variant'], expected)
-                    self.assertEqual(zipped.read(manifest['application']['path']), expected.encode())
+                    wrong = 'headless' if variant == 'eyes' else 'eyes'
+                    with self.assertRaisesRegex(ValueError, 'variant'):
+                        package_beken(root, board, root, 'release', variant=wrong)
             with self.assertRaises(ValueError):
                 package_beken(root, board, root, 'release', variant='other')
 
@@ -123,7 +131,7 @@ class ValidationPackagingTests(unittest.TestCase):
         project = Path("/workspace/firmware/beken/demo")
         self.assertEqual(
             beken_build_root(project, "bk7258", "release"),
-            project / "build" / "bk7258" / "demo_release",
+            project / "build" / "bk7258" / "demo",
         )
         self.assertEqual(
             beken_build_root(project, "bk7258", "development"),

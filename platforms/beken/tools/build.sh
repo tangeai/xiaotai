@@ -60,7 +60,8 @@ if [[ ! "$firmware_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "VERSION.md must contain one major.minor.patch firmware version" >&2
     exit 1
 fi
-config_args=()
+unset BK_CONFIG_FILE CONFIG_SUBTITUTE_FILE
+config_args=(CONFIG_SUBTITUTE_FILE=config)
 artifact_project_name="$(basename "$project_dir")"
 board_id="${artifact_project_name%-xiaotai}"
 config_name=""
@@ -71,8 +72,8 @@ if [ -n "$board_variant" ] && [ "$board_variant" != headless ]; then
     cp_config="$project_dir/cp/config/bk7258/$config_name.config"
     test -f "$ap_config"
     test -f "$cp_config"
-    config_args+=(BK_CONFIG_FILE="$config_name")
-    artifact_project_name="${artifact_project_name}_$config_name"
+    # Select Kconfig through the SDK interface without renaming the project.
+    config_args=(CONFIG_SUBTITUTE_FILE="$config_name.config")
     ap_release_config="$project_dir/ap/config/bk7258_ap/${config_name}_release.config"
     cp_release_config="$project_dir/cp/config/bk7258/${config_name}_release.config"
 fi
@@ -99,8 +100,7 @@ if [ "$build_profile" = release ]; then
         "$ap_config" "$ap_release_config"
     python3 "$support_dir/tools/prepare_release_config.py" \
         "$cp_config" "$cp_release_config"
-    config_args=(BK_CONFIG_FILE="${config_name:+${config_name}_}release")
-    artifact_project_name="${artifact_project_name}_release"
+    config_args=(CONFIG_SUBTITUTE_FILE="${config_name:+${config_name}_}release.config")
     build_purpose="${XIAOTAI_BUILD_PURPOSE:-Online release candidate}"
 elif [ "$build_profile" != development ]; then
     echo "Unknown XIAOTAI_BUILD_PROFILE: $build_profile" >&2
@@ -175,7 +175,7 @@ done
 source_commit=$(git -C "$workspace_dir" rev-parse HEAD)
 python3 "$support_dir/tools/build_identity.py" prepare \
     "$build_root" "$firmware_version" "$source_commit" \
-    "$project_dir/BUILD_NUMBER" "$build_profile" "$build_purpose" "$board_id"
+    "$project_dir/BUILD_NUMBER" "$build_profile" "$build_purpose" "$board_id" "${board_variant:-default}"
 build_version=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["build_version"])' \
     "$build_root/build_identity.json")
 make -C "$project_dir" bk7258 SDK_DIR="$sdk_dir" \

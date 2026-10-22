@@ -30,7 +30,7 @@ def next_build_number(counter_file):
 
 def prepare(directory, version, source_commit, counter_file,
             profile='development', purpose='Local development and debugging',
-            board_id='lckfb-bk7258'):
+            board_id='lckfb-bk7258', variant='default'):
     if not source_commit or any(c not in "0123456789abcdef" for c in source_commit):
         raise ValueError("source commit must be lowercase hexadecimal")
     if re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version) is None:
@@ -48,6 +48,7 @@ def prepare(directory, version, source_commit, counter_file,
         f'#define XIAOTAI_BUILD_VERSION "{build_version}"\n')
     write_json(directory / "build_identity.json", {
         "board_id": board_id,
+        "variant": variant,
         "build_id": build_id,
         "build_number": number,
         "build_version": build_version,
@@ -122,10 +123,10 @@ def finalize(directory, artifact, ap_elf):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) in (6, 8, 9) and sys.argv[1] == "prepare":
+    if len(sys.argv) in (6, 8, 9, 10) and sys.argv[1] == "prepare":
         prepare(Path(sys.argv[2]), sys.argv[3], sys.argv[4], Path(sys.argv[5]),
                 *sys.argv[6:])
     elif len(sys.argv) == 5 and sys.argv[1] == "finalize":
         finalize(Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4]))
     else:
-        raise SystemExit("usage: build_identity.py prepare DIR VERSION COMMIT BUILD_NUMBER [PROFILE PURPOSE [BOARD_ID]] | finalize DIR IMAGE AP_ELF")
+        raise SystemExit("usage: build_identity.py prepare DIR VERSION COMMIT BUILD_NUMBER [PROFILE PURPOSE [BOARD_ID [VARIANT]]] | finalize DIR IMAGE AP_ELF")

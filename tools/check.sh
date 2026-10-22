@@ -135,7 +135,7 @@ python3 "$repo_dir/tools/tests/test_firmware_versions.py"
 # Includes M5/MGKFB release namespaces and corrupt-asset rejection.
 python3 "$repo_dir/tools/tests/test_release_identity.py"
 python3 "$repo_dir/tools/tests/test_boot_identity.py"
-# Includes MGKFB eyes/headless output isolation in development/release packaging.
+# Includes shared Beken output directories and profile/variant identity guards.
 python3 "$repo_dir/tools/tests/test_validation_packaging.py"
 bash "$repo_dir/tools/run_host_tests.sh"
 python3 "$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools/test_video_regions.py"

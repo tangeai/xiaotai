@@ -1,6 +1,6 @@
 # 觅感 BK7258
 
-使用独立 SMP 工程，提供 eyes（默认双屏眼睛）和 headless（无屏）两种构建。
+使用独立 SMP 工程，支持双屏眼睛、实体按键、AI 对讲、微信语音通话和 H5 实时查看。
 
 [开发板指南](../../../docs/boards/mgkfb-bk7258/README.md) ·
 [硬件依据](../../../docs/boards/mgkfb-bk7258/hardware-ir.json)

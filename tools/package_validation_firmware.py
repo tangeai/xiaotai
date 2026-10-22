@@ -21,19 +21,13 @@ from package_esp_validation import (add_file, git_output, package_board, sha256,
 
 def beken_build_root(project_dir: Path, target: str, profile: str,
                      variant: str | None = None) -> Path:
-    """Resolve a Beken output tree without silently mixing build profiles."""
-    project_name = project_dir.name
-    if variant and variant not in ('default', 'headless'):
+    """Use the SDK project directory; identity guards profile/variant selection."""
+    if variant:
         if not re.fullmatch(r'[a-z][a-z0-9-]*', variant):
             raise ValueError('invalid Beken variant')
-        project_name += f'_{variant}'
-    if profile == "release":
-        project_name += '_release'
-    elif profile == "development":
-        pass
-    else:
+    if profile not in ('release', 'development'):
         raise ValueError(f"unsupported Beken build profile: {profile}")
-    return project_dir / "build" / target / project_name
+    return project_dir / "build" / target / project_dir.name
 
 
 def package_beken(root: Path, board: Board, output_dir: Path,
@@ -79,6 +73,8 @@ def package_beken(root: Path, board: Board, output_dir: Path,
     identity = json.loads(identity_file.read_text(encoding="utf-8"))
     if identity.get('build_profile') != build_profile:
         raise ValueError('BK build profile does not match the requested profile')
+    if len(board.data.get('variants', [])) > 1 and identity.get('variant') != variant:
+        raise ValueError('BK build variant does not match the requested variant; rebuild first')
     if identity["version"] != version or identity["all_app_sha256"] != sha256(application):
         raise ValueError("BK build identity does not match the flash image")
     full_version = f'{version}+build.{identity["build_id"]}'

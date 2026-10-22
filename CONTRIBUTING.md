@@ -240,14 +240,15 @@ python3 tools/package_validation_firmware.py --board <board-id>
 python3 tools/release_firmware.py --package <实际生成的验证包路径>
 ```
 
-BK7258 打包命令必须再加 `--beken-build-profile release`，否则工具默认选择开发
-产物。ESP-IDF 使用原生 `build/`；BK 开发目录为 `build/bk7258/<project>/`，
-发布目录为 `build/bk7258/<project>_release/`，烧录文件在相应 `package/` 下。
+BK7258 打包命令必须再加 `--beken-build-profile release`，否则工具默认校验开发
+配置。ESP-IDF 使用原生 `build/`；BK 固定使用 `build/bk7258/<project>/`，
+烧录文件位于其中的 `package/`。开发、发布及功能配置共用同一个工程输出目录，
+不按屏幕、音频等功能增加目录后缀；当前配置以 `build_identity.json` 为准。
 默认打包保留在这些原生目录；`--output` 只用于显式导出副本。
 
-觅感发布选择 `--variant eyes`，构建与打包必须使用同一个变体；双屏发布目录为
-`build/bk7258/mgkfb-bk7258-xiaotai_eyes_release/`。`headless` 为独立无屏变体，
-不得把它的镜像当作双屏固件发布。打包省略 `--variant` 时使用板卡清单的默认变体。
+构建与打包必须选择同一个变体，省略 `--variant` 时使用板卡清单默认值。
+BK 通过 SDK 的 `CONFIG_SUBTITUTE_FILE` 选择配置文件，保留官方原生工程名与目录结构。
+打包器同时核对构建配置和变体；不匹配时应重新编译，不能从其他目录找旧镜像凑包。
 
 ESP32 打包需先激活该工程的 ESP-IDF Python 环境以提供 esptool；统一打包入口会
 同时输出 ZIP、完整 BIN 和包含两者的校验文件。只给已有 ZIP 补充完整镜像时执行：

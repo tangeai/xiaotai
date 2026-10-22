@@ -218,8 +218,8 @@ python3 tools/build.py --board lckfb-bk7258
 
 整包产物位于
 `firmware/beken/bk7258/lckfb-bk7258-xiaotai/build/bk7258/lckfb-bk7258-xiaotai/package/all-app.bin`。
-本地开发和诊断都使用这个默认目录。只有准备线上发布时才显式传入 `--release`，
-由 SDK 生成 `lckfb-bk7258-xiaotai_release/package/`。烧录前应核对所选构建配置、
+开发、诊断和发布都使用这个固定目录；准备线上发布时显式传入 `--release`，
+本次配置记录在 `build_identity.json`，不会增加另一套输出目录。烧录前应核对所选构建配置、
 版本和文件 SHA-256；`app_pack.rbl` 仅用于 OTA。
 
 每次通过构建脚本编译都会将工程内 `BUILD_NUMBER` 的数字递增 1。
