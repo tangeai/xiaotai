@@ -445,12 +445,12 @@
       {
         "path": "build/m5stack_cores3_lite_xiaotai.bin",
         "size_bytes": 4023008,
-        "sha256": "339a547337d437bde25f69f21f62a6e3fb32e2ac1a258b866bb9aa56aa1b5992"
+        "sha256": "4b7e26fac87d1f28c7fd2591e1f04bdb3f500111f2f6182e14aa62e45ae51ef7"
       },
       {
         "path": "build/m5stack_cores3_lite_xiaotai.elf",
         "size_bytes": 29095812,
-        "sha256": "4d60e843d6ba761b58a2d0316b5a678f74e449e7643970d231636c56f78f15a5"
+        "sha256": "d9c32d8a034c1c4e67e82b5240a343be027a25efad9a647d900abd8869c25276"
       },
       {
         "path": "build/bootloader/bootloader.bin",
@@ -465,9 +465,9 @@
     ],
     "status": "COMPILE_PASS",
     "variant": "ili9342e",
-    "version": "1.0.1+build.41",
+    "version": "1.0.1+build.42",
     "idf_version": "v5.5.5",
-    "note": "Native development build fixes stale emotion TAG across completed same-group AI caption segments in the shared S3/P4/BK parser. Explicit neutral, partial-to-final TAG preservation, pending standalone TAG and round-end tail semantics retained. Public-interface regression failed before fix and passed after. Full tools/check.sh passed: 433 tool tests, product ASan/UBSan, five board manifests. Native compile and BIN/ELF identity passed. Only M5 rebuilt; no serial device, no local flash or hardware acceptance. Exact build.40 retained in artifacts. Voice-record remains withdrawn; short-phrase/onset-loss work remains deferred."
+    "note": "M5 ILI9342E release build using tools/build.py --release on main at dbc262c; only the allocated BUILD_NUMBER differed at compile time. ESP-IDF v5.5.5, Oct 22 2026 16:32:44. Native build, post-link audit and BIN/ELF identity passed. Same firmware behavior as build.41; release-tool naming and documentation changed. User build.41 observations remain historical, not build.42 hardware acceptance. No serial device; exact build.42 requires HIL. Build.41 native images, ELF and delivery files retained in artifacts/1.0.1+build.41."
   },
   "runtime_evidence": [
     {
@@ -640,6 +640,6 @@
       "tools/tests/test_cores3_text_memory.py"
     ],
     "standalone_skill_build_assessment": "not certified; repository-native shared AI alaw/8k uplink and opus/16k downlink",
-    "runtime": "Build.41 user reports music mouth restored and provides matching firmware identity in subsequent performance status. Real-time AEC/UI headroom remains limited. Full acoustic, long-run and other-board validation pending. Recording experiment withdrawn; short-phrase/onset-loss work deferred."
+    "runtime": "Build.42 release artifact awaits same-firmware hardware validation. Build.41 user-reported music-mouth recovery and performance status remain historical. AEC/UI real-time headroom, short-phrase onset loss and interruption limits remain; recording experiment withdrawn."
   }
 }

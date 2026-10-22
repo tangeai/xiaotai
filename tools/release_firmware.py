@@ -16,9 +16,9 @@ from merge_esp_firmware import verify_merged
 
 BOARDS = {
     'm5stack-cores3-lite': ('M5Stack CoreS3-Lite', 'm5stack-cores3-lite'),
-    'lckfb-bk7258': ('BK7258', 'bk7258'),
-    'lckfb-esp32s3': ('ESP32-S3', 'esp32s3'),
-    'waveshare-esp32p4-touch-lcd-43c-v10': ('ESP32-P4', 'esp32p4'),
+    'lckfb-bk7258': ('立创·实战派 BK7258', 'bk7258'),
+    'lckfb-esp32s3': ('立创·实战派 ESP32-S3', 'esp32s3'),
+    'waveshare-esp32p4-touch-lcd-43c-v10': ('微雪 ESP32-P4-WIFI6-Touch-LCD-4.3', 'esp32p4'),
 }
 
 

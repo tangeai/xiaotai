@@ -29,9 +29,9 @@ class ReleaseIdentityTests(unittest.TestCase):
     def test_all_boards_have_same_title_rule_with_actual_independent_builds(self):
         with tempfile.TemporaryDirectory() as temporary:
             for board, label, tag, number in [
-                ('lckfb-bk7258', 'BK7258', 'bk7258', 56),
-                ('lckfb-esp32s3', 'ESP32-S3', 'esp32s3', 1),
-                ('waveshare-esp32p4-touch-lcd-43c-v10', 'ESP32-P4', 'esp32p4', 2),
+                ('lckfb-bk7258', '立创·实战派 BK7258', 'bk7258', 56),
+                ('lckfb-esp32s3', '立创·实战派 ESP32-S3', 'esp32s3', 1),
+                ('waveshare-esp32p4-touch-lcd-43c-v10', '微雪 ESP32-P4-WIFI6-Touch-LCD-4.3', 'esp32p4', 2),
             ]:
                 result = self.plan(Path(temporary), board, f'1.0.1+build.{number}')
                 self.assertEqual(result.returncode, 0, result.stderr)

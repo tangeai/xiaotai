@@ -1,6 +1,24 @@
 # CoreS3-Lite 验证记录
 
-## 2026-10-22 当前构建：build.41，清除跨字幕段残留的 Tag
+## 2026-10-22 发布构建：build.42（ILI9342E）
+
+在 main 合并后的 `dbc262c` 源码上执行
+`python3 tools/build.py --board m5stack-cores3-lite --variant ili9342e --release`。
+编译时除调度器分配的 BUILD_NUMBER 外源码干净；后续发布名称、测试和证据文档修改
+不改变固件行为。应用沿用 build.41 的功能与修复，不能沿用其硬件验收结论。
+
+- 身份：`1.0.1+build.42`，ESP-IDF v5.5.5，Oct 22 2026 16:32:44。
+- 原生应用：`firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/m5stack_cores3_lite_xiaotai.bin`，4023008 字节。
+- 应用 BIN SHA-256：`4b7e26fac87d1f28c7fd2591e1f04bdb3f500111f2f6182e14aa62e45ae51ef7`。
+- 同目录 ELF：29095812 字节；SHA-256：`d9c32d8a034c1c4e67e82b5240a343be027a25efad9a647d900abd8869c25276`，与应用描述符一致。
+- 原生构建与链接审计通过；环境 Doctor PASS。无本地串口，build.42 实板测试 SKIP。
+- 发布包标记 `BUILD_VERIFIED_HIL_PENDING`；歌曲示波恢复的用户实测对应 build.41。
+- build.41 的原生烧录文件、ELF、ZIP、merged BIN、校验文件已完整保留在
+  `artifacts/1.0.1+build.41/`。
+
+发布功能与限制见[封版说明](../../../docs/boards/m5stack-cores3-lite/FREEZE.md)。
+
+## 2026-10-22 保留构建：build.41，清除跨字幕段残留的 Tag
 
 后续用户确认“现在好了”，作为歌曲嘴部恢复的用户观察记录；本次反馈未附新的
 版本/ELF 日志，不据此认定全部情绪、其他板卡或长稳已完成实板验收。
@@ -26,7 +44,7 @@ round_end 保留音频尾部表情。无 Tag 播放恢复默认眯眼和 PCM 嘴
 S3、P4、BK7258 使用同一解析器，源码均获修复；本轮只重新构建 M5。
 
 - 版本：`1.0.1+build.41`，ILI9342E，ESP-IDF v5.5.5，Oct 22 2026 15:31:08。
-- 原生应用：`firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/m5stack_cores3_lite_xiaotai.bin`，4023008 字节。
+- 原生应用：`firmware/esp-idf/esp32s3/m5stack-cores3-lite/artifacts/1.0.1+build.41/m5stack_cores3_lite_xiaotai.bin`，4023008 字节。
 - 应用 BIN SHA-256：`339a547337d437bde25f69f21f62a6e3fb32e2ac1a258b866bb9aa56aa1b5992`。
 - 同目录 ELF：29095812 字节，SHA-256：`4d60e843d6ba761b58a2d0316b5a678f74e449e7643970d231636c56f78f15a5`，与应用描述符一致。
 - 真实 JSON 解析接口回归先以残留 Tag 断言失败，修复后通过；运行时命令/快照回归及播放动效回归通过。
