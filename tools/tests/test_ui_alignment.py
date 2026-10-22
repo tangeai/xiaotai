@@ -67,7 +67,7 @@ int main(void){
  press(160,210);assert(reset_requests==1);
  press(40,210);assert(s_ui_page==UI_PAGE_NETWORK);
 }
-''')
+''', include_dirs=(ROOT / 'product/include',))
 
     def test_single_page_and_large_room_keep_ptt_widget(self):
         run_room_case(r'''
@@ -92,7 +92,7 @@ int main(void){
         source = ESP.read_text()
         enums = re.search(r'typedef enum \{[^}]+\} product_action_t;', source).group()
         run_c(r'''
-#include "/home/workspace/xiaotai/product/include/xiaotai_ui_copy.h"
+#include "xiaotai_ui_copy.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -133,7 +133,7 @@ int main(void){
  bool retry=false;for(unsigned i=0;i<count;i++)if(!strcmp(pool[i].text,"保存失败，重试"))retry=true;
  assert(retry);
 }
-''')
+''', include_dirs=(ROOT / 'product/include',))
 
 
 if __name__ == '__main__':

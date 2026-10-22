@@ -11,7 +11,7 @@ class RoomKeypad(unittest.TestCase):
         enums = '\n'.join(re.search(r'typedef enum \{[^}]+\} ' + name + ';', source).group()
                           for name in ('product_page_t', 'product_action_t'))
         run_c(r'''
-#include "/home/workspace/xiaotai/product/include/xiaotai_ui_copy.h"
+#include "xiaotai_ui_copy.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -58,7 +58,7 @@ int main(void){
  }
  return 0;
 }
-''')
+''', include_dirs=(ROOT / 'product/include',))
 
     def test_rendered_keys_preserve_digits_and_room_flow(self):
         source = (ROOT / 'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()
@@ -69,7 +69,7 @@ int main(void){
         end = handler.index('} else if (action >= ACTION_DIAG_SYSTEM', start)
         dispatch = 'static void dispatch(product_action_t action) { if (' + handler[start:end] + '} }'
         run_c(r'''
-#include "/home/workspace/xiaotai/product/include/xiaotai_ui_copy.h"
+#include "xiaotai_ui_copy.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -148,7 +148,7 @@ int main(void) {
     dispatch(ACTION_ROOM_LEAVE_CANCEL); assert(s_page==PAGE_ROOM && leaves==0);
     dispatch(ACTION_ROOM_LEAVE); dispatch(ACTION_ROOM_LEAVE_CONFIRM); assert(leaves==1);
 }
-''')
+''', include_dirs=(ROOT / 'product/include',))
 
 
 if __name__ == '__main__':

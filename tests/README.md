@@ -55,6 +55,15 @@ API 或 MQTT 地址；原有绑定显示、存储失败和重试测试继续覆�
 同步、新轮次丢弃待关联 Tag 及会话重新初始化。临时源码副本恢复旧的同组保留逻辑
 时，新组合测试断言失败；当前生产实现通过。此轮只增强测试和记录，不更改固件行为。
 
+## 2026-10-22 主机测试路径可迁移性
+
+GitHub Actions 在房间键盘测试编译阶段失败，原因是生成的 C 测试写死了开发机的
+`/home/workspace/xiaotai`。房间键盘、房间刷新、设置布局和 BK 状态测试改为从各自
+仓库根目录传入头文件搜索路径；只调整测试装配，不改变固件行为或测试断言。
+现有 `test_room_keypad.py`、`test_s3_room_refresh.py`、`test_ui_alignment.py` 与
+`test_bk_settings_status.py` 覆盖此次机械修改，均已由 `tools/check.sh` 执行；
+GitHub 的独立 checkout 用于验证不再依赖本机目录。
+
 ## 2026-10-22 AI Tag 来源与轮次诊断
 
 `test_ai_face_trace.py` 通过真实 `handle_ai_command` 的会话/代次/JSON 准入、

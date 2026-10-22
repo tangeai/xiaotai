@@ -16,7 +16,7 @@ def run_room_case(checks):
     except AssertionError:
         controls = 'static void refresh_room_controls(const starter_runtime_product_snapshot_t *room) {(void)room;}'
     code = r'''
-#include "/home/workspace/xiaotai/product/include/xiaotai_ui_copy.h"
+#include "xiaotai_ui_copy.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -99,7 +99,7 @@ int main(void) {
  product=snapshot;s_previous_room_phase=STARTER_ROOM_JOINED;s_previous_room_online_count=100;
  render_room(NULL);unsigned initial_nodes=nodes;
 ''' + checks + '\n}\n'
-    run_c(code)
+    run_c(code, include_dirs=(ROOT / 'product/include',))
 
 
 class RoomRefreshRegressions(unittest.TestCase):

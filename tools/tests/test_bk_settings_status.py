@@ -13,7 +13,7 @@ class BkSettingsStatus(unittest.TestCase):
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "/home/workspace/xiaotai/product/include/xiaotai_ui_copy.h"
+#include "xiaotai_ui_copy.h"
 typedef int frame_buffer_t;
 static int frame, rectangles;
 static bool reset, network, sleep_full;
@@ -30,7 +30,7 @@ static void centered_mixed_in(frame_buffer_t *f,int x,int y,const char *s,int sc
 static void flush_page(frame_buffer_t *f){}
 ''' + function(source, 'xiaotai_ui_show_settings') + r'''
 int main(void){xiaotai_ui_show_settings(8,false,false,5,"从不",false,false);assert(reset && network && sleep_full && rectangles==2);}
-''')
+''', include_dirs=(ROOT / 'product/include', BASE / 'include'))
 
     def test_reset_confirmation_cancel_failure_retry_and_duplicate(self):
         source = (BASE / 'src/xiaotai_app.c').read_text()
@@ -57,7 +57,7 @@ int main(void){
  failed=0;handle_reset_action(2);assert(cleared==2 && restarted==1);
  handle_reset_action(2);handle_reset_action(1);assert(cleared==2 && restarted==1 && s_ui_page==UI_PAGE_RESET_CONFIRM);
 }
-''')
+''', include_dirs=(ROOT / 'product/include', BASE / 'include'))
 
     def test_status_events_are_bounded_and_snapshot_is_read_only(self):
         source = (BASE / 'src/xiaotai_metrics.c').read_text()
@@ -65,7 +65,7 @@ int main(void){
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include "/home/workspace/xiaotai/firmware/beken/bk7258/lckfb-bk7258-xiaotai/ap/include/xiaotai_metrics.h"
+#include "xiaotai_metrics.h"
 static bool s_state_mutex_ready;
 static int s_state_mutex, locked;
 static char s_state[24]="BOOT";
@@ -88,7 +88,7 @@ int main(void){
  struct {char text[4];char guard;} small={{0},42};
  xiaotai_metrics_copy_events(small.text,sizeof(small.text));assert(small.text[3]==0 && small.guard==42 && !locked);
 }
-''')
+''', include_dirs=(ROOT / 'product/include', BASE / 'include'))
 
     def test_child_page_return_and_confirmation_gaps(self):
         source = (BASE / 'src/xiaotai_app.c').read_text()
@@ -124,7 +124,7 @@ int main(void){
  s_ui_page=UI_PAGE_DIAGNOSTICS;press(160,50);assert(s_diagnostics_tab==1 && rendered==2);
  press(210,50);assert(rendered==2);press(250,50);assert(s_diagnostics_tab==2 && rendered==3);
 }
-''')
+''', include_dirs=(ROOT / 'product/include', BASE / 'include'))
 
     def test_reset_deletes_only_user_keys_and_reports_partial_failure(self):
         source = (BASE / 'src/xiaotai_storage.c').read_text()
@@ -157,7 +157,7 @@ int main(void){
  atomic_store(&s_storage_reset_pending,false);calls=0;fail_at=2;assert(xiaotai_storage_reset_user_data()==BK_FAIL && calls==4);
  calls=0;fail_at=0;missing=1;assert(xiaotai_storage_reset_user_data()==BK_OK && calls==4);
 }
-''')
+''', include_dirs=(ROOT / 'product/include', BASE / 'include'))
 
 if __name__ == '__main__':
     unittest.main()
