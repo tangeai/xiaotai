@@ -62,7 +62,9 @@ GitHub Actions 在房间键盘测试编译阶段失败，原因是生成的 C �
 仓库根目录传入头文件搜索路径；只调整测试装配，不改变固件行为或测试断言。
 现有 `test_room_keypad.py`、`test_s3_room_refresh.py`、`test_ui_alignment.py` 与
 `test_bk_settings_status.py` 覆盖此次机械修改，均已由 `tools/check.sh` 执行；
-GitHub 的独立 checkout 用于验证不再依赖本机目录。
+GitHub 的独立 checkout 用于验证不再依赖本机目录。后续 CI 运行暴露 runner 缺少
+AEC 策略检查所需的 `rg`，因此在工作流中显式安装 `ripgrep`；继续运行现有 AEC
+策略检查验证，不跳过该检查。
 
 ## 2026-10-22 AI Tag 来源与轮次诊断
 

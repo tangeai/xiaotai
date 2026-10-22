@@ -23,7 +23,7 @@ jobs:
       - name: Install host test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes build-essential libcjson-dev python3
+          sudo apt-get install --yes build-essential libcjson-dev python3 ripgrep
 
       - name: Run full repository checks
         run: bash tools/check.sh
