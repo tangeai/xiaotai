@@ -118,6 +118,7 @@ class RepositoryLayoutTests(unittest.TestCase):
             "lckfb-esp32s3",
             "waveshare-esp32p4-touch-lcd-43c-v10",
             "m5stack-cores3-lite",
+            "mgkfb-bk7258",
         }
         for manifest in (ROOT / "boards").glob("*/*/board.json"):
             board_id = json.loads(manifest.read_text(encoding="utf-8"))["id"]
@@ -127,6 +128,8 @@ class RepositoryLayoutTests(unittest.TestCase):
             else:
                 self.assertNotIn(board_id, readme, board_id)
         self.assertIn("[完整开发板目录](docs/boards/README.md)", readme)
+        self.assertIn("releases/tag/mgkfb-bk7258-v1.0.1", readme)
+        self.assertIn("mgkfb-bk7258-1.0.1%2Bbuild.11-validation.zip", readme)
 
     def test_root_documents_keep_reader_focused_section_order(self):
         expected_sections = {

@@ -41,6 +41,8 @@ API 或 MQTT 地址；原有绑定显示、存储失败和重试测试继续覆�
 `mgkfb-bk7258-v<版本>` 标签和完整型号标题。`test_validation_packaging.py` 同时建立
 eyes/headless 两份不同内容的 release 产物，通过真实打包接口确认默认 eyes、显式变体、
 包内变体记录和未知变体拒绝；实现前因无变体入口失败。两者登记在 `tools/check.sh`。
+README 发布入口沿用 `test_repository_layout.py`；将觅感加入已发布板卡集合，并核对
+专属 Release 标签和 build.11 下载名。旧集合在新增下载行后失败，登记本次发布后通过。
 
 音量键此前与 AI 键共用 320 ms 双击窗口：孤立单击延迟，窗口内连按被合成 DOUBLE 后
 没有音量回调。`test_mgkfb_headless.py` 直接运行生产 key_task、手势状态机和回调，输入
