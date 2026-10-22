@@ -5,7 +5,8 @@
 本次发布面向 **M5Stack CoreS3-Lite / ILI9342E**，独立标签为
 `m5stack-cores3-lite-v1.0.1`，标题为 `M5Stack CoreS3-Lite v1.0.1 · build.42`。
 发布构建由 main 的 `dbc262c` 执行统一 `--release` 入口生成，保留以下 build.41
-功能与修复。build.41 的用户实测不转记为 build.42 验收，状态为
+功能与修复。用户已补充确认 M5 完成实板验证，待补齐本次确认的构建号；
+build.41 的既有记录不转记为 build.42 验收，精确产物状态为
 `BUILD_VERIFIED_HIL_PENDING`。
 
 交付包含同版分文件 ZIP、从 `0x0` 烧录的 merged BIN 和 `SHA256SUMS`。

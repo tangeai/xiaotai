@@ -1,6 +1,6 @@
 # M5Stack CoreS3-Lite 探鸽小钛
 
-板卡 ID：`m5stack-cores3-lite`，商品编号 K128-Lite。当前是开发适配，尚未完成实板验收。
+板卡 ID：`m5stack-cores3-lite`，商品编号 K128-Lite。用户已确认 M5 完成实板验证；具体构建身份及验证范围见[验证记录](../../../boards/m5stack/cores3-lite/VALIDATION.md)。
 ESP32-S3 与立创相同，但接线、电源、功放、屏幕和触摸方向不同，固件不能互刷。
 
 ## 烧录
