@@ -5,14 +5,27 @@
 目标业务为 AI 对讲、微信 VoIP 语音通话和 H5 实时查看；设备互呼、多人对讲禁用。
 双屏版一屏一只眼、不显示嘴巴；AI Tag 驱动表情，配网/绑定临时显示文字。引脚资料及证据等级见 [Hardware IR](hardware-ir.json)，接入细节见 [BRINGUP](BRINGUP.md)。
 
+发布版本：[v1.0.1 · build.11](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.1)，
+选择 `eyes` 变体，8 MiB Flash，使用 release 配置。验证范围见[验证记录](VALIDATION.md)。
+
 ## 烧录
+
+1. 下载并解压 [`mgkfb-bk7258-1.0.1+build.11-validation.zip`](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.1/mgkfb-bk7258-1.0.1%2Bbuild.11-validation.zip)。
+2. 通过通讯 Type-C 连接电脑，关闭占用该串口的日志终端，在 Beken 下载工具中选择本板对应 COM 口及 BK7258。
+3. 选择解压后的 **`mgkfb-bk7258-1.0.1+build.11-all-app.bin`**，起始地址 **`0x00000000`**。不要选 ZIP、ELF 或 `mgkfb-bk7258-1.0.1+build.11-app_pack.rbl`。
+4. 启动下载，按下载工具提示复位或重新上电进入下载握手，等待写入和工具校验完成，再重新上电。
+5. 打开 115200 波特率日志，核对 `mgkfb-bk7258`、`1.0.1+build.11` 和 `eyes-key`；无 Wi-Fi 配置时按屏幕热点提示配网。
+
+ZIP 内 `MANIFEST.json` 包含 BIN 的长度、SHA-256 和烧录地址；`all-app.bin` 的 SHA-256 为
+`5a8d24a9d058822e41b2700c325b924c6958385ce2d54e0aa4bbf05511dc90fb`。
 
 用户确认 Flash 为 8 MiB，当前分区末端为 `0x800000`，容量匹配。首次烧录前核对原厂启动程序和分区，
 保存原厂固件及 RF 校准数据。用户确认完成实板功能验证，不代表已测得 Flash JEDEC 或完成全项压力测试。
 程序采用仓库现有 SMP 分区布局，不采用 AIDK 的 CPU0/CPU1/CPU2 分区。
 
 构建目录前缀为 `firmware/beken/bk7258/mgkfb-bk7258-xiaotai/build/bk7258/`；
-双屏使用 `mgkfb-bk7258-xiaotai_eyes/`，无屏使用 `mgkfb-bk7258-xiaotai/`。每个目录有独立构建身份和 package：
+双屏开发构建使用 `mgkfb-bk7258-xiaotai_eyes/`，无屏使用 `mgkfb-bk7258-xiaotai/`；
+release 构建分别追加 `_release`。每个目录有独立构建身份和 package：
 
 | 文件 | 用途 |
 |---|---|
@@ -21,7 +34,7 @@
 | `build_identity.json` | 构建版本、源码身份和产物校验记录，核对时以实际构建目录为准 |
 
 本板烧录接口为通讯 Type-C 内的 UART0（TX GPIO11 / RX GPIO10）。
-Beken 下载工具及擦写范围需要结合实物确认后补充实测步骤；不要使用 ESP32 的 esptool-js，
+不要使用 ESP32 的 esptool-js，
 也不要使用 `lckfb-bk7258`、其他 BK7258 板或厂家 AIDK 工程的镜像代替本板固件。
 
 ## 首次使用
@@ -118,14 +131,14 @@ bash tools/check.sh
 
 ## 验证状态与已知限制
 
-已完成独立 SMP 工程链接及主机回归接入；立创原工程同步重编译以检查公共代码迁移。
-用户已烧录 build.4，日志确认联网及 GC2145 ID 检测成功，但 H5 无画面、未发送视频帧。
-GPIO 默认表的 DVP 复用已修正，修复版待复测。尚未完成整板验收或正式发布；
-摄像头身份记为 `detected`，接线资料及其余硬件证据仍保留相应等级。
+已完成独立 SMP 工程、主机回归及 release 构建；立创原工程此前同步重编译检查公共代码迁移。
+build.4 的 DVP 无帧问题已修复，后续用户日志记录首个 H.264 帧及持续上行；用户确认开发板验证完成，
+并明确确认 S1/S3 可调音量。发布的 build.11 从同一功能源码生成，使用 INFO 日志 release 配置；
+开发版的实板确认不自动等同于新 BIN 的逐字节验收，包内如实保留 `BUILD_VERIFIED_HIL_PENDING`。
 
-待验证：Flash/PSRAM/原厂分区、GPIO 电平和功放时序、实际摄像头、全双工及 AEC、
-Wi-Fi 配网绑定、AI 对讲、微信通话、H5 实时查看、长时间稳定性。
-待完善：无屏来电和错误语音反馈；双屏左右映射、方向、背光、颜色和眼形及文案均待实屏验证。
+已知限制：不支持触摸、设备互呼、多人房间；OTA 尚未专项验收。来电和错误的完整语音引导待完善，
+目前通过眼屏短文案、指示灯和串口反馈。Flash JEDEC、物理 PSRAM、回采电阻及功放时序没有量测报告；
+长期运行、弱网、双讲 AEC、音量边界/重启保存和双 DMA 异常恢复仍需专项验证。
 
 ## 双屏软件预览
 

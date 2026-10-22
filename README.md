@@ -24,6 +24,7 @@
 | <img src="https://xiaotai.chat/v1/board-images/2b74eed62b57852dff00fe9a04b14748bfcca4bbba3b4d79e891f9299f9a0c59.png" alt="立创·实战派 ESP32-S3 开发板" width="180"> | 立创·实战派 ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | v1.0.1<br>build.2 | [完整镜像（BIN）](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.2-merged.bin)<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.2-validation.zip) | [烧录指南](docs/boards/lckfb-esp32s3/README.md#烧录)<br>[开发板资料](docs/boards/lckfb-esp32s3/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.1) |
 | <img src="https://xiaotai.chat/v1/board-images/eb94bd88265ac488dc8fbc20fcb3896438439aa513529429bfb8ae2792be9aa4.jpg" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="180"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | v1.0.1<br>build.2 | [完整镜像（BIN）](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.2-merged.bin)<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.2-validation.zip) | [烧录指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录)<br>[开发板资料](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1) |
 | <img src="https://xiaotai.chat/v1/board-images/6ea7dc1e034807bc0de00963cfe625d74ed64d241170eeb207762041554bf19e.png" alt="M5Stack CoreS3-Lite 开发板" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342E 屏幕<br>`m5stack-cores3-lite` | v1.0.1<br>build.42 | [完整镜像（BIN）](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-merged.bin)<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-validation.zip) | [烧录指南](docs/boards/m5stack-cores3-lite/README.md#烧录)<br>[开发板资料](docs/boards/m5stack-cores3-lite/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1) |
+| 图片待补 | 觅感 AI 玩具开发板 BK7258<br>双屏眼睛 · 8 MiB Flash<br>`mgkfb-bk7258` | v1.0.1<br>build.11 | 完整镜像：包含在 ZIP 中<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.1/mgkfb-bk7258-1.0.1%2Bbuild.11-validation.zip) | [烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录)<br>[开发板资料](docs/boards/mgkfb-bk7258/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.1) |
 
 各入口用途如下：
 
@@ -83,6 +84,10 @@ ESP-IDF 编译并执行 `idf.py flash monitor`，适合修改源码与调试。
 ### BK7258 开发板
 
 下载 `lckfb-bk7258-` 开头的发布包，使用包内以 `-all-app.bin` 结尾的文件，从地址 `0x0` 完整烧录。以 `-app_pack.rbl` 结尾的文件是 OTA（无线升级）镜像，不能代替首次完整烧录。烧录工具、下载模式和串口设置见[立创·实战派 BK7258 烧录指南](docs/boards/lckfb-bk7258/README.md#烧录)。
+
+觅感板下载 `mgkfb-bk7258-1.0.1+build.11-validation.zip`，解压后使用
+`mgkfb-bk7258-1.0.1+build.11-all-app.bin`，地址同为 `0x0`；不能使用立创板镜像。
+具体步骤见[觅感 BK7258 烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录)。
 
 量产或升级前，再次核对板卡 ID、PCB（印刷电路板）版本和 SHA-256。校准区、密钥区和设备身份数据不能被通用固件覆盖。
 

@@ -58,7 +58,7 @@
     "input": "physical-buttons",
     "interaction_profile": "eyes-key",
     "layout_profile": "compact",
-    "note": "eyes is the default software variant; headless remains selectable. AI tags drive one eye per screen, no mouth. Setup and binding use short text. Dual-panel hardware validation pending.",
+    "note": "eyes is the default variant; headless remains selectable. User confirmed board validation after build.10 delivery. Release build.11 is separately build-verified; exact release artifact HIL is pending.",
     "deferred": [],
     "variants": [
       "eyes",
@@ -248,6 +248,14 @@
         "firmware_version": "1.0.1+build.4",
         "method": "video subscription enabled, camera stop sent=0 dropped=1; missing VSYNC edge",
         "next_action": "Flash DVP mux correction and confirm increasing video frames plus visible H5 image"
+      },
+      {
+        "name": "dual-eyes-board-functional-validation",
+        "status": "PASS",
+        "method": "User confirmed board validation and separately confirmed volume adjustment; no fresh firmware identity log supplied.",
+        "date": "2026-10-22",
+        "candidate_build_delivered": "1.0.1+build.10",
+        "exact_artifact_identity_verified": false
       }
     ]
   },
@@ -298,6 +306,16 @@
       46164,
       156277
     ],
-    "note": "eyes build.10 includes immediate per-click volume gestures and key/runtime diagnostics; native SMP build and package verification passed, 452 host tests passed at build time. User subsequently confirmed volume adjustment works, without a fresh firmware identity log; limits, persistence and per-media behavior remain pending. Dual screens remain pending HIL."
+    "note": "Development eyes build.10 was delivered; user subsequently confirmed volume adjustment and board validation. No fresh firmware identity log supplied. Release build.11 has separate build evidence; quantitative and fault-injection tests remain pending."
+  },
+  "release_evidence": {
+    "date": "2026-10-22",
+    "variant": "eyes",
+    "build_version": "1.0.1+build.11",
+    "source_commit": "fa522a967b688c4e8395991e6a16cfd72786d3cc",
+    "build_profile": "release",
+    "all_app_sha256": "5a8d24a9d058822e41b2700c325b924c6958385ce2d54e0aa4bbf05511dc90fb",
+    "verification_status": "BUILD_VERIFIED_HIL_PENDING",
+    "report": "docs/boards/mgkfb-bk7258/VALIDATION.md"
   }
 }
