@@ -50,10 +50,10 @@
 
 ### ESP32 开发板
 
-可以选择以下两种方式烧录，**任选一种即可**：
+烧录时可以使用多个 BIN 文件，也可以使用合并后的一个 BIN 文件，**任选一种即可**：
 
-- **分文件烧录**：解压固件包，将多个 BIN 按清单分别写入对应地址。
-- **合并镜像烧录**：下载完整的 `-merged.bin`，只添加这一个文件，从 `0x0` 写入。
+- **烧录多个 BIN 文件**：解压固件包，将多个 BIN 按清单写入各自的地址。
+- **烧录合并后的 BIN 文件**：下载完整的 `-merged.bin`，只添加这一个文件，从 `0x0` 写入。
 
 完整镜像由同一版本的分文件 BIN 合并生成，制作方法见[乐鑫官方指引](https://docs.espressif.com/projects/esptool/en/latest/esp32s3/esptool/basic-commands.html#merge-binaries-for-flashing-merge-bin)。
 
