@@ -24,6 +24,7 @@ sdk_patches=(
     "$support_dir/tools/patches/bk-avdk-dvp-sccb-diagnostics.patch"
     "$support_dir/tools/patches/bk-avdk-lwip-tcp-pcb-12.patch"
     "$support_dir/tools/patches/bk-avdk-captive-dns.patch"
+    "$support_dir/tools/patches/bk-avdk-cp-captive-dns.patch"
     "$support_dir/tools/patches/bk-avdk-gc0308-20fps.patch"
     "$support_dir/tools/patches/bk-avdk-redact-sensitive-logs.patch"
     "$support_dir/tools/patches/bk-avdk-touch-read-failure-release.patch"
@@ -38,6 +39,7 @@ sdk_patches=(
     "$support_dir/tools/patches/bk-avdk-heartbeat-owner-diagnostics.patch"
     "$support_dir/tools/patches/bk-avdk-heartbeat-debug-level.patch"
     "$support_dir/tools/patches/bk-avdk-speaker-close-debug-level.patch"
+    "$support_dir/tools/patches/bk-avdk-speaker-abort-write.patch"
     "$support_dir/tools/patches/bk-avdk-ipc-worker-sram.patch"
     "$support_dir/tools/patches/bk-avdk-rtos-assert-caller-diagnostics.patch"
 )

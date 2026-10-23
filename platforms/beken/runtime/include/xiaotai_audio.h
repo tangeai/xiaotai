@@ -63,6 +63,16 @@ int xiaotai_audio_announce_verification_pcm(int16_t *pcm,
                                             size_t sample_count);
 /** Preview the selected response once; reject active media and muted output. */
 int xiaotai_audio_preview_acknowledgement(bool male);
+typedef enum {
+    XIAOTAI_CALL_RING_NONE = 0,
+    XIAOTAI_CALL_RING_INCOMING,
+    XIAOTAI_CALL_RING_OUTGOING,
+} xiaotai_call_ring_t;
+
+/** Service from the control task. Uses prompt audio when idle and the existing
+ * playback path during media; NONE stops only the ringtone-owned prompt. */
+void xiaotai_audio_service_call_ringtone(xiaotai_call_ring_t kind);
+
 /** Read completion without waiting or touching the audio driver. */
 bool xiaotai_audio_prompt_result(int *result);
 void xiaotai_audio_cancel_prompt(void);

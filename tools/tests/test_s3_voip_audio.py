@@ -87,6 +87,12 @@ int main(void){
 
     def test_voip_media_waits_for_confirmation_and_subscription(self):
         runtime=(ROOT/'platforms/esp-idf/components/starter_runtime/src/starter_runtime.c').read_text()
+        product=(ROOT/'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()
+        start=product.index('        if (product.call_incoming) {', product.index('CALL_CONNECTING 同时涵盖'))
+        end=product.index('    } else if (call_before',start)
+        selector=product[start:end]
+        connected=runtime[runtime.index('        if (event->mode == STARTER_TIRTC_VOIP) {',runtime.index('WHIP 成功仅表示')):]
+        connected=connected[:connected.index('        s_call_waiting_confirm = true;',connected.index('            return;'))]
         run_c(COMMON+r'''
 #include <string.h>
 #define ESP_OK 0
@@ -115,11 +121,27 @@ static int starter_tirtc_subscribe_call_audio(void){subscriptions++;return subsc
 static int starter_media_start(int mode,uint32_t gen){assert(subscriptions>0 && mode==3 && gen==s_connection_generation);started++;return 0;}
 static bool xiaotai_runtime_media_started(int *s,uint32_t gen){state=2;return true;}
 static void publish_state(void){published++;}
+#define CALL_RING_NONE 0
+#define CALL_RING_INCOMING 1
+#define CALL_RING_OUTGOING 2
+#define VOIP_CONNECTED_WAIT_TIMEOUT_MS 35000
+static int s_call_ring_kind;
+static void arm_session_timeout(unsigned ms){assert(ms==35000);}
+static void transport_ready(runtime_event_t *event){
+'''+connected+r'''
+}
+static void refresh_ring(void){
+ struct {int state;} runtime={state};
+ struct {bool call_incoming;} product={false};
+'''+selector+r'''
+}
 '''+function(runtime,'handle_call_command')+r'''
 int main(void){
  runtime_event_t e={.mode=3,.generation=6,.command=0x2000};
  handle_call_command(&e);assert(!started && !subscriptions);
  e.generation=7;e.command=0x999;handle_call_command(&e);assert(!started);
+ s_call_outgoing=true;transport_ready(&e);
+ for(unsigned i=0;i<100;i++){refresh_ring();assert(s_call_ring_kind==CALL_RING_OUTGOING && state==1 && !started);}
  e.command=0x2000;subscribe_result=-42;handle_call_command(&e);
  assert(subscriptions==1 && !started && finished==1 && !published);
  handle_call_command(&e);assert(subscriptions==1 && !started);
@@ -128,6 +150,7 @@ int main(void){
  e.generation=8;
  subscribe_result=0;handle_call_command(&e);
  assert(subscriptions==2 && started==1 && published==1 && !s_call_waiting_confirm);
+ refresh_ring();assert(s_call_ring_kind==CALL_RING_NONE);
  handle_call_command(&e);assert(started==1 && subscriptions==2);
 }
 ''')

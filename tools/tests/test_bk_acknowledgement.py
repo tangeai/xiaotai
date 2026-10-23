@@ -33,6 +33,8 @@ static int s_prompt_stopped;
 static void *s_prompt_thread;
 static unsigned s_prompt_repeats;
 static atomic_int s_prompt_result;
+static atomic_uint s_prompt_generation;
+static atomic_flag s_audio_control_lock=ATOMIC_FLAG_INIT;
 static int16_t *s_prompt_pcm;
 static size_t s_prompt_samples;
 static const int16_t xiaotai_ack_female[2400]={11};
@@ -40,17 +42,18 @@ static const int16_t xiaotai_ack_male[2400]={22};
 static int allocation_fail,task_fail,board_fail,writes,freed,opened;
 static void (*worker)(beken_thread_arg_t);
 static int semaphore_fail,write_fail_at,cancel_at,stopped,allocations;
+static bool complete_after_join;
 void xiaotai_audio_cancel_prompt(void);
 static void *psram_malloc(size_t n){if(allocation_fail)return NULL;void *p=malloc(n);if(p)allocations++;return p;}
 static void psram_free(void *p){assert(p && allocations>0);allocations--;freed++;free(p);}
 static int rtos_init_semaphore(int *s,int n){return semaphore_fail?-1:0;}
-static int rtos_get_semaphore(int *s,int t){return t>0?-1:0;}
+static int rtos_get_semaphore(int *s,int t){return t>0 && !complete_after_join?-1:0;}
 static int rtos_set_semaphore(int *s){return 0;}
 static int rtos_create_psram_thread(void **t,int pr,const char*n,void(*f)(beken_thread_arg_t),int st,void*a){
  if(task_fail)return -1;
  *t=(void*)1;worker=f;return 0;
 }
-static void rtos_delay_milliseconds(unsigned n){}
+static void rtos_delay_milliseconds(unsigned n){if(complete_after_join)s_prompt_active=false;}
 static void rtos_delete_thread(void *t){}
 static int xiaotai_board_prompt_audio_start(void){opened++;return board_fail?-1:0;}
 static int xiaotai_board_prompt_audio_write(const int16_t *p,size_t n){
@@ -58,11 +61,20 @@ static int xiaotai_board_prompt_audio_write(const int16_t *p,size_t n){
  return writes==write_fail_at?-1:(int)(n*sizeof(*p));
 }
 static void xiaotai_board_prompt_audio_stop(void){stopped++;}
-''' + function(source,'play_prompt_pcm') + function(source,'prompt_task') +
-              function(source,'xiaotai_audio_prompt_result') + function(source,'xiaotai_audio_cancel_prompt') + function(source,'start_prompt') + function(source,'xiaotai_audio_announce_verification_pcm') + preview + r'''
+''' + function(source,'audio_control_enter') + function(source,'audio_control_leave') + function(source,'play_prompt_pcm') + function(source,'prompt_task') +
+              function(source,'xiaotai_audio_prompt_result') + function(source,'cancel_prompt_locked') + function(source,'xiaotai_audio_cancel_prompt') + function(source,'start_prompt_locked') + function(source,'start_prompt') + function(source,'xiaotai_audio_announce_verification_pcm') + preview + r'''
 int main(void){
 ''' + scenario + r'''
 }
+''')
+
+    def test_cancel_waits_for_completion_publication_after_join_signal(self):
+        self.replay(r'''
+ assert(xiaotai_audio_preview_acknowledgement(false)==0);
+ complete_after_join=true;
+ xiaotai_audio_cancel_prompt();
+ assert(!s_prompt_active);
+ worker(0);assert(allocations==0);
 ''')
 
     def test_preview_is_one_shot_and_does_not_steal_live_audio(self):

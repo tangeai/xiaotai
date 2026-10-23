@@ -97,7 +97,12 @@ static int audio_adapter_request_stop(void *context)
 {
     (void)context;
     (void)xiaotai_board_amplifier_set_playing(false);
-    return s_record == NULL ? BK_OK : audio_record_close(s_record);
+    /* Wake a writer stalled in the SDK ring before the runtime joins it.
+     * Closing the speaker here would free that ring while the writer uses it. */
+    int play_rc = s_play == NULL ? BK_OK :
+        audio_play_control(s_play, AUDIO_PLAY_ABORT_WRITE);
+    int capture_rc = s_record == NULL ? BK_OK : audio_record_close(s_record);
+    return play_rc != BK_OK ? play_rc : capture_rc;
 }
 
 static int audio_adapter_stop(void *context)

@@ -838,11 +838,10 @@ home_quick_start = app_source.index(
     "static void quick_call_first_wechat_contact(void)\n{")
 home_quick_end = app_source.index("\nstatic void", home_quick_start + 1)
 home_quick_call = app_source[home_quick_start:home_quick_end]
-require("xiaotai_contacts_first" in quick_call and
+require("quick_call_first_wechat_contact();" in quick_call and
         "xiaotai_contacts_first_of_type" in home_quick_call and
         "XIAOTAI_CONTACT_VOIP" in home_quick_call and
         "show_wechat_qr_waiting(true)" in home_quick_call and
-        "dial_contact(&contact)" in quick_call and
         "dial_contact(&contact)" in home_quick_call and
         "XIAOTAI_INTENT_HOME_WECHAT_CALL" in app_source and
         'owner == XIAOTAI_OWNER_DEVICE_CALL ?\n        "/v1/call/request" : "/v1/voip/device/call"' in app_source and
@@ -878,7 +877,7 @@ require('"%s/v1/device/tts?code=%s"' in platform_source and
         not (REPO_ROOT / "platforms/beken/runtime/assets/binding_digits.c").exists(),
         "binding voice must use authenticated server PCM three times without a local fallback")
 require("xiaotai_ui_show_wechat_qr();" in app_source and
-        "platform contact list is empty" in app_source and
+        "home call: no WeChat contact" in app_source and
         "UI_PAGE_WECHAT_QR" in app_source and
         "s_ui_page = UI_PAGE_WECHAT_QR" in app_source and
         "if (s_ui_page == UI_PAGE_WECHAT_QR" in app_source and

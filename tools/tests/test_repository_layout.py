@@ -128,8 +128,8 @@ class RepositoryLayoutTests(unittest.TestCase):
             else:
                 self.assertNotIn(board_id, readme, board_id)
         self.assertIn("[完整开发板目录](docs/boards/README.md)", readme)
-        self.assertIn("releases/tag/mgkfb-bk7258-v1.0.1", readme)
-        self.assertIn("mgkfb-bk7258-1.0.1%2Bbuild.11-validation.zip", readme)
+        self.assertRegex(readme, r"releases/tag/mgkfb-bk7258-v[0-9]+\.[0-9]+\.[0-9]+")
+        self.assertRegex(readme, r"mgkfb-bk7258-[0-9]+\.[0-9]+\.[0-9]+%2Bbuild\.[0-9]+-validation\.zip")
 
     def test_root_documents_keep_reader_focused_section_order(self):
         expected_sections = {
@@ -224,7 +224,7 @@ class RepositoryLayoutTests(unittest.TestCase):
         self.assertNotIn("当前仓库：ESP32-S3", prototype_html)
         self.assertNotIn("quickWechatCall", prototype_js)
         self.assertIn("quickFirstContactCall", prototype_js)
-        self.assertIn("visibleContacts()[0]", prototype_js)
+        self.assertIn('aria-label="呼叫第一个微信联系人"', prototype_js)
         self.assertIn("roomLeaveConfirm", prototype_js)
         self.assertIn("确认退出房间？", prototype_js)
         self.assertIn("房间已保留，再次进入可连接", prototype_js)

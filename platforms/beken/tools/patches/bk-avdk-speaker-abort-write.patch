@@ -1,0 +1,24 @@
+--- a/ap/components/audio_play/include/audio_play.h
++++ b/ap/components/audio_play/include/audio_play.h
+@@ -51,6 +51,7 @@
+     AUDIO_PLAY_MUTE,
+     AUDIO_PLAY_UNMUTE,
+     AUDIO_PLAY_SET_VOLUME,
++    AUDIO_PLAY_ABORT_WRITE, /* Wake pending writes without releasing speaker storage. */
+ } audio_play_ctl_t;
+ 
+ typedef struct
+--- a/ap/components/audio_play/src/onboard_speaker_play.c
++++ b/ap/components/audio_play/src/onboard_speaker_play.c
+@@ -854,6 +854,11 @@
+     onboard_speaker_play_priv_t *priv = (onboard_speaker_play_priv_t *)play->play_ctx;
+     ONBOARD_SPK_PLAY_CHECK_NULL(priv);
+ 
++    if (ctl == AUDIO_PLAY_ABORT_WRITE)
++    {
++        return rb_abort_write(priv->rb);
++    }
++
+     if (ctl == AUDIO_PLAY_PAUSE)
+     {
+         if (onboard_speaker_state_get(priv) == AUDIO_PLAY_STA_PAUSED)

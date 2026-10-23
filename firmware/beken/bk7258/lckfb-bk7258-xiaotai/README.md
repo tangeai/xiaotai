@@ -74,7 +74,7 @@ bash tools/check.sh
 - 房间退出的成功证据是 `/v1/call/group/device/leave` 业务成功、媒体关闭且服务端关系刷新
   为已退出；只返回首页或只关闭扬声器不算退出房间。
 
-首页触摸呼叫只选择平台顺序中的首个微信联系人；实体快捷键仍选择 `contacts[0]`。
+首页触摸呼叫和实体快捷键都选择平台顺序中的首个微信联系人；没有微信联系人时显示添加联系人引导。
 多人对讲页固定使用矩形“退出房间”和“按住说话”，成员超过单页容量时分页显示。产品
 规则以[交互形态](../../../../docs/product/PRODUCT_INTERACTION_PROFILES.md)和
 [产品需求](../../../../docs/product/PRODUCT_REQUIREMENTS.md)为准。

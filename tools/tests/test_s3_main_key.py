@@ -1,5 +1,6 @@
 """Replay the physical main key against the serialized ESP runtime policy."""
 import unittest
+import subprocess
 from test_s3_product_regressions import ROOT, function, run_c
 
 RUNTIME = ROOT / 'platforms/esp-idf/components/starter_runtime/src/starter_runtime.c'
@@ -7,11 +8,8 @@ BUTTON = ROOT / 'platforms/esp-idf/components/starter_button/src/starter_button.
 
 
 class MainKeyRegressions(unittest.TestCase):
-    def test_first_contact_and_empty_list_guide_use_runtime_snapshot(self):
+    def test_key_and_home_share_first_wechat_and_missing_contact_refresh(self):
         source=RUNTIME.read_text()
-        ui=(ROOT / 'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()
-        start=ui.index('    if (product.contact_guide_sequence != s_contact_guide_sequence)')
-        end=ui.index('    home =',start)
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>
@@ -21,34 +19,73 @@ class MainKeyRegressions(unittest.TestCase):
 #define CONFIG_IDF_TARGET_ESP32P4 0
 #define pdTRUE 1
 #define pdMS_TO_TICKS(x) (x)
-#define PAGE_WECHAT_QR 5
-static void *s_product_mutex=(void *)1;
-static bool lock_ok=true,call_now,binding_required;
-static struct {uint8_t contact_count;uint32_t contact_guide_sequence;
-               struct {int source;} contacts[1];} s_product_snapshot,product;
 #define STARTER_CONTACT_WECHAT 2
-static int dials,ends,renders,s_page;
-static uint32_t s_contact_guide_sequence;
+#define STARTER_PRODUCT_CONTACTS_MAX 4
+#define CONTACTS_CHECK_TIMEOUT_MS 1000
+static void *s_product_mutex=(void *)1;
+static bool lock_ok=true,s_wechat_quick_pending;
+static struct {uint8_t contact_count;uint32_t contact_guide_sequence;bool wechat_contacts_checked;
+ struct {int source;} contacts[4];} s_product_snapshot;
+static unsigned s_contacts_check_deadline_ms,s_contacts_retry_due_ms;
+static int dials,ends,refreshes;
 static int xSemaphoreTake(void *mutex,int timeout){return lock_ok;}
 static void xSemaphoreGive(void *mutex){}
+static unsigned now_ms(void){return 100;}
+static void refresh_contacts(void){refreshes++;}
 static void end_ai_session(void){ends++;}
-static void dial_contact(uint8_t index,bool video){assert(index==0 && !video);dials++;}
-static void render_page(void){renders++;}
+static void dial_contact(uint8_t index,bool video){assert(index==1 && !video);dials++;}
 ''' + function(source,'call_video_for_request') +
-              function(source,'dial_first_contact') + '\nstatic void tick(void){\n' + ui[start:end] + r'''
-}
+            function(source,'handle_wechat_quick_call') + function(source,'dial_first_contact') + r'''
 int main(void){
-    s_product_snapshot.contact_count=2;dial_first_contact();
-    assert(dials==1 && ends==0 && s_product_snapshot.contact_guide_sequence==0);
-    s_product_snapshot.contact_count=0;dial_first_contact();
-    assert(dials==1 && ends==1 && s_product_snapshot.contact_guide_sequence==1);
-    product=s_product_snapshot;tick();assert(s_page==PAGE_WECHAT_QR && renders==1);
-    s_page=0;tick();assert(s_page==0 && renders==1);
-    lock_ok=false;dial_first_contact();assert(dials==1 && ends==1);
-    product.contact_guide_sequence=2;call_now=true;tick();assert(s_page==0 && renders==1);
-    call_now=false;tick();assert(s_page==0 && renders==1);
+ s_product_snapshot.contact_count=4;
+ s_product_snapshot.contacts[0].source=1;s_product_snapshot.contacts[1].source=2;
+ s_product_snapshot.contacts[2].source=1;s_product_snapshot.contacts[3].source=2;
+ dial_first_contact();handle_wechat_quick_call();assert(dials==2 && refreshes==0);
+ s_product_snapshot.contact_count=1;dial_first_contact();
+ assert(dials==2 && s_wechat_quick_pending && refreshes==1);
+ s_product_snapshot.contact_count=0;dial_first_contact();assert(dials==2 && refreshes==2);
+ assert(s_contacts_check_deadline_ms==1100 && s_contacts_retry_due_ms==100);
 }
 ''')
+
+    def test_missing_wechat_guide_is_presented_once_and_does_not_interrupt_calls(self):
+        ui=(ROOT/'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()
+        start=ui.index('    if (product.contact_guide_sequence != s_contact_guide_sequence)')
+        end=ui.index('    home =',start)
+        run_c(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
+#define PAGE_WECHAT_QR 5
+static struct {uint32_t contact_guide_sequence;} product;
+static uint32_t s_contact_guide_sequence;
+static int s_page,renders;
+static bool call_now,binding_required;
+static void render_page(void){renders++;}
+static void tick(void){
+''' + ui[start:end] + r'''
+}
+int main(void){
+ product.contact_guide_sequence=1;tick();assert(s_page==PAGE_WECHAT_QR && renders==1);
+ s_page=0;tick();assert(s_page==0 && renders==1);
+ product.contact_guide_sequence=2;call_now=true;tick();assert(s_page==0 && renders==1);
+ call_now=false;tick();assert(s_page==0 && renders==1);
+ product.contact_guide_sequence=3;binding_required=true;tick();assert(renders==1);
+}
+''')
+
+    def test_prototype_home_calls_first_wechat_not_first_device(self):
+        script=(ROOT/'docs/product/prototype.js').read_text()
+        code = """const assert=require('assert');
+let list=[{name:'device',source:'设备'},{name:'wx1',source:'微信'},{name:'wx2',source:'微信'}];
+const visibleContacts=()=>list;let peer,callMode,callMicMuted,cameraOff,state;
+function render(next){state=next;}
+""" + function(script,'quickFirstContactCall') + """
+quickFirstContactCall();assert.equal(peer.name,'wx1');assert.equal(state,'dialing');
+list=[{name:'device',source:'设备'}];quickFirstContactCall();assert.equal(state,'wechat-auth');
+list=[];quickFirstContactCall();assert.equal(state,'wechat-auth');
+"""
+        subprocess.run(['node','-e',code],check=True)
 
     def test_polling_handles_boot_hold_bounce_double_click_and_queue_failure(self):
         source=BUTTON.read_text()

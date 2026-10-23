@@ -353,17 +353,7 @@ static void show_wechat_qr_waiting(bool wechat_only)
 
 static void quick_call_first_contact(void)
 {
-    xiaotai_contact_t contact = {0};
-    xiaotai_contact_match_t match =
-        xiaotai_contacts_first(&s_contacts, &contact);
-    if (match != XIAOTAI_CONTACT_MATCH_OK) {
-        show_wechat_qr_waiting(false);
-        BK_LOGW(TAG, "quick call: platform contact list is empty\n");
-        return;
-    }
-    BK_LOGI(TAG, "quick call dialing contacts[0] name=%s type=%d\n",
-            contact.name, (int)contact.type);
-    dial_contact(&contact);
+    quick_call_first_wechat_contact();
 }
 
 static void quick_call_first_wechat_contact(void)
@@ -719,6 +709,7 @@ static void accept_pending_call(void)
     }
     rtos_unlock_mutex(&s_runtime_mutex);
     if (!accepted) return;
+    xiaotai_audio_service_call_ringtone(XIAOTAI_CALL_RING_NONE);
 
     if (owner == XIAOTAI_OWNER_DEVICE_CALL) {
         char request[320];
@@ -2804,7 +2795,7 @@ static void handle_decoded_platform_signal(const xiaotai_signal_view_t *signal,
                 if (rc != 0) finish_voip(generation, rc);
                 else {
                     xiaotai_ui_show_status("VOIP CONNECT");
-                    BK_LOGI(TAG, "outbound VoIP answered call_id=%s\n", call_id);
+                    BK_LOGI(TAG, "outbound VoIP connection parameters ready call_id=%s\n", call_id);
                 }
             } else if (accepted) {
                 os_free(s_voip_reject_request);
@@ -3183,6 +3174,23 @@ static void service_ack_preview(void)
     }
 }
 
+static void service_call_ringtone(void)
+{
+    xiaotai_call_ring_t kind = XIAOTAI_CALL_RING_NONE;
+    rtos_lock_mutex(&s_runtime_mutex);
+    if (xiaotai_runtime_has_incoming(&s_runtime) ||
+        s_runtime.state == XIAOTAI_STATE_CALL_INCOMING) {
+        kind = XIAOTAI_CALL_RING_INCOMING;
+    } else if (s_runtime.state == XIAOTAI_STATE_CALL_CONNECTING &&
+               ((s_runtime.owner == XIAOTAI_OWNER_DEVICE_CALL && s_calls.device.outbound) ||
+                (s_runtime.owner == XIAOTAI_OWNER_WECHAT_VOIP &&
+                 s_calls.voip.outbound_openid[0] != '\0'))) {
+        kind = XIAOTAI_CALL_RING_OUTGOING;
+    }
+    rtos_unlock_mutex(&s_runtime_mutex);
+    xiaotai_audio_service_call_ringtone(kind);
+}
+
 static void control_maintenance(void)
 {
     xiaotai_ui_refresh_verification_countdown();
@@ -3200,6 +3208,7 @@ static void control_maintenance(void)
         xiaotai_tirtc_log_stream_media_state();
     }
     handle_runtime_timeout();
+    service_call_ringtone();
     xiaotai_room_tick(&s_room);
     refresh_idle_home();
     rtos_lock_mutex(&s_runtime_mutex);
@@ -3758,10 +3767,10 @@ int xiaotai_app_start(void)
         return rc;
     }
 #if XIAOTAI_HEADLESS
-    BK_LOGI(TAG, "S2 short=AI/answer/hangup double=contacts[0]; S1/S3 volume; S1 hold=idle provisioning\n");
+    BK_LOGI(TAG, "S2 short=AI/answer/hangup double=first-wechat; S1/S3 volume; S1 hold=idle provisioning\n");
 #else
     BK_LOGI(TAG,
-            "KEY map: short=answer/hangup/AI, double=contacts[0], long=room PTT\n");
+            "KEY map: short=answer/hangup/AI, double=first-wechat, long=room PTT\n");
 #endif
 #if XIAOTAI_BOARD_TOUCH_AVAILABLE
     rc = xiaotai_touch_start(touch_event, NULL);

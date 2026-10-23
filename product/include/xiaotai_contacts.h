@@ -56,8 +56,8 @@ xiaotai_contact_match_t xiaotai_contacts_match(
     const xiaotai_contacts_t *contacts, const char *name,
     const char *target_id, const char *channel, xiaotai_contact_t *result);
 
-/* Quick call is deliberately policy-free: the platform-ordered first entry is
- * returned unchanged. The device must not sort or prefer a channel. */
+/* Return the platform-ordered first entry unchanged. Channel-specific quick
+ * calls use xiaotai_contacts_first_of_type(). */
 xiaotai_contact_match_t xiaotai_contacts_first(
     const xiaotai_contacts_t *contacts, xiaotai_contact_t *result);
 

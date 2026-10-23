@@ -53,6 +53,8 @@ static beken_thread_t s_capture_thread;
 static beken_thread_t s_play_thread;
 static beken_semaphore_t s_capture_stopped;
 static beken_semaphore_t s_play_stopped;
+static bool s_capture_joined;
+static bool s_play_joined;
 static beken_mutex_t s_ring_mutex;
 static bool s_ring_mutex_ready;
 static atomic_bool s_capture_run;
@@ -138,6 +140,29 @@ static int16_t *s_prompt_pcm;
 static size_t s_prompt_samples;
 static unsigned s_prompt_repeats;
 static atomic_int s_prompt_result;
+static atomic_uint s_prompt_generation;
+static atomic_int s_call_ring_kind;
+static atomic_uint s_call_ring_started_ms;
+static unsigned s_ring_prompt_generation;
+static unsigned s_ring_prompt_volume;
+/* Serialize prompt creation and media device transitions on SMP. Workers never
+ * take this lock, so cancellation can wait for their completion safely. */
+static atomic_flag s_audio_control_lock = ATOMIC_FLAG_INIT;
+
+static bool audio_control_enter(bool wait)
+{
+    for (unsigned waited = 0U;; ++waited) {
+        if (!atomic_flag_test_and_set_explicit(&s_audio_control_lock,
+                                               memory_order_acquire)) return true;
+        if (!wait || waited >= AUDIO_TASK_STOP_TIMEOUT_MS) return false;
+        rtos_delay_milliseconds(1);
+    }
+}
+
+static void audio_control_leave(void)
+{
+    atomic_flag_clear_explicit(&s_audio_control_lock, memory_order_release);
+}
 
 static xiaotai_audio_uplink_fn s_uplink;
 static void *s_uplink_context;
@@ -183,7 +208,7 @@ static void prompt_task(beken_thread_arg_t argument)
     (void)argument;
     int result = xiaotai_board_prompt_audio_start();
     bool ready = result == BK_OK;
-    if (!ready) BK_LOGE(TAG, "cannot open speaker for binding prompt\n");
+    if (!ready) BK_LOGE(TAG, "cannot open speaker for audio prompt\n");
 
     if (ready) {
         for (unsigned repeat = 0; repeat < s_prompt_repeats && s_prompt_run; ++repeat) {
@@ -209,7 +234,7 @@ static void prompt_task(beken_thread_arg_t argument)
     s_prompt_thread = NULL;
     rtos_set_semaphore(&s_prompt_stopped);
     atomic_store_explicit(&s_prompt_active, false, memory_order_release);
-    BK_LOGI(TAG, "binding prompt stopped\n");
+    BK_LOGI(TAG, "audio prompt stopped\n");
     rtos_delete_thread(NULL);
 }
 
@@ -220,17 +245,30 @@ bool xiaotai_audio_prompt_result(int *result)
     return true;
 }
 
-void xiaotai_audio_cancel_prompt(void)
+static void cancel_prompt_locked(void)
 {
     if (!atomic_load_explicit(&s_prompt_active, memory_order_acquire)) return;
     atomic_store_explicit(&s_prompt_run, false, memory_order_release);
     if (s_prompt_sync_ready) {
-        (void)rtos_get_semaphore(&s_prompt_stopped,
-                                 AUDIO_TASK_STOP_TIMEOUT_MS);
+        int rc = rtos_get_semaphore(&s_prompt_stopped,
+                                     AUDIO_TASK_STOP_TIMEOUT_MS);
+        /* The worker signals before publishing inactive. On SMP, waking from
+         * the semaphore alone does not mean that publication is visible yet. */
+        for (unsigned waited = 0U; rc == BK_OK &&
+             atomic_load_explicit(&s_prompt_active, memory_order_acquire) &&
+             waited < AUDIO_TASK_STOP_TIMEOUT_MS; ++waited)
+            rtos_delay_milliseconds(1);
     }
 }
 
-static int start_prompt(int16_t *pcm, size_t sample_count, unsigned repeats)
+void xiaotai_audio_cancel_prompt(void)
+{
+    if (!audio_control_enter(true)) return;
+    cancel_prompt_locked();
+    audio_control_leave();
+}
+
+static int start_prompt_locked(int16_t *pcm, size_t sample_count, unsigned repeats)
 {
     /* 250 ms to 20 seconds is deliberately bounded.  The API contract is
      * 8 kHz mono S16LE, so longer or empty responses are not accepted. */
@@ -248,6 +286,7 @@ static int start_prompt(int16_t *pcm, size_t sample_count, unsigned repeats)
     } else {
         (void)rtos_get_semaphore(&s_prompt_stopped, 0);
     }
+    atomic_fetch_add(&s_prompt_generation, 1U);
     s_prompt_pcm = pcm;
     s_prompt_samples = sample_count;
     s_prompt_repeats = repeats;
@@ -262,6 +301,14 @@ static int start_prompt(int16_t *pcm, size_t sample_count, unsigned repeats)
         s_prompt_pcm = NULL;
         s_prompt_samples = 0U;
     }
+    return rc;
+}
+
+static int start_prompt(int16_t *pcm, size_t sample_count, unsigned repeats)
+{
+    if (!audio_control_enter(false)) return BK_ERR_BUSY;
+    int rc = start_prompt_locked(pcm, sample_count, repeats);
+    audio_control_leave();
     return rc;
 }
 
@@ -282,6 +329,86 @@ int xiaotai_audio_preview_acknowledgement(bool male)
     int rc = start_prompt(pcm, bytes / sizeof(*pcm), 1U);
     if (rc != BK_OK) psram_free(pcm);
     return rc;
+}
+
+/* Only the control task owns prompt generation; playback reads the atomic view. */
+static const int16_t *call_ringtone_pcm(xiaotai_call_ring_t kind, size_t *samples)
+{
+    if (kind == XIAOTAI_CALL_RING_INCOMING) {
+        *samples = sizeof(xiaotai_ring_incoming) / sizeof(int16_t);
+        return xiaotai_ring_incoming;
+    }
+    *samples = sizeof(xiaotai_ring_outgoing) / sizeof(int16_t);
+    return xiaotai_ring_outgoing;
+}
+
+static void service_call_ringtone_locked(xiaotai_call_ring_t kind)
+{
+    if (kind < XIAOTAI_CALL_RING_NONE || kind > XIAOTAI_CALL_RING_OUTGOING) return;
+    /* Call-active media wins even before the runtime callback is serviced. */
+    if (kind == XIAOTAI_CALL_RING_OUTGOING && s_running)
+        kind = XIAOTAI_CALL_RING_NONE;
+    unsigned volume = atomic_load(&s_volume);
+    bool muted = atomic_load(&s_speaker_muted) || volume == 0U;
+    bool changed = kind != atomic_load(&s_call_ring_kind);
+    bool owns_prompt = s_ring_prompt_generation != 0U &&
+                       s_ring_prompt_generation == atomic_load(&s_prompt_generation);
+    if (owns_prompt && (changed || kind == XIAOTAI_CALL_RING_NONE || muted || s_running ||
+                        volume != s_ring_prompt_volume)) {
+        cancel_prompt_locked();
+        if (!atomic_load_explicit(&s_prompt_active, memory_order_acquire))
+            s_ring_prompt_generation = 0U;
+    }
+    if (changed) {
+        atomic_store(&s_call_ring_started_ms, rtos_get_time());
+        atomic_store_explicit(&s_call_ring_kind, kind, memory_order_release);
+        BK_LOGI(TAG, "call ringtone %s\n",
+                kind == XIAOTAI_CALL_RING_INCOMING ? "incoming" :
+                kind == XIAOTAI_CALL_RING_OUTGOING ? "outgoing" : "stopped");
+    }
+    if (kind == XIAOTAI_CALL_RING_NONE || s_running || muted ||
+        atomic_load_explicit(&s_prompt_active, memory_order_acquire)) return;
+    size_t samples;
+    const int16_t *source = call_ringtone_pcm(kind, &samples);
+    int16_t *pcm = psram_malloc(samples * sizeof(*pcm));
+    if (pcm == NULL) return;
+    for (size_t i = 0; i < samples; ++i)
+        pcm[i] = (int16_t)((int32_t)source[i] * (int32_t)volume / 10);
+    int rc = start_prompt_locked(pcm, samples, 1U);
+    if (rc != BK_OK) {
+        psram_free(pcm);
+    } else {
+        s_ring_prompt_generation = atomic_load(&s_prompt_generation);
+        s_ring_prompt_volume = volume;
+    }
+}
+
+void xiaotai_audio_service_call_ringtone(xiaotai_call_ring_t kind)
+{
+    /* A busy handoff is retried by the next control maintenance iteration. */
+    if (!audio_control_enter(false)) return;
+    service_call_ringtone_locked(kind);
+    audio_control_leave();
+}
+
+/* Called only by the existing playback task, including gaps in remote audio.
+ * Mix before volume/mute and feed the resulting speaker PCM to AEC. */
+static void mix_call_ringtone(int16_t *pcm, size_t samples, uint32_t rate)
+{
+    xiaotai_call_ring_t kind = atomic_load_explicit(&s_call_ring_kind, memory_order_acquire);
+    if (kind == XIAOTAI_CALL_RING_NONE) return;
+    size_t length;
+    const int16_t *ring = call_ringtone_pcm(kind, &length);
+    uint32_t elapsed = rtos_get_time() - atomic_load(&s_call_ring_started_ms);
+    size_t period = length + 5600U; /* 700 ms between repetitions, at 8 kHz. */
+    size_t position = ((uint64_t)elapsed * 8U) % period;
+    for (size_t i = 0; i < samples; ++i) {
+        size_t index = (position + i * 8000U / rate) % period;
+        int32_t value = pcm[i] / 2 + (index < length ? ring[index] : 0);
+        if (value > 32767) value = 32767;
+        if (value < -32768) value = -32768;
+        pcm[i] = (int16_t)value;
+    }
 }
 
 static void ring_reset(void)
@@ -719,17 +846,22 @@ static void playback_task(beken_thread_arg_t argument)
             (unsigned)(s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ?
                 OPUS_PACKET_SLOTS * 20U : AUDIO_RING_FRAMES * 20U));
     while (s_play_run) {
+        bool media_frame = true;
         size_t samples = s_frame_samples;
         size_t encoded_size = sizeof(alaw);
         if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
             encoded_size = opus_ring_take(opus, sizeof(opus));
             if (encoded_size == 0U) {
-                rtos_delay_milliseconds(5);
-                continue;
+                if (atomic_load(&s_call_ring_kind) == XIAOTAI_CALL_RING_NONE) {
+                    rtos_delay_milliseconds(5);
+                    continue;
+                }
+                media_frame = false;
+                memset(pcm, 0, samples * sizeof(*pcm));
             }
-            int decoded = opus_decode(s_opus_decoder, opus,
+            int decoded = media_frame ? opus_decode(s_opus_decoder, opus,
                                       (opus_int32)encoded_size, pcm,
-                                      OPUS_MAX_DECODE_SAMPLES, 0);
+                                      OPUS_MAX_DECODE_SAMPLES, 0) : (int)samples;
             if (decoded <= 0) {
                 atomic_store_explicit(&s_playback_in_progress, false,
                                       memory_order_release);
@@ -740,16 +872,25 @@ static void playback_task(beken_thread_arg_t argument)
             samples = (size_t)decoded;
         } else {
             if (ring_take(alaw, sizeof(alaw)) != sizeof(alaw)) {
-                rtos_delay_milliseconds(5);
-                continue;
+                if (atomic_load(&s_call_ring_kind) == XIAOTAI_CALL_RING_NONE) {
+                    rtos_delay_milliseconds(5);
+                    continue;
+                }
+                media_frame = false;
+                memset(pcm, 0, samples * sizeof(*pcm));
             }
         }
+        for (size_t i = 0; i < samples; ++i) {
+            if (s_codec != XIAOTAI_AUDIO_CODEC_OPUS_16K && media_frame)
+                pcm[i] = alaw2linear(alaw[i]);
+        }
+        mix_call_ringtone(pcm, samples,
+            s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? 16000U : 8000U);
         unsigned volume = atomic_load_explicit(&s_volume, memory_order_acquire);
         bool muted = atomic_load_explicit(&s_speaker_muted,
                                           memory_order_acquire);
         for (size_t i = 0; i < samples; ++i) {
-            int32_t sample = s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ?
-                             pcm[i] : alaw2linear(alaw[i]);
+            int32_t sample = pcm[i];
             pcm[i] = muted ? 0 :
                 (int16_t)((sample * (int32_t)volume) / 10);
         }
@@ -761,7 +902,7 @@ static void playback_task(beken_thread_arg_t argument)
                                           &bytes_written);
         if (rc != BK_OK || bytes_written != samples * sizeof(*pcm)) {
             BK_LOGW(TAG, "speaker write failed rc=%d\n", rc);
-        } else {
+        } else if (media_frame) {
             if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
                 atomic_store_explicit(&s_playback_columns,
                     playback_columns_pack(pcm, samples), memory_order_relaxed);
@@ -794,6 +935,8 @@ static void playback_task(beken_thread_arg_t argument)
                         (unsigned)(samples * sizeof(*pcm)));
             }
         }
+        if (!media_frame && rc == BK_OK && bytes_written == samples * sizeof(*pcm))
+            aec_reference_push(pcm, samples);
         atomic_store_explicit(&s_playback_in_progress, false,
                               memory_order_release);
     }
@@ -815,7 +958,7 @@ int xiaotai_audio_start(xiaotai_audio_codec_t codec,
     return xiaotai_audio_start_duplex(codec, codec, uplink, context);
 }
 
-int xiaotai_audio_start_duplex(xiaotai_audio_codec_t uplink_codec,
+static int audio_start_duplex_locked(xiaotai_audio_codec_t uplink_codec,
                                xiaotai_audio_codec_t codec,
                                xiaotai_audio_uplink_fn uplink, void *context)
 {
@@ -827,7 +970,13 @@ int xiaotai_audio_start_duplex(xiaotai_audio_codec_t uplink_codec,
     if (codec != XIAOTAI_AUDIO_CODEC_ALAW_8K &&
         codec != XIAOTAI_AUDIO_CODEC_OPUS_16K) return BK_ERR_PARAM;
     if (s_running) return BK_ERR_BUSY;
-    xiaotai_audio_cancel_prompt();
+    /* Starting call media is the accept boundary, unlike receipt of WHIP parameters. */
+    int outgoing_ring = XIAOTAI_CALL_RING_OUTGOING;
+    if (atomic_compare_exchange_strong(&s_call_ring_kind, &outgoing_ring,
+                                       XIAOTAI_CALL_RING_NONE))
+        BK_LOGI(TAG, "call ringtone outgoing stopped for call media\n");
+    cancel_prompt_locked();
+    if (atomic_load(&s_prompt_active)) return BK_ERR_BUSY;
 
     if (!s_ring_mutex_ready) {
         int rc = rtos_init_mutex(&s_ring_mutex);
@@ -995,6 +1144,8 @@ int xiaotai_audio_start_duplex(xiaotai_audio_codec_t uplink_codec,
     s_echo_diag_last_overruns = 0U;
     s_uplink = uplink;
     s_uplink_context = context;
+    s_capture_joined = false;
+    s_play_joined = false;
     s_play_run = true;
     uint32_t playback_stack = codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ?
                               OPUS_PLAYBACK_TASK_STACK : AUDIO_TASK_STACK;
@@ -1054,6 +1205,16 @@ fail:
     aec_destroy();
     rtos_deinit_semaphore(&s_capture_stopped);
     rtos_deinit_semaphore(&s_play_stopped);
+    return rc;
+}
+
+int xiaotai_audio_start_duplex(xiaotai_audio_codec_t uplink_codec,
+                               xiaotai_audio_codec_t codec,
+                               xiaotai_audio_uplink_fn uplink, void *context)
+{
+    if (!audio_control_enter(true)) return BK_ERR_BUSY;
+    int rc = audio_start_duplex_locked(uplink_codec, codec, uplink, context);
+    audio_control_leave();
     return rc;
 }
 
@@ -1146,7 +1307,7 @@ int xiaotai_audio_play_opus(const uint8_t *data, size_t size)
     return (int)size;
 }
 
-int xiaotai_audio_stop(void)
+static int audio_stop_locked(void)
 {
     if (!s_running) return BK_OK;
     s_running = false;
@@ -1158,13 +1319,20 @@ int xiaotai_audio_stop(void)
     if (s_board_audio != NULL && s_board_audio->request_stop != NULL) {
         (void)s_board_audio->request_stop(s_board_audio->context);
     }
-    /* A running instance always owns both tasks. Waiting on their completion
-     * semaphores also closes the race where a task clears its handle just
-     * before signalling completion. */
-    int capture_rc = rtos_get_semaphore(&s_capture_stopped,
+    /* Completion signals are one-shot. Retain each successful join when the
+     * other worker times out so a retry only waits for unfinished workers. */
+    int capture_rc = BK_OK;
+    int play_rc = BK_OK;
+    if (!s_capture_joined) {
+        capture_rc = rtos_get_semaphore(&s_capture_stopped,
                                         AUDIO_TASK_STOP_TIMEOUT_MS);
-    int play_rc = rtos_get_semaphore(&s_play_stopped,
+        s_capture_joined = capture_rc == BK_OK;
+    }
+    if (!s_play_joined) {
+        play_rc = rtos_get_semaphore(&s_play_stopped,
                                      AUDIO_TASK_STOP_TIMEOUT_MS);
+        s_play_joined = play_rc == BK_OK;
+    }
     if (capture_rc != BK_OK || play_rc != BK_OK) {
         BK_LOGE(TAG, "audio task stop timed out capture=%d play=%d\n",
                 capture_rc, play_rc);
@@ -1201,6 +1369,14 @@ int xiaotai_audio_stop(void)
             (unsigned)s_aec_reference_overruns,
             (unsigned)atomic_load(&s_admission_busy));
     return BK_OK;
+}
+
+int xiaotai_audio_stop(void)
+{
+    if (!audio_control_enter(true)) return BK_ERR_BUSY;
+    int rc = audio_stop_locked();
+    audio_control_leave();
+    return rc;
 }
 
 bool xiaotai_audio_running(void)

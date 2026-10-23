@@ -39,7 +39,8 @@ When changing UI, buttons, voice controls, or user-visible flow, read
 and [`product/interaction/README.md`](product/interaction/README.md). Keep
 business state in the product runtime; interaction adapters emit intents and
 render its view model. Select explicit interaction and layout profiles in each
-board variant. Quick call always uses the platform-ordered `contacts[0]`.
+board variant. Physical quick-call keys and the home call button select the first WeChat contact
+in platform order; when none exists, show contact authorization guidance.
 
 When changing room-assignment triggers, read the room-assignment section in
 [`PRODUCT_INTERACTION_PROFILES.md`](docs/product/PRODUCT_INTERACTION_PROFILES.md#64-房间分配刷新).

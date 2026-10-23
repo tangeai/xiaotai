@@ -35,7 +35,7 @@ int main(void) {{
     def test_home_key_ai_and_refreshed_contacts_use_media_policy(self):
         source = RUNTIME.read_text()
         self.assertIn("dial_contact(index, call_video_for_request(NULL, true));", source)
-        self.assertIn("dial_contact(0, call_video_for_request(NULL, wechat));", source)
+        self.assertIn("handle_wechat_quick_call();", function(source, "dial_first_contact"))
         self.assertIn("dial_contact(contact_index, call_video_for_request(media, wechat));", source)
         self.assertRegex(source, r'bool media_valid\s*=.*"video"')
 

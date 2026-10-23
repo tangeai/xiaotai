@@ -342,7 +342,8 @@ endfunction()
             'interaction_profile': 'headless-key', 'layout_profile': 'none'}, data['variants'])
         self.assertNotIn('touch', data['capabilities'])
         self.assertIn('camera-h264', data['capabilities'])
-        self.assertEqual(str(read_board_version(ROOT, board.id)), '1.0.1')
+        self.assertEqual(str(read_board_version(ROOT, board.id)),
+                         re.search(r'`([^`]+)`', (PROJECT/'VERSION.md').read_text()).group(1))
         before = (PROJECT / 'BUILD_NUMBER').read_bytes()
         result = subprocess.run([sys.executable, str(ROOT/'tools/build.py'),
             '--board', board.id, '--dry-run'], capture_output=True, text=True)

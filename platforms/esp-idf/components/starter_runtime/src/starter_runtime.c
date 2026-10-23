@@ -3881,15 +3881,7 @@ static void handle_wechat_quick_call(void)
 
 static void dial_first_contact(void)
 {
-    if (s_product_mutex == NULL ||
-        xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(50)) != pdTRUE) return;
-    bool empty = s_product_snapshot.contact_count == 0U;
-    bool wechat = !empty &&
-        s_product_snapshot.contacts[0].source == STARTER_CONTACT_WECHAT;
-    if (empty) ++s_product_snapshot.contact_guide_sequence;
-    xSemaphoreGive(s_product_mutex);
-    if (empty) end_ai_session();
-    else dial_contact(0, call_video_for_request(NULL, wechat));
+    handle_wechat_quick_call();
 }
 
 static void handle_main_key(bool double_click)
@@ -3918,7 +3910,7 @@ static void handle_main_key(bool double_click)
         return;
     }
     if (double_click) {
-        /* Platform order is authoritative, including device contacts. */
+        /* Preserve platform order within the WeChat channel. */
         dial_first_contact();
     } else if (state == STARTER_RUNTIME_AI_CONNECTING ||
                state == STARTER_RUNTIME_AI_ACTIVE) {
