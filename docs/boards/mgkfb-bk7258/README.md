@@ -1,6 +1,6 @@
 # 觅感 AI 玩具开发板 BK7258
 
-[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.2)
+[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3)
 
 板卡 ID：`mgkfb-bk7258`。本板支持 AI 对讲、微信 VoIP（网络语音通话）和 H5（网页端）
 实时查看。两块屏幕分别显示左右眼，随 AI 情绪标签切换表情；配网、绑定和通话时显示操作提示。
@@ -8,7 +8,7 @@
 
 ## 烧录
 
-当前发布版本为 **v1.0.2 · build.18**，适用于 **8 MiB Flash 的觅感 BK7258 双屏板**。
+当前发布版本为 **v1.0.3 · build.20**，适用于 **8 MiB Flash 的觅感 BK7258 双屏板**。
 
 ### 安装烧录工具
 
@@ -25,11 +25,11 @@
 
 ### 烧录步骤
 
-1. 下载并解压 [`mgkfb-bk7258-1.0.2+build.18-validation.zip`](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.2/mgkfb-bk7258-1.0.2%2Bbuild.18-validation.zip)。
+1. 下载并解压 [`mgkfb-bk7258-1.0.3+build.20-validation.zip`](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3/mgkfb-bk7258-1.0.3%2Bbuild.20-validation.zip)。
 2. 用本板通讯 Type-C 连接电脑，关闭占用串口的日志终端，打开 BKFIL，点击 **Select Port** 选择对应 COM 口。
-3. 选择 **`mgkfb-bk7258-1.0.2+build.18-all-app.bin`**，起始地址为 **`0x00000000`**。
+3. 选择 **`mgkfb-bk7258-1.0.3+build.20-all-app.bin`**，起始地址为 **`0x00000000`**。
 4. 启动下载，按工具提示复位或重新上电完成下载握手；等待写入及工具校验完成，再重新上电。
-5. 打开 115200 波特率日志，核对板卡 `mgkfb-bk7258` 和版本 `1.0.2+build.18`，再进行配网与绑定。
+5. 打开 115200 波特率日志，核对板卡 `mgkfb-bk7258` 和版本 `1.0.3+build.20`，再进行配网与绑定。
 
 下面是 [BKFIL v4 官方操作指南](https://docs.bekencorp.com/arminodoc/bk_app/bkfil_v4/zh_CN/latest/quick_start/quick_start_guide/quick_start_guide.html#id3)中的界面截图，红框标出了操作位置。
 
@@ -40,7 +40,7 @@
 ![BKFIL 选择串口和波特率，红框标出设置位置](../../images/flashing/bkfil-select-port.png)
 
 **选择固件。** 点击 **Select BIN**，选择解压后的
-`mgkfb-bk7258-1.0.2+build.18-all-app.bin`。
+`mgkfb-bk7258-1.0.3+build.20-all-app.bin`。
 
 ![BKFIL 选择固件，红框标出 Select BIN 按钮](../../images/flashing/bkfil-select-bin.png)
 
@@ -52,8 +52,8 @@
 
 | 文件 | 用途 |
 |---|---|
-| `mgkfb-bk7258-1.0.2+build.18-all-app.bin` | **直接用于串口烧录**，起始地址 **`0x0`** |
-| `mgkfb-bk7258-1.0.2+build.18-app_pack.rbl` | **不能用于串口烧录**；OTA（无线升级）尚未验证，暂不使用 |
+| `mgkfb-bk7258-1.0.3+build.20-all-app.bin` | **直接用于串口烧录**，起始地址 **`0x0`** |
+| `mgkfb-bk7258-1.0.3+build.20-app_pack.rbl` | **不能用于串口烧录**；OTA（无线升级）尚未验证，暂不使用 |
 | `MANIFEST.json` | 文件信息与校验清单，不用于烧录 |
 | `symbols/`、`partitions/`、`build_identity.json` | 开发排查资料，不用于烧录 |
 
