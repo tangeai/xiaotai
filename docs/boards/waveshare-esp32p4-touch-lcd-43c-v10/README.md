@@ -3,7 +3,9 @@
 [返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1)
 
 板卡 ID：`waveshare-esp32p4-touch-lcd-43c-v10`。当前发布固件为 **v1.0.1 · build.14**。
-用户确认本版 P4 实板可用；详细场景范围见下文“验证状态与已知限制”。
+本版已由用户确认实板可用；H5、AI、通话、AEC 和长时间运行的逐项验收记录仍待补齐。
+从源码复现本版请使用[对应源码提交 `c2d75e9`](https://github.com/tangeai/xiaotai/tree/c2d75e9eadcc1c24af1bb09b3f9972ebdad84e2b)；
+发布标签早于 build.14，发布页自动生成的 Source code 压缩包不对应本版固件。
 
 ## 烧录
 
@@ -50,7 +52,8 @@ macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIF
 
 ## 首次使用
 
-确认 P4 发布包中的全部烧录文件都已写入且设备正常重启，再进行下面的配网和绑定。
+使用完整镜像时，只需确认单个 `-merged.bin` 已从 `0x0` 写入并正常重启；使用分文件包时，
+确认清单中的 4 个 BIN 都已按各自地址写入。两种方式任选一种，然后配网和绑定。
 
 ### 1. 配置 Wi-Fi
 

@@ -26,6 +26,11 @@
 | <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite 开发板" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342E 屏幕<br>`m5stack-cores3-lite` | v1.0.1<br>build.42 | [完整镜像（BIN）](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-merged.bin)<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-validation.zip) | [烧录指南](docs/boards/m5stack-cores3-lite/README.md#烧录)<br>[开发板资料](docs/boards/m5stack-cores3-lite/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1) |
 | <img src="docs/images/boards/mgkfb-bk7258.webp" alt="觅感 AI 玩具开发板 BK7258" width="180"> | 觅感 AI 玩具开发板 BK7258<br>双屏眼睛 · 8 MiB Flash<br>`mgkfb-bk7258` | v1.0.3<br>build.20 | 完整镜像：包含在 ZIP 中<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3/mgkfb-bk7258-1.0.3%2Bbuild.20-validation.zip) | [烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录)<br>[开发板资料](docs/boards/mgkfb-bk7258/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3) |
 
+选板时请留意：M5 发布镜像只适用于已确认的 ILI9342E 屏；觅感 BK7258 的长期稳定性与
+异常恢复尚待专项验证；P4 build.14 的逐项音视频验收记录仍待补齐。详情见各板指南。
+P4 build.14 的[对应源码提交](https://github.com/tangeai/xiaotai/tree/c2d75e9eadcc1c24af1bb09b3f9972ebdad84e2b)
+与旧发布标签不同，发布页自动生成的 Source code 压缩包不对应 build.14。
+
 各入口用途如下：
 
 | 入口 | 用途 |
