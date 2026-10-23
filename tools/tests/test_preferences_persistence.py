@@ -45,7 +45,10 @@ static void nvs_close(int h){closes++;}
 #define pdMS_TO_TICKS(n) (n)
 static atomic_int s_factory_reset_status;
 static int cleared,restarted;
+static bool endpoint_saved;
+static int endpoint_clear_fail;
 static int runtime_config_clear_tirtc(void){cleared++;return 0;}
+static int runtime_config_clear_endpoint(void){cleared++;if(endpoint_clear_fail)return ESP_FAIL;endpoint_saved=false;return ESP_OK;}
 static int wifi_manager_forget_credentials(void){cleared++;return 0;}
 static int clear_product_preferences(void){cleared++;return 0;}
 static void vTaskDelay(unsigned n){}
@@ -87,7 +90,26 @@ int main(void){
  factory_reset_task(NULL);assert(cleared==0 && restarted==0 && atomic_load(&s_factory_reset_status)==FACTORY_RESET_FAILED);
  writes=commits=0;worker(NULL);preferences_poll();preferences_save();
  assert(writes==0 && commits==0 && tasks==before+1);
- factory_reset_task(NULL);assert(cleared==3 && restarted==1);
+ factory_reset_task(NULL);assert(cleared==4 && restarted==1);
+''')
+
+    def test_factory_reset_clears_ep_and_retries_failed_clear(self):
+        self.replay(r'''
+ // A saved ep-set override must be gone before reset can reboot.
+ endpoint_saved=true;
+ factory_reset_task(NULL);
+ assert(!endpoint_saved && restarted==1 && cleared==4);
+ // A storage failure must remain visible and allow a successful retry.
+ endpoint_saved=true;endpoint_clear_fail=1;restarted=cleared=0;
+ factory_reset_task(NULL);
+ assert(endpoint_saved && restarted==0 && cleared==4);
+ assert(atomic_load(&s_factory_reset_status)==FACTORY_RESET_FAILED);
+ endpoint_clear_fail=0;
+ factory_reset_task(NULL);
+ assert(!endpoint_saved && restarted==1 && cleared==8);
+ // Reset is also valid when no override is saved.
+ factory_reset_task(NULL);
+ assert(!endpoint_saved && restarted==2 && cleared==12);
 ''')
 
     def test_reset_during_each_write_then_cancel_preserves_pending_save(self):

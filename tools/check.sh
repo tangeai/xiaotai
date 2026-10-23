@@ -17,7 +17,7 @@ python3 "$repo_dir/tools/tests/test_tip_layout.py"
 python3 "$repo_dir/tools/tests/test_room_keypad.py"
 python3 "$repo_dir/tools/tests/test_s3_touch_targets.py"
 python3 "$repo_dir/tools/tests/test_ui_alignment.py"
-# Includes 1,000 coalesced-save cycles and reset at each NVS write boundary.
+# Includes 1,000 save cycles, reset at NVS boundaries, and EP clear/failure retry.
 python3 "$repo_dir/tools/tests/test_preferences_persistence.py"
 python3 "$repo_dir/tools/tests/test_reset_only_prototype.py"
 python3 "$repo_dir/tools/tests/test_binding_guidance.py"

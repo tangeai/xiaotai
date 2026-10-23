@@ -1048,16 +1048,19 @@ static void factory_reset_task(void *argument)
         return;
     }
     esp_err_t config_err = runtime_config_clear_tirtc();
+    esp_err_t endpoint_err = runtime_config_clear_endpoint();
     esp_err_t wifi_err = wifi_manager_forget_credentials();
     /* Product preferences are cleared last so an already-queued async save
      * cannot repopulate them while the identity stores are being erased. */
     esp_err_t product_err = clear_product_preferences();
 
-    if (product_err != ESP_OK || config_err != ESP_OK || wifi_err != ESP_OK) {
+    if (product_err != ESP_OK || config_err != ESP_OK ||
+        endpoint_err != ESP_OK || wifi_err != ESP_OK) {
         ESP_LOGE(TAG,
-                 "device reset failed: product=%s config=%s wifi=%s",
+                 "device reset failed: product=%s config=%s endpoint=%s wifi=%s",
                  esp_err_to_name(product_err),
                  esp_err_to_name(config_err),
+                 esp_err_to_name(endpoint_err),
                  esp_err_to_name(wifi_err));
         atomic_store(&s_factory_reset_status, FACTORY_RESET_FAILED);
         vTaskDelete(NULL);

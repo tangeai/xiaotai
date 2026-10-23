@@ -1,5 +1,12 @@
 # 小钛测试与硬件验证
 
+## 恢复出厂清除 EP 覆盖
+
+`test_preferences_persistence.py` 回放 ESP32 生产重置任务，先复现重置后仍保留
+`ep-set` 覆盖项的问题，再验证清除覆盖项、清除失败不重启、重试成功及无覆盖项时重置。
+沿用 `tools/check.sh` 注册；BK 原有 `test_bk_settings_status.py` 继续覆盖重置删除 EP 键。
+实板仍须设置自定义 EP 后执行重置，确认重启后 `ep-show` 为 default，重新配网使用默认服务。
+
 ## BK7258 本轮发布检查
 
 2026-10-23：立创 `1.0.2+build.71` 与觅感 `1.0.3+build.20` 分别完成 release AP/CP
