@@ -41,12 +41,12 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 ### 先选烧录文件：单文件与分文件二选一
 
 网页烧录和工程烧录是操作方式；**单文件与分文件是两种文件组织方式**。
-本页文件名和地址对应 **v1.0.1 · build.2**；其他版本必须重新核对该版本清单。
+本页文件名和地址对应 **v1.0.1 · build.14**；其他版本必须重新核对该版本清单。
 
 | 文件方式 | 下载文件的完整名称 | 网页中应添加的内容 |
 |---|---|---|
-| 单文件（首次体验推荐） | `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-merged.bin` | 只添加这个 BIN，地址 `0x0` |
-| 分文件（也可首次烧录） | `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-validation.zip` | 先解压，再添加下文列出的 **4 个 BIN**，各填各的地址 |
+| 单文件（首次体验推荐） | `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.14-merged.bin` | 只添加这个 BIN，地址 `0x0` |
+| 分文件（也可首次烧录） | `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.14-validation.zip` | 先解压，再添加下文列出的 **4 个 BIN**，各填各的地址 |
 
 乐鑫支持按“地址 + 文件”写入多个 BIN，也支持用 `merge-bin` 合并后写入。
 **分文件数量不是固定三个，地址也不能直接照抄官方示例**；以本工程生成的清单为准。
@@ -56,11 +56,11 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 
 #### 1. 下载完整镜像
 
-下载 [v1.0.1 · build.2 完整 merged.bin](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.2-merged.bin)。
+下载 [v1.0.1 · build.14 完整 merged.bin](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.14-merged.bin)。
 
 下载后先核对下方完整文件名；BIN 的 SHA-256 及核对方法见本节“文件与写入校验”。
 
-文件名应为 `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-merged.bin`。
+文件名应为 `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.14-merged.bin`。
 
 版本内容与限制见[发布说明](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1)。
 
@@ -79,7 +79,7 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 
 #### 3. 选文件、改地址并烧录
 
-1. 在 `File` 一栏点击 **Choose File / 选择文件**，选择 **`waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-merged.bin`**，不要选 ZIP、ELF 或单独的应用 BIN。
+1. 在 `File` 一栏点击 **Choose File / 选择文件**，选择 **`waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.14-merged.bin`**，不要选 ZIP、ELF 或单独的应用 BIN。
 2. 将 **Flash Address 从默认值改为 `0x0`**。完整镜像只添加这一行，不再同时添加 bootloader、分区表或应用文件。
 3. 将 **Flash Mode、Flash Frequency、Flash Size 都选为 `keep`**，保留发布固件中的参数。`keep` 不表示保留 Wi-Fi 或绑定数据。
 4. 再次核对芯片、文件名和 `0x0`，点击 **Program**。等待全部写入和校验完成；烧录期间保持供电和数据线连接，不点击 `Erase Flash`。
@@ -103,7 +103,7 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 
 #### 另一种选择：分文件烧录（4 个 BIN）
 
-下载 [waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-validation.zip](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.2-validation.zip)，解压到独立目录。
+下载 [waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.14-validation.zip](https://github.com/tangeai/xiaotai/releases/download/esp32p4-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.14-validation.zip)，解压到独立目录。
 不要将不同板卡或不同版本的解压文件放在一起；即使同名 `bootloader.bin`，内容也可能不同。
 
 以下路径相对于 ZIP 的解压目录，已与本版 `MANIFEST.json` 和 `flasher_args.json` 核对：
@@ -136,10 +136,10 @@ VoIP 指网络语音通话。Flash 是闪存，PSRAM 是用于音视频缓冲的
 烧录前核对本板 ID、版本、BIN 文件名和地址；需要核对文件内容时，使用以下 SHA-256：
 
 - 分文件 BIN：打开包内 `MANIFEST.json`，按 `files[].path` 找到对应文件，比较其 `sha256`。
-- 单文件 `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.2-merged.bin`：本版 SHA-256 如下，也可在[发布页](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1)的 `SHA256SUMS` 中查找同名 BIN 的条目。
+- 单文件 `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.14-merged.bin`：本版 SHA-256 如下，也可在[发布页](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1)的 `SHA256SUMS` 中查找同名 BIN 的条目。
 
 ```text
-086360ba88853eace66c44c7935265ecd082ce87c0e7e96fcb861f87b4cee2d0
+c578976bb353509fb38b4884ade9053993eead16a8d3700386c0f5bf531cdb35
 ```
 
 Windows PowerShell 执行 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 执行
@@ -364,6 +364,11 @@ VoIP。音视频分别记录实际帧率、码率、丢帧、首包、AEC 参考
 - 会话结束后异常：检查旧 generation（会话代次）回调是否被拒绝，以及相机和音频资源是否释放。
 
 ## 验证状态与已知限制
+
+当前 `1.0.1+build.14` 完整 BIN SHA-256 为
+`c578976bb353509fb38b4884ade9053993eead16a8d3700386c0f5bf531cdb35`；
+用户于 2026-10-23 确认该版 P4 实板可用。该反馈确认可用性，未提供逐项测试日志；
+音质、AEC 双讲、H5/AI/通话反复切换和长时间稳定性仍待同版详细记录。
 
 项目方确认该型号的 PCB V1.0 实板已有跑通记录。“已验证”只适用于记录中的固件和
 测试范围，不代表从任意提交构建的固件已经验收。
