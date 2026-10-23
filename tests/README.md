@@ -60,6 +60,23 @@ S3 build.17、P4 build.13、M5 build.45 编译通过。觅感 build.16 验证包
 `1d7d51537308df6f36d3bfab383ef874970dcabe62b2b014cfdef27beb42029d`。
 这些是本地验证产物，未更新线上 Release，修复后的回铃仍待实板验收。
 
+## BK 配网页诊断日志
+
+`test_bk_portal_diagnostics.py` 回放生产网页服务的 accept、路由和响应路径。
+新增断言先在旧代码缺少就绪日志时失败；加入日志后检查 Apple 探测、页面访问、
+Wi-Fi 提交及未知请求的固定分类，确认不输出请求头、任意路径、查询参数和正文。
+响应日志区分发送成功与失败；发送成功只代表本地发送完成，不代表手机已经弹窗。
+启动回放保留“启动热点 → 屏幕提示 → 网页任务”的顺序，模拟屏幕耗时和任务创建失败。
+测试登记在 `tools/check.sh`；原 DNS 补丁回归继续覆盖 AP/CP 域名应答。
+
+临时诊断前缀为 `[DEBUG-bk-portal]`，使用 INFO 级别，发布配置也能看到。
+实板连接热点前开始保存串口日志：对照 `ap-started`、`ui-returned`、`ready` 的
+`elapsed-ms` 判断启动耗时，再看 `accepted`、`request`、`response`。
+`request=apple-probe` 表示收到了 Apple 常用探测路径；`incomplete` 表示读取未完成，
+`read-ms` 可定位等待请求的时间。该日志没有抓取 DHCP/DNS 报文，不能据此断定手机
+使用了哪一个 DNS。立创复测时先等待自动弹窗，再手动打开网页作对照；觅感验证
+自动弹窗仍正常。定位完成后移除这组临时日志。
+
 ## BK7258 自动配网 DNS
 
 `test_bk_captive_dns.py` 把构建脚本实际登记的补丁应用到固定 SDK 的 DNS 源码片段，

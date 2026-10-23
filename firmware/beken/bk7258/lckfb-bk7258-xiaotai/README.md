@@ -22,7 +22,7 @@ BK7258 与 ESP-IDF 工程保持独立，只通过稳定的产品接口复用业�
 ## 当前能力
 
 项目方已经在实板验证 H5 实时查看与双向对讲、AI 对话和音频微信 VoIP。H5 和微信通话
-使用 8 kHz 单声道 A-law；AI 使用 16 kHz 单声道 Opus。AI 在 PCM 阶段使用 AEC、NS
+使用 8 kHz 单声道 A-law；当前 AI 上行使用 A-law / 8 kHz，下行使用 Opus / 16 kHz。AI 在 16 kHz PCM 阶段使用 AEC、NS
 和 AGC；8 kHz 链路使用 AGC，AEC/NS 在完成实机验证前保持关闭。设置页的 1–5 档
 麦克风灵敏度调整所有链路共用的 ADC 前端增益，默认增强档，标准档对应 BSP 原值
 `0x2d`。详细参数见
@@ -43,8 +43,8 @@ bash tools/check.sh
 并将 AP、CP 和小钛应用日志统一限制到 INFO，仍保留 INFO、WARN 和 ERROR，
 但不输出 DEBUG 载荷。WARN 仅适合故障定位非常有限的特殊固件，不作为默认发布级别。
 
-原生产物保留在工程 `build/bk7258/` 下，开发与发布配置使用不同工程子目录，
-完整镜像位于相应 `package/all-app.bin`。打包与导出按
+原生产物固定保留在本工程 `build/bk7258/lckfb-bk7258-xiaotai/`，开发与发布共用此目录，
+完整镜像位于 `package/all-app.bin`。打包与导出按
 [固件版本与发布](../../../../CONTRIBUTING.md#固件版本与发布)执行。
 工程内的 `build/`、日志和自动化测试报告不提交。
 
@@ -83,3 +83,6 @@ bash tools/check.sh
 
 TODO：补充可公开的 PCB（印刷电路板）版本照片、Flash（闪存）实测容量，以及新固件的完整
 实板回归日志。证据补充不改变当前项目方确认的“已验证”状态，也不阻塞源码提交。
+
+串口调试见[BK7258 串口命令](../../../../docs/development/BK7258_SERIAL_COMMANDS.md)，
+两块 BK7258 板共用命令实现，常用 CP 串口入口需加 `ap_cmd` 前缀。

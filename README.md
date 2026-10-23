@@ -179,6 +179,7 @@ ESP-IDF 和 Beken 仍是两个独立 SDK（软件开发工具包）工程。统�
 - 想了解功能怎样实现：阅读[架构与二次开发](ARCHITECTURE.md)。
 - 想修改代码或新增开发板：阅读[参与开发](CONTRIBUTING.md)。
 - 想查询某块板的规格、原理图和依赖：打开[开发板目录](docs/boards/README.md)。
+- 想通过串口查看 BK7258 状态或调试：阅读[BK7258 串口命令](docs/development/BK7258_SERIAL_COMMANDS.md)。
 - 想查全部产品与工程文档：打开[完整文档](docs/README.md)。
 
 本项目自有源码和文档采用 [MIT License](LICENSE)。第三方 SDK、预编译库、模型、字体和媒体资源仍遵守各自许可证，详见[第三方清单](THIRD_PARTY.md)。

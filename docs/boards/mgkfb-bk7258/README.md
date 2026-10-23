@@ -10,7 +10,9 @@
 
 当前发布版本为 **v1.0.2 · build.18**，适用于 **8 MiB Flash 的觅感 BK7258 双屏板**。
 
-先下载并安装 Beken 官方烧录工具 **BKFIL v4**，按电脑系统选择：
+### 安装烧录工具
+
+下载并安装 Beken 官方烧录工具 **BKFIL v4**，按电脑系统选择：
 
 | 系统 | 官方下载目录 |
 |---|---|
@@ -20,6 +22,8 @@
 
 打开对应目录，下载适合电脑系统的安装包。界面与参数说明见
 [BKFIL v4 官方操作指南](https://docs.bekencorp.com/arminodoc/bk_app/bkfil_v4/zh_CN/latest/index.html)。
+
+### 烧录步骤
 
 1. 下载并解压 [`mgkfb-bk7258-1.0.2+build.18-validation.zip`](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.2/mgkfb-bk7258-1.0.2%2Bbuild.18-validation.zip)。
 2. 用本板通讯 Type-C 连接电脑，关闭占用串口的日志终端，打开 BKFIL，点击 **Select Port** 选择对应 COM 口。
@@ -58,6 +62,7 @@
 烧录接口使用 UART0（TX GPIO11、RX GPIO10）。
 首次烧录前请备份原厂固件和射频校准资料。日常更新使用 **Download** 写入固件，保留数据分区。
 **全片擦除会清除本板保存在 Flash 中的 MAC、配网和绑定信息，重新启动后 MAC 可能变化。**
+自行编译时，使用“编译”一节列出的 `package/all-app.bin`，地址同样为 `0x0`。
 
 ## 首次使用
 
@@ -109,6 +114,8 @@ H5 摄像头上行为 H.264，GC2145 配置目标为 640×480 / 20 fps；微信 
 实际参数及不同业务的媒体编号以[音视频合同](../../product/MEDIA_CONTRACT.md)为准。
 
 ## 环境与依赖
+
+仅烧录发布固件不需要搭建开发环境。从源码编译时，准备以下工具和依赖。
 
 - Beken AVDK SMP `release/v3.1.1.10`，提交 `398cab28b938e69ba2071a597daf00845dd080b6`；[官方 SDK 源码](https://github.com/bekencorp/bk_avdk_smp/tree/release/v3.1.1.10)。
 - 编译主机：Linux 或 WSL2，安装 Git、Python 3、CMake 和 Ninja。
@@ -198,7 +205,9 @@ ap_cmd call-status
 ap_cmd help
 ```
 
-`status` 查看联网、绑定、当前会话及 SRAM/PSRAM 剩余量；`call-status` 查看通话状态。
+`status` 查看联网、绑定、当前会话和内存，`call-status` 查看通话状态。
+完整命令、参数、平台地址设置及两块 BK7258 的适用范围见
+[BK7258 串口命令](../../development/BK7258_SERIAL_COMMANDS.md)。
 
 ## 验证状态与已知限制
 

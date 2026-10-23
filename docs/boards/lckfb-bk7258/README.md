@@ -1,61 +1,68 @@
 # 立创·实战派 BK7258
 
-串口修改平台服务发现基址：`ep-show` 查看覆盖项，`ep-set http://ep-open.tangeopen.com/pre`
-保存后重启并请求 `/pre/services`，`ep-reset` 删除覆盖项并重启。
-TiRTC 地址始终取自 `/services` 响应的 `tirtc-srv`。
-命令接受带 `http://` 或 `https://` 的主机地址，可附端口和路径；不接受查询参数或片段。
+[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.1)
 
-本文中的 H5 指网页端，AI 指人工智能对讲，AEC 指声学回声消除，
-VoIP 指网络语音通话。PSRAM 是用于音视频缓冲的大块运行内存。
-
-如果只想体验小钛，直接下载发布固件，按“烧录”和“首次使用”操作即可，不需要先搭建
-开发环境。
-
-准备修改或编译源码时，需要掌握 C 语言、Git、串口日志和 BK7258 的构建流程。
-BK7258 采用 AP/CP（应用处理器/协处理器）双镜像架构，不能按单核工程理解。
-
-## 屏幕布局与字体约束
-
-本板当前屏幕适配为 **320×240 横屏**，variant 选择 **`compact`** 布局，产品正文、
-按钮、设置值、联系人与动态字幕统一使用 **16 像素**字库。每个固件只链接所选字号，
-不允许缺字后回退到另一字号。字号由 `product/interaction/profiles.json` 的
-`font_size_px` 约束，不按芯片类型自行推断。
-
-更换屏幕时必须重新登记分辨率、方向与布局，并验证字号、换行和触摸区域。当前屏幕
-硬件证据仍以本板 Hardware IR / 探针资料为准；布局配置不能替代硬件证据。完整要求见
-[产品交互规范 §1.3](../../product/PRODUCT_INTERACTION_PROFILES.md#13-屏幕布局与字库约束)。
+板卡 ID：`lckfb-bk7258`。本板通过触摸屏和按键操作，支持 H5（网页端）实时查看与
+双向对讲、AI（人工智能）对讲、设备互呼、微信 VoIP（网络语音通话）和多人对讲。
 
 ## 烧录
 
-### 获取固件
+当前发布版本为 **v1.0.1 · build.56**，适用于 **立创·实战派 BK7258**。
+本次发布的构建和主机检查已完成，同版音质和完整实板验收范围见
+[发布说明](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.1)。
 
-从 [BK7258 v1.0.1 · build.56 发布页](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.1)
-下载名称以 `lckfb-bk7258-` 开头的压缩包，解压并核对 `MANIFEST.json` 后，使用其中以
-`-all-app.bin` 结尾的文件。自行编译时，使用本页“编译”一节列出的 `all-app.bin` 产物。
-下文的 `all-app.bin` 和 `app_pack.rbl` 在发布包中均带板卡、版本和构建号前缀。
+### 安装烧录工具
 
-本次发布包已通过构建和主机检查，同版音质和完整实板验收仍待完成，具体范围见发布说明。
+下载并安装 Beken 官方烧录工具 **BKFIL v4**，按电脑系统选择：
 
-### 选择烧录工具
+| 系统 | 官方下载目录 |
+|---|---|
+| Windows | [下载 Windows 版](https://dl.bekencorp.com/tools/bkfil/v4/gui/windows/) |
+| macOS | [下载 macOS 版](https://dl.bekencorp.com/tools/bkfil/v4/gui/macos/) |
+| Linux | [下载 Linux 版](https://dl.bekencorp.com/tools/bkfil/v4/gui/linux/) |
 
-BKFIL 是 Beken 官方烧录工具，下载总入口为
-[BKFIL v4 图形工具目录](https://dl.bekencorp.com/tools/bkfil/v4/gui)。该目录按操作系统
-分开发布安装包；不要从不明网盘下载改包版本。
+打开对应目录，下载适合电脑系统的安装包。界面与参数说明见
+[BKFIL v4 官方操作指南](https://docs.bekencorp.com/arminodoc/bk_app/bkfil_v4/zh_CN/latest/index.html)；
+本板接线、复位和下载握手方式见
+[立创官方烧录教程](https://wiki.lckfb.com/zh-hans/szpi-bk7258/szpi-bk7258/basic/burn.html)。
 
-| 方式 | 工具入口 | 适用环境 | 说明 |
-| --- | --- | --- | --- |
-| 网页烧录 | [立创 BK7258 网页烧录工具](https://wiki.lckfb.com/storage/html/bk7258-web-flasher/#/download) | Chrome/Edge | 无需安装客户端，可导入 `all-app.bin` |
-| BKFIL Windows 客户端 | [Beken 官方 Windows 目录](https://dl.bekencorp.com/tools/bkfil/v4/gui/windows) | Windows | 下载目录中的 Windows ZIP 包，解压后运行 |
-| BKFIL Linux 客户端 | [Beken 官方 Linux 目录](https://dl.bekencorp.com/tools/bkfil/v4/gui/linux) | Linux | 下载目录中的 Linux ZIP 包，适合开发与批量验证 |
-| BKFIL macOS 客户端 | [Beken 官方 macOS 目录](https://dl.bekencorp.com/tools/bkfil/v4/gui/macos) | macOS | 下载目录中的 DMG 安装包 |
+### 烧录步骤
 
-BKFIL 的界面与参数说明见[Beken BKFIL v4 官方文档](https://docs.bekencorp.com/arminodoc/bk_app/bkfil_v4/zh_CN/latest/index.html)，
-开发板接线和进入下载模式的方法见
-[立创官方固件烧录教程](https://wiki.lckfb.com/zh-hans/szpi-bk7258/szpi-bk7258/basic/burn.html)。
+1. 下载并解压 [`lckfb-bk7258-1.0.1+build.56-validation.zip`](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.1/lckfb-bk7258-1.0.1%2Bbuild.56-validation.zip)。
+2. 按立创官方烧录教程连接电脑，关闭占用串口的日志终端。打开 BKFIL，点击 **Select Port**，选择本板串口。
+3. 点击 **Select BIN**，选择 **`lckfb-bk7258-1.0.1+build.56-all-app.bin`**，确认 **Start Address** 为 **`0x00000000`**，勾选该文件。
+4. 点击 **Download**，按工具提示复位或重新上电。等待写入和工具校验完成，再重新上电。
+5. 打开 115200 波特率串口日志，核对板卡 `lckfb-bk7258` 和版本 `1.0.1+build.56`，再进行配网与绑定。
 
-从 `0x00000000` 完整烧录 `all-app.bin`。`app_pack.rbl` 只用于 OTA（无线升级），不能代替
-首次整包烧录。烧录工具配置必须保留 RF（射频）校准、工厂数据和凭证分区；不确定分区时
-先读取并备份，不执行全片擦除。
+下面使用 BKFIL 官方指南的界面截图，红框标出了操作位置。截图中的串口号、文件路径和
+波特率是示例；串口选电脑实际识别的设备，固件选上面的立创 BIN 文件。
+`Baud` 是烧录速率，`AppResetBaud` 是应用复位通信速率，两者不是同一项。
+
+**选择串口。** 点击 **Select Port**，选择本板串口，再点击 **OK**。
+
+![BKFIL 选择串口和波特率，红框标出设置位置](../../images/flashing/bkfil-select-port.png)
+
+**选择固件。** 点击 **Select BIN**，选择 `lckfb-bk7258-1.0.1+build.56-all-app.bin`。
+
+![BKFIL 选择固件，红框标出 Select BIN 按钮](../../images/flashing/bkfil-select-bin.png)
+
+**确认地址并下载。** 文件起始地址为 **`0x0`**，勾选文件后点击 **Download**。
+
+![BKFIL 开始烧录，红框标出 Download 按钮，文件行显示起始地址 0x0](../../images/flashing/bkfil-download.png)
+
+| 文件 | 用途 |
+|---|---|
+| `lckfb-bk7258-1.0.1+build.56-all-app.bin` | **直接用于串口烧录**，起始地址 **`0x0`** |
+| `lckfb-bk7258-1.0.1+build.56-app_pack.rbl` | **不能用于串口烧录**；仅用于 OTA（无线升级），首次烧录不使用 |
+| `MANIFEST.json` | 文件信息与校验清单，不用于烧录 |
+| `symbols/`、`partitions/`、`build_identity.json` | 开发排查资料，不用于烧录 |
+
+如需核验文件，使用固件包内 `MANIFEST.json` 中的 SHA-256 校验值。
+首次烧录前请备份原厂固件和射频校准资料；日常更新保留校准、工厂数据和凭证分区，
+不要全片擦除。自行编译时，使用“编译”一节列出的 `package/all-app.bin`，地址同样为 `0x0`。
+
+也可使用[立创 BK7258 网页烧录工具](https://wiki.lckfb.com/storage/html/bk7258-web-flasher/#/download)，
+在 Chrome 或 Edge 中导入上述完整 BIN；操作见立创官方教程。
 
 ## 首次使用
 
@@ -63,7 +70,7 @@ BKFIL 的界面与参数说明见[Beken BKFIL v4 官方文档](https://docs.beke
 
 ### 1. 配置 Wi-Fi
 
-首次烧录、执行过 `wifi-clear` 或已保存网络连接失败时，屏幕显示配网提示，并广播
+首次烧录、执行过 `ap_cmd wifi-clear` 或已保存网络连接失败时，屏幕显示配网提示，并广播
 无密码的 `XiaoTai-XXXX` 热点。用手机或电脑连接该热点；提示“无互联网”属于正常现象。
 配网页没有自动打开时，访问 `http://192.168.6.1`，选择 2.4 GHz Wi-Fi，输入路由器密码
 并提交。热点重新出现表示联网失败，需要检查密码和信号覆盖。
@@ -82,8 +89,8 @@ BKFIL 的界面与参数说明见[Beken BKFIL v4 官方文档](https://docs.beke
 `READY`，且没有 UsageFault（处理器用法异常）、异常重启或持续内存下降。
 
 需要更换网络或重新绑定时，进入“设备设置 → 重置设备”，确认后重新配网并绑定。
-研发/售后串口仍保留 `wifi-clear` 和 `tirtc-clear`，但它们不是用户界面的独立入口。
-不要使用全片擦除。完整诊断命令见[固件工程说明](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/README.md)。
+串口也可使用 `ap_cmd wifi-clear` 清除 Wi-Fi，或用 `ap_cmd tirtc-clear` 清除本机绑定凭证。
+命令效果和重启说明见[BK7258 串口命令](../../development/BK7258_SERIAL_COMMANDS.md)。
 
 ## 规格
 
@@ -108,8 +115,11 @@ BKFIL 的界面与参数说明见[Beken BKFIL v4 官方文档](https://docs.beke
 
 H5、设备呼叫和微信通话使用 8 kHz 单声道 A-law，上行每个网络包 20 毫秒、160 字节。
 下行按实际包长解码，不要求对端采用相同分包长度。
+
 AI 上行使用 8 kHz 单声道 A-law，每包 20 毫秒、160 字节；下行使用 Opus / 16 kHz，
-当前下行单包缓冲上限为 512 字节。硬件和 AEC/NS/AGC 保持 16 kHz，上传编码前降采样。
+当前下行单包缓冲上限为 512 字节。
+
+AI 的硬件采样和 AEC/NS/AGC 处理保持 16 kHz，上传编码前降采样。
 
 视频上行使用 H.264，目标为 640×480、20 fps（每秒 20 帧）。设备会记录实际帧率、码率、
 关键帧和丢帧数，不能只用配置值判断链路质量。
@@ -122,6 +132,8 @@ AI 的 AEC（声学回声消除）按 20 毫秒、320 个采样处理，播放�
 
 ## 环境与依赖
 
+仅烧录发布固件不需要搭建开发环境。从源码编译时，准备以下工具和依赖。
+
 | 依赖项 | 固定版本或文件 | 来源或下载链接 | SHA-256 |
 | --- | --- | --- | --- |
 | 主机环境 | Linux/WSL2、Git、Python 3 | [Git](https://git-scm.com/downloads)、[Python](https://www.python.org/downloads/) | 无 |
@@ -130,7 +142,8 @@ AI 的 AEC（声学回声消除）按 20 毫秒、320 个采样处理，播放�
 | TiRTC-Nano | 本地交付的 `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini`，manifest 指向 BK-AVDK 3.1.1.10 | 公开下载链接待核实 | 工程内静态库：`1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9` |
 | 厂商组件 | AP/CP 多媒体、网络、显示、触摸、DVP（数字视频端口）和音频组件 | [BK-AVDK SMP 源码](https://github.com/bekencorp/bk_avdk_smp/tree/398cab28b938e69ba2071a597daf00845dd080b6) | 无 |
 
-Beken 工程保持独立的 AP/CP（应用处理器/协处理器）、分区、TLS ABI（线程局部存储应用二进制接口）和 TiRTC 静态库，不能套用 ESP-IDF 依赖。
+本工程使用独立的 AP/CP 配置、分区、TLS（安全传输）库和 TiRTC 静态库，
+编译器与库的二进制接口需要匹配。
 
 第一次开发 BK7258 时，先按[立创官方环境搭建](https://wiki.lckfb.com/zh-hans/szpi-bk7258/szpi-bk7258/basic/programming-environment-setup.html)
 准备主机，再阅读 [AP/CP 双镜像架构](https://wiki.lckfb.com/zh-hans/szpi-bk7258/szpi-bk7258/advanced-guide/ap-cp-architecture.html)。
@@ -149,7 +162,10 @@ Beken 工程保持独立的 AP/CP（应用处理器/协处理器）、分区、T
 
 引脚和外设结论以工程 Hardware IR（硬件信息记录）及实板验证为准。
 
-## 开发
+## 开发目录
+
+修改源码前，需要熟悉 C 语言、Git 和串口日志。BK7258 工程分别构建 AP（应用核）与
+CP（通信核）镜像，再打包为完整烧录文件；入口和配置见下表。
 
 ### 目录结构
 
@@ -193,6 +209,17 @@ xiaotai/
 | 持久化、串口命令、运行指标和硬件探针 | [`platforms/beken/runtime/src/`](../../../platforms/beken/runtime/src/) | 分别从 `xiaotai_storage.c`、`xiaotai_console.c`、`xiaotai_metrics.c` 和 `xiaotai_probe.c` 开始 |
 | 分区、编译环境和打包 | [`partitions/`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/partitions/)、[`tools/`](../../../firmware/beken/bk7258/lckfb-bk7258-xiaotai/tools/) | 修改后同时验证 AP、CP、整包和 Flash 布局 |
 
+### 屏幕布局与字体约束
+
+本板当前屏幕适配为 **320×240 横屏**，variant 选择 **`compact`** 布局，产品正文、
+按钮、设置值、联系人与动态字幕统一使用 **16 像素**字库。每个固件只链接所选字号，
+不允许缺字后回退到另一字号。字号由 `product/interaction/profiles.json` 的
+`font_size_px` 约束，不按芯片类型自行推断。
+
+更换屏幕时必须重新登记分辨率、方向与布局，并验证字号、换行和触摸区域。当前屏幕
+硬件证据仍以本板 Hardware IR / 探针资料为准；布局配置不能替代硬件证据。完整要求见
+[产品交互规范 §1.3](../../product/PRODUCT_INTERACTION_PROFILES.md#13-屏幕布局与字库约束)。
+
 ### 推荐修改顺序
 
 1. 先判断改动属于产品规则、BK 平台适配还是当前开发板硬件，避免在错误层级修补。
@@ -222,52 +249,19 @@ python3 tools/build.py --board lckfb-bk7258
 本次配置记录在 `build_identity.json`，不会增加另一套输出目录。烧录前应核对所选构建配置、
 版本和文件 SHA-256；`app_pack.rbl` 仅用于 OTA。
 
-每次通过构建脚本编译都会将工程内 `BUILD_NUMBER` 的数字递增 1。
-`VERSION.md` 保留产品版本号，例如 `1.0.0`；启动日志 `XIAOTAI_BOOT`
-打印 `version=1.0.0+build.40 build=40`，与
-`build/bk7258/<所选工程配置>/build_identity.json` 一致。临时验证包的
-`MANIFEST.json` 也记录同一编号。构建记录保存整包
-SHA-256；在电脑上对待烧录的 `all-app.bin` 执行 `sha256sum` 核对。
+构建号在本板 `BUILD_NUMBER` 中递增，产品版本保存在 `VERSION.md`。
+`build/bk7258/lckfb-bk7258-xiaotai/build_identity.json` 记录本次版本、配置及完整镜像校验值。
+同一 `package/` 目录还会生成带板卡名、版本和构建号的完整 BIN，内容与 `all-app.bin` 相同。
 
-产品版本号继续使用 `VERSION.md`；开机日志、平台能力上报、SDK 镜像版本和
-交付清单统一使用完整的 `x.x.x+build.n`。
-
-构建脚本在构建号变化时重新配置 AP/CP，避免 SDK 缓存旧的 `APP_VERSION`。
-交付前要求 AP ELF 只包含本次完整版本，并将整包中剥离 CRC 的 AP/CP 内容
-与编译出的 BIN 逐字节比较；仅出现本次版本字符串不足以通过身份检查。
-
-当前开发配置启用 `CONFIG_CRITICAL_LR_RECORD`：CP 心跳超时后间隔 20ms
-读取两次 AP 的 tick、内核锁、任务指针及临界区调用地址，打印 `[DEBUG-bk-hb] ap-lr`。
-地址从本次 AP ELF 获取并在再次打包后复核，SDK 临时插桩随后恢复。release
-关闭该临界区记录。它是停顿诊断，会增加临界区开销，不代表重启已修复。
-
-当前 CP 的 IPC 心跳判超窗口设为 8 秒，与 10 月 2 日构建一致；AP 仍每
-2 秒发送一次心跳。它只决定 AP 停止回应后 CP 等多久才复位，不能修复
-AP 调度停顿。
-
-构建脚本在同一个 `package/` 目录保留 SDK 原生的 `all-app.bin`，并生成
-`lckfb-bk7258-<版本号>+build.<构建号>-all-app.bin`，两份内容相同。正式交付使用带
-版本号与 build 号的文件名，烧录偏移仍为 `0x00000000`。同目录自动生成
-`README.md`，记录构建用途、development/release、完整版本、原始路径、SHA-256
-和实板验证状态。用途可通过 `XIAOTAI_BUILD_PURPOSE` 指定。
-
-### 临时验证固件
-
-后续编译物统一保存在工程内：开发联调用默认目录，线上发布候选用 SDK 的
-`_release` 目录。根目录 `output/` 只保留整理后的历史基线与说明，构建和打包
-不再自动向其中复制文件；不按日期或诊断用途另建目录。
-其他分支的对照固件可显式导出到 `output/`，仍用完整版本命名，并在 Markdown
-说明中记录分支与用途。
-
-需要包含配对 AP/CP ELF 的完整验证包时，显式执行：
+生成发布配置的固件和 ZIP 包：
 
 ```bash
-python3 tools/package_validation_firmware.py --board lckfb-bk7258
+python3 tools/build.py --board lckfb-bk7258 --release
+python3 tools/package_validation_firmware.py --board lckfb-bk7258 --beken-build-profile release
 ```
 
-默认打包 development 产物；线上发布才传 `--beken-build-profile release`。
-ZIP、整包和 OTA 副本的文件名都包含完整版本号，保存在所选工程的同一
-`package/` 目录；构建用途记录在该目录的 `README.md`。
+开发配置和发布配置共用上述输出目录，打包命令使用前一条命令生成的固件。
+版本、打包和发布要求见[固件版本与发布](../../../CONTRIBUTING.md#固件版本与发布)。
 
 ## 测试
 
@@ -281,6 +275,19 @@ python3 tools/build.py --board lckfb-bk7258
 恢复且设备没有重启。
 
 ## 排查
+
+使用 115200 波特率串口，在 CP 命令行输入：
+
+```text
+ap_cmd status
+ap_cmd call-status
+ap_cmd help
+```
+
+`status` 查看联网、绑定、当前会话和内存，`call-status` 查看通话状态。
+完整命令、参数、平台地址设置及两块 BK7258 的适用范围见
+[BK7258 串口命令](../../development/BK7258_SERIAL_COMMANDS.md)。
+
 
 - H5 下行无声：检查流 14 是否收到数据、A-law 解码是否产出 PCM、DAC 写入和功放 GPIO。
 - 微信上行无声：检查流 0 的平台接受状态；持续 `rc=-40006` 表示上行尚未就绪。

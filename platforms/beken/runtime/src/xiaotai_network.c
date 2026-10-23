@@ -50,6 +50,7 @@ static volatile bool s_disconnected;
 static char s_ap_ssid[33];
 static beken_mutex_t s_scan_mutex;
 static bool s_scan_mutex_ready;
+static uint32_t s_portal_start_ms;
 static portal_scan_state_t s_scan_state;
 static portal_ap_t s_scan_aps[SCAN_AP_MAX];
 static size_t s_scan_ap_count;
@@ -356,9 +357,11 @@ static void send_response(int fd, const char *status,
                          "HTTP/1.1 %s\r\nContent-Type: %s\r\n"
                          "Content-Length: %u\r\nConnection: close\r\n\r\n",
                          status, content_type, (unsigned)body_size);
-    if (count <= 0 || (size_t)count >= sizeof(header) ||
-        !send_all(fd, header, (size_t)count)) return;
-    (void)send_all(fd, body, body_size);
+    bool sent = count > 0 && (size_t)count < sizeof(header) &&
+                send_all(fd, header, (size_t)count) &&
+                send_all(fd, body, body_size);
+    BK_LOGI(TAG, "[DEBUG-bk-portal] event=response status=%s sent=%u\n",
+            status, (unsigned)sent);
 }
 
 static void send_redirect(int fd)
@@ -369,7 +372,30 @@ static void send_redirect(int fd)
         "Cache-Control: no-store\r\n"
         "Content-Length: 0\r\n"
         "Connection: close\r\n\r\n";
-    (void)send_all(fd, response, sizeof(response) - 1U);
+    bool sent = send_all(fd, response, sizeof(response) - 1U);
+    BK_LOGI(TAG, "[DEBUG-bk-portal] event=response status=302 sent=%u\n",
+            (unsigned)sent);
+}
+
+/* Only fixed labels reach the log: never print paths, headers or Wi-Fi bodies. */
+static const char *portal_request_label(const char *request)
+{
+    if (strncmp(request, "GET /hotspot-detect.html ", 25) == 0 ||
+        strncmp(request, "GET /library/test/success.html ", 31) == 0)
+        return "apple-probe";
+    if (strncmp(request, "GET /generate_204 ", 18) == 0 ||
+        strncmp(request, "GET /gen_204 ", 13) == 0)
+        return "android-probe";
+    if (strncmp(request, "GET /connecttest.txt ", 21) == 0 ||
+        strncmp(request, "GET /ncsi.txt ", 14) == 0)
+        return "windows-probe";
+    if (strncmp(request, "GET / ", 6) == 0 ||
+        strncmp(request, "GET /index.html ", 16) == 0) return "page";
+    if (strncmp(request, "POST /api/wifi ", 15) == 0) return "wifi-save";
+    if (strncmp(request, "POST /api/scan ", 15) == 0) return "scan";
+    if (strncmp(request, "GET /api/setup ", 15) == 0) return "setup";
+    if (strncmp(request, "GET /api/networks ", 18) == 0) return "networks";
+    return "other";
 }
 
 static bool is_captive_probe(const char *request)
@@ -453,9 +479,14 @@ static void portal_task(beken_thread_arg_t argument)
         goto done;
     }
     BK_LOGI(TAG, "provisioning portal ready at http://%s\n", SETUP_IP);
+    BK_LOGI(TAG, "[DEBUG-bk-portal] event=ready elapsed-ms=%u\n",
+            (unsigned)(rtos_get_time() - s_portal_start_ms));
     for (;;) {
         int client = accept(server, NULL, NULL);
         if (client < 0) continue;
+        uint32_t accepted_ms = rtos_get_time();
+        BK_LOGI(TAG, "[DEBUG-bk-portal] event=accepted elapsed-ms=%u\n",
+                (unsigned)(accepted_ms - s_portal_start_ms));
         struct timeval timeout = {
             .tv_sec = PORTAL_IO_TIMEOUT_SECONDS,
             .tv_usec = 0,
@@ -466,7 +497,11 @@ static void portal_task(beken_thread_arg_t argument)
                          &timeout, sizeof(timeout));
         char request[HTTP_REQUEST_MAX + 1] = {0};
         size_t received = 0;
-        if (!receive_request(client, request, sizeof(request), &received)) {
+        bool complete = receive_request(client, request, sizeof(request), &received);
+        BK_LOGI(TAG, "[DEBUG-bk-portal] event=request request=%s complete=%u read-ms=%u\n",
+                complete ? portal_request_label(request) : "incomplete",
+                (unsigned)complete, (unsigned)(rtos_get_time() - accepted_ms));
+        if (!complete) {
             send_response(client, "400 Bad Request", "text/plain", "invalid request");
         } else if (strncmp(request, "POST /api/scan ", 15) == 0) {
             int scan_rc = start_portal_scan();
@@ -515,6 +550,8 @@ static void portal_task(beken_thread_arg_t argument)
         close(client);
     }
 done:
+    BK_LOGE(TAG, "[DEBUG-bk-portal] event=failed elapsed-ms=%u\n",
+            (unsigned)(rtos_get_time() - s_portal_start_ms));
     BK_LOGE(TAG, "provisioning portal failed\n");
     rtos_delete_thread(NULL);
 }
@@ -522,6 +559,7 @@ done:
 static int start_provisioning(void)
 {
     if (s_provisioning) return BK_OK;
+    s_portal_start_ms = rtos_get_time();
     uint8_t mac[6] = {0};
     (void)bk_get_mac(mac, MAC_TYPE_BASE);
     snprintf(s_ap_ssid, sizeof(s_ap_ssid), "XiaoTai-%02X%02X", mac[4], mac[5]);
@@ -539,13 +577,23 @@ static int start_provisioning(void)
     ap.channel = 1;
     if (rc == BK_OK) rc = bk_wifi_ap_set_config(&ap);
     if (rc == BK_OK) rc = bk_wifi_ap_start();
-    if (rc != BK_OK) return rc;
+    if (rc != BK_OK) {
+        BK_LOGW(TAG, "[DEBUG-bk-portal] event=ap-failed rc=%d\n", rc);
+        return rc;
+    }
 
     s_provisioning = true;
     BK_LOGW(TAG, "SoftAP provisioning active SSID=%s\n", s_ap_ssid);
+    BK_LOGI(TAG, "[DEBUG-bk-portal] event=ap-started elapsed-ms=%u\n",
+            (unsigned)(rtos_get_time() - s_portal_start_ms));
     xiaotai_ui_show_network_setup(s_ap_ssid);
-    return rtos_create_thread(NULL, BEKEN_APPLICATION_PRIORITY,
-                              "xiaotai_portal", portal_task, 4096, NULL);
+    BK_LOGI(TAG, "[DEBUG-bk-portal] event=ui-returned elapsed-ms=%u\n",
+            (unsigned)(rtos_get_time() - s_portal_start_ms));
+    rc = rtos_create_thread(NULL, BEKEN_APPLICATION_PRIORITY,
+                            "xiaotai_portal", portal_task, 4096, NULL);
+    BK_LOGI(TAG, "[DEBUG-bk-portal] event=task-submitted rc=%d elapsed-ms=%u\n",
+            rc, (unsigned)(rtos_get_time() - s_portal_start_ms));
+    return rc;
 }
 
 static void network_task(beken_thread_arg_t argument)

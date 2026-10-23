@@ -32,6 +32,7 @@
 - [约束规则索引](../CONTRIBUTING.md#约束规则索引)：命名、目录、开发、编译、测试和发布规则的权威出处。
 - [固件版本与发布](../CONTRIBUTING.md#固件版本与发布)：产品版本、构建身份、Release 名称及发布出口检查。
 - [测试与硬件验证](../tests/README.md)：主机测试、驱动 probe（探针测试）和产品业务 HIL（硬件在环测试）。
+- [BK7258 串口命令](development/BK7258_SERIAL_COMMANDS.md)：立创与觅感共用的状态查询、配网、通话和平台地址设置。
 - [二次开发易错点](development/pitfalls.md)：界面、音频、BK 重启、异步房间、MQTT 与固件打包的问题证据和回归入口。
 - [音视频参数](product/MEDIA_CONTRACT.md)：媒体流编号、设备能力和编解码约定。
 - [P4 媒体架构](../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/docs/P4_MEDIA_ARCHITECTURE.md)：当前 P4 媒体模块、帧所有权和性能边界。
