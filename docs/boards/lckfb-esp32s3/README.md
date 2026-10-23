@@ -48,7 +48,38 @@ Windows 可用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 用 `s
 macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIFEST.json`，
 发布附件的完整哈希见[发布页](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.1)中的 `SHA256SUMS`。
 
-### 其他方式：分文件烧录
+## 首次使用
+
+确认发布包中的全部烧录文件都已写入且设备正常重启，再进行下面的配网和绑定。
+
+### 1. 配置 Wi-Fi
+
+首次烧录、执行过 `wifi-clear` 或已保存网络连接失败时，屏幕显示“需要连接网络”，并
+广播无密码的 `XiaoTai-XXXX` 热点。用手机连接该热点；提示“无互联网”属于正常现象。
+配网页没有自动打开时，访问 `http://192.168.6.1`，选择 2.4 GHz Wi-Fi，输入路由器密码
+并提交。热点重新出现表示联网失败，需要检查密码和信号覆盖。
+配网页面及文案统一以[产品需求 4.11](../../product/PRODUCT_REQUIREMENTS.md#411-启动无网络与-ap-配网)为准。
+
+### 2. 绑定设备
+
+联网后，屏幕显示并播报 6 位验证码。让手机恢复互联网连接，登录
+[小钛设备页](https://xiaotai.chat/devices)，在添加设备处输入屏幕上的验证码。验证码
+过期时使用新号码。绑定成功后设备进入首页；串口执行 `status` 应显示平台、MQTT
+（设备消息通道）和 TiRTC（实时音视频软件开发工具包）均已就绪。
+
+### 3. 验证与恢复
+
+依次检查屏幕、触摸、按键、摄像头和音频，再验证 H5（网页端）双向对讲、至少三轮 AI
+对话、设备呼叫和微信 VoIP（语音通话）。每次会话结束后应回到首页，且无异常重启
+或持续内存下降。
+
+需要更换网络或重新绑定时，进入“设备设置 → 重置设备”，确认后重新配网并绑定。
+研发/售后串口仍保留 `wifi-clear` 和 `tirtc-clear`；不要擦除整片 Flash。完整诊断
+命令见[固件工程说明](../../../firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/README.md)。
+
+## 其他烧录方式
+
+### 分文件烧录
 
 下载并解压 [lckfb-esp32s3-1.0.1+build.2-validation.zip](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.2-validation.zip)。
 此方式需按包内 `MANIFEST.json` 和 `flasher_args.json` 核对本板、本版的 **3 个 BIN**：
@@ -81,35 +112,6 @@ idf.py -p <串口> flash monitor
 普通升级不执行 `erase-flash`。示例命令截图不代表已在当前硬件执行：
 
 ![立创·实战派 ESP32-S3 工程编译及烧录命令](../../images/flashing/project-lckfb-esp32s3.png)
-
-## 首次使用
-
-确认发布包中的全部烧录文件都已写入且设备正常重启，再进行下面的配网和绑定。
-
-### 1. 配置 Wi-Fi
-
-首次烧录、执行过 `wifi-clear` 或已保存网络连接失败时，屏幕显示“需要连接网络”，并
-广播无密码的 `XiaoTai-XXXX` 热点。用手机连接该热点；提示“无互联网”属于正常现象。
-配网页没有自动打开时，访问 `http://192.168.6.1`，选择 2.4 GHz Wi-Fi，输入路由器密码
-并提交。热点重新出现表示联网失败，需要检查密码和信号覆盖。
-配网页面及文案统一以[产品需求 4.11](../../product/PRODUCT_REQUIREMENTS.md#411-启动无网络与-ap-配网)为准。
-
-### 2. 绑定设备
-
-联网后，屏幕显示并播报 6 位验证码。让手机恢复互联网连接，登录
-[小钛设备页](https://xiaotai.chat/devices)，在添加设备处输入屏幕上的验证码。验证码
-过期时使用新号码。绑定成功后设备进入首页；串口执行 `status` 应显示平台、MQTT
-（设备消息通道）和 TiRTC（实时音视频软件开发工具包）均已就绪。
-
-### 3. 验证与恢复
-
-依次检查屏幕、触摸、按键、摄像头和音频，再验证 H5（网页端）双向对讲、至少三轮 AI
-对话、设备呼叫和微信 VoIP（语音通话）。每次会话结束后应回到首页，且无异常重启
-或持续内存下降。
-
-需要更换网络或重新绑定时，进入“设备设置 → 重置设备”，确认后重新配网并绑定。
-研发/售后串口仍保留 `wifi-clear` 和 `tirtc-clear`；不要擦除整片 Flash。完整诊断
-命令见[固件工程说明](../../../firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/README.md)。
 
 ## 规格
 

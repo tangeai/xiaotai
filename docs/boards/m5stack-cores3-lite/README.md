@@ -49,7 +49,19 @@ Windows 可用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 用 `s
 macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIFEST.json`，
 发布附件的完整哈希见[发布页](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1)中的 `SHA256SUMS`。
 
-### 其他方式：分文件烧录
+## 首次使用
+
+设备没有 Wi-Fi 凭证时显示配网提示。使用者用手机或电脑连接 `XiaoTai-` 开头的开放热点，
+在弹出页面填写目标 2.4 GHz Wi-Fi；没有弹窗时打开 `http://192.168.6.1`。
+联网后屏幕显示六位绑定码，在 `https://xiaotai.chat` 注册或登录，选择“添加设备”并输入该码。
+绑定成功后进入首页，使用触摸菜单进入 AI、联系人、多人对讲和设置。
+
+Wi-Fi 连接失败时返回配网页重填；验证码过期等待刷新。更换网络或身份时从设置页选择
+“重置设备”并确认，清除 Wi-Fi、绑定凭证和本机设置后重新配网绑定。凭证保存在 NVS，源码不带账号或密码。
+
+## 其他烧录方式
+
+### 分文件烧录
 
 下载并解压 [m5stack-cores3-lite-1.0.1+build.42-validation.zip](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-validation.zip)。
 此方式需按包内 `MANIFEST.json` 和 `flasher_args.json` 核对本板、本版的 **3 个 BIN**：
@@ -82,16 +94,6 @@ idf.py -p <串口> flash monitor
 普通升级不执行 `erase-flash`。示例命令截图不代表已在当前硬件执行：
 
 ![M5Stack CoreS3-Lite 工程编译及烧录命令](../../images/flashing/project-m5stack-cores3-lite.png)
-
-## 首次使用
-
-设备没有 Wi-Fi 凭证时显示配网提示。使用者用手机或电脑连接 `XiaoTai-` 开头的开放热点，
-在弹出页面填写目标 2.4 GHz Wi-Fi；没有弹窗时打开 `http://192.168.6.1`。
-联网后屏幕显示六位绑定码，在 `https://xiaotai.chat` 注册或登录，选择“添加设备”并输入该码。
-绑定成功后进入首页，使用触摸菜单进入 AI、联系人、多人对讲和设置。
-
-Wi-Fi 连接失败时返回配网页重填；验证码过期等待刷新。更换网络或身份时从设置页选择
-“重置设备”并确认，清除 Wi-Fi、绑定凭证和本机设置后重新配网绑定。凭证保存在 NVS，源码不带账号或密码。
 
 ## 规格
 
