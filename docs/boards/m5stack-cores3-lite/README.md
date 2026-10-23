@@ -1,130 +1,75 @@
-# M5Stack CoreS3-Lite 探鸽小钛
+# M5Stack CoreS3-Lite
 
-板卡 ID：`m5stack-cores3-lite`，商品编号 K128-Lite。当前正式固件为 v1.0.1 · build.42（ILI9342E）。
-ESP32-S3 与立创相同，但接线、电源、功放、屏幕和触摸方向不同，固件不能互刷。
+[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1)
+
+板卡 ID：`m5stack-cores3-lite`。当前发布固件为 **v1.0.1 · build.42**。
+发布固件仅适用于 **K128-Lite / ILI9342E 屏幕**；旧 ILI9342C 屏需按“编译”一节选对应变体，不能刷此镜像。
+此处列出当前正式发布的 build.42，验证范围见发布说明。
 
 ## 烧录
 
-提供两种方式：**网页烧录**适合直接体验，无需安装开发环境；**工程烧录**适合修改源码后编译、调试。
-两种方式任选其一。先核对完整板型，不能只按 `ESP32-S3` 选择固件。
+### 打开烧录工具
 
-发布固件仅适用于 **CoreS3-Lite（K128-Lite）的 ILI9342E 屏幕变体**。
-使用 USB 数据线连接本机 Type-C 接口。长按底侧复位键约 3 秒，绿色灯亮后松开，
-灯熄灭后进入下载模式；烧录后单击底侧 RST 重启。
-按键位置与操作见[M5Stack 官方说明](https://docs.m5stack.com/en/core/CoreS3-Lite)。
+使用电脑上的 **Chrome 或 Edge** 打开[乐鑫 ESP Web Tool](https://espressif.github.io/esptool-js/)；
+网页烧录无需安装 ESP-IDF。关闭占用设备串口的终端或其他烧录网页。
+接口和下载模式位置见[板卡官方说明](https://docs.m5stack.com/en/core/CoreS3-Lite)。
 
-### 先选烧录文件：单文件与分文件二选一
+### 烧录步骤
 
-网页烧录和工程烧录是操作方式；**单文件与分文件是两种文件组织方式**。
-本页文件名和地址对应 **v1.0.1 · build.42**；其他版本必须重新核对该版本清单。
+1. 下载 [m5stack-cores3-lite-1.0.1+build.42-merged.bin](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-merged.bin)。本版只选择这一个完整 BIN，地址为 **`0x0`**。
+2. 使用本机 Type-C 接口连接电脑。长按底侧复位键约 3 秒，绿色灯亮后松开，灯熄灭后进入下载模式。识别结果必须是 **ESP32-S3**。
+3. 在网页工具的 **Program** 区域选择 `Baudrate`（可先用 `921600`，不稳定时改为 `115200`），点击 **Connect** 并选择本板串口。桌面串口方式不勾选 `WebUSB (CH340)`。
+4. 点击 **Choose File** 选择下载的完整 BIN，**Flash Address 改为 `0x0`**；Flash Mode、Flash Frequency、Flash Size 均选 `keep`。只添加这一行，点击 **Program**。
+5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `m5stack_cores3_lite_xiaotai` 和版本 `1.0.1+build.42`，再进入“首次使用”。
 
-| 文件方式 | 下载文件的完整名称 | 网页中应添加的内容 |
-|---|---|---|
-| 单文件（首次体验推荐） | `m5stack-cores3-lite-1.0.1+build.42-merged.bin` | 只添加这个 BIN，地址 `0x0` |
-| 分文件（也可首次烧录） | `m5stack-cores3-lite-1.0.1+build.42-validation.zip` | 先解压，再添加下文列出的 **3 个 BIN**，各填各的地址 |
+连接位置和烧录参数见下图，图中的端口号与路径只是示例：
 
-乐鑫支持按“地址 + 文件”写入多个 BIN，也支持用 `merge-bin` 合并后写入。
-**分文件数量不是固定三个，地址也不能直接照抄官方示例**；以本工程生成的清单为准。
-参见[乐鑫写入与合并镜像说明](https://docs.espressif.com/projects/esptool/en/latest/esp32s3/esptool/basic-commands.html#merge-binaries-for-flashing-merge-bin)。
+![ESP Web Tool 的 Connect 和 Program 区域](../../images/flashing/web-connect.png)
 
-### 方式一：网页烧录（推荐首次体验）
+![M5Stack CoreS3-Lite 完整镜像的文件、0x0 地址与 Program 按钮](../../images/flashing/web-m5stack-cores3-lite.png)
 
-#### 1. 下载完整镜像
+**完整镜像会覆盖 NVS 中的 Wi-Fi、绑定和 EP 覆盖项等持久配置。** 烧录后需重新配网、绑定。
+`keep` 仅保留镜像中的 Flash 参数，不表示保留设备配置。若网页连接失败，按第 2 步进入下载模式后重连；
+若写入或校验失败，检查串口、数据线、文件和地址后重试，不按进度条 100% 判定成功。
 
-下载 [v1.0.1 · build.42 完整 merged.bin](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-merged.bin)。
+| 下载或包内文件 | 用途 |
+|---|---|
+| `m5stack-cores3-lite-1.0.1+build.42-merged.bin` | **直接烧录**，只此一个文件，地址 `0x0` |
+| `m5stack-cores3-lite-1.0.1+build.42-validation.zip` | 分文件烧录包，先解压，按下表各地址写入 |
+| `m5stack_cores3_lite_xiaotai.bin` | 应用 BIN，仅在分文件方式中写入 `0x10000`，不可当完整镜像写入 `0x0` |
+| `MANIFEST.json`、`flasher_args.json`、`flash_args`、ELF | 清单或排查资料，不直接烧录 |
 
-下载后先核对下方完整文件名；BIN 的 SHA-256 及核对方法见本节“文件与写入校验”。
-
-文件名应为 `m5stack-cores3-lite-1.0.1+build.42-merged.bin`。
-
-版本内容与限制见[发布说明](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1)。
-
-**完整镜像会覆盖 NVS 中的 Wi-Fi、绑定等持久配置，烧录后需要重新配网、绑定。**
-需要保留配置的升级请使用本节末尾的分文件方法，并核对分区布局与配置兼容性。
-
-#### 2. 连接开发板
-
-1. 关闭串口助手、`idf.py monitor` 和其他占用设备串口的网页。
-2. 在电脑 Chrome 或 Edge 中打开[乐鑫 ESP Web Tool](https://espressif.github.io/esptool-js/)；Safari 不支持。
-3. 使用 **Program** 区域的 `Baudrate`，可先保留 `921600`；传输不稳定时改为 `115200` 重试。桌面串口方式不勾选 `WebUSB (CH340)`。
-4. 点击红框中的 **Connect**，在浏览器弹出的串口列表中选中本板，再点击“连接”。端口名可能是 COM、USB Serial 或 USB JTAG/serial；通过拔插前后的变化确认。
-5. 等待日志识别出 **ESP32-S3**，再添加固件。若一直连接失败，按上面的板级步骤进入下载模式后重连。
-
-![网页连接步骤：红框标出 Program 波特率和 Connect 按钮](../../images/flashing/web-connect.png)
-
-#### 3. 选文件、改地址并烧录
-
-1. 在 `File` 一栏点击 **Choose File / 选择文件**，选择 **`m5stack-cores3-lite-1.0.1+build.42-merged.bin`**，不要选 ZIP、ELF 或单独的应用 BIN。
-2. 将 **Flash Address 从默认值改为 `0x0`**。完整镜像只添加这一行，不再同时添加 bootloader、分区表或应用文件。
-3. 将 **Flash Mode、Flash Frequency、Flash Size 都选为 `keep`**，保留发布固件中的参数。`keep` 不表示保留 Wi-Fi 或绑定数据。
-4. 再次核对芯片、文件名和 `0x0`，点击 **Program**。等待全部写入和校验完成；烧录期间保持供电和数据线连接，不点击 `Erase Flash`。
-
-![完整镜像参数示意：红框标出地址、文件、keep 参数和 Program 按钮](../../images/flashing/web-m5stack-cores3-lite.png)
-
-红框依次标出地址、文件、Flash 参数与烧录按钮。
-图中参数区为未连接设备时展开的操作示意，不是实板烧录成功截图。
-
-#### 4. 重启并检查
-
-先检查 Program 区域日志：当前[乐鑫网页工具](https://espressif.github.io/esptool-js/)
-每写完一个文件会输出 `Hash of data verified.`，所有文件完成后输出 `Leaving...`。
-确认每个文件都通过校验，且没有 `Error:`；仅进度条到 100% 不代表校验通过。
-若出现 MD5 不匹配或其他错误，不按成功处理，排查连接、文件和地址后重新烧录。
-
-完成后点击 **Disconnect** 释放串口，按开发板复位键重启。
-看到小钛启动及配网界面后，继续下方“首次使用”。需要日志时，可在网页 Console
-区域以 `115200` 点击 `Start`，或打开本地串口工具，检查启动版本和报错。
-只有烧录进度完成而设备不能正常启动时，应先核对板型、镜像和下载地址。
-
-#### 另一种选择：分文件烧录（3 个 BIN）
-
-下载 [m5stack-cores3-lite-1.0.1+build.42-validation.zip](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-validation.zip)，解压到独立目录。
-不要将不同板卡或不同版本的解压文件放在一起；即使同名 `bootloader.bin`，内容也可能不同。
-
-以下路径相对于 ZIP 的解压目录，已与本版 `MANIFEST.json` 和 `flasher_args.json` 核对：
-
-| File：选择的 BIN 文件 | Flash Address：填写地址 | 用途 |
-|---|---|---|
-| `bootloader/bootloader.bin` | `0x0` | 启动引导程序 |
-| `partition_table/partition-table.bin` | `0x8000` | 分区表 |
-| `m5stack_cores3_lite_xiaotai.bin` | `0x10000` | 小钛应用程序，不能当作完整镜像 |
-
-1. 按前面的步骤连接开发板；保留首行，删除之前用 **Add File** 添加的多余行。
-2. 首行重新选择表中第一个 BIN（替换之前的 `-merged.bin`）并填写对应地址，点击 **Add File** 添加其余行，直到总共 **3 行**。
-3. 逐行检查完整文件名与地址。三项 Flash 参数仍选 `keep`，点击 **Program**，等待所有文件写入和校验完成后重启。
-
-**应用 BIN 的地址是 `0x10000`，不是 `0x0`。** ZIP、ELF、JSON、`flash_args` 和 `SHA256SUMS`
-均不是可直接烧录的文件，不要在 File 栏中选择它们。分文件清单中不能再加 merged.bin。
-
-![分文件参数示意：红框标出每个 BIN、地址及 Add File 和 Program](../../images/flashing/web-split-m5stack-cores3-lite.png)
-
-上图为未连接设备时展开的参数示意。分文件方式也适用于首次烧录；用于升级时，不执行全片擦除，
-并核对分区布局与配置兼容性。它不会像 raw merged.bin 那样写入镜像间的填充区域。
-
-#### 文件与写入校验
-
-解压成功只说明压缩包可以读取，不能证明板型和版本正确。本指南不要求额外校验 ZIP 本身。
-烧录前核对本板 ID、版本、BIN 文件名和地址；需要核对文件内容时，使用以下 SHA-256：
-
-- 分文件 BIN：打开包内 `MANIFEST.json`，按 `files[].path` 找到对应文件，比较其 `sha256`。
-- 单文件 `m5stack-cores3-lite-1.0.1+build.42-merged.bin`：本版 SHA-256 如下，也可在[发布页](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1)的 `SHA256SUMS` 中查找同名 BIN 的条目。
+如需核验完整 BIN，SHA-256 为：
 
 ```text
 383412b207086e21edbc90fc194bab84dac0e5ed317581b7de511a5b2bef807f
 ```
 
-Windows PowerShell 执行 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 执行
-`sha256sum "实际BIN路径"`；macOS 执行 `shasum -a 256 "实际BIN路径"`，再对照上述值或清单。
+Windows 可用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 用 `sha256sum "实际BIN路径"`；
+macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIFEST.json`，
+发布附件的完整哈希见[发布页](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1)中的 `SHA256SUMS`。
 
-文件 SHA-256 与烧录后的写入校验用途不同。乐鑫 esptool 的 `write-flash` 自动进行 MD5 写入校验，
-通常不需要另跑 `verify-flash`；网页操作仍须等待写入及校验完成。参见
-[乐鑫写入校验说明](https://docs.espressif.com/projects/esptool/en/latest/esp32s3/esptool/advanced-commands.html#verify-flash-data-verify-flash)。
+### 其他方式：分文件烧录
 
-### 方式二：工程烧录（源码编译与调试）
+下载并解压 [m5stack-cores3-lite-1.0.1+build.42-validation.zip](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-validation.zip)。
+此方式需按包内 `MANIFEST.json` 和 `flasher_args.json` 核对本板、本版的 **3 个 BIN**：
 
-1. 按根目录[源码获取说明](../../../README.md#从源码编译)下载仓库；未安装工具链时，先完成本页“环境与依赖”和“编译”。
-2. 连接本板并关闭网页烧录连接。在仓库根目录执行下列命令，编译成功后进入对应工程目录烧录。
-3. **将 `<串口>` 替换为本机实际端口**，例如 Linux 的 `/dev/ttyACM0`、`/dev/ttyUSB0` 或 Windows ESP-IDF 终端的 `COM5`；不要照抄示例端口。
+| 文件 | 烧录地址 | 用途 |
+|---|---|---|
+| `bootloader/bootloader.bin` | `0x0` | 启动引导程序 |
+| `partition_table/partition-table.bin` | `0x8000` | 分区表 |
+| `m5stack_cores3_lite_xiaotai.bin` | `0x10000` | 应用程序，不可写入 0x0 |
+
+在网页工具用 **Add File** 添加上述每个 BIN，各填对应地址，然后点击 **Program**。
+不要同时添加完整镜像；不同板卡的 bootloader 地址也可能不同。分文件方式可用于保留配置的升级，
+但必须先确认分区布局兼容，不执行全片擦除。操作位置见下图：
+
+![M5Stack CoreS3-Lite 分文件烧录的文件与地址](../../images/flashing/web-split-m5stack-cores3-lite.png)
+
+### 从源码编译后烧录
+
+按[源码获取说明](../../../README.md#从源码编译)准备仓库，并安装本板要求的 ESP-IDF。
+在仓库根目录执行：
 
 ```bash
 . tools/activate_esp_idf.sh
@@ -133,14 +78,10 @@ cd firmware/esp-idf/esp32s3/m5stack-cores3-lite
 idf.py -p <串口> flash monitor
 ```
 
-![工程命令示意：红框标出本板 ID、工程目录和需要替换的串口](../../images/flashing/project-m5stack-cores3-lite.png)
+`<串口>` 换成本机实际端口；`idf.py` 会使用工程烧录清单和正确地址。
+普通升级不执行 `erase-flash`。示例命令截图不代表已在当前硬件执行：
 
-上图为命令示意，不是已执行编译或烧录的终端记录。可复制的命令见上方代码块。
-
-以上环境激活命令适用于 Linux/WSL；WSL 还需将 USB 设备接入该环境。
-`idf.py` 按工程生成的烧录清单调用 esptool，不必手填地址。
-出现启动日志后核对版本与板型，使用 `Ctrl+]` 退出监视器；不能连接时按本页下载模式步骤重试。
-普通升级不执行 `erase-flash`。修改屏幕等硬件配置前，先核对本板支持的变体。
+![M5Stack CoreS3-Lite 工程编译及烧录命令](../../images/flashing/project-m5stack-cores3-lite.png)
 
 ## 首次使用
 

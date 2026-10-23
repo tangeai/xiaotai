@@ -7,9 +7,13 @@
 
 表中的 AEC 指声学回声消除。Flash 指闪存，PSRAM 指用于音视频缓冲的大块运行内存。
 
+开发板指南先列当前可下载的固件及适用硬件，再按“烧录工具 → 烧录步骤 → 首次使用”
+说明用户操作；分文件烧录、源码编译和硬件参数随后说明。没有正式发布包的板卡明确标出，
+只给出可执行的源码构建步骤。各板的 USB 接口、下载模式、烧录地址和镜像数量以本板指南为准。
+
 | 板卡 ID（仓库中的开发板唯一名称） | 厂商与型号 | 平台 | 资源 | 能力 | 当前状态 | 说明 |
 |---|---|---|---|---|---|---|
-| `alientek-atk-dnesp32s3` | ALIENTEK ATK-DNESP32S3 V1.4 | ESP32-S3 / ESP-IDF 5.5.5 | 16 MB Flash / 8 MB PSRAM | 音频、按键、MJPEG 摄像头、Wi-Fi | 实板已跑通 | [打开](alientek-atk-dnesp32s3/README.md) |
+| `alientek-atk-dnesp32s3` | ALIENTEK ATK-DNESP32S3 V1.4 | ESP32-S3 / ESP-IDF 5.5.5 | 16 MB Flash / 8 MB PSRAM | 音频、按键、MJPEG 摄像头、Wi-Fi | 实板已跑通；尚无正式发布包 | [源码烧录指南](alientek-atk-dnesp32s3/README.md) |
 | `lckfb-esp32s3` | 立创·实战派 ESP32-S3（ESP32-S3-WROOM-1-N16R8，PCB V1.0.1） | ESP32-S3 / ESP-IDF 5.5.5 | 16 MB Flash / 8 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Wi-Fi | 实板已跑通 | [下载 v1.0.1 · build.2](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.1) · [开发板指南](lckfb-esp32s3/README.md) |
 | `waveshare-esp32p4-touch-lcd-43c-v10` | Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 | ESP32-P4 / ESP-IDF 5.5.5 | 32 MB Flash / 32 MB PSRAM | AEC、音频、屏幕、触摸、摄像头、Hosted Wi-Fi | 用户确认 build.14 实板可用；专项验收待补 | [下载 v1.0.1 · build.14](https://github.com/tangeai/xiaotai/releases/tag/esp32p4-v1.0.1) · [开发板指南](waveshare-esp32p4-touch-lcd-43c-v10/README.md) |
 | `lckfb-bk7258` | 立创·实战派 BK7258 | BK7258 / Beken AVDK | 8 MiB Flash / 16 MiB PSRAM / 640 KiB SRAM（构建配置） | 音频、屏幕、触摸、H.264 摄像头、Wi-Fi | 实板已跑通 | [下载 v1.0.2 · build.71](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.2) · [开发板指南](lckfb-bk7258/README.md) |

@@ -1,10 +1,12 @@
 # ALIENTEK ATK-DNESP32S3 V1.4
 
+[返回开发板目录](../README.md)
+
+板卡 ID：`alientek-atk-dnesp32s3`。**本板当前没有正式发布的烧录包**；以下步骤适用于
+使用仓库源码编译并烧录。实物需核对 V1.4 丝印和摄像头模组。
+
 本文中的 H5 指网页端，AI 指人工智能对讲，SDK 指软件开发工具包。
 Flash 是闪存，PSRAM 是用于音视频缓冲的大块运行内存。
-
-如果只想体验小钛，直接下载发布固件，按“烧录”和“首次使用”操作即可，不需要先搭建
-开发环境。
 
 准备修改或编译源码时，需要掌握 C/C++、Git、串口日志和乐鑫 ESP-IDF 的基本
 开发流程。第一次接触 ESP32-S3 时，建议先阅读
@@ -13,27 +15,31 @@ Flash 是闪存，PSRAM 是用于音视频缓冲的大块运行内存。
 
 ## 烧录
 
-### 直接烧录发布包
+### 准备烧录工具
 
-从 [GitHub Releases](https://github.com/tangeai/xiaotai/releases) 下载名称以
-`alientek-atk-dnesp32s3-` 开头的压缩包。解压后先核对 `MANIFEST.json`（发布包清单）中的板卡 ID、
-SHA-256 和 `flash_files`，再按包内 `README.txt` 的命令烧录。
+从源码烧录需要仓库指定的 **ESP-IDF 5.5.5** 和 USB 数据线。先按本页“环境与依赖”
+安装工具链，连接板卡并关闭占用串口的终端。串口须对应 ATK-DNESP32S3，不能仅凭
+芯片同为 ESP32-S3 就选择其他板卡的固件。
 
-也可以使用[乐鑫官方 ESP Web Tool](https://espressif.github.io/esptool-js/)。在 Chrome 或
-Edge 中连接本板串口，按 `flash_files` 逐项添加文件和地址后执行 `Program`。该工具不会
-自动识别板型或地址，必须烧录完整文件集合；Safari 不支持。
+### 烧录步骤
 
-### 从源码编译后烧录
-
-`idf.py` 会调用 ESP-IDF 自带的 `esptool`：
+1. 核对开发板 V1.4 丝印及摄像头模组，连接本板实际的串口。
+2. 在仓库根目录激活 ESP-IDF，选择本板构建；不要使用立创 S3 或 M5 的镜像。
+3. 进入本板工程，填写电脑上的实际串口并执行烧录和日志监视：
 
 ```bash
+. tools/activate_esp_idf.sh
+python3 tools/build.py --board alientek-atk-dnesp32s3
 cd firmware/esp-idf/esp32s3/atk-dnesp32s3
 idf.py -p <串口> flash monitor
 ```
 
-普通升级不要执行 `erase-flash`，以免清掉 Wi-Fi、绑定信息和量产数据。烧录前确认
-串口属于这块板，并断开其他可能抢占串口的监视程序。
+4. 等待工具写入并校验完成，在串口日志核对板卡与构建身份，再进入“首次使用”。
+
+`idf.py` 会读取工程生成的烧录清单，按本板地址写入 bootloader、分区表和应用。
+普通升级不要执行 `erase-flash`，以免清掉 Wi-Fi、绑定信息和量产数据。
+如果后续有正式发布包，才按对应版本的 `MANIFEST.json` 核对板卡、SHA-256、文件和地址；
+目前不能从其他板卡的 Release 选择镜像。
 
 ## 首次使用
 
