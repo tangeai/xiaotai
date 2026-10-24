@@ -195,13 +195,13 @@ S3/P4 首次启用从 1 开始，BK 延续原有计数。构建号从本次产�
 
 | 开发板 | 稳定 GitHub 标签 | Release 标题 |
 |---|---|---|
-| 立创·实战派 ESP32-S3 | `esp32s3-v<产品版本>` | `立创·实战派 ESP32-S3 v<产品版本> · build.<本次构建号>` |
+| 立创·实战派 ESP32-S3 | `lckfb-esp32s3-v<产品版本>` | `立创·实战派 ESP32-S3 v<产品版本> · build.<本次构建号>` |
 | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 | `waveshare-esp32p4-touch-lcd-43c-v10-v<产品版本>` | `微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 v<产品版本> · build.<本次构建号>` |
 | 立创·实战派 BK7258 | `bk7258-v<产品版本>` | `立创·实战派 BK7258 v<产品版本> · build.<本次构建号>` |
 | 觅感 AI 玩具开发板 BK7258 | `mgkfb-bk7258-v<产品版本>` | `觅感 AI 玩具开发板 BK7258 v<产品版本> · build.<本次构建号>` |
 | M5Stack CoreS3-Lite（ESP32-S3） | `m5stack-cores3-lite-v<产品版本>` | `M5Stack CoreS3-Lite v<产品版本> · build.<本次构建号>` |
 
-M5 使用独立板卡标签，不能覆盖立创 S3 的 `esp32s3-v...` 发布。M5 附件名称仍以
+M5 使用独立板卡标签，不能覆盖立创 S3 的 `lckfb-esp32s3-v...` 发布。M5 附件名称仍以
 永久板卡 ID `m5stack-cores3-lite` 开头，正文明确屏幕变体；不同板卡固件不能互刷。
 
 包名以永久板卡 ID 开头，由现有打包工具生成，统一为
