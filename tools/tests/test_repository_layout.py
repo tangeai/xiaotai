@@ -128,8 +128,10 @@ class RepositoryLayoutTests(unittest.TestCase):
             else:
                 self.assertNotIn(board_id, readme, board_id)
         self.assertIn("[完整开发板目录](docs/boards/README.md)", readme)
-        self.assertRegex(readme, r"releases/tag/mgkfb-bk7258-v[0-9]+\.[0-9]+\.[0-9]+")
-        self.assertRegex(readme, r"mgkfb-bk7258-[0-9]+\.[0-9]+\.[0-9]+%2Bbuild\.[0-9]+-validation\.zip")
+        self.assertIn("docs/downloads.md#mgkfb-bk7258", readme)
+        downloads = (ROOT / "docs/downloads.md").read_text(encoding="utf-8")
+        self.assertRegex(downloads, r"releases/tag/mgkfb-bk7258-v[0-9]+\.[0-9]+\.[0-9]+")
+        self.assertRegex(downloads, r"mgkfb-bk7258-[0-9]+\.[0-9]+\.[0-9]+%2Bbuild\.[0-9]+-validation\.zip")
 
     def test_root_documents_keep_reader_focused_section_order(self):
         expected_sections = {

@@ -1,11 +1,13 @@
 # 立创·实战派 ESP32-S3
 
-[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/lckfb-esp32s3-v1.0.1-build.23)
+[返回开发板目录](../README.md) · [固件下载与发布说明](../../downloads.md#lckfb-esp32s3)
 
-板卡 ID：`lckfb-esp32s3`。当前发布固件为 **v1.0.1 · build.23**。
-用户确认 build.23 实板可用。对应[源码标签](https://github.com/tangeai/xiaotai/tree/lckfb-esp32s3-v1.0.1-build.23)。
+板卡 ID：`lckfb-esp32s3`。当前版本见[固件下载](../../downloads.md#lckfb-esp32s3)。
+实板验证范围见文末记录及下载页对应的发布说明。
 
 ## 烧录
+
+文件名中的 `<版本>` 代表下载页列出的完整版本（含 build 编号）。操作时选择实际下载的文件，并核对包内清单；截图中的版本和路径仅作示例。
 
 ### 打开烧录工具
 
@@ -15,11 +17,11 @@
 
 ### 烧录步骤
 
-1. 下载 [lckfb-esp32s3-1.0.1+build.23-merged.bin](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.0.1-build.23/lckfb-esp32s3-1.0.1%2Bbuild.23-merged.bin)。本版只选择这一个完整 BIN，地址为 **`0x0`**。
+1. 下载 [完整镜像（BIN）](../../downloads.md#lckfb-esp32s3)。本版只选择这一个完整 BIN，地址为 **`0x0`**。
 2. 使用板上 Type-C 接口连接电脑。连接失败时按住 BOOT，再重新上电，进入下载模式后松开 BOOT 并重新选择串口。识别结果必须是 **ESP32-S3**。
 3. 在网页工具的 **Program** 区域选择 `Baudrate`（可先用 `921600`，不稳定时改为 `115200`），点击 **Connect** 并选择本板串口。桌面串口方式不勾选 `WebUSB (CH340)`。
 4. 点击 **Choose File** 选择下载的完整 BIN，**Flash Address 改为 `0x0`**；Flash Mode、Flash Frequency、Flash Size 均选 `keep`。只添加这一行，点击 **Program**。
-5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `lckfb_esp32s3_xiaotai` 和版本 `1.0.1+build.23`，再进入“首次使用”。
+5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `lckfb_esp32s3_xiaotai` 和所下载包的完整版本，再进入“首次使用”。
 
 连接位置和烧录参数见下图，图中的端口号与路径只是示例：
 
@@ -33,20 +35,16 @@
 
 | 下载或包内文件 | 用途 |
 |---|---|
-| `lckfb-esp32s3-1.0.1+build.23-merged.bin` | **直接烧录**，只此一个文件，地址 `0x0` |
-| `lckfb-esp32s3-1.0.1+build.23-validation.zip` | 分文件烧录包，先解压，按下表各地址写入 |
+| `lckfb-esp32s3-<版本>-merged.bin` | **直接烧录**，只此一个文件，地址 `0x0` |
+| `lckfb-esp32s3-<版本>-validation.zip` | 分文件烧录包，先解压，按下表各地址写入 |
 | `lckfb_esp32s3_xiaotai.bin` | 应用 BIN，仅在分文件方式中写入 `0x10000`，不可当完整镜像写入 `0x0` |
 | `MANIFEST.json`、`flasher_args.json`、`flash_args`、ELF | 清单或排查资料，不直接烧录 |
 
-如需核验完整 BIN，SHA-256 为：
-
-```text
-14f5fdab44c30478efd4ef462026a7b863b427f76314b358c5b3a14616c3aa4b
-```
+如需核验完整 BIN，使用下载页对应 Release 的 `SHA256SUMS`。
 
 Windows 可用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 用 `sha256sum "实际BIN路径"`；
 macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIFEST.json`，
-发布附件的完整哈希见[发布页](https://github.com/tangeai/xiaotai/releases/tag/lckfb-esp32s3-v1.0.1-build.23)中的 `SHA256SUMS`。
+发布附件的完整哈希见[固件下载与发布说明](../../downloads.md#lckfb-esp32s3)中的 `SHA256SUMS`。
 
 ## 首次使用
 
@@ -82,7 +80,7 @@ macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIF
 
 ### 分文件烧录
 
-下载并解压 [lckfb-esp32s3-1.0.1+build.23-validation.zip](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.0.1-build.23/lckfb-esp32s3-1.0.1%2Bbuild.23-validation.zip)。
+下载并解压 [固件包（ZIP）](../../downloads.md#lckfb-esp32s3)。
 此方式需按包内 `MANIFEST.json` 和 `flasher_args.json` 核对本板、本版的 **3 个 BIN**：
 
 | 文件 | 烧录地址 | 用途 |
@@ -135,7 +133,7 @@ PCB（印刷电路板）V1.0.1 丝印为准。
 
 ## 音视频参数
 
-当前正式版 **v1.0.1 · build.23** 的参数如下。音频均为单声道，每包 20 毫秒。
+音频参数如下。音频均为单声道，每包 20 毫秒。
 
 | 场景 | 方向与流编号 | 编码与采样率 | 包大小或画面参数 |
 |---|---|---|---|
@@ -272,7 +270,7 @@ python3 tools/build.py --board lckfb-esp32s3
 
 ## 验证状态与已知限制
 
-用户确认当前 build.23 实板可用。完整 BIN SHA-256 为
+用户确认 build.23 实板可用。完整 BIN SHA-256 为
 `14f5fdab44c30478efd4ef462026a7b863b427f76314b358c5b3a14616c3aa4b`。
 TODO：补充逐项启动与媒体日志、AEC 单讲/双讲指标及板卡照片。
 

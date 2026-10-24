@@ -1,12 +1,13 @@
 # M5Stack CoreS3-Lite
 
-[返回开发板目录](../README.md) · [ILI9342E 发布说明](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1-build.47-ili9342e) · [ILI9342C 发布说明](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1-build.48-ili9342c)
+[返回开发板目录](../README.md) · [固件下载与发布说明](../../downloads.md#m5stack-cores3-lite)
 
-板卡 ID：`m5stack-cores3-lite`。当前正式固件为 **v1.0.1**：ILI9342E 屏幕使用
-**build.47**，ILI9342C 屏幕使用 **build.48**。用户已确认两个变体实板可用。
+板卡 ID：`m5stack-cores3-lite`。两种屏幕固件的当前版本见[固件下载](../../downloads.md#m5stack-cores3-lite)。
 短句识别、AI 打断和双讲效果仍需回归；详情见[验证状态与已知限制](#验证状态与已知限制)。
 
 ## 烧录
+
+文件名中的 `<版本>` 代表下载页列出的完整版本（含 build 编号）。操作时选择实际下载的文件，并核对包内清单；截图中的版本和路径仅作示例。
 
 ### 烧录前确认屏幕型号
 
@@ -17,8 +18,8 @@
 
 | 屏幕控制器 | 完整镜像（首次烧录） | 分文件包（保留配置升级） |
 |---|---|---|
-| ILI9342E | [build.47 merged.bin](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1-build.47-ili9342e/m5stack-cores3-lite-1.0.1%2Bbuild.47-merged.bin) | [build.47 ZIP](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1-build.47-ili9342e/m5stack-cores3-lite-1.0.1%2Bbuild.47-validation.zip) |
-| ILI9342C | [build.48 merged.bin](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1-build.48-ili9342c/m5stack-cores3-lite-1.0.1%2Bbuild.48-merged.bin) | [build.48 ZIP](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1-build.48-ili9342c/m5stack-cores3-lite-1.0.1%2Bbuild.48-validation.zip) |
+| ILI9342E | 当前可用性见[固件下载](../../downloads.md#m5stack-cores3-lite) | 当前可用性见[固件下载](../../downloads.md#m5stack-cores3-lite) |
+| ILI9342C | [完整镜像（BIN）](../../downloads.md#m5stack-cores3-lite) | [固件包（ZIP）](../../downloads.md#m5stack-cores3-lite) |
 
 ### 打开烧录工具
 
@@ -32,7 +33,7 @@
 2. 使用本机 Type-C 接口连接电脑。长按底侧复位键约 3 秒，绿色灯亮后松开，灯熄灭后进入下载模式。识别结果必须是 **ESP32-S3**。
 3. 在网页工具的 **Program** 区域选择 `Baudrate`（可先用 `921600`，不稳定时改为 `115200`），点击 **Connect** 并选择本板串口。桌面串口方式不勾选 `WebUSB (CH340)`。
 4. 点击 **Choose File** 选择下载的完整 BIN，**Flash Address 改为 `0x0`**；Flash Mode、Flash Frequency、Flash Size 均选 `keep`。只添加这一行，点击 **Program**。
-5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `m5stack_cores3_lite_xiaotai`，以及与屏幕变体对应的版本 `1.0.1+build.47` 或 `1.0.1+build.48`，再进入“首次使用”。
+5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `m5stack_cores3_lite_xiaotai`，以及下载包对应屏幕变体和完整版本，再进入“首次使用”。
 
 连接位置和烧录参数见下图，图中的端口号与路径只是示例：
 
@@ -51,10 +52,7 @@
 | `m5stack_cores3_lite_xiaotai.bin` | 应用 BIN，仅在分文件方式中写入 `0x10000`，不可当完整镜像写入 `0x0` |
 | `MANIFEST.json`、`flasher_args.json`、`flash_args`、ELF | 清单或排查资料，不直接烧录 |
 
-完整 BIN 的 SHA-256：ILI9342E build.47 为
-`c6f891894f1da3fe369fac5f60987bde4a24e98f40ac441d7f0c677892650e35`；
-ILI9342C build.48 为
-`f59c6f2e45253b921f1b1c9bc7b41dbe573e48db66633e320723e1e54d0d92df`。
+完整 BIN 的 SHA-256 见下载页对应 Release 的 `SHA256SUMS`。
 
 Windows 可用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 用 `sha256sum "实际BIN路径"`；
 macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIFEST.json`，
@@ -127,7 +125,7 @@ idf.py -p <串口> flash monitor
 
 ## 音视频参数
 
-当前正式版：ILI9342E 屏幕 **v1.0.1 · build.47**、ILI9342C 屏幕 **v1.0.1 · build.48**。
+两种屏幕的当前正式版见[固件下载](../../downloads.md#m5stack-cores3-lite)。
 两版使用相同媒体参数。音频均为单声道，每包 20 毫秒。
 
 | 场景 | 方向与流编号 | 编码与采样率 | 包大小或画面参数 |
@@ -282,7 +280,7 @@ bash tools/check.sh
 
 ## 验证状态与已知限制
 
-M5 已完成实板验证，当前正式发布为 **v1.0.1 · build.47 / ILI9342E** 和
+M5 已完成实板验证，已验证的发布记录为 **v1.0.1 · build.47 / ILI9342E** 和
 **v1.0.1 · build.48 / ILI9342C**。
 功能与修复列表见[发布记录](FREEZE.md)，具体构建身份、验证范围和历史日志见
 [验证记录](../../../boards/m5stack/cores3-lite/VALIDATION.md)。
@@ -290,5 +288,5 @@ M5 已完成实板验证，当前正式发布为 **v1.0.1 · build.47 / ILI9342E
 - 收音、AI 打断和双讲效果仍需持续测试；短句“好的”识别不稳定、可能丢失句首的问题尚未修复。
 - 本版不提供录音导出到 TF 卡的实验功能。诊断使用 `voice-diag`、`status` 和 `face-animation`。
 - 播放期间的 AEC 与 UI 实时处理余量仍偏紧；弱网、反复切换和长时间运行需持续回归。分析见[音频性能排查](AUDIO_PERFORMANCE_REVIEW.md)。
-- ILI9342C 屏使用 build.48，ILI9342E 屏使用 build.47；按屏幕控制器选择对应固件。
+- 按屏幕控制器选择对应固件，当前版本见下载页。
 - SD 卡、IMU、磁力计、接近传感器和 RTC 尚未接入小钛产品功能。
