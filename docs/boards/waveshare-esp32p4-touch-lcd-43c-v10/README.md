@@ -5,12 +5,11 @@
 板卡 ID：`waveshare-esp32p4-touch-lcd-43c-v10`。当前发布固件为 **v1.0.1 · build.14**。
 本版已由用户完成实板验证，使用正常。下文的历史性能记录对应旧构建，不代表 build.14 的已知问题。
 
-另有 [v1.0.1 · build.19 预发布验证包](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1)：
-使用当前源码与独立板卡标签，功能与 build.14 一致，尚无该镜像的实板结果。
-首次使用仍建议选择上方已验证的 build.14；测试新包时请核对文件名和版本。
+当前待实板验证包：[v1.0.1 · build.19](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1)。
+功能与 build.14 一致；首次使用仍建议选择已验证的 build.14。
 
-从源码复现本版请使用[对应源码提交 `c2d75e9`](https://github.com/tangeai/xiaotai/tree/c2d75e9eadcc1c24af1bb09b3f9972ebdad84e2b)；
-发布标签早于 build.14，发布页自动生成的 Source code 压缩包不对应本版固件。
+build.14 的对应源码为 [`c2d75e9`](https://github.com/tangeai/xiaotai/tree/c2d75e9eadcc1c24af1bb09b3f9972ebdad84e2b)；
+原发布页自动生成的 Source code 压缩包不对应 build.14。
 
 ## 烧录
 
