@@ -3,7 +3,14 @@
 
 void starter_preroll_init(starter_preroll_t *q, int16_t *pcm, size_t capacity)
 {
-    *q = (starter_preroll_t){.pcm = pcm, .capacity = capacity};
+    starter_preroll_init_rate(q, pcm, capacity, PREROLL_RATE);
+}
+
+void starter_preroll_init_rate(starter_preroll_t *q, int16_t *pcm,
+                              size_t capacity, uint32_t sample_rate_hz)
+{
+    *q = (starter_preroll_t){.pcm = pcm, .capacity = capacity,
+                             .sample_rate_hz = sample_rate_hz};
 }
 
 void starter_preroll_clear(starter_preroll_t *q)
@@ -24,13 +31,13 @@ void starter_preroll_append(starter_preroll_t *q, const int16_t *pcm,
      * First admitted frame establishes a fresh timestamp/continuity boundary. */
     if (q->ack_pending) return;
     if (q->listen_after_ms != 0) {
-        if (end_ms - (int64_t)samples / 8 < q->listen_after_ms) return;
+        if (end_ms - (int64_t)samples * 1000 / q->sample_rate_hz < q->listen_after_ms) return;
         q->listen_after_ms = 0;
-        q->timestamp_ms = end_ms - (int64_t)samples / 8;
+        q->timestamp_ms = end_ms - (int64_t)samples * 1000 / q->sample_rate_hz;
         q->end_ms = 0;
     }
     /* An input discontinuity invalidates a pending utterance, never splices it. */
-    int64_t duration_ms = (int64_t)samples / 8;
+    int64_t duration_ms = (int64_t)samples * 1000 / q->sample_rate_hz;
     if (q->end_ms != 0 &&
         (end_ms <= q->end_ms || end_ms - q->end_ms > duration_ms + 100)) {
         if (q->token != 0) { q->failed = true; return; }
@@ -42,8 +49,9 @@ void starter_preroll_append(starter_preroll_t *q, const int16_t *pcm,
         q->failed = true;
         return;
     }
+    size_t history_samples = (size_t)q->sample_rate_hz * PREROLL_HISTORY_MS / 1000U;
     size_t limit = q->token ? q->capacity :
-                   (q->capacity < PREROLL_HISTORY_SAMPLES ? q->capacity : PREROLL_HISTORY_SAMPLES);
+                   (q->capacity < history_samples ? q->capacity : history_samples);
     for (size_t i = 0; i < samples; ++i) {
         if (q->count == limit) {
             q->head = (q->head + 1U) % q->capacity;
@@ -65,7 +73,7 @@ uint32_t starter_preroll_prepare(starter_preroll_t *q, int64_t wake_ms, int64_t 
      * connection setup, but never deliberately replay the detector's window.
      * Empty post-wake audio is valid: future capture belongs to this token. */
     int64_t keep_ms = q->end_ms - wake_ms;
-    size_t keep = (size_t)keep_ms * 8U;
+    size_t keep = (size_t)keep_ms * q->sample_rate_hz / 1000U;
     if (keep < q->count) {
         size_t drop = q->count - keep;
         q->head = (q->head + drop) % q->capacity;
@@ -73,7 +81,7 @@ uint32_t starter_preroll_prepare(starter_preroll_t *q, int64_t wake_ms, int64_t 
     }
     if (++q->next_token == 0) ++q->next_token;
     q->token = q->next_token;
-    q->timestamp_ms = q->end_ms - (int64_t)q->count / 8;
+    q->timestamp_ms = q->end_ms - (int64_t)q->count * 1000 / q->sample_rate_hz;
     q->expires_ms = now_ms + PREROLL_TIMEOUT_MS;
     return q->token;
 }
@@ -140,7 +148,7 @@ void starter_preroll_consume(starter_preroll_t *q, size_t samples)
     if (samples > q->count) return;
     q->head = (q->head + samples) % q->capacity;
     q->count -= samples;
-    q->timestamp_ms += (int64_t)samples / 8;
+    q->timestamp_ms += (int64_t)samples * 1000 / q->sample_rate_hz;
 }
 
 bool starter_preroll_finish_replay(starter_preroll_t *q, uint32_t generation,

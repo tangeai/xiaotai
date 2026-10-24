@@ -5,9 +5,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Pure 8 kHz PCM queue. Caller serializes access; no SDK calls or allocation. */
+/* PCM queue at 8 or 16 kHz. Caller serializes access; no SDK calls or allocation. */
 #define PREROLL_RATE 8000U
-#define PREROLL_HISTORY_SAMPLES 12000U
+#define PREROLL_HISTORY_MS 1500U
 #define PREROLL_CAPACITY_SAMPLES (PREROLL_RATE * 20U)
 #define PREROLL_TIMEOUT_MS 19000
 #define PREROLL_ACK_QUEUE_TIMEOUT_MS 2000
@@ -16,6 +16,7 @@
 typedef struct {
     int16_t *pcm;
     size_t capacity, head, count;
+    uint32_t sample_rate_hz;
     uint32_t next_token, token, generation;
     int64_t end_ms, expires_ms, timestamp_ms;
     bool failed;
@@ -24,6 +25,8 @@ typedef struct {
 } starter_preroll_t;
 
 void starter_preroll_init(starter_preroll_t *q, int16_t *pcm, size_t capacity);
+void starter_preroll_init_rate(starter_preroll_t *q, int16_t *pcm,
+                              size_t capacity, uint32_t sample_rate_hz);
 void starter_preroll_clear(starter_preroll_t *q);
 void starter_preroll_append(starter_preroll_t *q, const int16_t *pcm,
                            size_t samples, int64_t end_ms);

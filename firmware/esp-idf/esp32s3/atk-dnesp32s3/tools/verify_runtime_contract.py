@@ -116,7 +116,7 @@ def check_platform_contract(platform: Any, errors: list[str]) -> None:
     expected_audio = {
         ("h5", "audio_up"): (10, "alaw", 8000, 1),
         ("h5", "audio_down"): (14, "alaw", 8000, 1),
-        ("ai", "audio_up"): (1, "alaw", 8000, 1),
+        ("ai", "audio_up"): (1, "alaw", 16000, 1),
         ("ai", "audio_down"): (1, "alaw", 8000, 1),
     }
     for (section, direction), expected in expected_audio.items():
@@ -131,12 +131,17 @@ def check_platform_contract(platform: Any, errors: list[str]) -> None:
             actual.get("sample_rate_hz"),
             actual.get("channels"),
         )
+        expected_flags = (
+            "TIRTC_AUDIOSAMPLE_16K16B1C"
+            if section == "ai" and direction == "audio_up"
+            else "TIRTC_AUDIOSAMPLE_8K16B1C"
+        )
         if values != expected or actual.get("media") != "TIRTC_AUDIO_ALAW" or actual.get(
             "flags"
-        ) != "TIRTC_AUDIOSAMPLE_8K16B1C":
+        ) != expected_flags:
             errors.append(
                 f"platform {section}.{direction} must be stream/codec/rate/channels "
-                f"{expected} with TiRTC A-law 8k flags"
+                f"{expected} with {expected_flags}"
             )
     h5 = platform.get("h5")
     video = h5.get("video_up") if isinstance(h5, dict) else None
@@ -335,7 +340,8 @@ def verify_contract(contract_path: Path, project_path: Path) -> dict[str, Any]:
             "config->service_endpoint",
             ".stream_id = mode == STARTER_TIRTC_H5 ? H5_AUDIO_STREAM : AI_AUDIO_STREAM",
             ".media = TIRTC_AUDIO_ALAW",
-            ".flags = TIRTC_AUDIOSAMPLE_8K16B1C",
+            "mode == STARTER_TIRTC_AI",
+            "TIRTC_AUDIOSAMPLE_16K16B1C : TIRTC_AUDIOSAMPLE_8K16B1C",
             "frame->media != TIRTC_AUDIO_ALAW",
             "frame->flags != TIRTC_AUDIOSAMPLE_8K16B1C",
             "TIRTC_VIDEO_JPEG",
@@ -366,11 +372,12 @@ def verify_contract(contract_path: Path, project_path: Path) -> dict[str, Any]:
             '"input_audio"',
             '"output_audio"',
             '"codec", "alaw"',
+            '"sample_rate", 16000',
             '"sample_rate", 8000',
             '"channels", 1',
             '"session_id"',
-            "ai_audio_format_is_alaw_8k_mono(input_audio)",
-            "ai_audio_format_is_alaw_8k_mono(output_audio)",
+            "ai_audio_format_is_alaw_mono(input_audio, 16000)",
+            "ai_audio_format_is_alaw_mono(output_audio, 8000)",
             "has_result && !accepted",
             'strcmp(method->valuestring, "end_session")',
         ),

@@ -135,7 +135,7 @@ idf.py -p <串口> flash monitor
 ## 音视频参数
 
 H5、设备呼叫、多人对讲和微信通话使用 8 kHz 单声道 A-law，每包 20 毫秒、160 字节。
-AI 上行使用 8 kHz 单声道 A-law，每包 20 毫秒、160 字节；下行使用 Opus / 16 kHz。
+当前源码的 AI 上行使用 16 kHz 单声道 A-law，每包 20 毫秒、320 字节；下行使用 Opus / 16 kHz。
 
 当前参数由工程 `main/media/media_tuning.h` 定义，均为目标值，实际吞吐以实板日志为准：
 

@@ -942,7 +942,11 @@ int starter_tirtc_send_alaw(uint32_t timestamp_ms,
     TIRTCFRAMEINFO frame = {
         .stream_id = audio_stream_for_mode(mode),
         .media = TIRTC_AUDIO_ALAW,
-        .flags = TIRTC_AUDIOSAMPLE_8K16B1C,
+        .flags =
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+            mode == STARTER_TIRTC_AI ? TIRTC_AUDIOSAMPLE_16K16B1C :
+#endif
+            TIRTC_AUDIOSAMPLE_8K16B1C,
         .ts = timestamp_ms,
         .length = length,
     };

@@ -703,13 +703,13 @@ static void capture_task(beken_thread_arg_t argument)
 {
     (void)argument;
     int16_t pcm[AUDIO_MAX_FRAME_SAMPLES];
-    uint8_t alaw[AUDIO_ALAW_FRAME_BYTES];
+    uint8_t alaw[AUDIO_MAX_FRAME_SAMPLES];
     uint8_t opus[OPUS_MAX_PACKET_BYTES];
     int16_t narrow_pcm[AUDIO_ALAW_FRAME_BYTES];
 
     BK_LOGI(TAG, "capture task started: uplink=%s rate=%u DSP-samples=%u\n",
             s_uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? "opus" : "alaw",
-            s_uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? 16000U : 8000U,
+            s_uplink_codec == XIAOTAI_AUDIO_CODEC_ALAW_8K ? 8000U : 16000U,
             (unsigned)s_frame_samples);
     while (s_capture_run) {
         size_t bytes_read = 0U;
@@ -796,13 +796,16 @@ static void capture_task(beken_thread_arg_t argument)
         } else {
             const int16_t *wire_pcm = pcm;
             size_t wire_samples = s_frame_samples;
-            if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
+            if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K &&
+                s_uplink_codec == XIAOTAI_AUDIO_CODEC_ALAW_8K) {
                 wire_samples = starter_audio_resampler_16k_to_8k_process(
                     &s_uplink_resampler, pcm, s_frame_samples,
                     narrow_pcm, AUDIO_ALAW_FRAME_BYTES);
                 wire_pcm = narrow_pcm;
             }
-            if (wire_samples != AUDIO_ALAW_FRAME_BYTES) continue;
+            size_t expected_samples = s_uplink_codec == XIAOTAI_AUDIO_CODEC_ALAW_16K
+                                          ? OPUS_FRAME_SAMPLES : AUDIO_ALAW_FRAME_BYTES;
+            if (wire_samples != expected_samples) continue;
             for (size_t i = 0; i < wire_samples; ++i) {
                 alaw[i] = muted ? 0xd5U : linear2alaw((int)wire_pcm[i]);
             }
@@ -964,8 +967,10 @@ static int audio_start_duplex_locked(xiaotai_audio_codec_t uplink_codec,
 {
     if (uplink == NULL ||
         (uplink_codec != XIAOTAI_AUDIO_CODEC_ALAW_8K &&
+         uplink_codec != XIAOTAI_AUDIO_CODEC_ALAW_16K &&
          uplink_codec != XIAOTAI_AUDIO_CODEC_OPUS_16K) ||
-        (uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K &&
+        ((uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ||
+          uplink_codec == XIAOTAI_AUDIO_CODEC_ALAW_16K) &&
          codec != XIAOTAI_AUDIO_CODEC_OPUS_16K)) return BK_ERR_PARAM;
     if (codec != XIAOTAI_AUDIO_CODEC_ALAW_8K &&
         codec != XIAOTAI_AUDIO_CODEC_OPUS_16K) return BK_ERR_PARAM;
@@ -1166,7 +1171,7 @@ static int audio_start_duplex_locked(xiaotai_audio_codec_t uplink_codec,
     s_running = true;
     BK_LOGI(TAG, "full-duplex board audio started uplink=%s/%u downlink=%s/%u DSP=%u\n",
             uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? "opus" : "alaw",
-            uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? 16000U : 8000U,
+            uplink_codec == XIAOTAI_AUDIO_CODEC_ALAW_8K ? 8000U : 16000U,
             codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? "opus" : "alaw",
             codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? 16000U : 8000U,
             (unsigned)required_rate);

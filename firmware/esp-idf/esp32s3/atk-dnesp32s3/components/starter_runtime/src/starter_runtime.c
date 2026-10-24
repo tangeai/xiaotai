@@ -463,7 +463,7 @@ static void send_ai_start(void)
               cJSON_AddStringToObject(params, "device_id", s_device_id) &&
               cJSON_AddStringToObject(params, "role_id", s_ai_role_id) &&
               cJSON_AddStringToObject(input, "codec", "alaw") &&
-              cJSON_AddNumberToObject(input, "sample_rate", 8000) &&
+              cJSON_AddNumberToObject(input, "sample_rate", 16000) &&
               cJSON_AddNumberToObject(input, "channels", 1) &&
               cJSON_AddStringToObject(output, "codec", "alaw") &&
               cJSON_AddNumberToObject(output, "sample_rate", 8000) &&
@@ -548,7 +548,7 @@ static void handle_connection(const runtime_event_t *event)
     finish_session(ESP_ERR_INVALID_STATE);
 }
 
-static bool ai_audio_format_is_alaw_8k_mono(const cJSON *format)
+static bool ai_audio_format_is_alaw_mono(const cJSON *format, int expected_rate)
 {
     const cJSON *codec = cJSON_IsObject(format)
                              ? cJSON_GetObjectItemCaseSensitive(format, "codec")
@@ -562,7 +562,7 @@ static bool ai_audio_format_is_alaw_8k_mono(const cJSON *format)
                                : NULL;
     return cJSON_IsString(codec) && codec->valuestring != NULL &&
            strcmp(codec->valuestring, "alaw") == 0 &&
-           cJSON_IsNumber(sample_rate) && sample_rate->valueint == 8000 &&
+           cJSON_IsNumber(sample_rate) && sample_rate->valueint == expected_rate &&
            cJSON_IsNumber(channels) && channels->valueint == 1;
 }
 
@@ -620,8 +620,8 @@ static void handle_ai_command(const runtime_event_t *event)
     bool accepted = has_result && cJSON_IsString(session_id) &&
                     session_id->valuestring != NULL &&
                     session_id->valuestring[0] != '\0' &&
-                    ai_audio_format_is_alaw_8k_mono(input_audio) &&
-                    ai_audio_format_is_alaw_8k_mono(output_audio);
+                    ai_audio_format_is_alaw_mono(input_audio, 16000) &&
+                    ai_audio_format_is_alaw_mono(output_audio, 8000);
     cJSON_Delete(root);
     if (rejected) {
         ESP_LOGE(TAG, "AI start_session was rejected");

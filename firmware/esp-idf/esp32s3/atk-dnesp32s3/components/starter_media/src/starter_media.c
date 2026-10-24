@@ -132,11 +132,26 @@ static void audio_sink_task(void *argument)
     }
 }
 
+static size_t encode_capture_alaw(starter_tirtc_mode_t mode, const int16_t *pcm,
+                                  uint8_t *encoded)
+{
+    size_t encoded_bytes = mode == STARTER_TIRTC_AI
+                               ? AUDIO_FRAMES_16K_20MS : AUDIO_SAMPLES_8K_20MS;
+    for (size_t i = 0; i < encoded_bytes; ++i) {
+        /* Vendor recorder routes the same microphone to both ADC slots. */
+        size_t frame = mode == STARTER_TIRTC_AI ? i : i * 2U;
+        int32_t a = pcm[2U * frame];
+        int32_t b = pcm[2U * frame + 1U];
+        encoded[i] = pcm_to_alaw((int16_t)((a + b) / 2));
+    }
+    return encoded_bytes;
+}
+
 static void audio_capture_task(void *argument)
 {
     (void)argument;
     int16_t pcm[AUDIO_FRAMES_16K_20MS * 2U];
-    uint8_t encoded[AUDIO_SAMPLES_8K_20MS];
+    uint8_t encoded[AUDIO_FRAMES_16K_20MS];
     for (;;) {
         if (!atomic_load_explicit(&s_active, memory_order_acquire)) {
             vTaskDelay(pdMS_TO_TICKS(20));
@@ -148,19 +163,16 @@ static void audio_capture_task(void *argument)
         if (s_audio_adapter->read_pcm(s_audio_adapter->context, pcm,
                                       AUDIO_FRAMES_16K_20MS, &bytes) != ESP_OK ||
             bytes != sizeof(pcm)) continue;
-        for (size_t i = 0; i < AUDIO_SAMPLES_8K_20MS; ++i) {
-            /* Vendor recorder routes the same microphone to both ADC slots. */
-            int32_t a = pcm[4U * i];
-            int32_t b = pcm[4U * i + 2U];
-            encoded[i] = pcm_to_alaw((int16_t)((a + b) / 2));
-        }
+        starter_tirtc_mode_t mode = (starter_tirtc_mode_t)atomic_load_explicit(
+            &s_mode, memory_order_acquire);
+        size_t encoded_bytes = encode_capture_alaw(mode, pcm, encoded);
         if (xSemaphoreTake(s_media_lock, pdMS_TO_TICKS(100)) == pdTRUE) {
             if (generation != 0U &&
                 generation == atomic_load_explicit(&s_generation, memory_order_acquire) &&
                 atomic_load_explicit(&s_active, memory_order_acquire) &&
                 starter_tirtc_audio_ready() &&
                 starter_tirtc_send_buffer_used() < VIDEO_SEND_BUFFER_LIMIT &&
-                starter_tirtc_send_alaw(timestamp_ms(), encoded, sizeof(encoded)) == 0) {
+                starter_tirtc_send_alaw(timestamp_ms(), encoded, encoded_bytes) == 0) {
                 atomic_fetch_add_explicit(&s_audio_sent, 1, memory_order_relaxed);
             }
             xSemaphoreGive(s_media_lock);

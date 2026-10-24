@@ -127,7 +127,7 @@ idf.py -p <串口> flash monitor
 
 复用当前 S3 产品媒体契约：H5 上行 MJPEG 320×240，目标上限 8 fps；实际帧率需测量。
 H5 的 A-law 8 kHz 单声道音频使用流 10/14，视频流 11。AI 使用流 1、20 ms 单声道帧：
-上行为 G.711 A-law / 8 kHz，每包 160 字节；下行为 Opus / 16 kHz。
+当前源码上行为 G.711 A-law / 16 kHz，每包 320 字节；下行为 Opus / 16 kHz。
 
 设备间呼叫和微信 VoIP 均为纯音频。微信能力上报 `up_video_mt=none`、
 `down_video_mt=none`、`no_video=true`，双向 A-law / 8 kHz 使用音频流 0。
@@ -157,13 +157,13 @@ ES7210 前两线槽是 MIC1 人声和 MIC3 扬声器电气回采，板级整理�
 [采音诊断](../../development/MEDIA_PIPELINE_DIAGNOSTICS.md#cores3-持续对话采音观测)。
 诊断命令只读取统计数据，不修改音频参数。
 
-AI 上行格式由 ESP 共享内部配置 `CONFIG_STARTER_AI_UPLINK_G711A=y` 固定。
+AI 上行格式由 ESP 共享内部配置 `CONFIG_STARTER_AI_UPLINK_G711A_16K=y` 固定。
 AI start_session 请求使用官方协议名 `alaw`，响应兼容 `g711a` 别名。
 它同步控制 start_session 输入声明/响应校验、预录音/实时 PCM、编码器选择和
-TiRTC 的 A-law / 8 kHz 帧标志；输出声明及解码仍为 Opus / 16 kHz。
+TiRTC 的 A-law / 16 kHz 帧标志；输出声明及解码仍为 Opus / 16 kHz。
 
-AEC 继续在 16 kHz 域运行，再复用既有低通降采样结果。为了只比较编码开销，
-保留原来的 codec 初始化、缓存容量、任务调度、增益和音量设置。
+AEC 继续在 16 kHz 域运行，AI 上行直接编码处理后的 16 kHz PCM；
+H5 和通话仍使用原有 8 kHz 路径。
 服务端若拒绝该输入/输出组合，会报协商错误并停止，不能视为声学测试通过。
 立创 S3、微雪 P4 和 BK7258 现在采用相同 AI 网络格式，各板保留原有 DSP 处理。
 

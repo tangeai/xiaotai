@@ -12,23 +12,29 @@ int main(void)
                                          "dev-1", "role-1");
     assert(length > 0);
     assert(strstr(request, "\"method\":\"start_session\"") != NULL);
-    assert(strstr(request, "\"input_audio\":{\"codec\":\"alaw\",\"sample_rate\":8000,\"channels\":1}") != NULL);
+    assert(strstr(request, "\"input_audio\":{\"codec\":\"alaw\",\"sample_rate\":16000,\"channels\":1}") != NULL);
     assert(strstr(request, "\"output_audio\":{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1}") != NULL);
     assert(strstr(request, "\"sample_rate\":16000") != NULL);
     assert(xiaotai_ai_encode_start(request, 8, "req-1", "dev-1", "role-1") < 0);
 
     const char accepted[] =
         "{\"id\":\"req-1\",\"result\":{\"session_id\":\"s\","
-        "\"input_audio\":{\"codec\":\"alaw\",\"sample_rate\":8000,\"channels\":1},"
+        "\"input_audio\":{\"codec\":\"alaw\",\"sample_rate\":16000,\"channels\":1},"
         "\"output_audio\":{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1}}}";
     assert(xiaotai_ai_decode_message(accepted, strlen(accepted), "req-1") ==
            XIAOTAI_AI_MESSAGE_START_ACCEPTED);
     const char alias[] =
         "{\"id\":\"req-1\",\"result\":{\"session_id\":\"s\","
-        "\"input_audio\":{\"codec\":\"g711a\",\"sample_rate\":8000,\"channels\":1},"
+        "\"input_audio\":{\"codec\":\"g711a\",\"sample_rate\":16000,\"channels\":1},"
         "\"output_audio\":{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1}}}";
     assert(xiaotai_ai_decode_message(alias, strlen(alias), "req-1") ==
            XIAOTAI_AI_MESSAGE_START_ACCEPTED);
+    const char old_rate[] =
+        "{\"id\":\"req-1\",\"result\":{\"session_id\":\"s\","
+        "\"input_audio\":{\"codec\":\"alaw\",\"sample_rate\":8000,\"channels\":1},"
+        "\"output_audio\":{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1}}}";
+    assert(xiaotai_ai_decode_message(old_rate, strlen(old_rate), "req-1") ==
+           XIAOTAI_AI_MESSAGE_START_REJECTED);
     const char bad_profile[] =
         "{\"id\":\"req-1\",\"result\":{\"session_id\":\"s\","
         "\"input_audio\":{\"codec\":\"alaw\",\"sample_rate\":8000,\"channels\":1},"
@@ -39,10 +45,10 @@ int main(void)
      * through the public decoder, rather than testing a private predicate. */
     const char *invalid_profiles[] = {
         "{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1}",
-        "{\"codec\":\"alaw\",\"sample_rate\":8000.5,\"channels\":1}",
-        "{\"codec\":\"alaw\",\"sample_rate\":8000,\"channels\":1.5}",
-        "{\"codec\":\"alaw\",\"sample_rate\":\"8000\",\"channels\":1}",
-        "{\"codec\":\"alaw\",\"sample_rate\":8000}",
+        "{\"codec\":\"alaw\",\"sample_rate\":16000.5,\"channels\":1}",
+        "{\"codec\":\"alaw\",\"sample_rate\":16000,\"channels\":1.5}",
+        "{\"codec\":\"alaw\",\"sample_rate\":\"16000\",\"channels\":1}",
+        "{\"codec\":\"alaw\",\"sample_rate\":16000}",
         "null",
     };
     for (size_t i = 0; i < sizeof(invalid_profiles) / sizeof(invalid_profiles[0]); ++i) {

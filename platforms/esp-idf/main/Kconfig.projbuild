@@ -6,6 +6,14 @@ config STARTER_AI_UPLINK_G711A
         Product AI profile: A-law 8 kHz uplink, Opus 16 kHz downlink.
         Capture/AEC keep the board's existing 16 kHz processing domain.
 
+config STARTER_AI_UPLINK_G711A_16K
+    bool "AI A-law uplink at 16 kHz (server trial)"
+    depends on STARTER_AI_UPLINK_G711A
+    default n
+    help
+        Send the 16 kHz AEC output directly as A-law on AI sessions.
+        The AI server must accept alaw/16000/1. Other sessions stay at 8 kHz.
+
 config XIAOTAI_DISCOVERY_URL
     string "ThingConnect service discovery URL"
     default "http://ep-open.tangeopen.com/services"

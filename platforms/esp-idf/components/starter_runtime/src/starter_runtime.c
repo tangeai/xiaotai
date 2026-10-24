@@ -2055,7 +2055,11 @@ static void send_ai_start(void)
 {
 #if CONFIG_STARTER_AI_UPLINK_G711A
     const char *input_codec = "alaw";
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+    const unsigned input_rate = 16000;
+#else
     const unsigned input_rate = 8000;
+#endif
 #else
     const char *input_codec = "opus";
     const unsigned input_rate = 16000;
@@ -2151,7 +2155,11 @@ static bool ai_audio_profile_valid(const cJSON *profile, bool uplink)
 #if CONFIG_STARTER_AI_UPLINK_G711A
     if (uplink) {
         expected_codec = "alaw";
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+        expected_rate = 16000;
+#else
         expected_rate = 8000;
+#endif
     }
 #else
     (void)uplink;

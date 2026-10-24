@@ -65,7 +65,7 @@
     {
       "file": "components/starter_media/src/starter_media.c",
       "contains_compact": [
-        "starter_tirtc_send_alaw(timestamp_ms(),encoded,sizeof(encoded))",
+        "starter_tirtc_send_alaw(timestamp_ms(),encoded,encoded_bytes)",
         "alaw_to_pcm(item.payload[offset+i])",
         "s_audio_adapter->write_pcm(s_audio_adapter->context,pcm,count*2U,&written)",
         "mode==STARTER_TIRTC_AI"

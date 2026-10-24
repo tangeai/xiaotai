@@ -6,10 +6,67 @@ COMMON = opus.COMMON
 
 P4=ROOT/'firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/starter_media/src/starter_media.c'
 BK=ROOT/'platforms/beken/runtime/src'
+ATK=ROOT/'firmware/esp-idf/esp32s3/atk-dnesp32s3/components/starter_media/src/starter_media.c'
 RESAMPLER=ROOT/'platforms/common'
 FIR=(RESAMPLER/'src/starter_audio_resampler.c').read_text()
 
 class AiAlawRollout(unittest.TestCase):
+    def test_atk_capture_keeps_every_16k_ai_sample_and_8k_h5(self):
+        source=ATK.read_text()
+        run_c(r'''
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#define AUDIO_FRAMES_16K_20MS 320U
+#define AUDIO_SAMPLES_8K_20MS 160U
+#define STARTER_TIRTC_AI 1
+#define STARTER_TIRTC_H5 2
+typedef int starter_tirtc_mode_t;
+static uint8_t pcm_to_alaw(int16_t sample){return (uint8_t)sample;}
+''' + function(source,'encode_capture_alaw') + r'''
+int main(void){
+ int16_t pcm[640];uint8_t encoded[320];
+ for(size_t i=0;i<320;i++){pcm[2*i]=(int16_t)i;pcm[2*i+1]=(int16_t)i;}
+ assert(encode_capture_alaw(STARTER_TIRTC_AI,pcm,encoded)==320);
+ for(size_t i=0;i<320;i++)assert(encoded[i]==(uint8_t)i);
+ assert(encode_capture_alaw(STARTER_TIRTC_H5,pcm,encoded)==160);
+ for(size_t i=0;i<160;i++)assert(encoded[i]==(uint8_t)(2*i));
+}
+''')
+
+    def test_p4_selects_16k_ai_profile_and_encoder(self):
+        defaults = ROOT/'firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/sdkconfig.defaults'
+        self.assertIn('CONFIG_STARTER_AI_UPLINK_G711A_16K=y', defaults.read_text())
+        source=P4.read_text()
+        run_c(r'''
+#define CONFIG_STARTER_AI_UPLINK_G711A_16K 1
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#define ESP_OK 0
+#define ESP_FAIL -1
+#define ESP_AUDIO_ERR_OK 0
+#define ESP_AUDIO_SAMPLE_RATE_8K 8000
+#define ESP_AUDIO_SAMPLE_RATE_16K 16000
+#define ESP_AUDIO_MONO 1
+#define ESP_AUDIO_BIT16 16
+#define AUDIO_PACKET_MS 20
+typedef int esp_err_t;
+typedef struct {int sample_rate,channel,bits_per_sample,frame_duration;} esp_g711_enc_config_t;
+#define ESP_G711_ENC_CONFIG_DEFAULT() {0}
+static void *s_g711_encoder,*s_ai_g711_encoder,*s_g711_decoder;
+static int opens;
+static int esp_g711a_enc_open(void *cfg,size_t size,void **handle){
+ esp_g711_enc_config_t *c=cfg;assert(size==sizeof(*c));
+ assert(c->sample_rate==(opens?16000:8000));
+ *handle=(void *)(uintptr_t)(++opens);return 0;
+}
+static int esp_g711_dec_open(void *cfg,size_t size,void **handle){*handle=(void *)3;return 0;}
+static void esp_g711_enc_close(void *handle){}
+''' + function(source,'g711_init') + r'''
+int main(void){assert(g711_init()==ESP_OK && opens==2 && s_ai_g711_encoder);}
+''')
+
     def test_p4_preroll_tail_and_live_join(self):
         opus.S3OpusMedia().check_preroll(g711=False, source_path=P4)
 
@@ -82,7 +139,7 @@ int main(void){
 }
 ''',include_dirs=[RESAMPLER/'include'])
 
-    def test_bk_capture_preserves_aec_ns_agc_and_downsamples(self):
+    def test_bk_capture_preserves_aec_ns_agc_and_selects_ai_16k(self):
         source=(BK/'xiaotai_audio.c').read_text()
         run_c(FIR+r'''
 #include <assert.h>
@@ -90,6 +147,7 @@ int main(void){
 #define BK_OK 0
 #define XIAOTAI_AUDIO_CODEC_ALAW_8K 0
 #define XIAOTAI_AUDIO_CODEC_OPUS_16K 1
+#define XIAOTAI_AUDIO_CODEC_ALAW_16K 2
 #define AUDIO_MAX_FRAME_SAMPLES 320
 #define AUDIO_ALAW_FRAME_BYTES 160
 #define OPUS_MAX_PACKET_BYTES 512
@@ -101,7 +159,7 @@ int main(void){
 typedef void *beken_thread_arg_t;
 typedef struct {unsigned input_peak,output_peak,limited_samples;} xiaotai_audio_agc_stats_t;
 typedef int (*xiaotai_audio_uplink_fn)(const uint8_t*,size_t,uint32_t,void*);
-static int s_codec=1,s_uplink_codec=0,s_uplink_ns,s_uplink_agc,s_capture_stopped;
+static int s_codec=1,s_uplink_codec=2,s_uplink_ns,s_uplink_agc,s_capture_stopped;
 static void *s_opus_encoder,*s_capture_thread,*s_uplink_context;
 static size_t s_frame_samples=320;
 static bool s_capture_run=true;
@@ -125,18 +183,18 @@ static void rtos_delay_milliseconds(int ms){}
 static unsigned rtos_get_time(void){return 1000+frames*20;}
 static void rtos_set_semaphore(void *p){}
 static void rtos_delete_thread(void *p){}
-static int send(const uint8_t *data,size_t size,uint32_t ts,void *c){assert(size==160 && ts==1000+frames*20);for(unsigned i=0;i<size;i++)assert(data[i]==(s_microphone_muted?0xd5:0x42));return 0;}
+static int send(const uint8_t *data,size_t size,uint32_t ts,void *c){assert(size==(s_uplink_codec==2?320:160) && ts==1000+frames*20);for(unsigned i=0;i<size;i++)assert(data[i]==(s_microphone_muted?0xd5:0x42));return 0;}
 static xiaotai_audio_uplink_fn s_uplink=send;
 ''' + function(source,'capture_task')+r'''
 static void replay(void){frames=0;s_capture_run=true;starter_audio_resampler_16k_to_8k_reset(&s_uplink_resampler);capture_task(NULL);}
 int main(void){
- replay();assert(s_uplink_frames==4 && s_uplink_rejected==0 && encoded_samples==640);
- s_microphone_muted=true;replay();assert(s_uplink_frames==8 && encoded_samples==640);
+ replay();assert(s_uplink_frames==4 && s_uplink_rejected==0 && encoded_samples==1280);
+ s_microphone_muted=true;replay();assert(s_uplink_frames==8 && encoded_samples==1280);
  s_microphone_muted=false;s_codec=0;s_frame_samples=160;
- replay();assert(s_uplink_frames==12 && encoded_samples==1280);
- s_uplink_enabled=false;replay();assert(s_uplink_frames==12 && encoded_samples==1920);
+ s_uplink_codec=0;replay();assert(s_uplink_frames==12 && encoded_samples==1920);
+ s_uplink_enabled=false;replay();assert(s_uplink_frames==12 && encoded_samples==2560);
  s_uplink_enabled=true;s_codec=1;s_frame_samples=320;
- replay();assert(s_uplink_frames==16 && encoded_samples==2560);
+ replay();assert(s_uplink_frames==16 && encoded_samples==3200);
 }
 ''',include_dirs=[RESAMPLER/'include'])
 
@@ -165,6 +223,7 @@ int main(void){
 #define TIRTC_AUDIOSAMPLE_16K16B1C 160
 #define XIAOTAI_AUDIO_CODEC_ALAW_8K 0
 #define XIAOTAI_AUDIO_CODEC_OPUS_16K 1
+#define XIAOTAI_AUDIO_CODEC_ALAW_16K 2
 typedef void *tirtc_conn_t;
 typedef int connection_mode_t;
 typedef struct {unsigned stream_id,media,flags,ts,length;} TIRTCFRAMEINFO;
@@ -175,14 +234,14 @@ static bool enabled=true;
 static unsigned sends,starts,subscribes,stops;
 static int start_error,subscribe_error;
 static int TiRtcSendAudioStream(tirtc_conn_t c,const TIRTCFRAMEINFO *f,const void *data){
- assert(c==(void *)1 && data && f->length==160 && f->ts==20);
- assert(f->media==TIRTC_AUDIO_ALAW && f->flags==TIRTC_AUDIOSAMPLE_8K16B1C);
+ assert(c==(void *)1 && data && f->length==(s_connection_mode==CONNECTION_AI?320:160) && f->ts==20);
+ assert(f->media==TIRTC_AUDIO_ALAW && f->flags==(s_connection_mode==CONNECTION_AI?TIRTC_AUDIOSAMPLE_16K16B1C:TIRTC_AUDIOSAMPLE_8K16B1C));
  unsigned id=s_connection_mode==CONNECTION_AI || s_connection_mode==CONNECTION_ROOM ? 1 : (s_connection_mode==CONNECTION_VOIP?0:10);
  assert(f->stream_id==id);sends++;return 0;
 }
 static void xiaotai_audio_set_uplink_enabled(bool value){enabled=value;}
 static int xiaotai_audio_start_duplex(int up,int down,void *fn,void *ctx){
- assert(up==0 && down==1 && fn && !enabled && !s_audio_subscribed);starts++;return start_error;
+ assert(up==2 && down==1 && fn && !enabled && !s_audio_subscribed);starts++;return start_error;
 }
 static int xiaotai_audio_start(int codec,void *fn,void *ctx){assert(!"AI must configure independent directions");return -1;}
 static int TiRtcSubscribeAudio(tirtc_conn_t c,unsigned id){assert(c==(void*)1 && id==1);subscribes++;return subscribe_error;}
@@ -190,12 +249,12 @@ static int xiaotai_audio_stop(void){stops++;return 0;}
 static int normalize_tirtc_result(int rc){return rc;}
 '''+function(source,'send_encoded_audio')+function(source,'xiaotai_tirtc_ai_prepare_media')+r'''
 int main(void){
- char data[160]={0};
- assert(send_encoded_audio((uint8_t *)data,160,20,NULL)==0);
- s_audio_subscribed=false;assert(send_encoded_audio((uint8_t *)data,160,20,NULL)==-1);
- s_audio_subscribed=true;s_active_disconnect_queued=true;assert(send_encoded_audio((uint8_t *)data,160,20,NULL)==-1);
+ char data[320]={0};
+ assert(send_encoded_audio((uint8_t *)data,320,20,NULL)==0);
+ s_audio_subscribed=false;assert(send_encoded_audio((uint8_t *)data,320,20,NULL)==-1);
+ s_audio_subscribed=true;s_active_disconnect_queued=true;assert(send_encoded_audio((uint8_t *)data,320,20,NULL)==-1);
  s_active_disconnect_queued=false;
- for(int mode=1;mode<=4;mode++){s_connection_mode=mode;assert(send_encoded_audio((uint8_t *)data,160,20,NULL)==0);}
+ for(int mode=1;mode<=4;mode++){s_connection_mode=mode;assert(send_encoded_audio((uint8_t *)data,mode==CONNECTION_AI?320:160,20,NULL)==0);}
  s_connection_mode=CONNECTION_AI;
  assert(xiaotai_tirtc_ai_prepare_media()==0 && starts==1 && subscribes==1 && !enabled);
  start_error=-5;assert(xiaotai_tirtc_ai_prepare_media()==-5 && subscribes==1 && stops==1);

@@ -18,7 +18,7 @@ static bool audio_profile_valid(const cJSON *profile, bool uplink)
            (uplink ? (strcmp(codec->valuestring, "alaw") == 0 ||
                       strcmp(codec->valuestring, "g711a") == 0) :
                      strcmp(codec->valuestring, "opus") == 0) &&
-           cJSON_IsNumber(rate) && rate->valuedouble == (uplink ? 8000 : 16000) &&
+           cJSON_IsNumber(rate) && rate->valuedouble == 16000 &&
            cJSON_IsNumber(channels) && channels->valuedouble == 1;
 }
 
@@ -32,7 +32,7 @@ int xiaotai_ai_encode_start(char *output, size_t capacity,
     int length = snprintf(output, capacity,
         "{\"jsonrpc\":\"2.0\",\"id\":\"%s\",\"method\":\"start_session\","
         "\"params\":{\"device_id\":\"%s\",\"role_id\":\"%s\","
-        "\"input_audio\":{\"codec\":\"alaw\",\"sample_rate\":8000,\"channels\":1},"
+        "\"input_audio\":{\"codec\":\"alaw\",\"sample_rate\":16000,\"channels\":1},"
         "\"output_audio\":{\"codec\":\"opus\",\"sample_rate\":16000,\"channels\":1}}}",
         request_id, device_id, role_id);
     return length > 0 && (size_t)length < capacity ? length : -1;

@@ -90,6 +90,7 @@ python3 "$repo_dir/tools/tests/test_s3_async_regressions.py"
 python3 "$repo_dir/tools/tests/test_s3_opus_media.py"
 # AI canonical alaw, legacy alias, admission failures and bounded diagnostics.
 python3 "$repo_dir/tools/tests/test_cores3_ai_g711.py"
+python3 "$repo_dir/tools/tests/test_lckfb_s3_ai_16k_alaw.py"
 python3 "$repo_dir/tools/tests/test_ai_alaw_rollout.py"
 python3 "$repo_dir/tools/tests/test_ui_status_budget.py"
 python3 "$repo_dir/tools/tests/test_ui_refresh_observation.py"

@@ -79,8 +79,8 @@ for token in \
     'starter_aec_process_capture(capture_bytes,&clean)' \
     '#ifCONFIG_STARTER_AI_UPLINK_G711A' \
     '#ifCONFIG_STARTER_AI_UPLINK_G711Aai_opus=false;#endif' \
-    'live_pcm=ai_opus?clean.pcm_16k:clean.pcm_8k' \
-    'live_samples=ai_opus?clean.samples_16k:clean.samples' \
+    'live_pcm=ai_16k?clean.pcm_16k:clean.pcm_8k' \
+    'live_samples=ai_16k?clean.samples_16k:clean.samples' \
     'packet_pcm[packet_samples++]=live_pcm[i]' \
     'esp_opus_enc_process(s_opus_encoder,&input,&output)' \
     'esp_opus_dec_decode(s_opus_decoder,&input,&output,&info)' \
@@ -113,4 +113,4 @@ if rg -q 's_playback_active|STARTER_AEC_REFERENCE_SLOT[[:space:]]*=[[:space:]]*0
     exit 1
 fi
 
-echo "PASS: MIC1/MIC3 full-duplex AEC at 16 kHz, anti-alias A-law/8 kHz uplink and Opus/16 kHz downlink"
+echo "PASS: MIC1/MIC3 full-duplex AEC at 16 kHz; AI A-law/16 kHz, calls A-law/8 kHz, AI downlink Opus/16 kHz"

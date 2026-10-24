@@ -1,4 +1,5 @@
 CONFIG_IDF_TARGET="esp32p4"
+CONFIG_STARTER_AI_UPLINK_G711A_16K=y
 
 # The tested revision 1.03 board rejects 400 MHz in esp_clk_init; keep 360 MHz.
 # CONFIG_ESP_FORCE_400MHZ_ON_REV_LESS_V3 is not set

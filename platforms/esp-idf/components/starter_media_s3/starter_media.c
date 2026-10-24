@@ -2,7 +2,7 @@
  * Shared ESP32-S3 media pipeline. Board adapters own pins, clocks and codecs.
  * RGB565 capture -> complete software JPEG -> H5 stream 11.
  * Normalized MIC/reference PCM -> ESP-SR AEC at 16 kHz;
- * AI uses G.711 A-law at 8 kHz upstream and Opus at 16 kHz downstream.
+ * AI uplink selects G.711 A-law at 8 or 16 kHz; downlink is Opus at 16 kHz.
  * Downlink PCM is normalized to stereo at 16 kHz for the board audio adapter.
  */
 #include "starter_media.h"
@@ -362,6 +362,7 @@ static QueueHandle_t s_audio_tx_free_queue;
 static SemaphoreHandle_t s_audio_output_mutex;
 static bool s_amp_enabled;
 static void *s_g711_encoder;
+static void *s_ai_g711_encoder;
 static void *s_g711_decoder;
 static void *s_opus_encoder;
 static void *s_opus_decoder;
@@ -420,6 +421,15 @@ static esp_err_t g711_init(void)
         ESP_AUDIO_ERR_OK) {
         return ESP_FAIL;
     }
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+    encoder.sample_rate = ESP_AUDIO_SAMPLE_RATE_16K;
+    if (esp_g711a_enc_open(&encoder, sizeof(encoder), &s_ai_g711_encoder) !=
+        ESP_AUDIO_ERR_OK) {
+        esp_g711_enc_close(s_g711_encoder);
+        s_g711_encoder = NULL;
+        return ESP_FAIL;
+    }
+#endif
     if (esp_g711_dec_open(NULL, 0, &s_g711_decoder) != ESP_AUDIO_ERR_OK) {
         return ESP_FAIL;
     }
@@ -502,6 +512,9 @@ static bool enqueue_uplink_pcm(starter_tirtc_mode_t mode,
     size_t expected_samples = mode == STARTER_TIRTC_AI ? OPUS_PACKET_SAMPLES : AUDIO_PACKET_SAMPLES;
 #if CONFIG_STARTER_AI_UPLINK_G711A
     expected_samples = AUDIO_PACKET_SAMPLES;
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+    if (mode == STARTER_TIRTC_AI) expected_samples = OPUS_PACKET_SAMPLES;
+#endif
 #endif
     if (pcm == NULL || sample_count != expected_samples ||
         s_audio_tx_free_queue == NULL ||
@@ -566,16 +579,24 @@ static void audio_uplink_task(void *argument)
                 .len = sizeof(encoded_packet),
             };
             int64_t encode_start_us = esp_timer_get_time();
+            void *g711_encoder = s_g711_encoder;
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+            if (item->mode == STARTER_TIRTC_AI) g711_encoder = s_ai_g711_encoder;
+#endif
             esp_err_t encoded = use_opus
                 ? esp_opus_enc_process(s_opus_encoder, &input, &output)
-                : esp_g711_enc_process(s_g711_encoder, &input, &output);
+                : esp_g711_enc_process(g711_encoder, &input, &output);
             uint32_t encode_us = (uint32_t)(esp_timer_get_time() - encode_start_us);
             update_max_counter(&s_audio_encode_max_us, encode_us);
             update_timing_average(&s_encode_average, item->generation,
                                   &s_audio_encode_avg_us, encode_us);
+            size_t expected_alaw_bytes = AUDIO_PACKET_SAMPLES;
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+            if (item->mode == STARTER_TIRTC_AI) expected_alaw_bytes = OPUS_PACKET_SAMPLES;
+#endif
             bool encoded_ok = encoded == ESP_AUDIO_ERR_OK && output.encoded_bytes > 0U &&
                 output.encoded_bytes <= sizeof(encoded_packet) &&
-                (use_opus || output.encoded_bytes == AUDIO_PACKET_SAMPLES);
+                (use_opus || output.encoded_bytes == expected_alaw_bytes);
             /* Encoding can yield while the runtime stops, mutes or replaces
              * this owner. Do not submit its PCM using the SDK's new owner. */
             if (encoded_ok && same_session(item->mode, item->generation) &&
@@ -615,7 +636,13 @@ static void audio_capture_task(void *argument)
 {
     (void)argument;
     int16_t packet_pcm[AUDIO_PACKET_SAMPLES_MAX];
-    int16_t preroll_8k[AUDIO_PACKET_SAMPLES];
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+    int16_t preroll_pcm[OPUS_PACKET_SAMPLES];
+    const size_t preroll_packet_samples = OPUS_PACKET_SAMPLES;
+#else
+    int16_t preroll_pcm[AUDIO_PACKET_SAMPLES];
+    const size_t preroll_packet_samples = AUDIO_PACKET_SAMPLES;
+#endif
     size_t packet_samples = 0;
     uint32_t packet_generation = 0;
     uint32_t next_timestamp_ms = 0;
@@ -723,7 +750,11 @@ static void audio_capture_task(void *argument)
                 starter_preroll_clear(&s_preroll);
             } else if (s_preroll.token != 0 ||
                        (!atomic_load(&s_active) && atomic_load(&s_wake_allowed))) {
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+                starter_preroll_append(&s_preroll, clean.pcm_16k, clean.samples_16k, captured_ms);
+#else
                 starter_preroll_append(&s_preroll, clean.pcm_8k, clean.samples, captured_ms);
+#endif
             }
             if (s_preroll.failed && s_preroll.generation != 0) {
                 /* Already admitted: lose damaged backlog, never the AI session.
@@ -793,6 +824,10 @@ static void audio_capture_task(void *argument)
 #if CONFIG_STARTER_AI_UPLINK_G711A
         ai_opus = false;
 #endif
+        bool ai_16k = ai_opus;
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+        ai_16k = mode == STARTER_TIRTC_AI;
+#endif
         bool replay = false;
         if (mode == STARTER_TIRTC_AI) {
             /* Catch up, then transfer the partial packet exactly once to live. */
@@ -802,18 +837,18 @@ static void audio_capture_task(void *argument)
                 packet_samples = 0;
                 for (unsigned packet = 0; packet < 3U; ++packet) {
                     uint32_t timestamp;
-                    if (!starter_preroll_peek(&s_preroll, generation, preroll_8k,
-                                              AUDIO_PACKET_SAMPLES, &timestamp)) break;
+                    if (!starter_preroll_peek(&s_preroll, generation, preroll_pcm,
+                                              preroll_packet_samples, &timestamp)) break;
                     size_t replay_samples = prepare_ai_preroll_pcm(
-                        preroll_8k, AUDIO_PACKET_SAMPLES, packet_pcm);
+                        preroll_pcm, preroll_packet_samples, packet_pcm);
                     if (!enqueue_uplink_pcm(mode, generation, timestamp, packet_pcm,
                                               replay_samples, mute_epoch)) break;
-                    starter_preroll_consume(&s_preroll, AUDIO_PACKET_SAMPLES);
+                    starter_preroll_consume(&s_preroll, preroll_packet_samples);
                 }
-                if (starter_preroll_finish_replay(&s_preroll, generation, preroll_8k,
-                                                 AUDIO_PACKET_SAMPLES, &packet_samples,
+                if (starter_preroll_finish_replay(&s_preroll, generation, preroll_pcm,
+                                                 preroll_packet_samples, &packet_samples,
                                                  &next_timestamp_ms)) {
-                    packet_samples = prepare_ai_preroll_pcm(preroll_8k, packet_samples, packet_pcm);
+                    packet_samples = prepare_ai_preroll_pcm(preroll_pcm, packet_samples, packet_pcm);
                     s_expected_wake_token = 0;
                     /* Keep replay=true for this iteration: clean was already
                      * appended above and must not be transmitted a second time. */
@@ -825,9 +860,9 @@ static void audio_capture_task(void *argument)
         }
         if (replay) continue;
 
-        const int16_t *live_pcm = ai_opus ? clean.pcm_16k : clean.pcm_8k;
-        size_t live_samples = ai_opus ? clean.samples_16k : clean.samples;
-        size_t packet_target = ai_opus ? OPUS_PACKET_SAMPLES : AUDIO_PACKET_SAMPLES;
+        const int16_t *live_pcm = ai_16k ? clean.pcm_16k : clean.pcm_8k;
+        size_t live_samples = ai_16k ? clean.samples_16k : clean.samples;
+        size_t packet_target = ai_16k ? OPUS_PACKET_SAMPLES : AUDIO_PACKET_SAMPLES;
         for (size_t i = 0; i < live_samples; ++i) {
             packet_pcm[packet_samples++] = live_pcm[i];
             if (packet_samples != packet_target) {
@@ -1188,12 +1223,18 @@ esp_err_t starter_media_init(void)
     s_audio_tx_pool = heap_caps_calloc(AUDIO_TX_QUEUE_DEPTH,
                                        sizeof(*s_audio_tx_pool),
                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    int16_t *preroll_pcm = heap_caps_calloc(PREROLL_CAPACITY_SAMPLES,
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+    const uint32_t preroll_rate = 16000U;
+#else
+    const uint32_t preroll_rate = PREROLL_RATE;
+#endif
+    const size_t preroll_capacity = (size_t)preroll_rate * 20U;
+    int16_t *preroll_pcm = heap_caps_calloc(preroll_capacity,
                                            sizeof(int16_t),
                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     s_preroll_mutex = xSemaphoreCreateMutex();
     if (preroll_pcm == NULL || s_preroll_mutex == NULL) return ESP_ERR_NO_MEM;
-    starter_preroll_init(&s_preroll, preroll_pcm, PREROLL_CAPACITY_SAMPLES);
+    starter_preroll_init_rate(&s_preroll, preroll_pcm, preroll_capacity, preroll_rate);
     s_jpeg_buffer = heap_caps_malloc(JPEG_BUFFER_BYTES,
                                      MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     s_audio_rx_ready_queue = xQueueCreate(AUDIO_RX_QUEUE_DEPTH, sizeof(uint8_t));
@@ -1260,7 +1301,11 @@ esp_err_t starter_media_init(void)
              "V1.0.1 media ready: GC0308/GC2145 MJPEG target=%u fps, "
              "PSRAM audio pools rx/tx=%u/%u bytes, JPEG=%u bytes, "
 #if CONFIG_STARTER_AI_UPLINK_G711A
+#if CONFIG_STARTER_AI_UPLINK_G711A_16K
+             "AI up=G711A/16k down=Opus/16k mono/20ms, "
+#else
              "AI up=G711A/8k down=Opus/16k mono/20ms, "
+#endif
 #else
              "AI up=Opus/16k down=Opus/16k mono/20ms, "
 #endif
@@ -1438,7 +1483,7 @@ bool starter_media_preroll_status(starter_media_preroll_status_t *out)
     if (out == NULL || s_preroll_mutex == NULL ||
         xSemaphoreTake(s_preroll_mutex, 0) != pdTRUE) return false;
     *out = (starter_media_preroll_status_t){
-        .buffered_ms = (uint32_t)(s_preroll.count / 8U),
+        .buffered_ms = (uint32_t)(s_preroll.count * 1000U / s_preroll.sample_rate_hz),
         .owned = s_preroll.token != 0,
         .bound = s_preroll.generation != 0,
         .failed = s_preroll.failed,

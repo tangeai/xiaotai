@@ -618,7 +618,8 @@ int starter_tirtc_send_alaw(uint32_t timestamp_ms,
     TIRTCFRAMEINFO frame = {
         .stream_id = mode == STARTER_TIRTC_H5 ? H5_AUDIO_STREAM : AI_AUDIO_STREAM,
         .media = TIRTC_AUDIO_ALAW,
-        .flags = TIRTC_AUDIOSAMPLE_8K16B1C,
+        .flags = mode == STARTER_TIRTC_AI
+                     ? TIRTC_AUDIOSAMPLE_16K16B1C : TIRTC_AUDIOSAMPLE_8K16B1C,
         .ts = timestamp_ms,
         .length = length,
     };

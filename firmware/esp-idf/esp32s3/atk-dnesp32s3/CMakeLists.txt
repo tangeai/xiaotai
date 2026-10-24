@@ -11,6 +11,7 @@ set(TIRTC_SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/third_party/tirtc"
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 set(PROJECT_VER "1.0.0")
+include("${XIAOTAI_REPO_ROOT}/platforms/esp-idf/cmake/xiaotai_build_version.cmake")
 project(atk_xiaotai_s3)
 
 # tirtc-runtime-semantic-gate-v1

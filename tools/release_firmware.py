@@ -15,6 +15,7 @@ from firmware_version import FirmwareVersion
 from merge_esp_firmware import verify_merged
 
 BOARDS = {
+    'alientek-atk-dnesp32s3': ('正点原子 ATK-DNESP32S3', 'alientek-atk-dnesp32s3'),
     'm5stack-cores3-lite': ('M5Stack CoreS3-Lite', 'm5stack-cores3-lite'),
     'lckfb-bk7258': ('立创·实战派 BK7258', 'bk7258'),
     'mgkfb-bk7258': ('觅感 AI 玩具开发板 BK7258', 'mgkfb-bk7258'),

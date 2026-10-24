@@ -116,6 +116,10 @@ int main(void){
         start = capture.index('        bool ai_opus =' if '        bool ai_opus =' in capture else '        bool replay =')
         body = capture[start:capture.rfind('\n    }')]
         preroll = ROOT / 'platforms/esp-idf/components/starter_media_common'
+        preroll_declaration = ('static int16_t packet_pcm[320],preroll_pcm[320],sent[2][320];\n'
+                               'static const size_t preroll_packet_samples=160;\n'
+                               if 'generation, preroll_pcm,' in body else
+                               'static int16_t packet_pcm[320],preroll_8k[160],sent[2][320];\n')
         run_c(f'#define CONFIG_STARTER_AI_UPLINK_G711A {int(g711)}\n' + COMMON + '#include "' + str(preroll / 'include/starter_preroll.h') + '"\n' +
               (preroll / 'src/starter_preroll.c').read_text().replace('#include "starter_preroll.h"', '') + r'''
 #define AUDIO_PACKET_MS 20U
@@ -124,7 +128,7 @@ static uint32_t s_expected_wake_token;
 static int s_preroll_mutex;
 static size_t packet_samples;
 static uint32_t next_timestamp_ms;
-static int16_t packet_pcm[320],preroll_8k[160],sent[2][320];
+''' + preroll_declaration + r'''
 static uint32_t timestamps[2];
 static unsigned packets;
 static struct {const int16_t *pcm_16k,*pcm_8k;size_t samples_16k,samples;} clean;
@@ -175,8 +179,10 @@ int main(void){
                 with self.subTest(g711=g711, interruption=interruption):
                     self.check_uplink(g711, interruption)
 
-    def check_uplink(self, g711, interruption=0):
-        run_c(f'#define CONFIG_STARTER_AI_UPLINK_G711A {int(g711)}\n#define INTERRUPT_CASE {interruption}\n' + COMMON + r'''
+    def check_uplink(self, g711, interruption=0, alaw16=False):
+        run_c(f'#define CONFIG_STARTER_AI_UPLINK_G711A {int(g711)}\n'
+              f'#define CONFIG_STARTER_AI_UPLINK_G711A_16K {int(alaw16)}\n'
+              f'#define INTERRUPT_CASE {interruption}\n' + COMMON + r'''
 typedef struct {int mode;uint32_t generation,timestamp_ms;unsigned mute_epoch;
     size_t sample_count;int16_t pcm[320];} audio_tx_item_t;
 static audio_tx_item_t pool[1],*s_audio_tx_pool=pool;
@@ -187,6 +193,7 @@ static jmp_buf done;
 static unsigned reads,opus_enc,alaw_enc,opus_send,alaw_send;
 static size_t encoded_size=37;
 static unsigned interrupt_encode, encode_warnings;
+static void *s_ai_g711_encoder=(void *)2;
 static bool transport_ready=true;
 #undef ESP_LOGW
 #define ESP_LOGW(...) ((void)++encode_warnings)
@@ -199,7 +206,7 @@ static int xQueueReceive(int q,uint8_t *slot,int wait){
 static int xQueueSend(int q,uint8_t *slot,int wait){return pdTRUE;}
 static int encode(esp_audio_enc_in_frame_t *in,esp_audio_enc_out_frame_t *out,bool opus){
     clock_us+=opus ? 3000 : 800;
-    assert(in->len==(opus ? 640U : 320U));
+    assert(in->len==(opus || (CONFIG_STARTER_AI_UPLINK_G711A_16K && mode==STARTER_TIRTC_AI) ? 640U : 320U));
     assert(((int16_t *)in->buffer)[0]==42);
     switch(interrupt_encode) {
     case 1: s_microphone_muted=true;break;
@@ -210,9 +217,13 @@ static int encode(esp_audio_enc_in_frame_t *in,esp_audio_enc_out_frame_t *out,bo
     case 6: s_room_pressed=false;break;
     case 7: transport_ready=false;break;
     }
-    out->encoded_bytes=opus ? encoded_size : 160;return codec_error;
+    out->encoded_bytes=opus ? encoded_size :
+        (CONFIG_STARTER_AI_UPLINK_G711A_16K && mode==STARTER_TIRTC_AI ? 320 : 160);
+    return codec_error;
 }
 static int esp_g711_enc_process(void *h,esp_audio_enc_in_frame_t *i,esp_audio_enc_out_frame_t *o){
+    assert(h==(mode==STARTER_TIRTC_AI && CONFIG_STARTER_AI_UPLINK_G711A_16K ?
+               s_ai_g711_encoder : s_g711_encoder));
     alaw_enc++;return encode(i,o,false);
 }
 static int esp_opus_enc_process(void *h,esp_audio_enc_in_frame_t *i,esp_audio_enc_out_frame_t *o){
@@ -220,7 +231,9 @@ static int esp_opus_enc_process(void *h,esp_audio_enc_in_frame_t *i,esp_audio_en
 }
 static int starter_tirtc_send_alaw(uint32_t ts,const void *data,uint32_t size){
     clock_us+=25000;
-    assert((CONFIG_STARTER_AI_UPLINK_G711A || mode!=STARTER_TIRTC_AI) && ts==100 && size==160);alaw_send++;return 0;
+    assert((CONFIG_STARTER_AI_UPLINK_G711A || mode!=STARTER_TIRTC_AI) && ts==100 &&
+           size==(mode==STARTER_TIRTC_AI && CONFIG_STARTER_AI_UPLINK_G711A_16K ? 320 : 160));
+    alaw_send++;return 0;
 }
 static int starter_tirtc_send_opus(uint32_t ts,const void *data,uint32_t size){
     clock_us+=25000;
@@ -229,7 +242,8 @@ static int starter_tirtc_send_opus(uint32_t ts,const void *data,uint32_t size){
 ''' + playback_fixture(MEDIA.read_text()) + function(MEDIA.read_text(), 'update_max_counter') + function(MEDIA.read_text(), 'update_timing_average') + function(MEDIA.read_text(), 'uplink_allowed') + function(MEDIA.read_text(), 'audio_uplink_task') + r'''
 static void replay(void){
     reads=0;pool[0]=(audio_tx_item_t){.mode=mode,.generation=active_generation,.timestamp_ms=100,
-        .sample_count=mode==STARTER_TIRTC_AI && !CONFIG_STARTER_AI_UPLINK_G711A ? 320 : 160};pool[0].pcm[0]=42;
+        .sample_count=mode==STARTER_TIRTC_AI && (!CONFIG_STARTER_AI_UPLINK_G711A ||
+                       CONFIG_STARTER_AI_UPLINK_G711A_16K) ? 320 : 160};pool[0].pcm[0]=42;
     if(setjmp(done)==0) audio_uplink_task(NULL);
 }
 int main(void){

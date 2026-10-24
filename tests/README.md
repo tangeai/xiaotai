@@ -1,5 +1,16 @@
 # 小钛测试与硬件验证
 
+## AI 上行 16 kHz A-law 验证包
+
+`test_lckfb_s3_ai_16k_alaw.py` 先复现 S3 仍声明 `alaw/8000`、发送 8 kHz 标志、
+只创建 8 kHz A-law 编码器以及预录音保持 8 kHz 的问题；改动后验证 AI 会话声明和
+准入 `alaw/16000/1`、20 毫秒 320 字节编码和发送、16 kHz 预录音及时间戳，
+同时验证 H5 仍使用 8 kHz A-law。该测试已登记在 `tools/check.sh`；原有
+`test_cores3_ai_g711.py`、`test_s3_opus_media.py` 和 `test_ai_alaw_rollout.py`
+覆盖 M5/P4/BK/ATK 的上行采集、编码、会话声明和其他 8 kHz 业务路径。
+每块板卡及变体分别编译并打包；实板验证需对应各包的镜像校验值，检查
+AI 语音识别、短句打断、双讲回声和上行丢帧。
+
 ## 恢复出厂清除 EP 覆盖
 
 `test_preferences_persistence.py` 回放 ESP32 生产重置任务，先复现重置后仍保留
