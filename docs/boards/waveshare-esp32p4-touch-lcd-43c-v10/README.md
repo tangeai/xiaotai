@@ -1,11 +1,11 @@
 # 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3
 
-[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1)
+[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1-build.20)
 
-板卡 ID：`waveshare-esp32p4-touch-lcd-43c-v10`。当前发布固件为 **v1.0.1 · build.19**。
-本版已由用户完成实板验证，使用正常。下文的历史性能记录对应旧构建，不代表 build.19 的已知问题。
+板卡 ID：`waveshare-esp32p4-touch-lcd-43c-v10`。当前发布固件为 **v1.0.1 · build.20**。
+本版已由用户完成实板验证，使用正常。下文的历史性能记录对应旧构建，不代表 build.20 的已知问题。
 
-本版对应[源码标签](https://github.com/tangeai/xiaotai/tree/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1)。
+本版对应[源码标签](https://github.com/tangeai/xiaotai/tree/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1-build.20)。
 
 ## 烧录
 
@@ -17,11 +17,11 @@
 
 ### 烧录步骤
 
-1. 下载 [waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.19-merged.bin](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.19-merged.bin)。本版只选择这一个完整 BIN，地址为 **`0x0`**。
+1. 下载 [waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.20-merged.bin](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1-build.20/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.20-merged.bin)。本版只选择这一个完整 BIN，地址为 **`0x0`**。
 2. 使用板上的 **USB TO UART** Type-C 接口连接电脑，不要连接 USB OTG 或 C6 烧录焊盘。连接失败时按住 BOOT，按一下 RESET，再松开 BOOT。识别结果必须是 **ESP32-P4**；若显示 ESP32-C6，检查接口。
 3. 在网页工具的 **Program** 区域选择 `Baudrate`（可先用 `921600`，不稳定时改为 `115200`），点击 **Connect** 并选择本板串口。桌面串口方式不勾选 `WebUSB (CH340)`。
 4. 点击 **Choose File** 选择下载的完整 BIN，**Flash Address 改为 `0x0`**；Flash Mode、Flash Frequency、Flash Size 均选 `keep`。只添加这一行，点击 **Program**。
-5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `xiaotai_esp32p4` 和版本 `1.0.1+build.19`，再进入“首次使用”。
+5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `xiaotai_esp32p4` 和版本 `1.0.1+build.20`，再进入“首次使用”。
 
 连接位置和烧录参数见下图，图中的端口号与路径只是示例：
 
@@ -35,20 +35,20 @@
 
 | 下载或包内文件 | 用途 |
 |---|---|
-| `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.19-merged.bin` | **直接烧录**，只此一个文件，地址 `0x0` |
-| `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.19-validation.zip` | 分文件烧录包，先解压，按下表各地址写入 |
+| `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.20-merged.bin` | **直接烧录**，只此一个文件，地址 `0x0` |
+| `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.20-validation.zip` | 分文件烧录包，先解压，按下表各地址写入 |
 | `xiaotai_esp32p4.bin` | 应用 BIN，仅在分文件方式中写入 `0x10000`，不可当完整镜像写入 `0x0` |
 | `MANIFEST.json`、`flasher_args.json`、`flash_args`、ELF | 清单或排查资料，不直接烧录 |
 
 如需核验完整 BIN，SHA-256 为：
 
 ```text
-d5b6378565513ae44028556d67427e3c7e89a98afdd16491c66cbaa0b20c3cfb
+f451b706940a551c1ddd4d7f5d164618e514f45495e7e95a14002d67e22dc4d1
 ```
 
 Windows 可用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 用 `sha256sum "实际BIN路径"`；
 macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIFEST.json`，
-发布附件的完整哈希见[发布页](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1)中的 `SHA256SUMS`。
+发布附件的完整哈希见[发布页](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1-build.20)中的 `SHA256SUMS`。
 
 ## 首次使用
 
@@ -83,7 +83,7 @@ macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIF
 
 ### 分文件烧录
 
-下载并解压 [waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.19-validation.zip](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.19-validation.zip)。
+下载并解压 [waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.20-validation.zip](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1-build.20/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.20-validation.zip)。
 此方式需按包内 `MANIFEST.json` 和 `flasher_args.json` 核对本板、本版的 **4 个 BIN**：
 
 | 文件 | 烧录地址 | 用途 |
@@ -300,10 +300,10 @@ VoIP。音视频分别记录实际帧率、码率、丢帧、首包、AEC 参考
 
 ## 验证状态与已知限制
 
-当前 `1.0.1+build.19` 完整 BIN SHA-256 为
-`d5b6378565513ae44028556d67427e3c7e89a98afdd16491c66cbaa0b20c3cfb`；
+当前 `1.0.1+build.20` 完整 BIN SHA-256 为
+`f451b706940a551c1ddd4d7f5d164618e514f45495e7e95a14002d67e22dc4d1`；
 用户确认该版 P4 实板验证可用、使用无问题。反馈未附逐项测试日志，
-因此下列旧构建的性能数据不能作为 build.19 的帧率、音质或长时间稳定性指标。
+因此下列旧构建的性能数据不能作为 build.20 的帧率、音质或长时间稳定性指标。
 
 项目方确认该型号的 PCB V1.0 实板已有跑通记录。“已验证”只适用于记录中的固件和
 测试范围，不代表从任意提交构建的固件已经验收。

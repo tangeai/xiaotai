@@ -1,31 +1,54 @@
 # ALIENTEK ATK-DNESP32S3 V1.4
 
-[返回开发板目录](../README.md)
+[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/alientek-atk-dnesp32s3-v1.0.0)
 
-板卡 ID：`alientek-atk-dnesp32s3`。**本板当前没有正式发布的烧录包**；以下步骤适用于
-使用仓库源码编译并烧录。实物需核对 V1.4 丝印和摄像头模组。
+板卡 ID：`alientek-atk-dnesp32s3`。当前正式固件为 **v1.0.0 · build.1**，
+用户已确认实板可用。先核对 V1.4 丝印和摄像头模组，再下载本板固件。
 
 本文中的 H5 指网页端，AI 指人工智能对讲，SDK 指软件开发工具包。
 Flash 是闪存，PSRAM 是用于音视频缓冲的大块运行内存。
 
-准备修改或编译源码时，需要掌握 C/C++、Git、串口日志和乐鑫 ESP-IDF 的基本
-开发流程。第一次接触 ESP32-S3 时，建议先阅读
-[ESP32-S3 ESP-IDF 5.5.5 入门指南](https://docs.espressif.com/projects/esp-idf/en/v5.5.5/esp32s3/get-started/)
-和[正点原子官方板卡资料](https://github.com/openedv/ATK-DNESP32S3-Board/tree/c7434a3da5b9e6feda05added5d6a686f1c95f13)。
-
 ## 烧录
 
-### 准备烧录工具
+### 打开烧录工具
 
-从源码烧录需要仓库指定的 **ESP-IDF 5.5.5** 和 USB 数据线。先按本页“环境与依赖”
-安装工具链，连接板卡并关闭占用串口的终端。串口须对应 ATK-DNESP32S3，不能仅凭
-芯片同为 ESP32-S3 就选择其他板卡的固件。
+使用电脑上的 **Chrome 或 Edge** 打开[乐鑫 ESP Web Tool](https://espressif.github.io/esptool-js/)；
+网页烧录无需安装 ESP-IDF。关闭占用设备串口的终端或其他烧录网页。
+按[正点原子官方板卡资料](https://github.com/openedv/ATK-DNESP32S3-Board/tree/c7434a3da5b9e6feda05added5d6a686f1c95f13)
+确认 USB 串口和 BOOT/RESET 操作。
 
 ### 烧录步骤
 
-1. 核对开发板 V1.4 丝印及摄像头模组，连接本板实际的串口。
-2. 在仓库根目录激活 ESP-IDF，选择本板构建；不要使用立创 S3 或 M5 的镜像。
-3. 进入本板工程，填写电脑上的实际串口并执行烧录和日志监视：
+1. 下载 [alientek-atk-dnesp32s3-1.0.0+build.1-merged.bin](https://github.com/tangeai/xiaotai/releases/download/alientek-atk-dnesp32s3-v1.0.0/alientek-atk-dnesp32s3-1.0.0%2Bbuild.1-merged.bin)。首次烧录只选择这一个完整 BIN，地址为 **`0x0`**。
+2. 用本板串口连接电脑；如未识别下载模式，按板卡 BOOT/RESET 操作进入下载模式。连接目标必须显示 **ESP32-S3**。
+3. 在网页工具中点击 **Connect**，选择本板串口；点击 **Choose File** 选择完整 BIN，**Flash Address 填 `0x0`**，Flash Mode、Frequency、Size 选 `keep`。
+4. 点击 **Program**，等待 `Hash of data verified.` 和 `Leaving...`，且没有 `Error:`；断开连接并复位。
+5. 用 115200 波特率日志核对项目 `atk_xiaotai_s3` 和版本 `1.0.0+build.1`，再进入“首次使用”。
+
+**完整镜像会覆盖 NVS 中的 Wi-Fi、绑定等持久配置。** 烧录后需重新配网绑定；
+`keep` 只保留镜像中的 Flash 参数，不表示保留设备配置。
+
+完整 BIN 的 SHA-256 为
+`6e98304bfce9347c7205bbd47ba444cd12b0ac5c67c7a8c7540ddeae102b6276`。
+发布页的 `SHA256SUMS` 同时覆盖完整 BIN 和分文件包。
+
+### 保留配置的分文件烧录
+
+下载并解压 [alientek-atk-dnesp32s3-1.0.0+build.1-validation.zip](https://github.com/tangeai/xiaotai/releases/download/alientek-atk-dnesp32s3-v1.0.0/alientek-atk-dnesp32s3-1.0.0%2Bbuild.1-validation.zip)，
+按包内 `MANIFEST.json` 和 `flasher_args.json` 核对文件、地址及分区兼容性：
+
+| 文件 | 烧录地址 | 用途 |
+|---|---|---|
+| `bootloader/bootloader.bin` | `0x0` | 启动引导程序 |
+| `partition_table/partition-table.bin` | `0x8000` | 分区表 |
+| `atk_xiaotai_s3.bin` | `0x10000` | 应用程序，不能作为完整镜像写入 `0x0` |
+
+在网页工具用 **Add File** 分别添加上述 BIN，填写各自地址，再点击 **Program**。
+保留配置升级不做全片擦除，且应先确认分区布局和配置兼容。
+
+### 从源码编译并烧录
+
+需要 ESP-IDF 5.5.5。在仓库根目录执行：
 
 ```bash
 . tools/activate_esp_idf.sh
@@ -34,12 +57,7 @@ cd firmware/esp-idf/esp32s3/atk-dnesp32s3
 idf.py -p <串口> flash monitor
 ```
 
-4. 等待工具写入并校验完成，在串口日志核对板卡与构建身份，再进入“首次使用”。
-
-`idf.py` 会读取工程生成的烧录清单，按本板地址写入 bootloader、分区表和应用。
-普通升级不要执行 `erase-flash`，以免清掉 Wi-Fi、绑定信息和量产数据。
-如果后续有正式发布包，才按对应版本的 `MANIFEST.json` 核对板卡、SHA-256、文件和地址；
-目前不能从其他板卡的 Release 选择镜像。
+`<串口>` 换成本机实际端口；普通升级不要执行 `erase-flash`。
 
 ## 首次使用
 

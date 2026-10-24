@@ -114,6 +114,7 @@ class RepositoryLayoutTests(unittest.TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         catalog = (ROOT / "docs/boards/README.md").read_text(encoding="utf-8")
         featured = {
+            "alientek-atk-dnesp32s3",
             "lckfb-bk7258",
             "lckfb-esp32s3",
             "waveshare-esp32p4-touch-lcd-43c-v10",

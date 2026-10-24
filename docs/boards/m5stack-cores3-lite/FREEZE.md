@@ -1,6 +1,10 @@
 # CoreS3-Lite 发布与封版记录
 
-## M5 正式 Release：1.0.1+build.42（2026-10-22）
+当前正式固件为 [ILI9342E · v1.0.1 build.47](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1-build.47-ili9342e)
+和 [ILI9342C · v1.0.1 build.48](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1-build.48-ili9342c)；
+烧录步骤见[开发板指南](README.md)。以下保留旧构建的发布与验证记录。
+
+## 历史 Release：1.0.1+build.42（2026-10-22）
 
 本次发布面向 **M5Stack CoreS3-Lite / ILI9342E**，独立标签为
 `m5stack-cores3-lite-v1.0.1`，标题为 `M5Stack CoreS3-Lite v1.0.1 · build.42`。

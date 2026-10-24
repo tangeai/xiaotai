@@ -1,6 +1,6 @@
 # 觅感 AI 玩具开发板 BK7258
 
-[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3)
+[返回开发板目录](../README.md) · [双屏眼睛版发布说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.22-eyes) · [无屏版发布说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.21-headless)
 
 通话结束后仍可能出现任务退出告警，长时间运行与异常恢复尚未专项验收；
 选择本板前请阅读[验证状态与已知限制](#验证状态与已知限制)。
@@ -11,7 +11,9 @@
 
 ## 烧录
 
-当前发布版本为 **v1.0.3 · build.20**，适用于 **8 MiB Flash 的觅感 BK7258 双屏板**。
+当前发布版本为 **v1.0.3 · build.22**，适用于 **8 MiB Flash 的觅感 BK7258 双屏板**。
+无屏变体使用 **v1.0.3 · build.21**，下载[无屏版固件包](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.21-headless/mgkfb-bk7258-1.0.3%2Bbuild.21-validation.zip)，
+按相同串口步骤选择包内 `mgkfb-bk7258-1.0.3+build.21-all-app.bin`。
 
 ### 安装烧录工具
 
@@ -28,11 +30,11 @@
 
 ### 烧录步骤
 
-1. 下载并解压 [`mgkfb-bk7258-1.0.3+build.20-validation.zip`](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3/mgkfb-bk7258-1.0.3%2Bbuild.20-validation.zip)。
+1. 双屏版下载并解压 [`mgkfb-bk7258-1.0.3+build.22-validation.zip`](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.22-eyes/mgkfb-bk7258-1.0.3%2Bbuild.22-validation.zip)；无屏版下载上方 build.21 固件包。
 2. 用本板通讯 Type-C 连接电脑，关闭占用串口的日志终端，打开 BKFIL，点击 **Select Port** 选择对应 COM 口。
-3. 选择 **`mgkfb-bk7258-1.0.3+build.20-all-app.bin`**，起始地址为 **`0x00000000`**。
+3. 选择所下载固件包中的 **`-all-app.bin`**，起始地址为 **`0x00000000`**。
 4. 启动下载，按工具提示复位或重新上电完成下载握手；等待写入及工具校验完成，再重新上电。
-5. 打开 115200 波特率日志，核对板卡 `mgkfb-bk7258` 和版本 `1.0.3+build.20`，再进行配网与绑定。
+5. 打开 115200 波特率日志，核对板卡 `mgkfb-bk7258` 和版本：双屏版 `1.0.3+build.22`，无屏版 `1.0.3+build.21`，再进行配网与绑定。
 
 下面是 [BKFIL v4 官方操作指南](https://docs.bekencorp.com/arminodoc/bk_app/bkfil_v4/zh_CN/latest/quick_start/quick_start_guide/quick_start_guide.html#id3)中的界面截图，红框标出了操作位置。
 
@@ -43,7 +45,7 @@
 ![BKFIL 选择串口和波特率，红框标出设置位置](../../images/flashing/bkfil-select-port.png)
 
 **选择固件。** 点击 **Select BIN**，选择解压后的
-`mgkfb-bk7258-1.0.3+build.20-all-app.bin`。
+双屏版选择 `mgkfb-bk7258-1.0.3+build.22-all-app.bin`；无屏版选择 `mgkfb-bk7258-1.0.3+build.21-all-app.bin`。
 
 ![BKFIL 选择固件，红框标出 Select BIN 按钮](../../images/flashing/bkfil-select-bin.png)
 
@@ -55,8 +57,8 @@
 
 | 文件 | 用途 |
 |---|---|
-| `mgkfb-bk7258-1.0.3+build.20-all-app.bin` | **直接用于串口烧录**，起始地址 **`0x0`** |
-| `mgkfb-bk7258-1.0.3+build.20-app_pack.rbl` | **不能用于串口烧录**；OTA（无线升级）尚未验证，暂不使用 |
+| `mgkfb-bk7258-1.0.3+build.22-all-app.bin` | **直接用于串口烧录**，起始地址 **`0x0`** |
+| `mgkfb-bk7258-1.0.3+build.22-app_pack.rbl` | **不能用于串口烧录**；OTA（无线升级）尚未验证，暂不使用 |
 | `MANIFEST.json` | 文件信息与校验清单，不用于烧录 |
 | `symbols/`、`partitions/`、`build_identity.json` | 开发排查资料，不用于烧录 |
 
@@ -69,10 +71,10 @@
 
 ## 首次使用
 
-1. 设备没有 Wi-Fi 配置时，屏幕显示配网热点名。使用手机连接该热点，再用手机浏览器打开
+1. 设备没有 Wi-Fi 配置时，双屏版在屏幕显示配网热点名；无屏版从串口日志查看 `配网热点=` 后的名称。使用手机连接该热点，再用手机浏览器打开
    `http://192.168.6.1`，填写家中 Wi-Fi 信息。保存后等待设备联网；连接失败时重新连接热点检查配置。
-2. 联网后，屏幕显示绑定验证码并语音播报。使用手机打开 `https://xiaotai.chat`，注册或登录账号，
-   在“添加设备”中输入设备显示的验证码。以平台提示绑定成功、设备恢复眼睛显示为完成；
+2. 联网后，双屏版在屏幕显示绑定验证码并语音播报；无屏版语音播报验证码，也可从串口日志的 `串口备用验证码=` 查看。使用手机打开 `https://xiaotai.chat`，注册或登录账号，
+   在“添加设备”中输入验证码。以平台提示绑定成功为准；双屏版设备恢复眼睛显示。
    验证码过期时使用设备刷新的新码。
 3. 单击 S2 开始 AI 对讲，再单击结束；按下表进行音量和微信通话操作。
 4. 需要实时查看时，在手机网页中打开已绑定设备的实时查看入口。画面来自本板摄像头，
