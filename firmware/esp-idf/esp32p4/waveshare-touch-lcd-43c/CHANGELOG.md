@@ -4,10 +4,11 @@
 [`main/media/media_tuning.h`](main/media/media_tuning.h) 和
 [媒体合同](../../../../docs/product/MEDIA_CONTRACT.md)为准；这里的实板数字只对应所注明的固件。
 
-## 1.0.1+build.19（2026-10-24，待实板验证）
+## 1.0.1+build.19（2026-10-24）
 
-- 当前 P4 预发布验证包。产品功能与已验证的 build.14 一致。
-- ESP-IDF 5.5.5 编译、主机回归、应用 BIN/ELF 身份及镜像校验通过；实板待验证。
+- 用户确认该版 P4 实板验证可用。完整镜像 SHA-256：
+  `d5b6378565513ae44028556d67427e3c7e89a98afdd16491c66cbaa0b20c3cfb`。
+- 产品功能与 build.14 一致；ESP-IDF 5.5.5 编译、主机回归和镜像校验通过。
 
 ## 1.0.1+build.14（2026-10-23）
 
