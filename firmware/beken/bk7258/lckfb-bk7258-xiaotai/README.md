@@ -22,7 +22,7 @@ BK7258 与 ESP-IDF 工程保持独立，只通过稳定的产品接口复用业�
 ## 当前能力
 
 项目方已经在实板验证 H5 实时查看与双向对讲、AI 对话和音频微信 VoIP。H5 和微信通话
-使用 8 kHz 单声道 A-law；当前 AI 上行使用 A-law / 8 kHz，下行使用 Opus / 16 kHz。AI 在 16 kHz PCM 阶段使用 AEC、NS
+使用 8 kHz 单声道 A-law；当前 AI 上行使用 A-law / 16 kHz，下行使用 Opus / 16 kHz。AI 在 16 kHz PCM 阶段使用 AEC、NS
 和 AGC；8 kHz 链路使用 AGC，AEC/NS 在完成实机验证前保持关闭。设置页的 1–5 档
 麦克风灵敏度调整所有链路共用的 ADC 前端增益，默认增强档，标准档对应 BSP 原值
 `0x2d`。详细参数见

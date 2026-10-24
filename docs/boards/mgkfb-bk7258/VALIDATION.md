@@ -1,18 +1,31 @@
 # 觅感 AI 玩具开发板 BK7258 验证记录
 
-## 当前验证固件
+## 当前发布固件
 
-2026-10-24：`1.0.3+build.26`，统一固件配置，包含双屏眼睛显示及 BK 解绑后的签名重绑修复。
-原生 release AP/CP 编译和板级契约检查通过，验证包 8 个文件的长度、SHA-256、ZIP 完整性通过。
+2026-10-24 发布 [觅感 AI 玩具开发板 BK7258 v1.0.3 · build.26](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.26)。
+修复设备解绑后收到 `HTTP 410 / 6006` 时无限重试，改为保留旧身份并签名重绑。觅感统一为一套包含双屏眼睛显示的固件。
 
-完整 BIN SHA-256：`50f5633c428f8b80c67234ab8c05b07d3fa9bf43d2c702ed19560ff59952be3c`。
-产物位于本工程既定 `build/bk7258/mgkfb-bk7258-xiaotai/package/`，`all-app.bin` 与包内镜像一致。
+| 项目 | 记录 |
+|---|---|
+| 固件 | `1.0.3+build.26`，release |
+| 源码提交 | `369c53593178279ae83aed12f26ebac6bf750fd4` |
+| 验证状态 | `HIL_VERIFIED`，用户确认本轮已测试可用并授权发布 |
+| 串口烧录文件 | `mgkfb-bk7258-1.0.3+build.26-all-app.bin`，起始地址 `0x0` |
+| 完整 BIN SHA-256 | `50f5633c428f8b80c67234ab8c05b07d3fa9bf43d2c702ed19560ff59952be3c` |
+| ZIP | `mgkfb-bk7258-1.0.3+build.26-validation.zip` |
+| ZIP SHA-256 | `8a8ccaf1d56eaa79ba4d0c8d4f38b6f95379dce468ec814db4ec656d9cbdbfbd` |
 
-用户于 2026-10-24 确认“已经测试，可用”，并要求提交代码。尚未发布。
-验证包生成时的 `BUILD_VERIFIED_HIL_PENDING` 元数据保持原样；本次确认未附逐项实测记录，
-不扩展为长期稳定性、弱网或 OTA 的专项验收。
+发布沿用用户测试时的 BIN 字节，未重新编译。包内 `build_identity.json` 保留构建时基础提交，
+`MANIFEST.json` 记录整理后的源码提交；此次只更新发布验证状态和打包元数据。
+产物保留在本工程原生 `build/bk7258/mgkfb-bk7258-xiaotai/package/`。
 
-以下保留 build.20 的历史验证记录，不代表本次镜像已经完成实板验收。
+480 项主机回归、完整 `tools/check.sh`、ASan/UBSan 和 5 板清单检查通过，原生 release 编译通过。
+包内 8 个清单文件的长度、SHA-256 和 ZIP 完整性通过；公开下载的 ZIP 校验值与本地一致。
+GitHub 标题、标签、附件及源码提交均已核对。用户确认可用不扩展为长期运行、弱网或 OTA 的专项验收。
+
+## 历史验证记录：build.20
+
+以下仅记录旧镜像及其当时的验证状态。
 
 日期：2026-10-23。板卡 `mgkfb-bk7258`。
 

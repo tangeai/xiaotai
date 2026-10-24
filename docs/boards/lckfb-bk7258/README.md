@@ -1,15 +1,15 @@
 # 立创·实战派 BK7258
 
-[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.2-build.72)
+[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.2-build.73)
 
 板卡 ID：`lckfb-bk7258`。本板通过触摸屏和按键操作，支持 H5（网页端）实时查看与
 双向对讲、AI（人工智能）对讲、设备互呼、微信 VoIP（网络语音通话）和多人对讲。
 
 ## 烧录
 
-当前发布版本为 **v1.0.2 · build.72**，适用于 **立创·实战派 BK7258**。
+当前发布版本为 **v1.0.2 · build.73**，适用于 **立创·实战派 BK7258**。
 当前功能已完成实板使用验证，构建身份、验证范围和剩余专项见
-[验证记录](VALIDATION.md)和[发布说明](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.2-build.72)。
+[验证记录](VALIDATION.md)和[发布说明](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.2-build.73)。
 
 ### 安装烧录工具
 
@@ -28,11 +28,11 @@
 
 ### 烧录步骤
 
-1. 下载并解压 [`lckfb-bk7258-1.0.2+build.72-validation.zip`](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.2-build.72/lckfb-bk7258-1.0.2%2Bbuild.72-validation.zip)。
+1. 下载并解压 [`lckfb-bk7258-1.0.2+build.73-validation.zip`](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.2-build.73/lckfb-bk7258-1.0.2%2Bbuild.73-validation.zip)。
 2. 按立创官方烧录教程连接电脑，关闭占用串口的日志终端。打开 BKFIL，点击 **Select Port**，选择本板串口。
-3. 点击 **Select BIN**，选择 **`lckfb-bk7258-1.0.2+build.72-all-app.bin`**，确认 **Start Address** 为 **`0x00000000`**，勾选该文件。
+3. 点击 **Select BIN**，选择 **`lckfb-bk7258-1.0.2+build.73-all-app.bin`**，确认 **Start Address** 为 **`0x00000000`**，勾选该文件。
 4. 点击 **Download**，按工具提示复位或重新上电。等待写入和工具校验完成，再重新上电。
-5. 打开 115200 波特率串口日志，核对板卡 `lckfb-bk7258` 和版本 `1.0.2+build.72`，再进行配网与绑定。
+5. 打开 115200 波特率串口日志，核对板卡 `lckfb-bk7258` 和版本 `1.0.2+build.73`，再进行配网与绑定。
 
 下面使用 BKFIL 官方指南的界面截图，红框标出了操作位置。截图中的串口号、文件路径和
 波特率是示例；串口选电脑实际识别的设备，固件选上面的立创 BIN 文件。
@@ -42,7 +42,7 @@
 
 ![BKFIL 选择串口和波特率，红框标出设置位置](../../images/flashing/bkfil-select-port.png)
 
-**选择固件。** 点击 **Select BIN**，选择 `lckfb-bk7258-1.0.2+build.72-all-app.bin`。
+**选择固件。** 点击 **Select BIN**，选择 `lckfb-bk7258-1.0.2+build.73-all-app.bin`。
 
 ![BKFIL 选择固件，红框标出 Select BIN 按钮](../../images/flashing/bkfil-select-bin.png)
 
@@ -52,8 +52,8 @@
 
 | 文件 | 用途 |
 |---|---|
-| `lckfb-bk7258-1.0.2+build.72-all-app.bin` | **直接用于串口烧录**，起始地址 **`0x0`** |
-| `lckfb-bk7258-1.0.2+build.72-app_pack.rbl` | **不能用于串口烧录**；仅用于 OTA（无线升级），首次烧录不使用 |
+| `lckfb-bk7258-1.0.2+build.73-all-app.bin` | **直接用于串口烧录**，起始地址 **`0x0`** |
+| `lckfb-bk7258-1.0.2+build.73-app_pack.rbl` | **不能用于串口烧录**；仅用于 OTA（无线升级），首次烧录不使用 |
 | `MANIFEST.json` | 文件信息与校验清单，不用于烧录 |
 | `symbols/`、`partitions/`、`build_identity.json` | 开发排查资料，不用于烧录 |
 
@@ -113,7 +113,7 @@
 
 ## 音视频参数
 
-当前正式版 **v1.0.2 · build.72** 的参数如下。音频均为单声道，上行每包 20 毫秒。
+当前正式版 **v1.0.2 · build.73** 的参数如下。音频均为单声道，上行每包 20 毫秒。
 
 | 场景 | 方向 | 编码与采样率 | 包大小或画面参数 |
 |---|---|---|---|
@@ -292,7 +292,7 @@ ap_cmd help
 - H5 下行无声：检查流 14 是否收到数据、A-law 解码是否产出 PCM、DAC 写入和功放 GPIO。
 - 微信上行无声：检查流 0 的平台接受状态；持续 `rc=-40006` 表示上行尚未就绪。
 - 视频连接中断：记录 TiRTC 缓冲占用、实际码率、关键帧和丢帧，不只看 Wi-Fi RSSI。
-- AI 异常或自打断：核对上行 A-law 的 160 字节包、下行 Opus 格式、AEC 播放参考、`ref-under` 统计和会话结束顺序。
+- AI 异常或自打断：核对 AI 上行 A-law 的 320 字节包、下行 Opus 格式、AEC 播放参考、`ref-under` 统计和会话结束顺序。
 
 ## 验证状态与已知限制
 

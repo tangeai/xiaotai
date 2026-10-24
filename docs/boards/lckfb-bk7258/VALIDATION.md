@@ -1,4 +1,31 @@
-# 立创·实战派 BK7258 v1.0.2 · build.71 验证记录
+# 立创·实战派 BK7258 验证记录
+
+## 当前发布固件
+
+2026-10-24 发布 [立创·实战派 BK7258 v1.0.2 · build.73](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.2-build.73)。
+修复设备解绑后收到 `HTTP 410 / 6006` 时无限重试，改为保留旧身份并签名重绑。
+
+| 项目 | 记录 |
+|---|---|
+| 固件 | `1.0.2+build.73`，release |
+| 源码提交 | `369c53593178279ae83aed12f26ebac6bf750fd4` |
+| 验证状态 | `HIL_VERIFIED`，用户确认本轮已测试可用并授权发布 |
+| 串口烧录文件 | `lckfb-bk7258-1.0.2+build.73-all-app.bin`，起始地址 `0x0` |
+| 完整 BIN SHA-256 | `24a8ecc0a906efbeebb445197a04838c64de548e3264f846016144a14e87553d` |
+| ZIP | `lckfb-bk7258-1.0.2+build.73-validation.zip` |
+| ZIP SHA-256 | `1df08e9c2ca43a7297e01c026835d951586152b204b4c7fa658842d09fd34f02` |
+
+发布沿用用户测试时的 BIN 字节，未重新编译。包内 `build_identity.json` 保留构建时基础提交，
+`MANIFEST.json` 记录整理后的源码提交；此次只更新发布验证状态和打包元数据。
+产物保留在本工程原生 `build/bk7258/lckfb-bk7258-xiaotai/package/`。
+
+480 项主机回归、完整 `tools/check.sh`、ASan/UBSan 和 5 板清单检查通过，原生 release 编译通过。
+包内 8 个清单文件的长度、SHA-256 和 ZIP 完整性通过；公开下载的 ZIP 校验值与本地一致。
+GitHub 标题、标签、附件及源码提交均已核对。用户确认可用不扩展为长期运行、弱网或 OTA 的专项验收。
+
+## 历史验证记录：build.71
+
+以下仅记录旧镜像及其当时的验证状态。
 
 日期：2026-10-23。板卡 `lckfb-bk7258`。
 
