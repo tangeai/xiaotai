@@ -201,8 +201,8 @@ S3/P4 首次启用从 1 开始，BK 延续原有计数。构建号从本次产�
 | 觅感 AI 玩具开发板 BK7258 | `mgkfb-bk7258-v<产品版本>` | `觅感 AI 玩具开发板 BK7258 v<产品版本> · build.<本次构建号>` |
 | M5Stack CoreS3-Lite（ESP32-S3） | `m5stack-cores3-lite-v<产品版本>` | `M5Stack CoreS3-Lite v<产品版本> · build.<本次构建号>` |
 
-M5 使用独立板卡标签，不能覆盖立创 S3 的 `lckfb-esp32s3-v...` 发布。M5 附件名称仍以
-永久板卡 ID `m5stack-cores3-lite` 开头，正文明确屏幕变体；不同板卡固件不能互刷。
+M5 使用独立板卡标签，附件名称以永久板卡 ID `m5stack-cores3-lite` 开头，
+正文明确屏幕变体。
 
 包名以永久板卡 ID 开头，由现有打包工具生成，统一为
 `<board-id>-<产品版本>+build.<构建号>-validation.zip`。固件内部使用 `+build.N`，
