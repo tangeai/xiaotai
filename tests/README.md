@@ -1,5 +1,38 @@
 # 小钛测试与硬件验证
 
+## 设备已解绑后的启动恢复
+
+`test_bk_revoked_binding.py` 回放生产 token 鉴权和启动流程，先复现 `HTTP 410 / 6006`
+被降为普通失败、每 5 秒重试的问题，再验证签名重绑、保存失败保留旧身份、
+完整凭据更新和沿用原凭据的授权；普通鉴权错误和服务错误不能触发重绑。
+`test_esp_revoked_binding.py` 用真实 JSON 响应和原有启动分支确认 ESP32 已支持
+`6006 → 签名重绑`，没有复现 BK 的错误码丢失问题。ESP32 生产代码保持原样。
+两项登记在 `tools/check.sh`，沿用 `test_onboarding_faults.py` 和
+`test_binding_completion.py` 覆盖持久化失败及验证码播报取消。
+实板需分别验证离线删除设备后开机、输入新验证码、保存与上线、重启后正常使用，
+以及正常已绑定设备的启动内存余量和通话；主机回放不代替这些硬件验证。
+
+本轮完整 `bash tools/check.sh` 通过（480 项 Python 回归、ASan/UBSan、5 板清单）。
+立创 BK7258 `1.0.2+build.73` 原生 release 编译与契约检查通过，验证包 8 个文件的
+长度、SHA-256 和 ZIP 完整性通过，保留 `BUILD_VERIFIED_HIL_PENDING`，未发布。
+觅感本轮交付统一为双屏功能固件，见下节；此前误生成的无屏 build.24 产物已删除。
+ESP32 保持原有生产实现，恢复后的 S3、M5、P4 原生编译通过；此前尝试改启动顺序的
+临时候选包已移除，不作为交付物。
+
+## 觅感统一固件配置
+
+觅感仅保留 `default` 构建配置，固定包含双屏眼睛显示、实体按键和既有业务能力。
+`test_mgkfb_eyes.py` 先复现无变体参数时未编入双屏源文件，再验证原生 CMake
+包含显示实现、统一构建入口不要求版本选择，且旧 eyes/headless 选择被拒绝。
+`test_mgkfb_board.py` 覆盖板级配置与能力边界，立创源文件选择仍独立；
+`test_validation_packaging.py` 覆盖统一包身份与错误变体拒绝。
+测试已登记 `tools/check.sh`。文档和下载入口统一为一个固件，历史发布地址保持原链接。
+原生产物只保留在觅感工程既定 `build/bk7258/mgkfb-bk7258-xiaotai/package/`。
+统一配置的 release `1.0.3+build.26` 编译与打包校验通过；完整 `tools/check.sh`、
+480 项 Python 回归、ASan/UBSan 和 5 板清单校验通过。
+用户于 2026-10-24 确认本轮已测试可用并要求提交。未提供逐项实测记录；
+长期运行、弱网、双讲 AEC 和 OTA 仍按专项验证计划执行。
+
 ## AI 上行 16 kHz A-law 验证包
 
 `test_lckfb_s3_ai_16k_alaw.py` 先复现 S3 仍声明 `alaw/8000`、发送 8 kHz 标志、
@@ -35,7 +68,7 @@ AI 语音识别、短句打断、双讲回声和上行丢帧。
 发布构建为 `1.0.2+build.18`，仅更新版本标识，AP/CP 和契约检查通过；完整主机检查仍为 467 项，
 ASan/UBSan 与 6 板清单校验通过。精确镜像、实板证据边界及剩余诊断项统一记录在
 [觅感验证记录](../docs/boards/mgkfb-bk7258/VALIDATION.md)。公开指南补齐 `ap_cmd status` 等 CP 转发用法；
-本轮文档及版本测试沿用 `test_repository_layout.py`、`test_mgkfb_headless.py` 和发布打包测试，
+本轮文档及版本测试沿用 `test_repository_layout.py`、`test_mgkfb_board.py` 和发布打包测试，
 版本校验不再把当前产品版本和 build.11 下载名写死。
 
 ## BK 铃声交接与挂断恢复
@@ -194,7 +227,7 @@ README 发布入口沿用 `test_repository_layout.py`；将觅感加入已发布
 专属 Release 标签和 build.11 下载名。旧集合在新增下载行后失败，登记本次发布后通过。
 
 音量键此前与 AI 键共用 320 ms 双击窗口：孤立单击延迟，窗口内连按被合成 DOUBLE 后
-没有音量回调。`test_mgkfb_headless.py` 直接运行生产 key_task、手势状态机和回调，输入
+没有音量回调。`test_mgkfb_board.py` 直接运行生产 key_task、手势状态机和回调，输入
 S1/S3 单击及连按，同时输入 S2 双击。修复前在每次音量点击都应送达的断言失败；改为
 音量键独立的即时单击采样入口后通过，S2 双击、上电按住、去抖、长按与回绕回归保留。
 
@@ -235,7 +268,7 @@ SMP SDK 开启默认 GPIO 表时跳过 dvp_camera_io_init；build.4 的表只登
 INIT_DISABLE，缺少 DVP 功能复用。修正本板 AP/CP 表的 12 个 DVP 引脚为 JPEG 功能及
 INIT_ENABLE；其他控制、串口和指示引脚继续由适配器/驱动管理，LCD 不启用。
 
-`test_mgkfb_headless.py` 使用 SDK 实际 gpio_hal_default_map_init 函数的固定副本，
+`test_mgkfb_board.py` 使用 SDK 实际 gpio_hal_default_map_init 函数的固定副本，
 分别编译 AP/CP 表并捕获寄存器映射。修改前在每个表的 DVP 路由断言失败，修正后通过，
 同时确认不会改动复位、按键、指示灯、电源及串口。该测试已随文件登记到 tools/check.sh。
 这验证了缺失配置的修正，H5 画面和连续帧仍需修复版的实板复测。
@@ -247,7 +280,7 @@ INIT_ENABLE；其他控制、串口和指示引脚继续由适配器/驱动管�
 SDK `gpio_dev_unmap` 在查不到引脚时返回错误，按键初始化失败使 app_start 在 network_start
 之前退出。此前 GPIO 模拟无条件成功，遗漏了这一 SDK 契约。
 
-`test_mgkfb_headless.py` 使用固定 SMP SDK 的实际查表和 unmap 函数（来源记录在
+`test_mgkfb_board.py` 使用固定 SMP SDK 的实际查表和 unmap 函数（来源记录在
 `tools/tests/fixtures/bk7258_gpio_admission.c`），分别编译本板 AP/CP 配置和实际按键入口。
 修复前两个配置都在按键初始化成功断言处失败；登记本板使用的引脚后通过，且未登记
 引脚继续拒绝。使用 INIT_DISABLE 保留启动和串口状态，由板级适配器及 SDK 驱动配置
@@ -256,7 +289,7 @@ SDK `gpio_dev_unmap` 在查不到引脚时返回错误，按键初始化失败�
 
 ## 2026-10-22 觅感 BK7258 无屏 SMP 接入
 
-`tools/tests/test_mgkfb_headless.py` 已登记到 `tools/check.sh`。新增工程前，构建选择与
+`tools/tests/test_mgkfb_board.py` 已登记到 `tools/check.sh`。新增工程前，构建选择与
 禁用业务的公开请求接口用例失败；适配后通过。用实际 CMake 组合入口检查选源不含
 立创原生路径、LCD、触摸和字库，同时保留 H5 摄像头；编译能力上报代码核对本板身份
 及 stream/voip，禁用设备互呼和多人对讲。按键采样用例覆盖去抖、上电按住、单击、

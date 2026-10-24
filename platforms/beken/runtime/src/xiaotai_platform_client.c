@@ -466,8 +466,12 @@ int xiaotai_platform_service_request(const char *path, const char *json,
     return http_status >= 300 && http_status <= 599 ? http_status : BK_FAIL;
 }
 
+static int hmac_signature(const char *key, const char *text,
+                           char *output, size_t capacity);
+
 static int report_device(const platform_services_t *services,
-                         provision_report_t *report)
+                         provision_report_t *report,
+                         const xiaotai_device_credentials_t *existing)
 {
     char mac_text[18];
     if (format_device_mac(mac_text) != BK_OK) return BK_FAIL;
@@ -484,8 +488,37 @@ static int report_device(const platform_services_t *services,
 
     char *response = NULL;
     size_t response_size = 0;
-    int rc = http_json_request(url, body, &response, &response_size);
-    if (rc != BK_OK) return rc;
+    const char *names[] = {"X-Device-Id", "X-Timestamp", "X-Nonce", "X-Signature"};
+    const char *values[4] = {0};
+    char timestamp[24] = {0}, nonce[17] = {0}, signature[64] = {0};
+    size_t header_count = 0;
+    if (existing != NULL) {
+        uint8_t random[8];
+        if (bk_fill_rand(random, sizeof(random)) != BK_OK) return BK_FAIL;
+        snprintf(timestamp, sizeof(timestamp), "%lld", (long long)xiaotai_time_now());
+        snprintf(nonce, sizeof(nonce), "%02x%02x%02x%02x%02x%02x%02x%02x",
+                 random[0], random[1], random[2], random[3],
+                 random[4], random[5], random[6], random[7]);
+        char signed_text[384];
+        int n = snprintf(signed_text, sizeof(signed_text), "%s%s%s",
+                         existing->device_id, timestamp, nonce);
+        if (n <= 0 || (size_t)n >= sizeof(signed_text) ||
+            hmac_signature(existing->device_secret, signed_text,
+                           signature, sizeof(signature)) != BK_OK) return BK_FAIL;
+        values[0] = existing->device_id;
+        values[1] = timestamp;
+        values[2] = nonce;
+        values[3] = signature;
+        header_count = 4;
+    }
+    int rc = http_json_request_ex(url, HTTP_JSON_POST, body, NULL,
+                                  names, values, header_count,
+                                  &response, &response_size, NULL);
+    memset(signature, 0, sizeof(signature));
+    if (rc != BK_OK) {
+        if (response != NULL) os_free(response);
+        return rc;
+    }
     (void)response_size;
     cJSON *root = cJSON_Parse(response);
     os_free(response);
@@ -798,13 +831,27 @@ static bool parse_auth_grant(const uint8_t *payload, size_t size,
         cJSON_GetObjectItemCaseSensitive(root, "type");
     const cJSON *data = root == NULL ? NULL :
         cJSON_GetObjectItemCaseSensitive(root, "payload");
-    bool valid = cJSON_IsString(type) &&
-                 strcmp(type->valuestring, "auth_grant") == 0 &&
-                 cJSON_IsObject(data) &&
-                 copy_json_string(data, "device_id", out->device_id,
-                                  sizeof(out->device_id)) &&
-                 copy_json_string(data, "device_key", out->device_secret,
-                                  sizeof(out->device_secret));
+    xiaotai_device_credentials_t candidate = *out;
+    bool valid = cJSON_IsString(type) && type->valuestring != NULL &&
+                 strcmp(type->valuestring, "auth_grant") == 0;
+    if (valid && cJSON_IsObject(data)) {
+        const cJSON *id = cJSON_GetObjectItemCaseSensitive(data, "device_id");
+        const cJSON *key = cJSON_GetObjectItemCaseSensitive(data, "device_key");
+        bool has_id = cJSON_IsString(id) && id->valuestring != NULL && id->valuestring[0];
+        bool has_key = cJSON_IsString(key) && key->valuestring != NULL && key->valuestring[0];
+        if (has_id != has_key) valid = false;
+        else if (has_id) {
+            valid = copy_json_string(data, "device_id", candidate.device_id,
+                                      sizeof(candidate.device_id)) &&
+                    copy_json_string(data, "device_key", candidate.device_secret,
+                                      sizeof(candidate.device_secret));
+        }
+    }
+    /* Signed rebind may acknowledge the existing identity without rotating it.
+     * First binding still requires both credentials; never accept half a pair. */
+    valid = valid && candidate.device_id[0] && candidate.device_secret[0];
+    if (valid) *out = candidate;
+    memset(&candidate, 0, sizeof(candidate));
     cJSON_Delete(root);
     return valid;
 }
@@ -971,7 +1018,7 @@ static int wait_for_auth_grant(const platform_services_t *services,
                                      (uint8_t)incoming_id};
                 (void)mqtt_send_frame(socket_fd, 0x40U, puback, sizeof(puback));
             }
-            xiaotai_device_credentials_t granted = {0};
+            xiaotai_device_credentials_t granted = *out;
             if (!ack_pending && parse_auth_grant(packet + offset, size - offset,
                                                   &granted)) {
                 /* TiRTC CLIENT_ID identifies the physical unit independently
@@ -1203,7 +1250,9 @@ static int obtain_device_token(const platform_services_t *services,
     BK_LOGD(TAG, "device token JSON release begin\n");
     cJSON_Delete(root);
     BK_LOGD(TAG, "device token JSON release complete\n");
-    if (!valid) return BK_FAIL;
+    if (!valid) {
+        return platform_code == 6006 ? XIAOTAI_PLATFORM_ERR_UNBOUND : BK_FAIL;
+    }
     BK_LOGI(TAG, "device token obtained (value hidden)\n");
     return BK_OK;
 }
@@ -1492,15 +1541,17 @@ int xiaotai_platform_run(const xiaotai_device_credentials_t *credentials,
     }
 }
 
-int xiaotai_platform_bind(xiaotai_device_credentials_t *out)
+static int bind_device(const xiaotai_device_credentials_t *existing,
+                        xiaotai_device_credentials_t *out)
 {
     if (out == NULL || s_binding) return BK_ERR_PARAM;
-    memset(out, 0, sizeof(*out));
+    if (existing != NULL) *out = *existing;
+    else memset(out, 0, sizeof(*out));
     platform_services_t services = {0};
     provision_report_t report = {0};
     s_binding = true;
     int rc = discover_services_with_network_time(&services);
-    if (rc == BK_OK) rc = report_device(&services, &report);
+    if (rc == BK_OK) rc = report_device(&services, &report, existing);
     if (rc == BK_OK) {
         s_verification_expiry = xiaotai_binding_token_expiry(report.temp_token);
         rc = wait_for_auth_grant(&services, &report, out);
@@ -1512,6 +1563,19 @@ int xiaotai_platform_bind(xiaotai_device_credentials_t *out)
     s_binding = false;
     if (rc == BK_OK) BK_LOGI(TAG, "verification binding completed\n");
     return rc;
+}
+
+int xiaotai_platform_bind(xiaotai_device_credentials_t *out)
+{
+    return bind_device(NULL, out);
+}
+
+int xiaotai_platform_rebind(const xiaotai_device_credentials_t *existing,
+                            xiaotai_device_credentials_t *out)
+{
+    if (existing == NULL || out == existing || existing->device_id[0] == '\0' ||
+        existing->device_secret[0] == '\0') return BK_ERR_PARAM;
+    return bind_device(existing, out);
 }
 
 bool xiaotai_platform_binding_active(void)

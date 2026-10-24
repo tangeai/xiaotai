@@ -67,7 +67,7 @@ config_args=(CONFIG_SUBTITUTE_FILE=config)
 artifact_project_name="$(basename "$project_dir")"
 board_id="${artifact_project_name%-xiaotai}"
 config_name=""
-if [ -n "$board_variant" ] && [ "$board_variant" != headless ]; then
+if [ -n "$board_variant" ] && [ "$board_variant" != default ]; then
     if [[ ! "$board_variant" =~ ^[a-z][a-z0-9-]*$ ]]; then exit 2; fi
     config_name="$board_variant"
     ap_config="$project_dir/ap/config/bk7258_ap/$config_name.config"

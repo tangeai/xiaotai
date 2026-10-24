@@ -27,13 +27,7 @@
   },
   "variants": [
     {
-      "name": "headless",
-      "default": false,
-      "interaction_profile": "headless-key",
-      "layout_profile": "none"
-    },
-    {
-      "name": "eyes",
+      "name": "default",
       "default": true,
       "interaction_profile": "eyes-key",
       "layout_profile": "compact"

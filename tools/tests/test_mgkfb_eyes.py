@@ -16,9 +16,7 @@ class DualEyes(unittest.TestCase):
     def test_native_source_selection_keeps_other_boards_isolated(self):
         # Execute each native CMake entry, including target_sources added after
         # component registration; a manifest alone cannot prove isolation.
-        for board, variant in (('lckfb-bk7258', 'eyes'),
-                               ('mgkfb-bk7258', 'headless'),
-                               ('mgkfb-bk7258', 'eyes')):
+        for board, variant in (('lckfb-bk7258', ''), ('mgkfb-bk7258', '')):
             with self.subTest(board=board, variant=variant), tempfile.TemporaryDirectory() as temp:
                 temp = Path(temp)
                 (temp/'xiaotai_build_identity.h').write_text('/* test identity */')
@@ -51,7 +49,7 @@ endfunction()
                 names = [Path(s).name for s in sources]
                 self.assertTrue(all(Path(s).is_file() for s in sources))
                 self.assertEqual(len(sources), len(set(sources)))
-                eyes = board == 'mgkfb-bk7258' and variant == 'eyes'
+                eyes = board == 'mgkfb-bk7258'
                 for name in ('board_eyes.c', 'xiaotai_eyes_ui.c',
                              'xiaotai_eyes.c', 'xiaotai_eye_text.c'):
                     self.assertEqual(name in names, eyes, name)
@@ -196,7 +194,7 @@ int main(void){
         script=(ROOT/'platforms/beken/tools/build.sh').read_text().replace('\\\n',' ')
         commands=[line.strip() for line in script.splitlines() if line.strip().startswith('make -C')]
         self.assertEqual(len(commands),2)
-        for config in ('config','eyes.config','eyes_release.config','release.config'):
+        for config in ('config','panel.config','panel_release.config','release.config'):
             harness='make(){ printf "%s\\n" "$*"; }; project_dir=/tmp/board; sdk_dir=/tmp/sdk; build_version=1.0.1; config_args=(CONFIG_SUBTITUTE_FILE='+config+');\n'+'\n'.join(commands)
             result=subprocess.run(['bash','-c',harness],check=True,capture_output=True,text=True)
             calls=result.stdout.splitlines()
@@ -208,14 +206,14 @@ int main(void){
     def test_sdk_configuration_selection_keeps_one_project_directory(self):
         script=(ROOT/'platforms/beken/tools/build.sh').read_text()
         selection=script[script.index('unset BK_CONFIG_FILE'):script.index('# Lock the prebuilt SDK')]
-        for variant in ('', 'headless', 'eyes'):
+        for variant in ('', 'default', 'panel'):
             for profile in ('development', 'release'):
                 with self.subTest(variant=variant, profile=profile), tempfile.TemporaryDirectory() as temp:
                     project=Path(temp)/'demo'
                     for core,soc in (('ap','bk7258_ap'),('cp','bk7258')):
                         directory=project/core/'config'/soc
                         directory.mkdir(parents=True)
-                        for name in ('config','eyes.config'):
+                        for name in ('config','panel.config'):
                             (directory/name).write_text('CONFIG_LOG_LEVEL=4\n')
                     setup=f'''project_dir="{project}"
 support_dir="{ROOT}/platforms/beken"
@@ -230,26 +228,26 @@ cp_release_config="$project_dir/cp/config/bk7258/release.config"
                         '\nprintf "%s\\n" "$artifact_project_name" "${config_args[@]}"'],
                         check=True,capture_output=True,text=True,
                         env={**os.environ,'BK_CONFIG_FILE':'stale','CONFIG_SUBTITUTE_FILE':'stale'})
-                    config='eyes.config' if variant=='eyes' else 'config'
-                    if profile=='release':config='eyes_release.config' if variant=='eyes' else 'release.config'
+                    config='panel.config' if variant=='panel' else 'config'
+                    if profile=='release':config='panel_release.config' if variant=='panel' else 'release.config'
                     self.assertEqual(result.stdout.splitlines(),['demo','CONFIG_SUBTITUTE_FILE='+config])
 
-    def test_build_variants_select_eyes_or_headless_explicitly(self):
+    def test_board_has_one_build_with_displays_enabled(self):
         board=next(b for b in load_boards(ROOT) if b.id=='mgkfb-bk7258')
-        variants={v['name']:v for v in board.data['variants']}
-        self.assertEqual(board.default_variant(),'eyes')
-        self.assertEqual(variants['eyes']['interaction_profile'],'eyes-key')
-        self.assertEqual(variants['eyes']['layout_profile'],'compact')
-        self.assertEqual(variants['headless']['layout_profile'],'none')
-        for name in ('eyes','headless'):
-            command,_=build_command(ROOT,board,name)
-            self.assertEqual(command,['bash','tools/build.sh',name])
+        self.assertEqual(board.data['variants'], [{'name':'default','default':True,
+            'interaction_profile':'eyes-key','layout_profile':'compact'}])
+        command,_=build_command(ROOT,board,board.default_variant())
+        self.assertEqual(command,['bash','tools/build.sh'])
+        for obsolete in ('eyes','headless'):
+            result=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),
+                '--board',board.id,'--variant',obsolete,'--dry-run'],capture_output=True,text=True)
+            self.assertNotEqual(result.returncode,0)
         project=ROOT/board.data['project_dir']
         for core,soc in (('ap','bk7258_ap'),('cp','bk7258')):
-            config=(project/core/'config'/soc/'eyes.config').read_text()
-            self.assertIn('CONFIG_QSPI_LINE_MODE=1\n',config,
-                          'four-wire QSPI would steal DC/backlight GPIO5/25')
-        config=(project/'ap/config/bk7258_ap/eyes.config').read_text()
+            config=(project/core/'config'/soc/'config').read_text()
+            self.assertIn('CONFIG_QSPI_LINE_MODE=1\n',config)
+            self.assertFalse((project/core/'config'/soc/'eyes.config').exists())
+        config=(project/'ap/config/bk7258_ap/config').read_text()
         for option in ('LCD_SPI','LCD_SPI_GC9D01','LCD_SPI_REFRESH_WITH_QSPI_MAPPING_MODE'):
             self.assertIn('CONFIG_'+option+'=y\n',config)
 

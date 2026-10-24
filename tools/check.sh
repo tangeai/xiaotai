@@ -4,7 +4,7 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 python3 "$repo_dir/tools/tests/test_retired_board.py"
-python3 "$repo_dir/tools/tests/test_mgkfb_headless.py"
+python3 "$repo_dir/tools/tests/test_mgkfb_board.py"
 python3 "$repo_dir/tools/tests/test_mgkfb_eyes.py"
 python3 "$repo_dir/tools/tests/test_cores3_board.py"
 python3 "$repo_dir/tools/tests/test_cores3_memory_config.py"
@@ -26,6 +26,8 @@ python3 "$repo_dir/tools/tests/test_binding_countdown.py"
 python3 "$repo_dir/tools/tests/test_binding_completion.py"
 # Includes saved legacy portal configuration versus the actual binding log/UI.
 python3 "$repo_dir/tools/tests/test_onboarding_faults.py"
+python3 "$repo_dir/tools/tests/test_bk_revoked_binding.py"
+python3 "$repo_dir/tools/tests/test_esp_revoked_binding.py"
 python3 "$repo_dir/tools/tests/test_status_metric_validity.py"
 python3 "$repo_dir/tools/tests/test_call_error_reset.py"
 python3 "$repo_dir/tools/tests/test_release_logging.py"

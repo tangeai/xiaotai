@@ -58,11 +58,10 @@
     "input": "physical-buttons",
     "interaction_profile": "eyes-key",
     "layout_profile": "compact",
-    "note": "eyes is the default variant; headless remains selectable. User confirmed board validation after build.10 delivery. Release build.11 is separately build-verified; exact release artifact HIL is pending.",
+    "note": "One firmware configuration includes both eye displays. Screen support was implemented in stages, not separate hardware products. Historical build evidence below retains its original artifact identity and evidence grade.",
     "deferred": [],
     "variants": [
-      "eyes",
-      "headless"
+      "default"
     ]
   },
   "display": {

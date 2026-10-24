@@ -3627,8 +3627,6 @@ static void supervisor_task(beken_thread_arg_t argument)
         rtos_delay_milliseconds(5000);
         while (!xiaotai_network_ready()) rtos_delay_milliseconds(200);
     }
-    snprintf(s_device_id, sizeof(s_device_id), "%s", credentials.device_id);
-    xiaotai_room_set_device_id(&s_room, s_device_id);
 
     /* TiRTC signs its synchronous /v1/start request with the wall clock.
      * Platform capability reporting performs service discovery and SNTP
@@ -3639,12 +3637,27 @@ static void supervisor_task(beken_thread_arg_t argument)
         int platform_rc =
             xiaotai_platform_report_capabilities(&credentials);
         if (platform_rc == BK_OK) break;
+        if (platform_rc == XIAOTAI_PLATFORM_ERR_UNBOUND) {
+            BK_LOGW(TAG, "stored device was unbound; starting signed rebind\n");
+            xiaotai_device_credentials_t candidate = {0};
+            int bind_rc = xiaotai_platform_rebind(&credentials, &candidate);
+            if (bind_rc == BK_OK) bind_rc = xiaotai_storage_save_device(&candidate);
+            if (bind_rc == BK_OK) {
+                credentials = candidate;
+                xiaotai_ui_show_status("BOUND");
+            }
+            memset(&candidate, 0, sizeof(candidate));
+            if (bind_rc == BK_OK) continue;
+        }
         BK_LOGW(TAG,
                 "platform preparation failed rc=%d; retrying in 5 seconds\n",
                 platform_rc);
         rtos_delay_milliseconds(5000);
         while (!xiaotai_network_ready()) rtos_delay_milliseconds(200);
     }
+
+    snprintf(s_device_id, sizeof(s_device_id), "%s", credentials.device_id);
+    xiaotai_room_set_device_id(&s_room, s_device_id);
 
     char tirtc_endpoint[256];
     if (xiaotai_platform_tirtc_endpoint(tirtc_endpoint,

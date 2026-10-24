@@ -428,8 +428,8 @@ require(clocked_discovery.index("synchronize_clock()") <
         "platform preparation must synchronize time before service discovery")
 for start, end in (
     ("int xiaotai_platform_report_capabilities(", "static int mqtt_wait_connack("),
-    ("int xiaotai_platform_run(", "int xiaotai_platform_bind("),
-    ("int xiaotai_platform_bind(", "bool xiaotai_platform_binding_active("),
+    ("int xiaotai_platform_run(", "static int bind_device("),
+    ("static int bind_device(", "int xiaotai_platform_bind("),
 ):
     section = platform_source.split(start, 1)[1].split(end, 1)[0]
     require("discover_services_with_network_time(&services)" in section and

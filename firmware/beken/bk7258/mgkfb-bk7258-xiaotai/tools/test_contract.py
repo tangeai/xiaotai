@@ -4,4 +4,4 @@ from pathlib import Path
 import subprocess
 import sys
 root = Path(__file__).resolve().parents[5]
-subprocess.run([sys.executable, str(root/'tools/tests/test_mgkfb_headless.py')], check=True)
+subprocess.run([sys.executable, str(root/'tools/tests/test_mgkfb_board.py')], check=True)

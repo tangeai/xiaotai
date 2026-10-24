@@ -1,4 +1,4 @@
-"""Build selection and public admission contracts for the headless SMP board."""
+"""Build selection and public admission contracts for the MGKFB SMP board."""
 import os
 import json
 import re
@@ -18,7 +18,7 @@ PROJECT = ROOT / 'firmware/beken/bk7258/mgkfb-bk7258-xiaotai'
 LEGACY = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai'
 
 
-class MgkfbHeadless(unittest.TestCase):
+class MgkfbBoard(unittest.TestCase):
     def test_sdk_default_init_routes_camera_clock_sync_and_data(self):
         fixture=(ROOT/'tools/tests/fixtures/bk7258_gpio_default_init.c').read_text()
         names=['MCLK','PCLK','HSYNC','VSYNC']+[f'PXDATA{i}' for i in range(8)]
@@ -69,7 +69,7 @@ int main(void) {
 }
 ''')
 
-    def test_sdk_gpio_admission_allows_headless_startup(self):
+    def test_sdk_gpio_admission_allows_board_startup(self):
         fixture=(ROOT/'tools/tests/fixtures/bk7258_gpio_admission.c').read_text()
         board=(ROOT/'boards/mgkfb/bk7258/board_button.c').read_text()
         board=re.sub(r'^#include.*$', '', board, flags=re.M)
@@ -171,7 +171,7 @@ int main(void){
 }
 ''')
 
-    def test_headless_status_and_incoming_call_use_board_indicator(self):
+    def test_status_and_incoming_call_use_board_indicator(self):
         source=(ROOT/'platforms/beken/src/xiaotai_headless_ui.c').read_text()
         # Compile the production presentation entry points, not a second state machine.
         names=['xiaotai_ui_init','xiaotai_ui_show_status',
@@ -295,6 +295,8 @@ function(armino_component_register)
   cmake_parse_arguments(A "" "" "SRCS;INCLUDE_DIRS;PRIV_REQUIRES" ${ARGN})
   file(WRITE "${CMAKE_BINARY_DIR}/../sources.txt" "${A_SRCS}")
 endfunction()
+function(target_sources)
+endfunction()
 function(target_compile_definitions)
 endfunction()
 function(target_include_directories)
@@ -306,12 +308,12 @@ endfunction()
 ''' + f'set(CMAKE_BINARY_DIR "{temp}/build")\n' +
                 f'include("{PROJECT}/ap/CMakeLists.txt")\n')
             subprocess.run(['cmake','-P',str(script)],check=True,capture_output=True,
-                           env={**os.environ,'XIAOTAI_BOARD_VARIANT':'headless'})
+                           env={**os.environ,'XIAOTAI_BOARD_VARIANT':''})
             sources=(temp/'sources.txt').read_text().split(';')
             self.assertTrue(all(Path(s).is_file() for s in sources))
             self.assertFalse(any('lckfb-bk7258-xiaotai' in s for s in sources))
             self.assertFalse(any(Path(s).name in ('board_display.c','board_touch.c',
-                'xiaotai_ui.c','xiaotai_ui_assets.c','xiaotai_touch.c') for s in sources))
+                'xiaotai_ui.c','xiaotai_touch.c') for s in sources))
             self.assertIn(str(ROOT/'boards/mgkfb/bk7258/board_camera.c'),sources)
             self.assertIn(str(ROOT/'platforms/beken/runtime/src/xiaotai_app.c'),sources)
 
@@ -332,14 +334,14 @@ endfunction()
                 self.assertFalse(body['profiles']['stream']['no_video'])
                 self.assertTrue(body['profiles']['voip']['no_video'])
 
-    def test_board_selects_independent_smp_headless_project(self):
+    def test_board_selects_independent_smp_project(self):
         boards = load_boards(ROOT)
         board = next(b for b in boards if b.id == 'mgkfb-bk7258')
         self.assertEqual(board.data['platform'], 'beken')
         data = json.loads((ROOT / 'boards/mgkfb/bk7258/board.json').read_text())
         self.assertEqual(data['sdk'], {'name': 'bk_avdk_smp', 'version': 'release/v3.1.1.10'})
-        self.assertIn({'name': 'headless', 'default': False,
-            'interaction_profile': 'headless-key', 'layout_profile': 'none'}, data['variants'])
+        self.assertIn({'name': 'default', 'default': True,
+            'interaction_profile': 'eyes-key', 'layout_profile': 'compact'}, data['variants'])
         self.assertNotIn('touch', data['capabilities'])
         self.assertIn('camera-h264', data['capabilities'])
         self.assertEqual(str(read_board_version(ROOT, board.id)),
@@ -395,7 +397,7 @@ int main(void) {
             else:
                 self.assertIn('# CONFIG_SOC_SMP is not set', config)
             self.assertNotIn('\nCONFIG_TP=y', config)
-            self.assertNotIn('\nCONFIG_LCD_SPI=y', config)
+            self.assertEqual('\nCONFIG_LCD_SPI=y' in config, core.startswith('ap'))
             self.assertNotIn('\nCONFIG_LDO3V3_CTRL_GPIO=13\n', config)
         config = (PROJECT/'ap/config/bk7258_ap/config').read_text()
         self.assertIn('CONFIG_LDO3V3_CTRL_GPIO=52', config)

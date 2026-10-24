@@ -16,7 +16,7 @@ from package_validation_firmware import beken_build_root, package_beken, verific
 
 
 class ValidationPackagingTests(unittest.TestCase):
-    def test_beken_variant_delivery_selects_default_eyes_and_explicit_headless(self):
+    def test_beken_single_firmware_delivery_rejects_obsolete_variants(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             project = root / 'firmware/mgkfb-bk7258-xiaotai'
@@ -26,10 +26,9 @@ class ValidationPackagingTests(unittest.TestCase):
                 'id': 'mgkfb-bk7258', 'project_dir': 'firmware/mgkfb-bk7258-xiaotai',
                 'target': 'bk7258', 'vendor': 'MGKFB', 'model': 'BK7258',
                 'sdk': {'name': 'bk_avdk_smp', 'version': 'release/v3.1.1.10'},
-                'variants': [{'name': 'eyes', 'default': True},
-                             {'name': 'headless', 'default': False}],
+                'variants': [{'name': 'default', 'default': True}],
             })
-            for variant, number in [('eyes', 12), ('headless', 13)]:
+            for variant, number in [('default', 12)]:
                 build = project/'build/bk7258'/project.name
                 image = variant.encode()
                 for relative in ('package/app_pack.rbl', 'package/build_summary.txt',
@@ -49,7 +48,7 @@ class ValidationPackagingTests(unittest.TestCase):
                     output = root/f'{variant}-{requested}'
                     output.mkdir()
                     with mock.patch('package_validation_firmware.git_output', return_value=''):
-                        if requested is None and variant != 'eyes':
+                        if requested is None and variant != 'default':
                             with self.assertRaisesRegex(ValueError, 'variant'):
                                 package_beken(root, board, output, 'release', variant=requested)
                             continue
@@ -59,7 +58,7 @@ class ValidationPackagingTests(unittest.TestCase):
                         self.assertEqual(manifest['variant'], variant)
                         self.assertEqual(zipped.read(manifest['application']['path']), variant.encode())
                 with mock.patch('package_validation_firmware.git_output', return_value=''):
-                    wrong = 'headless' if variant == 'eyes' else 'eyes'
+                    wrong = 'headless'
                     with self.assertRaisesRegex(ValueError, 'variant'):
                         package_beken(root, board, root, 'release', variant=wrong)
             with self.assertRaises(ValueError):

@@ -8,12 +8,17 @@
 
 #define XIAOTAI_PLATFORM_DISCOVERY_URL "http://ep-open.tangeopen.com/services"
 #define XIAOTAI_BIND_TIMEOUT_SECONDS 180U
+/* Stored identity was revoked by the platform (token response code 6006). */
+#define XIAOTAI_PLATFORM_ERR_UNBOUND (-6006)
 
 /**
  * Run the first-binding exchange synchronously on the caller's worker task.
  * The verification code remains available while this call waits for auth_grant.
  */
 int xiaotai_platform_bind(xiaotai_device_credentials_t *out);
+/** Rebind using the old identity for the signed report; never erase it first. */
+int xiaotai_platform_rebind(const xiaotai_device_credentials_t *existing,
+                            xiaotai_device_credentials_t *out);
 /** Authenticate with stored credentials and publish the complete product profile. */
 int xiaotai_platform_report_capabilities(
     const xiaotai_device_credentials_t *credentials);
