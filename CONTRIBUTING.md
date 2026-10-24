@@ -182,7 +182,7 @@ bash tools/check.sh
 
 产品版本由发布负责人指定为 `major.minor.patch`，构建、失败和重试均不修改它。
 ESP-IDF 从工程 `PROJECT_VER` 读取，BK7258 从工程 `VERSION.md` 读取。
-BK、立创 ESP32-S3、微雪 ESP32-P4、M5 和正点原子 S3 各自维护 `BUILD_NUMBER`，生成
+BK、立创 ESP32-S3、微雪 ESP32-P4、M5 各自维护 `BUILD_NUMBER`，生成
 `1.0.1+build.N` 用于启动身份和取证。BK 由原生脚本递增；S3/P4 由
 `tools/build.py` 在实际编译前递增，原生 CMake 重配置复用本次编号。
 失败的构建消耗编号，重试递增；查询、校验、dry-run 和打包不递增。
@@ -196,7 +196,6 @@ S3/P4 首次启用从 1 开始，BK 延续原有计数。构建号从本次产�
 | 开发板 | 稳定 GitHub 标签 | Release 标题 |
 |---|---|---|
 | 立创·实战派 ESP32-S3 | `lckfb-esp32s3-v<产品版本>` | `立创·实战派 ESP32-S3 v<产品版本> · build.<本次构建号>` |
-| 正点原子 ATK-DNESP32S3 | `alientek-atk-dnesp32s3-v<产品版本>` | `正点原子 ATK-DNESP32S3 v<产品版本> · build.<本次构建号>` |
 | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 | `waveshare-esp32p4-touch-lcd-43c-v10-v<产品版本>` | `微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 v<产品版本> · build.<本次构建号>` |
 | 立创·实战派 BK7258 | `bk7258-v<产品版本>` | `立创·实战派 BK7258 v<产品版本> · build.<本次构建号>` |
 | 觅感 AI 玩具开发板 BK7258 | `mgkfb-bk7258-v<产品版本>` | `觅感 AI 玩具开发板 BK7258 v<产品版本> · build.<本次构建号>` |

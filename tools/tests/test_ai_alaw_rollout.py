@@ -6,34 +6,10 @@ COMMON = opus.COMMON
 
 P4=ROOT/'firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/starter_media/src/starter_media.c'
 BK=ROOT/'platforms/beken/runtime/src'
-ATK=ROOT/'firmware/esp-idf/esp32s3/atk-dnesp32s3/components/starter_media/src/starter_media.c'
 RESAMPLER=ROOT/'platforms/common'
 FIR=(RESAMPLER/'src/starter_audio_resampler.c').read_text()
 
 class AiAlawRollout(unittest.TestCase):
-    def test_atk_capture_keeps_every_16k_ai_sample_and_8k_h5(self):
-        source=ATK.read_text()
-        run_c(r'''
-#include <assert.h>
-#include <stddef.h>
-#include <stdint.h>
-#define AUDIO_FRAMES_16K_20MS 320U
-#define AUDIO_SAMPLES_8K_20MS 160U
-#define STARTER_TIRTC_AI 1
-#define STARTER_TIRTC_H5 2
-typedef int starter_tirtc_mode_t;
-static uint8_t pcm_to_alaw(int16_t sample){return (uint8_t)sample;}
-''' + function(source,'encode_capture_alaw') + r'''
-int main(void){
- int16_t pcm[640];uint8_t encoded[320];
- for(size_t i=0;i<320;i++){pcm[2*i]=(int16_t)i;pcm[2*i+1]=(int16_t)i;}
- assert(encode_capture_alaw(STARTER_TIRTC_AI,pcm,encoded)==320);
- for(size_t i=0;i<320;i++)assert(encoded[i]==(uint8_t)i);
- assert(encode_capture_alaw(STARTER_TIRTC_H5,pcm,encoded)==160);
- for(size_t i=0;i<160;i++)assert(encoded[i]==(uint8_t)(2*i));
-}
-''')
-
     def test_p4_selects_16k_ai_profile_and_encoder(self):
         defaults = ROOT/'firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/sdkconfig.defaults'
         self.assertIn('CONFIG_STARTER_AI_UPLINK_G711A_16K=y', defaults.read_text())

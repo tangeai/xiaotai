@@ -83,8 +83,6 @@ def read_board_version(root: Path, board_id: str) -> FirmwareVersion:
     projects = {
         "m5stack-cores3-lite":
             "firmware/esp-idf/esp32s3/m5stack-cores3-lite",
-        "alientek-atk-dnesp32s3":
-            "firmware/esp-idf/esp32s3/atk-dnesp32s3",
         "lckfb-esp32s3":
             "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai",
         "waveshare-esp32p4-touch-lcd-43c-v10":

@@ -27,7 +27,6 @@ TiRTC 厂商库的历史构建资料保留原版本，不冒充由 5.5.5 重编�
 |---|---|---|---|
 | P4 | 1.0.0+build.91 | `cd2ebbd4972feba9d113ea4fe8b19a3d1d254704bd2e5734a6f648c6bc507653` | `a7106067dfbd51949d23cd75d329827b6240e3df467911bc990a0ecbb3d3495e` |
 | 立创 S3 | 1.0.0+build.48 | `166d4f92b3eb8bb2f6ae17de89a23ae48ccbe9b8e62834473d2231b4d92e42a9` | `141fc84a536399d7a43acb228166234e6a67ac34ef8bf736edcd6b76151e0fd9` |
-| 正点原子 S3 | 1.0.0+build.4 | `7b29de1181b6eeca5d6198f68d0ecad445a6a830fbe2a99d0f2c197c4eb070d2` | `8e6ffa72516e28179c129c0da304025978f140af9431f882a9ec553d1b947dcd` |
 
 以上应用描述符均报告 `v5.5.5`，BIN 中 ELF 哈希与实际 ELF 完全一致。
 对应工程的 `artifacts/<版本>/` 保留原 BIN、ELF、bootloader、分区表和身份记录；
@@ -47,7 +46,7 @@ TiRTC 厂商库的历史构建资料保留原版本，不冒充由 5.5.5 重编�
 | 统一主机检查 | PASS | `bash tools/check.sh`，包括 ASan/UBSan；产品核心行覆盖率 93.57%、分支 64.49% |
 | 板卡清单 | PASS | `python3 tools/build.py --validate`，4 块板 |
 | 工具测试 | PASS | `python3 -m unittest discover -s tools/tests -v` |
-| 严格 Hardware IR 构建评估 | FAIL | 历史来源路径缺口：P4/ATK 的本地 `.references` 资料及若干仓库相对引用无法由评估器从 IR 目录解析；三板均未取得严格评估通过结论 |
+| 严格 Hardware IR 构建评估 | FAIL | 历史来源路径缺口：P4 的本地 `.references` 资料及若干仓库相对引用无法由评估器从 IR 目录解析；三板均未取得严格评估通过结论 |
 | 烧录、双向声音、流畅度、弱网、长稳 | SKIP | 无串口设备；按试验步骤补两类通话、两档切换及停发后的音频/远端画面验收 |
 
 构建与主机回归通过不说明 12 fps 已达到流畅度要求。发送侧积压无法单独判断

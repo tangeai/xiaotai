@@ -3,7 +3,6 @@ set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 szpi_tools="$repo_dir/firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/tools"
-atk_tests="$repo_dir/firmware/esp-idf/esp32s3/atk-dnesp32s3/tests"
 bk7258_tools="$repo_dir/firmware/beken/bk7258/lckfb-bk7258-xiaotai/tools"
 p4_43_tools="$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools"
 
@@ -38,4 +37,3 @@ python3 "$szpi_tools/test_screen_event_lifetime.py"
 bash "$szpi_tools/test_audio_resampler.sh"
 bash "$szpi_tools/test_camera_sensor_policy.sh"
 bash "$szpi_tools/test_jpeg_collector.sh"
-bash "$atk_tests/run_host_tests.sh"

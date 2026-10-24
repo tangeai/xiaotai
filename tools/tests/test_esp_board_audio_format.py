@@ -14,7 +14,6 @@ from board_registry import find_board, load_boards  # noqa: E402
 
 
 BOARDS = load_boards(ROOT)
-ATK_PROJECT = find_board(BOARDS, "alientek-atk-dnesp32s3").project_path(ROOT)
 BK7258_PROJECT = find_board(BOARDS, "lckfb-bk7258").project_path(ROOT)
 SZPI_PROJECT = find_board(BOARDS, "lckfb-esp32s3").project_path(ROOT)
 P4_PROJECTS = tuple(
@@ -37,14 +36,6 @@ class BoardAudioFormatTest(unittest.TestCase):
         self.assertFalse(
             (ROOT / "platforms/esp-idf/include/xiaotai_board_audio.h").exists()
         )
-
-    def test_atk_duplicated_microphone_layout(self) -> None:
-        board = (ROOT / "boards/alientek/atk-dnesp32s3/atk_board.c").read_text()
-        media = (ATK_PROJECT / "components/starter_media/src/starter_media.c").read_text()
-        self.assertIn(".capture_layout = XIAOTAI_CAPTURE_DUPLICATED_MIC", board)
-        self.assertIn("atk_board_audio_adapter()", media)
-        self.assertIn("s_audio_adapter->format", media)
-        self.assertIn("audio_format.capture_layout != XIAOTAI_CAPTURE_DUPLICATED_MIC", media)
 
     def test_szpi_microphone_reference_layout(self) -> None:
         board = (ROOT / "boards/lckfb/esp32s3/board_adapter.c").read_text()
@@ -90,14 +81,6 @@ class BoardAudioFormatTest(unittest.TestCase):
         self.assertIn("xiaotai_board_camera_adapter_t", contract)
         self.assertIn("void *token", contract)
         for header_path, media_path, accessor in (
-            (
-                "boards/alientek/atk-dnesp32s3/atk_board.h",
-                str(
-                    ATK_PROJECT.relative_to(ROOT)
-                    / "components/starter_media/src/starter_media.c"
-                ),
-                "atk_board_camera_adapter()",
-            ),
             (
                 "boards/lckfb/esp32s3/board_adapter.h",
                 str(

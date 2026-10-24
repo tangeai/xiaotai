@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[2]
 BK = ROOT / 'firmware/beken/bk7258/lckfb-bk7258-xiaotai'
 P4 = ROOT / 'firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c'
 S3 = ROOT / 'platforms/esp-idf/main/app_main.c'
-ATK = ROOT / 'firmware/esp-idf/esp32s3/atk-dnesp32s3/main/app_main.c'
 
 
 class BootIdentityTest(unittest.TestCase):
@@ -181,7 +180,7 @@ class BootIdentityTest(unittest.TestCase):
             self.assertEqual(json.loads(body)['firmware_version'], '1.2.3+build.40')
 
     def test_esp_boots_use_embedded_app_descriptor(self):
-        for path in (P4 / 'main/app_main.c', S3, ATK):
+        for path in (P4 / 'main/app_main.c', S3):
             with self.subTest(path=path):
                 entry = path.read_text()
                 self.assertIn('XIAOTAI_BOOT project=%s version=%s', entry)

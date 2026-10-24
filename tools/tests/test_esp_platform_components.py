@@ -24,12 +24,10 @@ def project_path(board_id: str) -> Path:
     return find_board(BOARDS, board_id).project_path(ROOT)
 
 
-ATK_PROJECT_DIR = project_dir("alientek-atk-dnesp32s3")
 SZPI_PROJECT = project_path("lckfb-esp32s3")
 PROJECTS = tuple(
     project_dir(board_id)
     for board_id in (
-        "alientek-atk-dnesp32s3",
         "lckfb-esp32s3",
         "waveshare-esp32p4-touch-lcd-43c-v10",
     )
@@ -108,11 +106,6 @@ class EspPlatformComponentsTest(unittest.TestCase):
                 tool,
             )
 
-        # ATK still has a deliberately smaller API and remains a separate variant.
-        atk = ROOT / ATK_PROJECT_DIR / "components/platform_client"
-        self.assertTrue((atk / "src/platform_client.c").is_file())
-        self.assertTrue((atk / "include/platform_client.h").is_file())
-
     def test_button_policy_uses_board_adapters(self) -> None:
         contract = (
             ROOT / "platforms/common/include/xiaotai_board_button.h"
@@ -155,11 +148,6 @@ class EspPlatformComponentsTest(unittest.TestCase):
             self.assertFalse((component / "src/starter_tirtc.c").exists())
             self.assertFalse((component / "include/starter_tirtc.h").exists())
 
-        # ATK uses a smaller SDK/lifecycle surface and remains an explicit variant.
-        atk = ROOT / ATK_PROJECT_DIR / "components/starter_tirtc"
-        self.assertTrue((atk / "src/starter_tirtc.c").is_file())
-        self.assertTrue((atk / "include/starter_tirtc.h").is_file())
-
     def test_full_console_is_not_owned_by_szpi_project(self) -> None:
         canonical = ROOT / "platforms/esp-idf/components/starter_console"
         self.assertTrue((canonical / "src/starter_console.c").is_file())
@@ -173,10 +161,6 @@ class EspPlatformComponentsTest(unittest.TestCase):
             )
             self.assertFalse((component / "src/starter_console.c").exists())
             self.assertFalse((component / "include/starter_console.h").exists())
-
-        atk = ROOT / ATK_PROJECT_DIR / "components/starter_console"
-        self.assertTrue((atk / "src/starter_console.c").is_file())
-        self.assertTrue((atk / "include/starter_console.h").is_file())
 
     def test_full_runtime_is_not_owned_by_szpi_project(self) -> None:
         canonical = ROOT / "platforms/esp-idf/components/starter_runtime"
@@ -192,15 +176,10 @@ class EspPlatformComponentsTest(unittest.TestCase):
             self.assertFalse((component / "src/starter_runtime.c").exists())
             self.assertFalse((component / "include/starter_runtime.h").exists())
 
-        atk = ROOT / ATK_PROJECT_DIR / "components/starter_runtime"
-        self.assertTrue((atk / "src/starter_runtime.c").is_file())
-        self.assertTrue((atk / "include/starter_runtime.h").is_file())
-
     def test_esp_runtimes_use_the_public_product_session_state_machine(self) -> None:
         public_source = "product/src/xiaotai_runtime.c"
         runtime_components = (
             ROOT / "platforms/esp-idf/components/starter_runtime",
-            ROOT / ATK_PROJECT_DIR / "components/starter_runtime",
         )
         for component in runtime_components:
             cmake = (component / "CMakeLists.txt").read_text()
@@ -244,11 +223,6 @@ class EspPlatformComponentsTest(unittest.TestCase):
             self.assertNotIn(
                 "${XIAOTAI_SOURCE_ROOT}/components/wifi_manager", port
             )
-
-        # ATK's captive portal naming and lifecycle remain a separate variant.
-        atk = ROOT / ATK_PROJECT_DIR / "components/wifi_manager"
-        self.assertTrue((atk / "src/wifi_manager.c").is_file())
-        self.assertTrue((atk / "src/wifi_captive_dns.c").is_file())
 
     def test_product_composition_root_is_canonical(self) -> None:
         canonical = ROOT / "platforms/esp-idf/main"

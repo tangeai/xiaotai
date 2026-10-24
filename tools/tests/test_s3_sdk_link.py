@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Configure both production S3 SDK components and validate the linked archives."""
+"""Configure the production S3 SDK component and validate the linked archives."""
 from pathlib import Path
 import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parents[2]
-for name in ("lckfb-esp32s3-xiaotai", "atk-dnesp32s3"):
+for name in ("lckfb-esp32s3-xiaotai",):
     project = root / "firmware/esp-idf/esp32s3" / name
     sdk = project / "third_party/tirtc"
     component = project / "components/tirtc_sdk"

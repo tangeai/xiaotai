@@ -1,5 +1,0 @@
-dependencies:
-  espressif/esp32-camera:
-    version: "==2.1.7"
-  idf:
-    version: ">=5.5,<5.6"

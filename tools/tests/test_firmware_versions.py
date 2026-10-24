@@ -64,7 +64,6 @@ class FirmwareVersionTests(unittest.TestCase):
 
     def test_all_board_firmware_versions_use_user_selected_semver(self) -> None:
         projects = (
-            "firmware/esp-idf/esp32s3/atk-dnesp32s3/CMakeLists.txt",
             "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/CMakeLists.txt",
             "firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/CMakeLists.txt",
         )

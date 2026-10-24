@@ -114,7 +114,6 @@ class RepositoryLayoutTests(unittest.TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         catalog = (ROOT / "docs/boards/README.md").read_text(encoding="utf-8")
         featured = {
-            "alientek-atk-dnesp32s3",
             "lckfb-bk7258",
             "lckfb-esp32s3",
             "waveshare-esp32p4-touch-lcd-43c-v10",
@@ -238,7 +237,6 @@ class RepositoryLayoutTests(unittest.TestCase):
 
     def test_every_board_has_a_user_guide(self):
         board_ids = (
-            "alientek-atk-dnesp32s3",
             "lckfb-bk7258",
             "lckfb-esp32s3",
             "waveshare-esp32p4-touch-lcd-43c-v10",
@@ -266,7 +264,6 @@ class RepositoryLayoutTests(unittest.TestCase):
 
     def test_every_board_guide_separates_runtime_status_from_evidence_todos(self):
         board_ids = (
-            "alientek-atk-dnesp32s3",
             "lckfb-bk7258",
             "lckfb-esp32s3",
             "waveshare-esp32p4-touch-lcd-43c-v10",
@@ -340,15 +337,6 @@ class RepositoryLayoutTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertNotIn("小泰", text, f"{path}: product name must be 小钛")
 
-    def test_bk7258_schematic_is_indexed_with_checksum(self):
-        guide = ROOT / "docs/boards/lckfb-bk7258/README.md"
-        text = guide.read_text(encoding="utf-8")
-        self.assertIn("ATK-DNT5M_V1.0+原理图.PDF", text)
-        self.assertIn(
-            "faf535aea976d599d1576f21ff07d38600486b01fc18925c8bdc7f024c5203ef",
-            text,
-        )
-
     def test_p4_43c_schematic_is_indexed_with_checksum(self):
         guide = ROOT / "docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md"
         text = guide.read_text(encoding="utf-8")
@@ -377,11 +365,6 @@ class RepositoryLayoutTests(unittest.TestCase):
         self.assertFalse((ROOT / "docs/development/board-dependencies.md").exists())
 
         expected = {
-            "alientek-atk-dnesp32s3": (
-                "b774170ff46c393eeb5e495ea37936038d3f4f4f",
-                "xtensa-esp-elf-gcc 14.2.0",
-                "7334e846ed4261b5297607c85acafe1d586a22374f7c8e37b102b2742e47c7aa",
-            ),
             "lckfb-esp32s3": (
                 "b774170ff46c393eeb5e495ea37936038d3f4f4f",
                 "xtensa-esp-elf-gcc 14.2.0",

@@ -33,7 +33,6 @@ class ReleaseIdentityTests(unittest.TestCase):
                 ('mgkfb-bk7258', '觅感 AI 玩具开发板 BK7258', 'mgkfb-bk7258', 11),
                 ('lckfb-esp32s3', '立创·实战派 ESP32-S3', 'lckfb-esp32s3', 1),
                 ('waveshare-esp32p4-touch-lcd-43c-v10', '微雪 ESP32-P4-WIFI6-Touch-LCD-4.3', 'waveshare-esp32p4-touch-lcd-43c-v10', 2),
-                ('alientek-atk-dnesp32s3', '正点原子 ATK-DNESP32S3', 'alientek-atk-dnesp32s3', 1),
             ]:
                 result = self.plan(Path(temporary), board, f'1.0.1+build.{number}')
                 self.assertEqual(result.returncode, 0, result.stderr)
