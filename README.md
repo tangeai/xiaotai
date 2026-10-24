@@ -21,7 +21,7 @@
 | 开发板图片 | 型号与板卡 ID | 固件版本 | 固件下载 | 文档入口 |
 |---|---|---|---|---|
 | <img src="docs/images/boards/lckfb-bk7258.webp" alt="立创·实战派 BK7258 开发板" width="180"> | 立创·实战派 BK7258<br>`lckfb-bk7258` | v1.0.2<br>build.71 | 完整镜像：包含在 ZIP 中<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.2/lckfb-bk7258-1.0.2%2Bbuild.71-validation.zip) | [烧录指南](docs/boards/lckfb-bk7258/README.md#烧录)<br>[开发板资料](docs/boards/lckfb-bk7258/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.2) |
-| <img src="docs/images/boards/lckfb-esp32s3.webp" alt="立创·实战派 ESP32-S3 开发板" width="180"> | 立创·实战派 ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | v1.0.1<br>build.2 | [完整镜像（BIN）](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.2-merged.bin)<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.2-validation.zip) | [烧录指南](docs/boards/lckfb-esp32s3/README.md#烧录)<br>[开发板资料](docs/boards/lckfb-esp32s3/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.1) |
+| <img src="docs/images/boards/lckfb-esp32s3.webp" alt="立创·实战派 ESP32-S3 开发板" width="180"> | 立创·实战派 ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | v1.0.1<br>build.19 | [完整镜像（BIN）](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.19-merged.bin)<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.19-validation.zip) | [烧录指南](docs/boards/lckfb-esp32s3/README.md#烧录)<br>[开发板资料](docs/boards/lckfb-esp32s3/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/lckfb-esp32s3-v1.0.1) |
 | <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10.webp" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="180"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | v1.0.1<br>build.19 | [完整镜像（BIN）](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.19-merged.bin)<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.19-validation.zip) | [烧录指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录)<br>[开发板资料](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1) |
 | <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite 开发板" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342E 屏幕<br>`m5stack-cores3-lite` | v1.0.1<br>build.42 | [完整镜像（BIN）](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-merged.bin)<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1/m5stack-cores3-lite-1.0.1%2Bbuild.42-validation.zip) | [烧录指南](docs/boards/m5stack-cores3-lite/README.md#烧录)<br>[开发板资料](docs/boards/m5stack-cores3-lite/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1) |
 | <img src="docs/images/boards/mgkfb-bk7258.webp" alt="觅感 AI 玩具开发板 BK7258" width="180"> | 觅感 AI 玩具开发板 BK7258<br>双屏眼睛 · 8 MiB Flash<br>`mgkfb-bk7258` | v1.0.3<br>build.20 | 完整镜像：包含在 ZIP 中<br>[固件包（ZIP）](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3/mgkfb-bk7258-1.0.3%2Bbuild.20-validation.zip) | [烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录)<br>[开发板资料](docs/boards/mgkfb-bk7258/README.md#规格)<br>[发布说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3) |
@@ -29,6 +29,7 @@
 选板时请留意：M5 发布镜像只适用于已确认的 ILI9342E 屏；觅感 BK7258 的长期稳定性与
 异常恢复尚待专项验证。P4 build.19 已经实板验证可用。详情见各板指南。
 P4 build.19 的[源码标签](https://github.com/tangeai/xiaotai/tree/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1)与发布镜像对应。
+立创 S3 与 P4 各自维护构建号，两块板的 build.19 镜像不能互刷。
 
 各入口用途如下：
 
@@ -63,7 +64,7 @@ P4 build.19 的[源码标签](https://github.com/tangeai/xiaotai/tree/waveshare-
 
 | 开发板 | 合并镜像：只选择这一个 BIN | 烧录地址 | 分文件：从同版 ZIP 解压 |
 |---|---|---|---|
-| 立创 ESP32-S3 | `lckfb-esp32s3-1.0.1+build.2-merged.bin` | `0x0` | **3 个 BIN**：bootloader、分区表、应用 |
+| 立创 ESP32-S3 | `lckfb-esp32s3-1.0.1+build.19-merged.bin` | `0x0` | **3 个 BIN**：bootloader、分区表、应用 |
 | 微雪 ESP32-P4 | `waveshare-esp32p4-touch-lcd-43c-v10-1.0.1+build.19-merged.bin` | `0x0` | **4 个 BIN**：bootloader、分区表、OTA 初始化数据、应用 |
 | M5Stack CoreS3-Lite | `m5stack-cores3-lite-1.0.1+build.42-merged.bin` | `0x0` | **3 个 BIN**：bootloader、分区表、应用 |
 

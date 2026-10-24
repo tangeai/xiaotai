@@ -1,9 +1,9 @@
 # 立创·实战派 ESP32-S3
 
-[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.1)
+[返回开发板目录](../README.md) · [下载固件及发布说明](https://github.com/tangeai/xiaotai/releases/tag/lckfb-esp32s3-v1.0.1)
 
-板卡 ID：`lckfb-esp32s3`。当前发布固件为 **v1.0.1 · build.2**。
-此处列出当前正式发布的 build.2，验证范围见发布说明；本地后续构建不等于已发布固件。
+板卡 ID：`lckfb-esp32s3`。当前发布固件为 **v1.0.1 · build.19**。
+用户确认 build.19 实板可用。对应[源码标签](https://github.com/tangeai/xiaotai/tree/lckfb-esp32s3-v1.0.1)。
 
 ## 烧录
 
@@ -15,11 +15,11 @@
 
 ### 烧录步骤
 
-1. 下载 [lckfb-esp32s3-1.0.1+build.2-merged.bin](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.2-merged.bin)。本版只选择这一个完整 BIN，地址为 **`0x0`**。
+1. 下载 [lckfb-esp32s3-1.0.1+build.19-merged.bin](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.19-merged.bin)。本版只选择这一个完整 BIN，地址为 **`0x0`**。
 2. 使用板上 Type-C 接口连接电脑。连接失败时按住 BOOT，再重新上电，进入下载模式后松开 BOOT 并重新选择串口。识别结果必须是 **ESP32-S3**。
 3. 在网页工具的 **Program** 区域选择 `Baudrate`（可先用 `921600`，不稳定时改为 `115200`），点击 **Connect** 并选择本板串口。桌面串口方式不勾选 `WebUSB (CH340)`。
 4. 点击 **Choose File** 选择下载的完整 BIN，**Flash Address 改为 `0x0`**；Flash Mode、Flash Frequency、Flash Size 均选 `keep`。只添加这一行，点击 **Program**。
-5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `lckfb_esp32s3_xiaotai` 和版本 `1.0.1+build.2`，再进入“首次使用”。
+5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `lckfb_esp32s3_xiaotai` 和版本 `1.0.1+build.19`，再进入“首次使用”。
 
 连接位置和烧录参数见下图，图中的端口号与路径只是示例：
 
@@ -33,20 +33,20 @@
 
 | 下载或包内文件 | 用途 |
 |---|---|
-| `lckfb-esp32s3-1.0.1+build.2-merged.bin` | **直接烧录**，只此一个文件，地址 `0x0` |
-| `lckfb-esp32s3-1.0.1+build.2-validation.zip` | 分文件烧录包，先解压，按下表各地址写入 |
+| `lckfb-esp32s3-1.0.1+build.19-merged.bin` | **直接烧录**，只此一个文件，地址 `0x0` |
+| `lckfb-esp32s3-1.0.1+build.19-validation.zip` | 分文件烧录包，先解压，按下表各地址写入 |
 | `lckfb_esp32s3_xiaotai.bin` | 应用 BIN，仅在分文件方式中写入 `0x10000`，不可当完整镜像写入 `0x0` |
 | `MANIFEST.json`、`flasher_args.json`、`flash_args`、ELF | 清单或排查资料，不直接烧录 |
 
 如需核验完整 BIN，SHA-256 为：
 
 ```text
-f27ea251c04586fc625b9b1d8b5eda096d03fb86439588563885f4b52ca02737
+171b9ed8700c287260545609ad2791a65e2069ba3b7e3bcd5de8ef7b96732be3
 ```
 
 Windows 可用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 用 `sha256sum "实际BIN路径"`；
 macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIFEST.json`，
-发布附件的完整哈希见[发布页](https://github.com/tangeai/xiaotai/releases/tag/esp32s3-v1.0.1)中的 `SHA256SUMS`。
+发布附件的完整哈希见[发布页](https://github.com/tangeai/xiaotai/releases/tag/lckfb-esp32s3-v1.0.1)中的 `SHA256SUMS`。
 
 ## 首次使用
 
@@ -82,7 +82,7 @@ macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIF
 
 ### 分文件烧录
 
-下载并解压 [lckfb-esp32s3-1.0.1+build.2-validation.zip](https://github.com/tangeai/xiaotai/releases/download/esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.2-validation.zip)。
+下载并解压 [lckfb-esp32s3-1.0.1+build.19-validation.zip](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.0.1/lckfb-esp32s3-1.0.1%2Bbuild.19-validation.zip)。
 此方式需按包内 `MANIFEST.json` 和 `flasher_args.json` 核对本板、本版的 **3 个 BIN**：
 
 | 文件 | 烧录地址 | 用途 |
@@ -149,8 +149,7 @@ H5 视频使用流 11，格式为 MJPEG（逐帧 JPEG 图像），分辨率 320�
 
 串口 `ep-show` 查看平台服务发现基址；`ep-set http://ep-open.tangeopen.com/pre`
 保存并重启，实际请求为 `/pre/services`；`ep-reset` 清除覆盖项。TiRTC 地址取自
-`/services` 响应的 `tirtc-srv`。当前源码的恢复出厂设置会清除覆盖项；已发布 build.2
-恢复默认地址时使用 `ep-reset`。
+`/services` 响应的 `tirtc-srv`。恢复出厂设置会清除覆盖项；单独恢复默认地址可用 `ep-reset`。
 
 
 ## 屏幕布局与字体约束
@@ -270,8 +269,9 @@ python3 tools/build.py --board lckfb-esp32s3
 
 ## 验证状态与已知限制
 
-项目方确认当前固件已在实板跑通。TODO：把结果绑定到精确 BIN/ELF SHA-256，补齐
-测试日期、启动与媒体日志摘要、AEC 单讲/双讲指标及板卡照片。
+用户确认当前 build.19 实板可用。完整 BIN SHA-256 为
+`171b9ed8700c287260545609ad2791a65e2069ba3b7e3bcd5de8ef7b96732be3`。
+TODO：补充逐项启动与媒体日志、AEC 单讲/双讲指标及板卡照片。
 
 板级配置和 adapter 位于 `boards/lckfb/esp32s3/`；准确硬件事实以 Hardware IR 为准。
 
