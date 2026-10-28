@@ -3,7 +3,8 @@
 这是立创·实战派 ESP32-S3 开发板 PCB V1.0.1 的 AIROBOT 语音版固件，
 板上模组为 `ESP32-S3-WROOM-1-N16R8`。固件使用 ESP-IDF 5.5.5、TiRTC SDK
 2.5.0 和 LVGL 8.3.11。工程包含 320×240 触控产品界面、设备配网/绑定上线、
-AI 双向语音、设备/微信纯语音呼叫，以及原有 H5 MJPEG 实时画面与双向语音能力。
+AI 双向语音、空闲声音的 AI 音频识别与结果播报、设备/微信纯语音呼叫，
+以及原有 H5 MJPEG 实时画面与双向语音能力。
 S3 产品界面不显示视频通话、本地预览或摄像头开关。
 
 板级媒体路径已经接入资料记载的 GC0308、实机精确探测到的 GC2145，以及 ES7210、ES8311、PCA9557 和 NS4150B。摄像头以 QVGA RGB565 采集，再由 `esp32-camera` 软件转换为完整 JPEG；摄像头门禁只接受 GC0308 PID 或 GC2145 PID `0x2145`，其他传感器仍拒绝。AI 传输音频为 Opus、16 kHz、单声道、20 ms，目标码率 16 kbit/s；H5、设备呼叫、微信通话和多人对讲为 G.711 A-law、8 kHz、单声道。硬件采集和播放为 16 kHz。AI 下行保留最多 64 个压缩包，按 20 ms 帧计可容纳 1.28 秒；首次播放仍只预缓冲 4 包且最多等待 80 ms，不通过改变采样率加速消耗积压。突发数据可能形成较长待播积压，停止或切换连接时必须清空旧队列；超过容量仍会明确计入 overflow。ES7210 RX 与 ES8311 TX 一次性注册为 I2S0 配对通道，标准 I2S 的两个 32-bit slot 与 TDM 的四个 16-bit slot 都使用 64 BCLK/frame，因此可在共享 MCLK/BCLK/WS 上同时采集和播放。Espressif ESP-SR 2.4.7 的 `AEC_MODE_FD_LOW_COST` 同时处理 MIC1 近端语音和 MIC3 硬件回采参考；AI 直接将 16 kHz AEC 输出组成 20 ms Opus 包；其他远程链路将 AEC 输出降采样为 20 ms/8 kHz G.711 包。本地唤醒使用 Voicute TFLite 和“你好小钛”模型，独立 CPU0 任务读取 AEC clean 最新窗口；摄像头事件、软件 JPEG 和浮点 AEC 任务固定在 CPU1，AEC/JPEG 循环主动让出 RTOS tick。

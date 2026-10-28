@@ -26,6 +26,7 @@ typedef enum {
     PLATFORM_SERVICE_AI,
     PLATFORM_SERVICE_CALL,
     PLATFORM_SERVICE_VOIP,
+    PLATFORM_SERVICE_RECOGNITION,
 } platform_service_t;
 
 typedef struct {
@@ -138,6 +139,15 @@ esp_err_t platform_client_request_timeout(platform_service_t service,
                                           unsigned timeout_ms,
                                           platform_response_callback_t callback,
                                           void *user_data);
+
+/** Recognition worker only; bearer stays private. Bounded, cancellable binary I/O.
+ * prefix/PCM/suffix form a multipart POST; NULL prefix selects GET.
+ * response belongs to caller; length is binary-safe. Redirects are disabled.
+ */
+esp_err_t platform_client_recognition_transfer(const char *path,
+    const char *prefix, const void *pcm, size_t pcm_bytes, const char *suffix,
+    void *response, size_t capacity, size_t *length, int *status,
+    bool (*cancelled)(void));
 
 /** 注册永久 MQTT 的信令消费者；应在 platform_client_start() 前调用。 */
 void platform_client_set_signal_handler(platform_signal_callback_t callback,

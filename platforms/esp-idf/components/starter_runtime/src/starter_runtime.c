@@ -14,6 +14,7 @@
  * 对外状态使用原子快照，供串口或产品 UI 无锁读取。
  */
 #include "starter_runtime.h"
+#include "starter_recognition.h"
 #include "xiaotai_ai_feedback.h"
 
 #include <ctype.h>
@@ -43,6 +44,9 @@
 
 #ifndef XIAOTAI_BOARD_MODEL
 #define XIAOTAI_BOARD_MODEL "lckfb-esp32s3"
+#endif
+#ifndef XIAOTAI_S3_PROFILE_VERSION
+#define XIAOTAI_S3_PROFILE_VERSION "1.1.0"
 #endif
 
 /* Receiver presentation only; the encoder keeps the sensor's pixels.
@@ -569,6 +573,8 @@ static void publish_state(void)
 {
     starter_runtime_state_t state = session_state();
     starter_media_set_wake_allowed(state == STARTER_RUNTIME_WAITING);
+    starter_recognition_allow(xiaotai_runtime_home_allowed(&s_session) &&
+        !starter_media_status().microphone_muted);
     /* 这些原子值用于诊断快照；业务判断始终留在 runtime_task 内。 */
     starter_runtime_state_t previous = (starter_runtime_state_t)atomic_exchange_explicit(
         &s_public_state, state, memory_order_acq_rel);
@@ -1172,6 +1178,7 @@ static void on_platform_signal(const char *json, size_t length, void *user_data)
 
 static void on_platform_online(void *user_data)
 {
+    starter_recognition_refresh();
     (void)user_data;
     const runtime_event_t event = {.type = EVENT_PLATFORM_ONLINE};
     if (!queue_event(&event)) {
@@ -1253,7 +1260,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-S3\","
         "\"board_model\":\"" XIAOTAI_BOARD_MODEL "\"},"
-        "\"firmware_version\":\"1.0.1\",\"profiles\":{"
+        "\"firmware_version\":\"" XIAOTAI_S3_PROFILE_VERSION "\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,\"up_video_mt\":[\"mjpeg\"],"
         "\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"
@@ -3053,7 +3060,18 @@ static void handle_platform_signal(const runtime_event_t *event)
                             : cJSON_GetObjectItemCaseSensitive(root, "type");
     const char *signal = cJSON_IsString(type) && type->valuestring != NULL
                              ? type->valuestring : "";
+    if (strcmp(signal, "recognition_config_changed") == 0) {
+        starter_recognition_refresh();
+        cJSON_Delete(root);
+        return;
+    }
+    if (strcmp(signal, "recognition_result") == 0) {
+        /* Worker queries the authoritative task snapshot by request ID. */
+        cJSON_Delete(root);
+        return;
+    }
     if (strcmp(signal, "unbind") == 0) {
+        starter_recognition_shutdown();
         cJSON_Delete(root);
         ESP_LOGW(TAG, "device was unbound; clearing local credentials and restarting");
         finish_session(0);
@@ -3956,6 +3974,12 @@ static void runtime_task(void *argument)
          * 平台信令无法可靠入队时通过重启重新核对服务端绑定状态；若设备已
          * unbind，组合根会进入签名重绑。传输事件丢失则收敛到 WAITING 并断连。
          */
+        if (starter_recognition_binding_revoked() &&
+            xiaotai_runtime_home_allowed(&s_session)) {
+            ESP_LOGW(TAG, "recognition reports binding revoked; restarting to rebind");
+            vTaskDelay(pdMS_TO_TICKS(100));
+            esp_restart();
+        }
         if (atomic_exchange_explicit(&s_platform_restart_required,
                                      false,
                                      memory_order_acq_rel)) {
@@ -3987,6 +4011,8 @@ static void runtime_task(void *argument)
             resume_mqtt_after_external_connect();
         }
 
+        starter_recognition_allow(xiaotai_runtime_home_allowed(&s_session) &&
+            !starter_media_status().microphone_muted);
         /* 50 ms 轮询间隔同时用于驱动 AI 延迟发送和各阶段超时。 */
         runtime_event_t event;
         if (xQueueReceive(s_queue, &event, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -4196,6 +4222,10 @@ esp_err_t starter_runtime_start(const char *device_id)
         return ESP_ERR_NO_MEM;
     }
     product_snapshot_reset();
+#if CONFIG_IDF_TARGET_ESP32S3
+    /* Explicit first-board rollout; P4 must not inherit the fallback model name. */
+    if (!strcmp(XIAOTAI_BOARD_MODEL, "lckfb-esp32s3")) starter_recognition_init();
+#endif
     /* 必须先注册回调，再由组合根启动 TiRTC，避免丢失早期启动/连接事件。 */
     const starter_tirtc_handlers_t handlers = {
         .on_started = on_tirtc_started,

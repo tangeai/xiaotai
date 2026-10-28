@@ -79,6 +79,9 @@ class FirmwareVersionTests(unittest.TestCase):
         self.assertIsNotNone(match)
         self.assertRegex(match.group(1), rf"^{SEMVER.pattern}$")
 
+    def test_lckfb_esp32s3_audio_recognition_release_is_1_1_0(self) -> None:
+        self.assertEqual(str(read_board_version(REPO_ROOT, "lckfb-esp32s3")), "1.1.0")
+
     def dispatch(self, *, release=False, dry_run=False, return_code=0):
         args = SimpleNamespace(list_boards=False, validate=False, all=False,
                                board="lckfb-esp32s3", variant=None,

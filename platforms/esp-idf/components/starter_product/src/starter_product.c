@@ -42,6 +42,10 @@
 #include "runtime_config.h"
 #include "starter_media.h"
 #include "starter_runtime.h"
+#include "starter_recognition.h"
+#ifndef XIAOTAI_RECOGNITION_HOME_SWITCH
+#define XIAOTAI_RECOGNITION_HOME_SWITCH 0
+#endif
 #include "wifi_manager.h"
 #if CONFIG_IDF_TARGET_ESP32P4
 #include "display_driver.h"
@@ -362,6 +366,17 @@ static lv_obj_t *s_wifi_signal_bars[4];
 static lv_obj_t *s_date;
 static lv_obj_t *s_state;
 static lv_obj_t *s_subtitle;
+static lv_obj_t *s_recognition_label;
+static lv_obj_t *s_recognition_result;
+static lv_obj_t *s_recognition_icon;
+static lv_obj_t *s_recognition_icon_parts[16];
+static size_t s_recognition_icon_part_count;
+static char s_previous_recognition[1728];
+static char s_previous_recognition_status[128];
+static int64_t s_recognition_status_until_ms;
+static bool s_recognition_status_visible;
+static char s_last_scrolled_result[1536];
+static bool s_recognition_result_finished = true;
 static lv_obj_t *s_hint;
 static lv_obj_t *s_activity;
 static lv_obj_t *s_face;
@@ -1829,9 +1844,96 @@ static void create_expression_face(lv_obj_t *parent,
     lv_canvas_fill_bg(s_face, lv_color_hex(HOME_BACKGROUND_COLOR), LV_OPA_COVER);
 }
 
+static void on_recognition_switch(lv_event_t *event)
+{
+    (void)event;
+    starter_recognition_set_local_enabled(!starter_recognition_local_enabled());
+    note_interaction();
+}
+
+static void recognition_icon_bar(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
+                                 lv_coord_t width, lv_coord_t height)
+{
+    lv_obj_t *bar = lv_obj_create(parent);
+    lv_obj_set_pos(bar, x, y);
+    lv_obj_set_size(bar, width, height);
+    lv_obj_set_style_pad_all(bar, 0, 0);
+    set_bg(bar, lv_color_hex(0x29424C));
+    lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    s_recognition_icon_parts[s_recognition_icon_part_count++] = bar;
+}
+
+static void render_recognition_switch(lv_obj_t *screen)
+{
+    if (!XIAOTAI_RECOGNITION_HOME_SWITCH) return;
+    s_recognition_icon = lv_obj_create(screen);
+    lv_obj_set_pos(s_recognition_icon, 193, 3);
+    lv_obj_set_size(s_recognition_icon, 28, 28);
+    lv_obj_set_style_bg_opa(s_recognition_icon, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(s_recognition_icon, 0, 0);
+    lv_obj_set_style_pad_all(s_recognition_icon, 0, 0);
+    lv_obj_clear_flag(s_recognition_icon, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(s_recognition_icon, on_recognition_switch, LV_EVENT_CLICKED, NULL);
+    const lv_coord_t edge = 4, far = 22;
+    recognition_icon_bar(s_recognition_icon, edge, edge, 6, 2);
+    recognition_icon_bar(s_recognition_icon, edge, edge, 2, 6);
+    recognition_icon_bar(s_recognition_icon, far - 4, edge, 6, 2);
+    recognition_icon_bar(s_recognition_icon, far, edge, 2, 6);
+    recognition_icon_bar(s_recognition_icon, edge, far, 6, 2);
+    recognition_icon_bar(s_recognition_icon, edge, far - 4, 2, 6);
+    recognition_icon_bar(s_recognition_icon, far - 4, far, 6, 2);
+    recognition_icon_bar(s_recognition_icon, far, far - 4, 2, 6);
+    /* Four-point AI sparkle and two scanner dots. */
+    recognition_icon_bar(s_recognition_icon, 13, 8, 2, 12);
+    recognition_icon_bar(s_recognition_icon, 8, 13, 12, 2);
+    recognition_icon_bar(s_recognition_icon, 11, 11, 6, 6);
+    recognition_icon_bar(s_recognition_icon, 10, 22, 2, 2);
+    recognition_icon_bar(s_recognition_icon, 16, 22, 2, 2);
+}
+
+static void recognition_result_scroll_done(lv_anim_t *anim)
+{
+    (void)anim;
+    s_recognition_result_finished = true;
+    if (s_recognition_result != NULL)
+        lv_obj_add_flag(s_recognition_result, LV_OBJ_FLAG_HIDDEN);
+}
+
+/* Each new result crosses the clipped viewport twice, then disappears. */
+static void set_recognition_result_x(void *object, int32_t x)
+{
+    lv_obj_set_x((lv_obj_t *)object, (lv_coord_t)x);
+}
+
+static void start_recognition_result_scroll(const char *result)
+{
+    if (s_recognition_result == NULL) return;
+    lv_anim_del(s_recognition_result, set_recognition_result_x);
+    lv_obj_set_x(s_recognition_result, 236);
+    const lv_font_t *font = product_ui_font();
+    lv_coord_t spacing = lv_obj_get_style_text_letter_space(s_recognition_result,
+                                                               LV_PART_MAIN);
+    lv_coord_t width = lv_txt_get_width(result, strlen(result), font, spacing,
+                                        LV_TEXT_FLAG_NONE);
+    lv_obj_set_width(s_recognition_result, width);
+    lv_label_set_text(s_recognition_result, result);
+    if (!result[0]) { s_recognition_result_finished = true; return; }
+    s_recognition_result_finished = false;
+    lv_anim_t anim;
+    lv_anim_init(&anim);
+    lv_anim_set_var(&anim, s_recognition_result);
+    lv_anim_set_exec_cb(&anim, set_recognition_result_x);
+    lv_anim_set_values(&anim, 236, -width);
+    lv_anim_set_time(&anim, 800U + (uint32_t)(236 + width) * 1000U / 50U);
+    lv_anim_set_repeat_count(&anim, 1);
+    lv_anim_set_ready_cb(&anim, recognition_result_scroll_done);
+    lv_anim_start(&anim);
+}
+
 static void render_home(lv_obj_t *screen)
 {
     render_header(screen, "小钛");
+    render_recognition_switch(screen);
     if (s_page == PAGE_HOME_CLOCK) {
         s_face = make_label(screen, "--:--", 24, 70, 272, lv_color_hex(0xFFFFFF));
         lv_obj_set_style_text_align(s_face, LV_TEXT_ALIGN_CENTER, 0);
@@ -1848,6 +1950,28 @@ static void render_home(lv_obj_t *screen)
     s_state = make_label(screen, "小钛在这儿", 45, 150, 230,
                          lv_color_hex(0xBFE9F3));
     lv_obj_set_style_text_align(s_state, LV_TEXT_ALIGN_CENTER, 0);
+    s_recognition_label = make_label(screen, "", 16, 169, 236, lv_color_hex(0xEDFAFF));
+    lv_obj_set_height(s_recognition_label, 17);
+    lv_obj_set_style_text_align(s_recognition_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_t *result_viewport = lv_obj_create(screen);
+    lv_obj_set_pos(result_viewport, 16, 187);
+    lv_obj_set_size(result_viewport, 236, 19);
+    lv_obj_clear_flag(result_viewport, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_bg_opa(result_viewport, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(result_viewport, 0, 0);
+    lv_obj_set_style_pad_all(result_viewport, 0, 0);
+    s_recognition_result = make_label(result_viewport, "", 0, 0, 236,
+                                      lv_color_hex(0xEDFAFF));
+    lv_obj_set_height(s_recognition_result, 19);
+    lv_label_set_long_mode(s_recognition_result, LV_LABEL_LONG_CLIP);
+    lv_obj_add_flag(s_recognition_result, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_long_mode(s_recognition_label, LV_LABEL_LONG_CLIP);
+    lv_obj_add_flag(s_recognition_label, LV_OBJ_FLAG_HIDDEN);
+    s_previous_recognition[0] = '\0';
+    s_previous_recognition_status[0] = '\0';
+    s_recognition_status_until_ms = 0;
+    s_recognition_status_visible = false;
+    s_recognition_result_finished = true;
     s_subtitle = make_label(screen, "", 16, 177, 236, lv_color_hex(0xEDFAFF));
     /* Dynamic captions and controls use the same complete, selected font. */
     lv_obj_set_style_text_font(s_subtitle, product_ui_font(), 0);
@@ -2859,6 +2983,11 @@ static void render_page(void)
     s_date = NULL;
     s_state = NULL;
     s_subtitle = NULL;
+    s_recognition_label = NULL;
+    s_recognition_result = NULL;
+    s_recognition_icon = NULL;
+    s_recognition_icon_part_count = 0;
+    s_recognition_status_visible = false;
     s_hint = NULL;
     s_activity = NULL;
     s_face = NULL;
@@ -3770,6 +3899,55 @@ static void product_tick(lv_timer_t *timer)
         }
     }
 
+    if (s_recognition_label != NULL && s_recognition_result != NULL) {
+        if (s_recognition_icon != NULL) {
+            lv_color_t color = lv_color_hex(starter_recognition_effective_enabled()
+                                            ? 0x72DEF8 : 0x647782);
+            for (size_t i = 0; i < s_recognition_icon_part_count; ++i)
+                lv_obj_set_style_bg_color(s_recognition_icon_parts[i], color, 0);
+        }
+        char recognition[1728];
+        starter_recognition_snapshot(recognition, sizeof(recognition));
+        bool show = runtime.state == STARTER_RUNTIME_WAITING && !product.call_incoming &&
+            (s_page == PAGE_HOME_FACE || s_page == PAGE_HOME_CLOCK) && recognition[0] != '\0';
+        if (strcmp(recognition, s_previous_recognition)) {
+            snprintf(s_previous_recognition, sizeof(s_previous_recognition), "%s", recognition);
+            char *result = strchr(recognition, '\n');
+            if (result != NULL) {
+                *result++ = '\0';
+                for (char *p = result; *p; ++p) if (*p == '\n') *p = ' ';
+            }
+            if (recognition[0] && strcmp(recognition, s_previous_recognition_status)) {
+                size_t status_bytes = strnlen(recognition,
+                    sizeof(s_previous_recognition_status) - 1U);
+                memcpy(s_previous_recognition_status, recognition, status_bytes);
+                s_previous_recognition_status[status_bytes] = '\0';
+                s_recognition_status_until_ms = now + 5000;
+            }
+            lv_label_set_text(s_recognition_label, recognition);
+            if (result == NULL) s_last_scrolled_result[0] = '\0';
+            if (result != NULL && strcmp(result, s_last_scrolled_result)) {
+                snprintf(s_last_scrolled_result, sizeof(s_last_scrolled_result), "%s", result);
+                start_recognition_result_scroll(result == NULL ? "" : result);
+            }
+        }
+        s_recognition_status_visible = show &&
+            starter_recognition_status_visible(s_previous_recognition_status,
+                                               s_recognition_status_until_ms, now);
+        bool result_visible = show && strchr(s_previous_recognition, '\n') &&
+            !s_recognition_result_finished;
+        if (s_recognition_status_visible)
+            lv_obj_clear_flag(s_recognition_label, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(s_recognition_label, LV_OBJ_FLAG_HIDDEN);
+        if (result_visible)
+            lv_obj_clear_flag(s_recognition_result, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(s_recognition_result, LV_OBJ_FLAG_HIDDEN);
+        if (s_recognition_status_visible || result_visible) {
+            if (s_hint != NULL) lv_obj_add_flag(s_hint, LV_OBJ_FLAG_HIDDEN);
+            s_hint_visible = false;
+        }
+    }
+
     bool ambient_before = s_ambient_visible;
     if (now >= s_audio_wake_guard_until_ms &&
         media.audio_activity_level >= 2U && s_previous_audio_level < 2U) {
@@ -3788,7 +3966,8 @@ static void product_tick(lv_timer_t *timer)
         backlight_set(false);
     }
 
-    if (home && session_idle && now >= s_hint_due_ms && !s_hint_visible) {
+    if (home && session_idle && now >= s_hint_due_ms && !s_hint_visible &&
+        !s_recognition_status_visible && s_recognition_result_finished) {
         s_hint_visible = true;
         s_hint_hide_ms = now + PRODUCT_HINT_VISIBLE_MS;
         if (s_hint != NULL) {

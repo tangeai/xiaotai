@@ -69,9 +69,10 @@ static int xTaskCreate(void(*fn)(void*),const char*name,unsigned stack,void*arg,
 ''' + source + r'''
 #define ESP_LOGW(...) ((void)0)
 #define ESP_LOGE(...) ((void)0)
-static int finished, restarted;
+static int finished, restarted, recognition_stopped;
+static void starter_recognition_shutdown(void){recognition_stopped++;}
 static void cJSON_Delete(void *root){}
-static void finish_session(int error){assert(error==0);finished++;}
+static void finish_session(int error){assert(error==0 && recognition_stopped==1);finished++;}
 static void vTaskDelay(unsigned ticks){}
 static void esp_restart(void){assert(erases==1 && commits==1 && closes==1);restarted++;}
 static void replay_platform_unbind(void){

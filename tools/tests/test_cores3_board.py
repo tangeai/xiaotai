@@ -199,6 +199,7 @@ int main(void) {
 #include <stddef.h>
 #define CONFIG_IDF_TARGET_ESP32P4 0
 #define XIAOTAI_BOARD_MODEL "m5stack-cores3-lite"
+#define XIAOTAI_S3_PROFILE_VERSION "1.0.1"
 #define PLATFORM_SERVICE_DEVICE 1
 #define ESP_OK 0
 #define ESP_LOGI(...) ((void)0)
@@ -214,6 +215,7 @@ static void voip_profile_response(void){}
 static int platform_client_request_timeout(int service,const char *url,
     const char *body,unsigned timeout,void (*callback)(void),void *context){
     assert(strstr(body,"\"board_model\":\"m5stack-cores3-lite\""));
+    assert(strstr(body,"\"firmware_version\":\"1.0.1\""));
     assert(strstr(body,"\"up_video_mt\":[\"mjpeg\"]"));
     assert(strstr(body,"\"no_video\":true"));
     return ESP_OK;

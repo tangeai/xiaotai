@@ -146,6 +146,7 @@ python3 "$repo_dir/tools/tests/test_release_identity.py"
 python3 "$repo_dir/tools/tests/test_boot_identity.py"
 # Includes shared Beken output directories and profile/variant identity guards.
 python3 "$repo_dir/tools/tests/test_validation_packaging.py"
+python3 "$repo_dir/tools/tests/test_audio_recognition.py"
 bash "$repo_dir/tools/run_host_tests.sh"
 python3 "$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools/test_video_regions.py"
 python3 "$repo_dir/firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/tools/test_media_performance_log.py"

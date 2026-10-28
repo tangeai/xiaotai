@@ -7,3 +7,6 @@ set(XIAOTAI_STARTER_PRODUCT_ASSET_DIR "${XIAOTAI_REPO_ROOT}/product/assets/audio
 set(XIAOTAI_STARTER_PRODUCT_EXTRA_SRCS "${board_dir}/board_display.c")
 set(XIAOTAI_STARTER_PRODUCT_EXTRA_PRIV_INCLUDE_DIRS "${board_dir}")
 include("${XIAOTAI_REPO_ROOT}/platforms/esp-idf/components/starter_product/CMakeLists.txt")
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE XIAOTAI_RECOGNITION_HOME_SWITCH=1)
+endif()

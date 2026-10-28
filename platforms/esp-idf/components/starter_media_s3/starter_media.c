@@ -344,6 +344,8 @@ static atomic_uint_fast32_t s_jpeg_max_encode_us;
 static atomic_uint_fast32_t s_jpeg_deadline_misses;
 static atomic_uchar s_audio_activity_level;
 static atomic_bool s_voice_active;
+static atomic_bool s_prompt_active;
+static atomic_int_fast64_t s_prompt_guard_ms;
 static atomic_uchar s_speaker_volume = 7;
 static atomic_bool s_speaker_muted;
 static atomic_bool s_microphone_muted;
@@ -807,6 +809,9 @@ static void audio_capture_task(void *argument)
                                   memory_order_release);
         }
 
+        starter_media_observe_pcm(clean.pcm_16k, clean.samples_16k,
+            atomic_load(&s_voice_active), wake_listen &&
+            !atomic_load(&s_prompt_active) && captured_ms >= atomic_load(&s_prompt_guard_ms), captured_ms);
         mode = (starter_tirtc_mode_t)atomic_load_explicit(&s_mode,
                                                            memory_order_acquire);
         generation = (uint32_t)atomic_load_explicit(&s_generation,
@@ -1530,6 +1535,7 @@ esp_err_t starter_media_play_pcm8k_at_epoch(const int16_t *pcm, size_t sample_co
         return ESP_ERR_INVALID_STATE;
     }
 
+    atomic_store(&s_prompt_active, true);
     esp_err_t err = audio_output_set_locked(true);
     int16_t previous = pcm[0];
     size_t offset = 0;
@@ -1572,6 +1578,8 @@ esp_err_t starter_media_play_pcm8k_at_epoch(const int16_t *pcm, size_t sample_co
         /* 等待最后一小段 DMA 数据移出，避免关闭功放时切掉尾音。 */
         vTaskDelay(pdMS_TO_TICKS(40));
     }
+    atomic_store(&s_prompt_guard_ms, esp_timer_get_time()/1000+1000);
+    atomic_store(&s_prompt_active, false);
     esp_err_t disable_err = audio_output_set_locked(false);
     xSemaphoreGive(s_audio_output_mutex);
     if (err == ESP_OK) {

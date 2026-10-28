@@ -19,6 +19,9 @@ def decode(text):
     default_board = re.search(r'#define XIAOTAI_BOARD_MODEL ("[^"]+")', source)
     if default_board:
         text = text.replace("XIAOTAI_BOARD_MODEL", default_board.group(1))
+    default_s3_version = re.search(r'#define XIAOTAI_S3_PROFILE_VERSION ("[^"]+")', source)
+    if default_s3_version:
+        text = text.replace("XIAOTAI_S3_PROFILE_VERSION", default_s3_version.group(1))
     return json.loads("".join(ast.literal_eval(s) for s in re.findall(r'"(?:\\.|[^"\\])*"', text)))
 p4, s3 = map(decode, profiles[:2])
 p4_manifest = json.loads((repo_root / "boards/waveshare/esp32p4-touch-lcd-43c/board.json").read_text())

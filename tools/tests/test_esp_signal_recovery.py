@@ -98,6 +98,8 @@ int main(void) {
 #define vTaskDelay(...) ((void)0)
 #define ESP_OK 0
 #define STARTER_ROOM_NONE 0
+static void starter_recognition_refresh(void){}
+static void starter_recognition_shutdown(void){}
 static int stops;
 static bool s_room_desired=true,s_room_resume_pending=true;
 static char s_room_id[65]="room-1",s_room_code[7]="123456";

@@ -65,6 +65,7 @@ typedef struct {
     char tirtc[256];
     char call[256];
     char voip[256];
+    char recognition[256];
 } platform_services_t;
 
 typedef struct {
@@ -356,6 +357,8 @@ static esp_err_t discover_services(const char *url)
                                sizeof(s_services.voip)) &&
               json_copy_string(root, "tirtc-srv", s_services.tirtc,
                                sizeof(s_services.tirtc));
+    if (root) (void)json_copy_string(root, "recognition-srv",
+        s_services.recognition, sizeof(s_services.recognition));
     cJSON_Delete(root);
     if (!ok) {
         ESP_LOGE(TAG, "service discovery response is incomplete");
@@ -495,6 +498,7 @@ static const char *service_base(platform_service_t service)
     case PLATFORM_SERVICE_AI: return s_services.ai;
     case PLATFORM_SERVICE_CALL: return s_services.call;
     case PLATFORM_SERVICE_VOIP: return s_services.voip;
+    case PLATFORM_SERVICE_RECOGNITION: return s_services.recognition;
     default: return NULL;
     }
 }
@@ -1573,4 +1577,72 @@ void platform_client_set_online_handler(platform_online_callback_t callback,
 unsigned platform_client_verification_seconds_left(void)
 {
     return xiaotai_binding_seconds_left(s_verification_expiry, (uint32_t)time(NULL));
+}
+
+/* Separate low-priority worker: never put a large upload in the call HTTP queue. */
+esp_err_t platform_client_recognition_transfer(const char *path,
+    const char *prefix, const void *pcm, size_t pcm_bytes, const char *suffix,
+    void *response, size_t capacity, size_t *length, int *status,
+    bool (*cancelled)(void))
+{
+    if (!path || strncmp(path, "/v1/recognition/", 16) || strstr(path, "..") ||
+        !response || !capacity || !length || !status || !cancelled ||
+        (prefix && (!pcm || !suffix || pcm_bytes > 5U*1024U*1024U)) ||
+        (!prefix && (pcm_bytes || suffix)))
+        return ESP_ERR_INVALID_ARG;
+    *length = 0; *status = 0;
+    if (!platform_client_ready() || !s_services.recognition[0] || cancelled())
+        return ESP_ERR_INVALID_STATE;
+    char url[512], authorization[1100];
+    if (snprintf(url, sizeof(url), "%s%s", s_services.recognition, path) >= sizeof(url))
+        return ESP_ERR_INVALID_SIZE;
+    snprintf(authorization, sizeof(authorization), "Bearer %s", s_mqtt_token);
+    esp_http_client_config_t config = {
+        .url=url, .timeout_ms=1500, .crt_bundle_attach=esp_crt_bundle_attach,
+        .disable_auto_redirect=true,
+    };
+    esp_http_client_handle_t client=esp_http_client_init(&config);
+    if (!client) return ESP_ERR_NO_MEM;
+    esp_http_client_set_header(client,"Authorization",authorization);
+    mbedtls_platform_zeroize(authorization,sizeof(authorization));
+    size_t pre=prefix?strlen(prefix):0, tail=suffix?strlen(suffix):0;
+    if (prefix) {
+        esp_http_client_set_method(client,HTTP_METHOD_POST);
+        esp_http_client_set_header(client,"Content-Type",
+            "multipart/form-data; boundary=xiaotai-recognition");
+    }
+    esp_err_t err=esp_http_client_open(client,(int)(pre+pcm_bytes+tail));
+    int64_t deadline=esp_timer_get_time()/1000+30000;
+    const void *parts[]={prefix,pcm,suffix};
+    size_t sizes[]={pre,pcm_bytes,tail};
+    for (unsigned i=0; err==ESP_OK && i<3; i++) {
+        size_t offset=0;
+        while(offset<sizes[i]) {
+            if(cancelled() || esp_timer_get_time()/1000>deadline) {err=ESP_ERR_TIMEOUT;break;}
+            size_t n=sizes[i]-offset; if(n>2048) n=2048;
+            int written=esp_http_client_write(client,(const char *)parts[i]+offset,n);
+            if(written<=0) {err=ESP_FAIL;break;}
+            offset+=(size_t)written;
+        }
+    }
+    if(err==ESP_OK && !cancelled()) {
+        int64_t announced=esp_http_client_fetch_headers(client);
+        *status=esp_http_client_get_status_code(client);
+        if(announced<0 || announced>(int64_t)capacity) err=ESP_ERR_INVALID_SIZE;
+        while(err==ESP_OK && !esp_http_client_is_complete_data_received(client)) {
+            if(cancelled() || esp_timer_get_time()/1000>deadline) {err=ESP_ERR_TIMEOUT;break;}
+            if(*length==capacity) {err=ESP_ERR_INVALID_SIZE;break;}
+            int n=esp_http_client_read(client,(char *)response+*length,
+                capacity-*length>2048?2048:capacity-*length);
+            if(n<0) {err=ESP_FAIL;break;}
+            if(n==0) {
+                if (!esp_http_client_is_complete_data_received(client)) err=ESP_FAIL;
+                break;
+            }
+            *length+=(size_t)n;
+        }
+    } else if(err==ESP_OK) err=ESP_ERR_INVALID_STATE;
+    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
+    return err;
 }

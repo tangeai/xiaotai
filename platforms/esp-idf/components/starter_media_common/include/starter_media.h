@@ -84,6 +84,12 @@ typedef struct {
     bool uplink_enabled;        /**< 业务上行门禁；多人对讲只在 PTT 按下时开启。 */
 } starter_media_status_t;
 
+/* Optional observer runs in capture: bounded copy only; registered before runtime starts. */
+typedef void (*starter_pcm_observer_t)(const int16_t *, size_t, bool, bool, int64_t);
+void starter_media_set_pcm_observer(starter_pcm_observer_t observer);
+void starter_media_observe_pcm(const int16_t *pcm, size_t samples, bool sound,
+                               bool safe, int64_t captured_ms);
+
 /** 创建固定下行音频队列和播放任务；应在启动其他模块前调用。 */
 esp_err_t starter_media_init(void);
 
