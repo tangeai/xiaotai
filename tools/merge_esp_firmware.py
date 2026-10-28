@@ -78,6 +78,8 @@ def merged_inputs(package: Path) -> tuple[str, str, list[tuple[int, str, bytes]]
 def verify_merged(package: Path, image: Path) -> dict:
     """Compare every input byte and every erased gap, with flash base fixed at 0."""
     name, _, parts = merged_inputs(package)
+    with zipfile.ZipFile(package) as archive:
+        verification_status = json.loads(archive.read('MANIFEST.json'))['verification_status']
     if image.name != name:
         raise ValueError('merged name differs from firmware identity')
     data = image.read_bytes()
@@ -93,7 +95,7 @@ def verify_merged(package: Path, image: Path) -> dict:
     return {'path': name, 'size_bytes': len(data),
             'sha256': hashlib.sha256(data).hexdigest(),
             'flash_offset': '0x0', 'overwrites_gaps': True,
-            'verification_status': 'BUILD_VERIFIED_HIL_PENDING'}
+            'verification_status': verification_status}
 
 
 def merge_package(package: Path, output_dir: Path | None = None) -> Path:

@@ -22,7 +22,8 @@ class MergedFirmwareTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.directory = Path(self.temp.name)
 
-    def fixture(self, chip='esp32s3', *, overlap=False, corrupt=False):
+    def fixture(self, chip='esp32s3', *, overlap=False, corrupt=False,
+                verification_status='BUILD_VERIFIED_HIL_PENDING'):
         board = ('lckfb-esp32s3' if chip == 'esp32s3' else
                  'waveshare-esp32p4-touch-lcd-43c-v10')
         version = '1.0.1+build.2'
@@ -47,7 +48,7 @@ class MergedFirmwareTests(unittest.TestCase):
         records = [{'path': name, 'size_bytes': len(data),
                     'sha256': hashlib.sha256(data).hexdigest()} for name, data in payloads.items()]
         manifest = {'board_id': board, 'project_version': version,
-                    'verification_status': 'BUILD_VERIFIED_HIL_PENDING',
+                    'verification_status': verification_status,
                     'image_identity': {'target': chip},
                     'application': records[2 if chip == 'esp32s3' else 3],
                     'flash_files': [{'offset': offset, 'file': name} for offset, name in files.items()],
@@ -57,6 +58,13 @@ class MergedFirmwareTests(unittest.TestCase):
                 z.writestr(name, b'corrupt' if corrupt and name == 'app.bin' else data)
             z.writestr('MANIFEST.json', json.dumps(manifest))
         return package
+
+    def test_merged_inherits_verified_package_status(self):
+        package = self.fixture(verification_status='HIL_VERIFIED')
+        with patch.object(merged.subprocess, 'run', side_effect=self.vendor_merge):
+            image = merged.merge_package(package)
+        self.assertEqual(merged.verify_merged(package, image)['verification_status'],
+                         'HIL_VERIFIED')
 
     def vendor_merge(self, command, **kwargs):
         # Stand-in for the external esptool process, not the production validator.

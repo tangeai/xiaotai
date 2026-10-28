@@ -19,7 +19,7 @@
 
 ## 构建和验证
 
-`bash tools/check.sh` 通过，包含 488 项 Python 回归、既有主机 ASan/UBSan 检查
+`bash tools/check.sh` 通过，包含 489 项 Python 回归、既有主机 ASan/UBSan 检查
 和 5 块板卡清单校验。ESP-IDF 5.5.5 原生发布构建通过。
 
 用户于 2026-10-29 确认 `1.1.0+build.40` 这份精确镜像已在实板验证，
