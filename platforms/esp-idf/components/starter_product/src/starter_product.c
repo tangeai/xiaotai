@@ -1869,7 +1869,7 @@ static void render_recognition_switch(lv_obj_t *screen)
 {
     if (!XIAOTAI_RECOGNITION_HOME_SWITCH) return;
     s_recognition_icon = lv_obj_create(screen);
-    lv_obj_set_pos(s_recognition_icon, 193, 3);
+    lv_obj_set_pos(s_recognition_icon, 210, 3);
     lv_obj_set_size(s_recognition_icon, 28, 28);
     lv_obj_set_style_bg_opa(s_recognition_icon, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(s_recognition_icon, 0, 0);

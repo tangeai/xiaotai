@@ -98,6 +98,36 @@ int main(void) {
         self.assertIn('lv_obj_set_pos(s_recognition_cooldown_fill, 6, 23 - height)', source)
         self.assertNotIn('Four-point AI sparkle and two scanner dots', source)
 
+    def test_home_header_places_recognition_next_to_clock(self):
+        import re
+        source=(ROOT/'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()
+        icon=re.search(r'lv_obj_set_pos\(s_recognition_icon, (\d+), (\d+)\);', source)
+        clock=re.search(r's_clock = make_label\(screen, "--:--", (\d+), (\d+), (\d+),', source)
+        wifi=re.search(r'lv_obj_set_pos\(s_wifi_signal, (\d+), (\d+)\);', source)
+        self.assertIsNotNone(icon)
+        self.assertIsNotNone(clock)
+        self.assertIsNotNone(wifi)
+        icon_x=int(icon.group(1))
+        # The clock is right aligned in its label. Its 5 glyphs occupy roughly
+        # the rightmost 42 px, leaving this 28 px hit target beside the text.
+        clock_text_x=int(clock.group(1))+int(clock.group(3))-42
+        self.assertGreaterEqual(icon_x, 205)
+        self.assertLessEqual(icon_x+28, clock_text_x)
+        self.assertGreaterEqual(clock_text_x-(icon_x+28), 0)
+        self.assertLessEqual(clock_text_x-(icon_x+28), 4)
+        self.assertLess(int(clock.group(1))+int(clock.group(3)), int(wifi.group(1)))
+
+    def test_product_prototype_shows_recognition_header_and_cooldown(self):
+        html=(ROOT/'docs/product/prototype.html').read_text()
+        js=(ROOT/'docs/product/prototype.js').read_text()
+        css=(ROOT/'docs/product/prototype-home.css').read_text()
+        self.assertIn('id="recognition-switch"', html)
+        self.assertIn('id="recognition-cooldown-fill"', html)
+        self.assertIn('id="header-clock"', html)
+        self.assertIn('data-recognition-demo="cooldown"', html)
+        self.assertIn('recognitionCooldownRemaining', js)
+        self.assertIn('.recognition-switch', css)
+
     def test_home_status_is_centered_and_idle_notice_expires(self):
         source=(ROOT/'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()
         self.assertIn('lv_obj_set_style_text_align(s_recognition_label, LV_TEXT_ALIGN_CENTER, 0)',source)
