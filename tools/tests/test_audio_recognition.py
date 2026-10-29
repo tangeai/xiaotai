@@ -108,14 +108,14 @@ int main(void) {
         self.assertIsNotNone(clock)
         self.assertIsNotNone(wifi)
         icon_x=int(icon.group(1))
-        # The clock is right aligned in its label. Its 5 glyphs occupy roughly
-        # the rightmost 42 px, leaving this 28 px hit target beside the text.
-        clock_text_x=int(clock.group(1))+int(clock.group(3))-42
-        self.assertGreaterEqual(icon_x, 205)
-        self.assertLessEqual(icon_x+28, clock_text_x)
-        self.assertGreaterEqual(clock_text_x-(icon_x+28), 0)
-        self.assertLessEqual(clock_text_x-(icon_x+28), 4)
-        self.assertLess(int(clock.group(1))+int(clock.group(3)), int(wifi.group(1)))
+        # Compare visible glyph edges on the photographed 320 px S3 header.
+        # The AI corners end at x+24; the right-aligned clock occupies about
+        # 41 px and the Wi-Fi glyph starts about 2 px inside its container.
+        clock_right=int(clock.group(1))+int(clock.group(3))
+        ai_to_clock=(clock_right-41)-(icon_x+24)
+        clock_to_wifi=(int(wifi.group(1))+2)-clock_right
+        self.assertLessEqual(abs(ai_to_clock-clock_to_wifi), 1)
+        self.assertLessEqual(icon_x+28, clock_right-41)
 
     def test_product_prototype_shows_recognition_header_and_cooldown(self):
         html=(ROOT/'docs/product/prototype.html').read_text()
@@ -127,6 +127,8 @@ int main(void) {
         self.assertIn('data-recognition-demo="cooldown"', html)
         self.assertIn('recognitionCooldownRemaining', js)
         self.assertIn('.recognition-switch', css)
+        self.assertIn('.header-right { margin-left:auto; display:flex; align-items:center; gap:8px;', css)
+        self.assertIn('.header-right #header-clock { width:auto;', css)
 
     def test_home_status_is_centered_and_idle_notice_expires(self):
         source=(ROOT/'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()

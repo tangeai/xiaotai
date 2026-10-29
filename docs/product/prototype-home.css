@@ -58,8 +58,8 @@
   height: 37px;
 }
 .header-name { color:#76def7; font-size:13px; font-weight:700; white-space:nowrap; }
-.header-right { margin-left:auto; display:flex; align-items:center; gap:4px; height:28px; }
-.header-right #header-clock { width:58px; text-align:right; color:#a5c5d0; font-size:15px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.header-right { margin-left:auto; display:flex; align-items:center; gap:8px; height:28px; }
+.header-right #header-clock { width:auto; text-align:right; color:#a5c5d0; font-size:15px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .header-wifi { width:22px; height:24px; display:grid; place-items:center; color:#78f0cf; }
 .prototype-mic { display:none; }
 .recognition-switch { position:relative; display:grid; place-items:center; width:28px; height:28px; flex:none; padding:0; border:0; background:transparent; color:#72def8; cursor:pointer; }
