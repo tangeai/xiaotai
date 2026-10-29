@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/xiaotai_repository.cmake")
 xiaotai_find_repository_root(XIAOTAI_REPO_ROOT)
-set(PROJECT_VER "1.0.1")
+set(PROJECT_VER "1.1.0")
 include("${XIAOTAI_REPO_ROOT}/platforms/esp-idf/cmake/xiaotai_build_version.cmake")
 set(XIAOTAI_BOARD_VARIANT "ili9342e" CACHE STRING "CoreS3-Lite LCD revision")
 if(NOT XIAOTAI_BOARD_VARIANT MATCHES "^(ili9342c|ili9342e)$")

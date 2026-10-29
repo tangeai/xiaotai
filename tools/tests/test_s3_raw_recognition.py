@@ -10,6 +10,38 @@ MEDIA = ROOT / "firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/components/starte
 
 
 class RawRecognitionCaptureTest(unittest.TestCase):
+    def test_m5_tdm_microphone_not_reference_drives_trigger(self):
+        source = r'''
+#include "board_audio_slots.h"
+#include "starter_raw_recognition.h"
+#include <assert.h>
+int main(void) {
+    int16_t wire[320*4], capture[320*2], mono[320];
+    starter_raw_recognition_t state={0};
+    for(int frame=0;frame<100;frame++) {
+        for(int i=0;i<320;i++) {
+            wire[4*i]=frame<50?0:1000;
+            wire[4*i+1]=12000; /* MIC3 electrical speaker reference */
+            wire[4*i+2]=20000; wire[4*i+3]=-20000;
+        }
+        cores3_audio_unpack(capture,wire,320);
+        bool sound=starter_raw_recognition_feed(&state,capture,320,2,0,mono,320,true,1000+frame*20);
+        for(int i=0;i<320;i++) assert(mono[i]==(frame<50?0:1000));
+        if(frame<50) assert(!sound);
+        if(frame==99) assert(sound);
+    }
+}
+'''
+        with tempfile.TemporaryDirectory() as temp:
+            path=pathlib.Path(temp)
+            (path/'test.c').write_text(source)
+            subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror',
+                '-I'+str(ROOT/'boards/m5stack/cores3-lite'),
+                '-I'+str(ROOT/'platforms/esp-idf/components/starter_media_common/include'),
+                str(path/'test.c'),str(ROOT/'platforms/esp-idf/components/starter_media_common/src/starter_raw_recognition.c'),
+                '-o',str(path/'test')],check=True)
+            subprocess.run([str(path/'test')],check=True)
+
     def test_raw_microphone_drives_detection_and_recording(self):
         source = r'''
 #include "starter_raw_recognition.h"
@@ -88,9 +120,17 @@ int main(void) {
             self.assertTrue(call in source, call)
         m5 = (ROOT / "firmware/esp-idf/esp32s3/m5stack-cores3-lite/components/starter_media/CMakeLists.txt").read_text()
         self.assertNotIn("starter_raw_recognition.c", m5)
-        self.assertNotIn("XIAOTAI_S3_RAW_RECOGNITION", m5)
+        self.assertIn("XIAOTAI_S3_RAW_RECOGNITION=1", m5)
         lckfb = (MEDIA / "CMakeLists.txt").read_text()
         self.assertIn("XIAOTAI_S3_RAW_RECOGNITION=1", lckfb)
+
+    def test_m5_runtime_and_home_enable_recognition(self):
+        project=ROOT/'firmware/esp-idf/esp32s3/m5stack-cores3-lite'
+        ui=(project/'components/starter_product/CMakeLists.txt').read_text()
+        runtime=(ROOT/'platforms/esp-idf/components/starter_runtime/src/starter_runtime.c').read_text()
+        self.assertTrue('XIAOTAI_RECOGNITION_HOME_SWITCH=1' in ui)
+        self.assertTrue('!strcmp(XIAOTAI_BOARD_MODEL, "m5stack-cores3-lite")' in runtime)
+        self.assertTrue('set(PROJECT_VER "1.1.0")' in (project/'CMakeLists.txt').read_text())
 
 
 if __name__ == "__main__":

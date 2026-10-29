@@ -4223,8 +4223,9 @@ esp_err_t starter_runtime_start(const char *device_id)
     }
     product_snapshot_reset();
 #if CONFIG_IDF_TARGET_ESP32S3
-    /* Explicit first-board rollout; P4 must not inherit the fallback model name. */
-    if (!strcmp(XIAOTAI_BOARD_MODEL, "lckfb-esp32s3")) starter_recognition_init();
+    /* Only boards with a wired PCM source and home switch are admitted. */
+    if (!strcmp(XIAOTAI_BOARD_MODEL, "lckfb-esp32s3") ||
+        !strcmp(XIAOTAI_BOARD_MODEL, "m5stack-cores3-lite")) starter_recognition_init();
 #elif CONFIG_IDF_TARGET_ESP32P4
     starter_recognition_init();
 #endif

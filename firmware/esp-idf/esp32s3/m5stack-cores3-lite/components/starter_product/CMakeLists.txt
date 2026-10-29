@@ -12,6 +12,7 @@ include("${XIAOTAI_REPO_ROOT}/platforms/esp-idf/components/starter_product/CMake
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)
     # Only the two bounded caption arrays; do not move the whole component BSS.
     target_compile_definitions(${COMPONENT_LIB} PRIVATE XIAOTAI_UI_TEXT_PSRAM=1)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE XIAOTAI_RECOGNITION_HOME_SWITCH=1)
 endif()
 
 if(NOT CMAKE_BUILD_EARLY_EXPANSION AND XIAOTAI_BOARD_VARIANT STREQUAL "ili9342c")

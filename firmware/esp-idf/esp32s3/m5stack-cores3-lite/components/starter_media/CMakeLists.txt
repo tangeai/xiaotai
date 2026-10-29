@@ -26,3 +26,6 @@ idf_component_register(
         esp_audio_codec
         esp-sr
 )
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE XIAOTAI_S3_RAW_RECOGNITION=1)
+endif()

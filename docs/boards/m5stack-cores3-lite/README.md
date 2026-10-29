@@ -237,7 +237,7 @@ python3 tools/build.py --board m5stack-cores3-lite --variant ili9342c
 省略 `--variant` 选择 `ili9342e`。切换会重新配置面板命令表，不会运行时猜测屏幕。
 原生输出在 `firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/`，应用为
 `m5stack_cores3_lite_xiaotai.bin` / `.elf`；烧录地址以同目录 `flasher_args.json` 为准。
-独立 `BUILD_NUMBER` 每次编译递增，失败也消耗编号，不改变产品版本 `1.0.1`。
+独立 `BUILD_NUMBER` 每次编译递增，失败也消耗编号，不自动改变产品版本。
 
 原生 CMake 检查最终生效的 PSRAM 配置，拒绝 Octal 或关闭 PSRAM 的构建。
 若已有 `sdkconfig` 保存了旧的 Octal 设置，修改 `sdkconfig.defaults` 不会覆盖它：
@@ -279,6 +279,11 @@ bash tools/check.sh
 再做仅人声、仅扬声器和双讲三种槽位测试。GPIO0 不允许配置为按键输入。
 
 ## 验证状态与已知限制
+
+1.1.0 测试固件新增 AI 音频分析：原始 MIC1 的 16 kHz PCM 触发后保留最多 5 秒预录，
+再录 10 秒上传。首页 AI 图标支持开关，底色表示 60 秒冷却，状态显示录制和上传阶段，
+结果滚动两次并语音播报。通话、实时查看、AI 对话和房间业务占用期间暂停识别。
+MIC3 回放参考不进入识别录音，阈值与实际声学表现仍待 M5 实板验证。
 
 M5 已完成实板验证，已验证的发布记录为 **v1.0.1 · build.47 / ILI9342E** 和
 **v1.0.1 · build.48 / ILI9342C**。

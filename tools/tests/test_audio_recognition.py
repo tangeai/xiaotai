@@ -91,7 +91,7 @@ int main(void) {
         lckfb=(ROOT/'firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/components/starter_product/CMakeLists.txt').read_text()
         m5=(ROOT/'firmware/esp-idf/esp32s3/m5stack-cores3-lite/components/starter_product/CMakeLists.txt').read_text()
         self.assertIn('XIAOTAI_RECOGNITION_HOME_SWITCH=1',lckfb)
-        self.assertNotIn('XIAOTAI_RECOGNITION_HOME_SWITCH=1',m5)
+        self.assertIn('XIAOTAI_RECOGNITION_HOME_SWITCH=1',m5)
 
     def test_home_icon_uses_ai_and_cooldown_background(self):
         source=(ROOT/'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()

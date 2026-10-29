@@ -20,7 +20,7 @@ class CoreS3BoardTest(unittest.TestCase):
             command, project = build_command(ROOT, board, variant)
             self.assertIn(f"-DXIAOTAI_BOARD_VARIANT={variant}", command)
             self.assertEqual(project.name, "m5stack-cores3-lite")
-        self.assertEqual(str(read_board_version(ROOT, board.id)), "1.0.1")
+        self.assertEqual(str(read_board_version(ROOT, board.id)), "1.1.0")
         result = subprocess.run(
             [sys.executable, str(ROOT / "tools/build.py"), "--board", board.id,
              "--variant", "ili9342c", "--dry-run"],
