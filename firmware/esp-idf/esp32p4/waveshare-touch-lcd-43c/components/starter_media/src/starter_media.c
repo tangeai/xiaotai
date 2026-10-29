@@ -2,6 +2,7 @@
  * hardware is ES8311 DAC playback + ES7210 four-slot TDM capture (MIC2 mic,
  * MIC3 playback reference) on the shared I2S1, and OV5647 CSI. */
 #include "starter_media.h"
+#include "starter_recognition_player.h"
 #include "starter_playback_scope.h"
 #include "starter_aec.h"
 #include "starter_voice.h"
@@ -187,6 +188,7 @@ static atomic_uint_fast32_t s_audio_write_failed;
 static atomic_uint_fast32_t s_audio_playback_pending;
 static atomic_bool s_audio_playback_active;
 static atomic_bool s_prompt_active;
+static starter_recognition_player_t s_recognition_player;
 static atomic_int_fast64_t s_prompt_guard_ms;
 static int16_t *s_recognition_raw_pcm;
 /* Successful I2S writes enqueue PCM; they do not wait for the DAC to finish. */
@@ -961,6 +963,7 @@ static void audio_capture_task(void *argument)
          * Copy raw 16 kHz PCM before AEC touches the input buffer. */
         bool recognition_safe = !atomic_load(&s_active) && atomic_load(&s_wake_allowed) &&
             !atomic_load(&s_microphone_muted) && !atomic_load(&s_prompt_active) &&
+            !starter_recognition_player_busy(&s_recognition_player) &&
             captured_ms >= atomic_load(&s_prompt_guard_ms) &&
             mute_epoch == atomic_load(&s_mute_epoch) &&
             capture_epoch == atomic_load(&s_capture_epoch);
@@ -1622,7 +1625,7 @@ esp_err_t starter_media_set_speaker_muted(bool muted)
     if (err == ESP_OK) {
         atomic_store_explicit(&s_speaker_muted, muted, memory_order_release);
         err = audio_output_set_locked(!muted &&
-            atomic_load_explicit(&s_active, memory_order_acquire));
+            (atomic_load_explicit(&s_active, memory_order_acquire) || starter_recognition_player_busy(&s_recognition_player)));
     }
     xSemaphoreGive(s_audio_output_mutex);
     return err;
@@ -1755,6 +1758,73 @@ uint32_t starter_media_playback_epoch(void)
     return (uint32_t)atomic_load_explicit(&s_pcm8k_cancel_sequence, memory_order_acquire);
 }
 
+
+/* Recognition-only output port. Every chunk releases the hardware lock so
+ * product volume/mute intents and foreground admission can run between blocks. */
+static bool recognition_output_allowed(unsigned epoch)
+{
+    return atomic_load(&s_ready) && !atomic_load(&s_active) &&
+        !atomic_load(&s_speaker_muted) &&
+        starter_recognition_player_epoch(&s_recognition_player)==epoch;
+}
+static int recognition_output_begin(void *context, unsigned epoch)
+{
+    (void)context;
+    if(xSemaphoreTake(s_audio_output_mutex,pdMS_TO_TICKS(500))!=pdTRUE) return ESP_ERR_TIMEOUT;
+    int err=ESP_ERR_INVALID_STATE;
+    if(recognition_output_allowed(epoch) && !atomic_load(&s_prompt_active)) {
+        err=audio_output_set_locked(true);
+        if(err!=ESP_OK) (void)audio_output_set_locked(false);
+    }
+    xSemaphoreGive(s_audio_output_mutex);
+    return err;
+}
+static int recognition_output_write(void *context, const int16_t *stereo,
+                                    size_t frames, unsigned epoch)
+{
+    (void)context;
+    if(xSemaphoreTake(s_audio_output_mutex,pdMS_TO_TICKS(500))!=pdTRUE) return ESP_ERR_TIMEOUT;
+    int err=ESP_ERR_INVALID_STATE;
+    if(recognition_output_allowed(epoch)) {
+        size_t written=0;
+        size_t bytes=frames*2U*sizeof(int16_t);
+        err=s_audio_adapter->write_pcm(s_audio_adapter->context,stereo,frames,&written);
+        if(err==ESP_OK && written!=bytes) err=ESP_FAIL;
+    }
+    xSemaphoreGive(s_audio_output_mutex);
+    vTaskDelay(pdMS_TO_TICKS(1));
+    return err;
+}
+static int recognition_output_end(void *context)
+{
+    (void)context;
+    xSemaphoreTake(s_audio_output_mutex,portMAX_DELAY);
+    /* A foreground owner may already have taken over between chunks. Its amp
+     * state belongs to that owner; stale recognition cleanup must not mute it. */
+    int err=ESP_OK;
+    if(!atomic_load(&s_active)) {
+        vTaskDelay(pdMS_TO_TICKS(40));
+        err=audio_output_set_locked(false);
+    }
+    atomic_store(&s_prompt_guard_ms,esp_timer_get_time()/1000+1000);
+    xSemaphoreGive(s_audio_output_mutex);
+    return err;
+}
+uint32_t starter_media_recognition_playback_epoch(void)
+{ return starter_recognition_player_epoch(&s_recognition_player); }
+void starter_media_cancel_recognition_playback(void)
+{ starter_recognition_player_cancel(&s_recognition_player); }
+esp_err_t starter_media_play_recognition_pcm16k(const int16_t *pcm, size_t samples,
+                                               uint32_t epoch)
+{
+    if(!atomic_load(&s_ready) || s_audio_output_mutex==NULL || s_audio_adapter==NULL)
+        return ESP_ERR_INVALID_STATE;
+    const starter_recognition_output_t output={.begin=recognition_output_begin,
+        .write=recognition_output_write,.end=recognition_output_end};
+    int err=starter_recognition_player_play(&s_recognition_player,&output,pcm,samples,epoch);
+    return err<0?ESP_ERR_INVALID_STATE:err;
+}
+
 esp_err_t starter_media_play_pcm8k_at_epoch(const int16_t *pcm, size_t sample_count,
                                            uint32_t cancel_sequence)
 {
@@ -1768,7 +1838,8 @@ esp_err_t starter_media_play_pcm8k_at_epoch(const int16_t *pcm, size_t sample_co
     if (xSemaphoreTake(s_audio_output_mutex, pdMS_TO_TICKS(500)) != pdTRUE) {
         return ESP_ERR_TIMEOUT;
     }
-    if (atomic_load_explicit(&s_active, memory_order_acquire) ||
+    if (starter_recognition_player_busy(&s_recognition_player) ||
+        atomic_load_explicit(&s_active, memory_order_acquire) ||
         atomic_load_explicit(&s_speaker_muted, memory_order_acquire) ||
         cancel_sequence != atomic_load_explicit(&s_pcm8k_cancel_sequence,
                                                  memory_order_acquire)) {
@@ -1842,6 +1913,12 @@ esp_err_t starter_media_start(starter_tirtc_mode_t mode, uint32_t generation)
          mode != STARTER_TIRTC_VOIP && mode != STARTER_TIRTC_CALL &&
          mode != STARTER_TIRTC_ROOM)) {
         return ESP_ERR_INVALID_STATE;
+    }
+    starter_media_cancel_recognition_playback();
+    int64_t recognition_deadline=esp_timer_get_time()+500000;
+    while(starter_recognition_player_busy(&s_recognition_player)) {
+        if(esp_timer_get_time()>=recognition_deadline) return ESP_ERR_TIMEOUT;
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
     xSemaphoreTake(s_preroll_mutex, portMAX_DELAY);
     bool preroll_ok = true;

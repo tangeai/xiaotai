@@ -54,43 +54,15 @@ void xiaotai_recognition_feed(xiaotai_recognition_t *r, const int16_t *pcm,
         }
     }
 }
-static uint32_t le32(const uint8_t *p)
-{ return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24); }
-static unsigned le16(const uint8_t *p) { return p[0]|((unsigned)p[1]<<8); }
-bool xiaotai_recognition_wav(const uint8_t *w, size_t bytes,
+
+bool xiaotai_recognition_pcm16(const uint8_t *data, size_t bytes,
     int16_t *out, size_t capacity, size_t *samples)
 {
-    if(!w || !out || !samples || bytes<44 || memcmp(w,"RIFF",4) || memcmp(w+8,"WAVE",4)) return false;
-    uint32_t riff=le32(w+4);
-    bool placeholder=riff==0xffffffffU || riff==2147483583U;
-    if(!placeholder && riff!=bytes-8) return false;
-    unsigned channels=0, rate=0, align=0;
-    for(size_t offset=12;offset+8<=bytes;) {
-        uint32_t size=le32(w+offset+4); size_t start=offset+8;
-        if(!memcmp(w+offset,"fmt ",4)) {
-            if(size<16 || size>bytes-start || le16(w+start)!=1 || le16(w+start+14)!=16) return false;
-            channels=le16(w+start+2); rate=le32(w+start+4); align=le16(w+start+12);
-            if((channels!=1 && channels!=2) || rate<8000 || rate>48000 || align!=channels*2) return false;
-        }
-        if(!memcmp(w+offset,"data",4)) {
-            if(!align) return false;
-            if(placeholder && ((riff==0xffffffffU && size==0xffffffffU) ||
-               (riff==2147483583U && size==2147483547U))) size=bytes-start;
-            if(size>bytes-start || size%align) return false;
-            size_t frames=size/align, n=frames*8000/rate;
-            if(!n || n>capacity || frames>(size_t)rate*180) return false;
-            /* Average source frames in each output interval; preserve little endian. */
-            for(size_t i=0;i<n;i++) {
-                size_t a=i*rate/8000,b=(i+1)*rate/8000;
-                int32_t total=0;
-                for(size_t j=a;j<b;j++) for(unsigned c=0;c<channels;c++)
-                    total+=(int16_t)le16(w+start+j*align+c*2);
-                out[i]=(int16_t)(total/(int32_t)((b-a)*channels));
-            }
-            *samples=n; return true;
-        }
-        if(size>bytes-start) return false;
-        offset=start+size+(size&1);
-    }
-    return false;
+    if(!data || !out || !samples || !bytes || bytes>2097152U ||
+       bytes%2 || bytes/2>capacity) return false;
+    if(bytes>=12 && !memcmp(data,"RIFF",4) && !memcmp(data+8,"WAVE",4)) return false;
+    for(size_t i=0;i<bytes/2;i++)
+        out[i]=(int16_t)((uint16_t)data[2*i]|((uint16_t)data[2*i+1]<<8));
+    *samples=bytes/2;
+    return true;
 }

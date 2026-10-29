@@ -17,8 +17,8 @@ void xiaotai_recognition_init(xiaotai_recognition_t *r, int16_t *pcm);
 void xiaotai_recognition_feed(xiaotai_recognition_t *r, const int16_t *pcm,
     size_t count, bool sound, bool allowed, int64_t now_ms);
 void xiaotai_recognition_release(xiaotai_recognition_t *r, int64_t accepted_ms);
-/* Validate complete PCM16 WAV and convert to mono 8 kHz for the prompt path. */
-bool xiaotai_recognition_wav(const uint8_t *wav, size_t bytes,
+/* Fixed recognition-result contract: mono 16 kHz PCM_S16LE, at most 2 MiB. */
+bool xiaotai_recognition_pcm16(const uint8_t *pcm_le, size_t bytes,
     int16_t *output, size_t capacity, size_t *samples);
 
 #endif

@@ -27,10 +27,11 @@ void vSemaphoreDelete(SemaphoreHandle_t s) {(void)s;}
 int xTaskCreate(void (*fn)(void *),const char *name,unsigned stack,void *arg,unsigned priority,void *handle)
 {(void)name;(void)stack;(void)priority;(void)handle;internal_stack=true;fn(arg);internal_stack=false;return 1;}
 void starter_media_set_pcm_observer(starter_pcm_observer_t fn) { observer=fn; }
-void starter_media_cancel_pcm8k_playback(void) {}
-uint32_t starter_media_playback_epoch(void) { return 0; }
-esp_err_t starter_media_play_pcm8k_at_epoch(const int16_t *pcm,size_t count,uint32_t epoch)
+void starter_media_cancel_recognition_playback(void) {}
+uint32_t starter_media_recognition_playback_epoch(void) { return 0; }
+esp_err_t starter_media_play_recognition_pcm16k(const int16_t *pcm,size_t count,uint32_t epoch)
 { (void)epoch;assert(!cancelled());assert(count==800);assert(pcm[0]==1234);plays++;
+  if(scenario==17) return -1;
   if(scenario==4) { starter_recognition_allow(false);resume_at=ticks+2000;return -1; }
   return 0; }
 bool platform_client_ready(void) { return true; }
@@ -51,6 +52,10 @@ void vTaskDelay(unsigned ms)
             assert(strstr(status,"声音分析完成") && !strstr(status,"冷却中"));
             assert(starter_recognition_cooldown_remaining_ms()>0);
         }
+    }
+    if((scenario==15 || scenario==17 || scenario==19) && ticks==20000) {
+        char status[1728];starter_recognition_snapshot(status,sizeof(status));
+        assert(strstr(status,"识别语音下载或播放失败"));
     }
     if(scenario==14 && ticks==80000) {
         char status[1728];starter_recognition_snapshot(status,sizeof(status));
@@ -101,21 +106,34 @@ esp_err_t platform_client_recognition_transfer(const char *path,const char *pref
         else json="{\"code\":200}";
     } else if(strstr(path,"/audio/")) {
         if(scenario==10) {*status=410;const char *b="{\"code\":6006}";*length=strlen(b);memcpy(response,b,*length);return 0;}
-        unsigned char wav[1644]={0};
-        memcpy(wav,"RIFF",4);unsigned riff=1636;memcpy(wav+4,&riff,4);memcpy(wav+8,"WAVEfmt ",8);
-        wav[16]=16;wav[20]=1;wav[22]=1;unsigned rate=8000;memcpy(wav+24,&rate,4);
-        wav[32]=2;wav[34]=16;memcpy(wav+36,"data",4);unsigned bytes=1600;memcpy(wav+40,&bytes,4);
-        for(unsigned i=44;i<sizeof(wav);i+=2) {wav[i]=0xd2;wav[i+1]=4;}
-        assert(capacity>=sizeof(wav));memcpy(response,wav,sizeof(wav));*length=sizeof(wav);return 0;
+        unsigned char pcm[1600];
+        for(unsigned i=0;i<sizeof(pcm);i+=2) {pcm[i]=0xd2;pcm[i+1]=4;}
+        assert(capacity>=sizeof(pcm));memcpy(response,pcm,sizeof(pcm));
+        *length=scenario==15?1599:scenario==19?1598:sizeof(pcm);return 0;
     } else {
         if(scenario==0 && queries==0) {char status[1728];starter_recognition_snapshot(status,sizeof(status));
             assert(strstr(status,"已上传，等待分析"));}
         queries++;
         if(scenario==9) {*status=410;json="{\"code\":6006}";}
-        else json="{\"code\":200,\"data\":{\"status_revision\":2,\"status\":\"succeeded\",\"results\":[{\"item_id\":\"item_1\",\"result\":{\"summary\":\"test sound\"},\"speech\":{\"status\":\"ready\"}}]}}";
+        else json="{\"code\":200,\"data\":{\"status_revision\":2,\"status\":\"succeeded\",\"results\":[{\"item_id\":\"item_1\",\"result\":{\"summary\":\"test sound\"},\"speech\":{\"status\":\"ready\",\"format\":\"pcm_s16le\",\"sample_rate\":16000,\"channels\":1,\"bytes\":1600}}]}}";
     }
     if(scenario==5 && !prefix && !strstr(path,"/config") && queries%2) {
-        json="{\"code\":200,\"data\":{\"status_revision\":2,\"status\":\"processing\",\"results\":[{\"item_id\":\"item_1\",\"result\":{\"summary\":\"test sound\"},\"speech\":{\"status\":\"ready\"}}]}}";
+        json="{\"code\":200,\"data\":{\"status_revision\":2,\"status\":\"processing\",\"results\":[{\"item_id\":\"item_1\",\"result\":{\"summary\":\"test sound\"},\"speech\":{\"status\":\"ready\",\"format\":\"pcm_s16le\",\"sample_rate\":16000,\"channels\":1,\"bytes\":1600}}]}}";
+    }
+    if((scenario==16 || scenario==18) && strstr(json,"pcm_s16le")) {
+        cJSON *root=cJSON_Parse(json);
+        cJSON *items=cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItemCaseSensitive(root,"data"),"results");
+        cJSON *speech=cJSON_GetObjectItemCaseSensitive(cJSON_GetArrayItem(items,0),"speech");
+        cJSON_DeleteItemFromObjectCaseSensitive(speech,"sample_rate");
+        if(scenario==16) cJSON_AddNumberToObject(speech,"sample_rate",8000);
+        else {
+            cJSON_DeleteItemFromObjectCaseSensitive(speech,"format");
+            cJSON_DeleteItemFromObjectCaseSensitive(speech,"channels");
+            cJSON_DeleteItemFromObjectCaseSensitive(speech,"bytes");
+        }
+        char *body=cJSON_PrintUnformatted(root);*length=strlen(body);
+        assert(*length<capacity);memcpy(response,body,*length);
+        free(body);cJSON_Delete(root);return 0;
     }
     *length=strlen(json);assert(*length<capacity);memcpy(response,json,*length);return 0;
 }
@@ -164,6 +182,7 @@ int main(int argc,char **argv)
     assert(uploads>=1);
     if(scenario==8) {assert(uploads==1 && plays==0 && queries==0 && starter_recognition_binding_revoked());return 0;}
     if(scenario==9 || scenario==10) {assert(uploads==1 && plays==0 && starter_recognition_binding_revoked());return 0;}
+    if(scenario==15 || scenario==16 || scenario==19) {assert(plays==0);return 0;}
     if(scenario==1) {assert(uploads==1 && plays==0);}
     else {assert(plays==uploads && queries>=uploads);}
     if(scenario!=1) { char snapshot[1728];starter_recognition_snapshot(snapshot,sizeof(snapshot));assert(strstr(snapshot,"test sound"));assert(strchr(snapshot,'\n')); }

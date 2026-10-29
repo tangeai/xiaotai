@@ -17,7 +17,7 @@
 #include <stdlib.h>
 
 #define JSON_BYTES 32768U
-#define WAV_BYTES (2U*1024U*1024U)
+#define PCM_BYTES (2U*1024U*1024U)
 static SemaphoreHandle_t s_lock;
 static atomic_bool s_allowed, s_refresh, s_capture, s_shutdown, s_revoked;
 static atomic_bool s_local_enabled = true, s_effective_enabled;
@@ -25,6 +25,7 @@ static atomic_bool s_resume_pending;
 static atomic_bool s_request_active;
 static atomic_uint s_admission_epoch;
 static unsigned s_io_epoch;
+static bool s_speech_failed; /* worker-owned outcome for the current request */
 static xiaotai_recognition_t s_recorder;
 static char s_text[128];
 static char s_summary[1536];
@@ -100,10 +101,12 @@ void starter_recognition_snapshot(char *text,size_t capacity)
                 bool outcome=!strcmp(s_text,"声音分析完成") ||
                     !strcmp(s_text,"声音分析失败或结果待确认") ||
                     !strcmp(s_text,"声音分析等待超时") ||
-                    !strcmp(s_text,"声音上传未受理");
+                    !strcmp(s_text,"声音上传未受理") ||
+                    !strcmp(s_text,"识别语音下载或播放失败") || !strcmp(s_text,"识别语音格式不支持");
                 status=outcome?s_text:"";
             } else if(!strcmp(s_text,"声音分析完成") || !strcmp(s_text,"声音分析失败或结果待确认") ||
-                    !strcmp(s_text,"声音分析等待超时") || !strcmp(s_text,"声音上传未受理")) status="等待声音";
+                    !strcmp(s_text,"声音分析等待超时") || !strcmp(s_text,"声音上传未受理") ||
+                    !strcmp(s_text,"识别语音下载或播放失败") || !strcmp(s_text,"识别语音格式不支持")) status="等待声音";
         }
         snprintf(text,capacity,"%s%s%s",status,s_summary[0]?"\n最近结果：":"",s_summary);
         xSemaphoreGive(s_lock);
@@ -147,7 +150,7 @@ void starter_recognition_set_local_enabled(bool enabled)
         xiaotai_recognition_release(&s_recorder,0);
         s_recorder.next_ms=next;
         xSemaphoreGive(s_lock);
-        starter_media_cancel_pcm8k_playback();
+        starter_media_cancel_recognition_playback();
         message("声音识别已暂停");
     } else {
         atomic_store(&s_refresh,true);
@@ -161,7 +164,7 @@ void starter_recognition_allow(bool allowed)
     if(atomic_load(&s_shutdown)) allowed=false;
     if(atomic_exchange(&s_allowed,allowed) && !allowed) {
         atomic_fetch_add(&s_admission_epoch,1);
-        starter_media_cancel_pcm8k_playback();
+        starter_media_cancel_recognition_playback();
     }
 }
 void starter_recognition_shutdown(void)
@@ -261,28 +264,40 @@ static bool play_item(const cJSON *item,const char *request)
 {
     cJSON *speech=cJSON_GetObjectItemCaseSensitive(item,"speech");
     if(strcmp(str(speech,"status"),"ready")) return false;
+    cJSON *rate=cJSON_GetObjectItemCaseSensitive(speech,"sample_rate");
+    cJSON *channels=cJSON_GetObjectItemCaseSensitive(speech,"channels");
+    cJSON *expected=cJSON_GetObjectItemCaseSensitive(speech,"bytes");
+    const char *format=str(speech,"format");
+    if((format[0] && strcmp(format,"pcm_s16le")) ||
+       (rate && (!cJSON_IsNumber(rate) || rate->valuedouble!=16000)) ||
+       (channels && (!cJSON_IsNumber(channels) || channels->valuedouble!=1)) ||
+       (expected && (!cJSON_IsNumber(expected) || expected->valuedouble<2 ||
+        expected->valuedouble>PCM_BYTES || (size_t)expected->valuedouble%2 ||
+        expected->valuedouble!=(double)(size_t)expected->valuedouble))) {
+        s_speech_failed=true;message("识别语音格式不支持");return true;
+    }
     const char *id=str(item,"item_id");
     if(!valid_id(id)) return false;
     /* Construct a same-service path; never trust arbitrary notification URLs. */
     char path[224];snprintf(path,sizeof(path),"/v1/recognition/requests/%s/audio/%s",request,id);
-    uint8_t *wav=heap_caps_malloc(WAV_BYTES,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
-    /* Downsampling in place is safe: output never overtakes unread source PCM. */
-    int16_t *pcm=(int16_t *)wav;
+    uint8_t *audio=heap_caps_malloc(PCM_BYTES,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+    /* Raw PCM is decoded in place, one input sample per output sample. */
+    int16_t *pcm=(int16_t *)audio;
     size_t length=0,samples=0;int status=0;
-    bool ok=wav && pcm && !cancelled() &&
-        platform_client_recognition_transfer(path,NULL,NULL,0,NULL,wav,WAV_BYTES,&length,&status,cancelled)==ESP_OK &&
-        status==200 && xiaotai_recognition_wav(wav,length,pcm,WAV_BYTES/2,&samples);
+    bool ok=audio && pcm && !cancelled() &&
+        platform_client_recognition_transfer(path,NULL,NULL,0,NULL,audio,PCM_BYTES,&length,&status,cancelled)==ESP_OK &&
+        status==200 && (!expected || length==(size_t)expected->valuedouble) && xiaotai_recognition_pcm16(audio,length,pcm,PCM_BYTES/2,&samples);
     bool attempted=false;
     if(ok && !cancelled()) {
-        uint32_t epoch=starter_media_playback_epoch();
+        uint32_t epoch=starter_media_recognition_playback_epoch();
         if(!cancelled()) {
             attempted=true;
-            ok=starter_media_play_pcm8k_at_epoch(pcm,samples,epoch)==ESP_OK;
+            ok=starter_media_play_recognition_pcm16k(pcm,samples,epoch)==ESP_OK;
         }
     }
-    heap_caps_free(wav);
+    heap_caps_free(audio);
     if(status==410) mark_revoked();
-    if(!ok && !cancelled()) message("识别语音下载或播放失败");
+    if(!ok && !cancelled()) {s_speech_failed=true;message("识别语音下载或播放失败");}
     return attempted || !cancelled(); /* Never restart an interrupted playback. */
 }
 static void worker(void *arg)
@@ -332,6 +347,7 @@ static void worker(void *arg)
         size_t count=s_recorder.count;
         xSemaphoreGive(s_lock);
         if(ready && !request[0]) {
+            s_speech_failed=false;
             atomic_store(&s_capture,false);
             /* Revalidate policy immediately before each submission. */
             enabled=config(buffer,&revision);
@@ -408,7 +424,7 @@ static void worker(void *arg)
                     if(cancelled()) break;
                 }
                 done=terminal(str(data,"status"))&&!waiting_speech&&!cancelled();
-                if(done) message(!strcmp(str(data,"status"),"succeeded")?"声音分析完成":"声音分析失败或结果待确认");
+                if(done) message(s_speech_failed?"识别语音下载或播放失败":!strcmp(str(data,"status"),"succeeded")?"声音分析完成":"声音分析失败或结果待确认");
             }
             cJSON_Delete(root);
             if(done || now>expires) {

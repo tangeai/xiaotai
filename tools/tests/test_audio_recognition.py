@@ -138,41 +138,30 @@ int main(void) {
         self.assertIn('lv_obj_set_style_text_align(s_recognition_label, LV_TEXT_ALIGN_CENTER, 0)',source)
         self.assertIn('starter_recognition_status_visible(s_previous_recognition_status,',source)
 
-    def test_wav(self):
+    def test_pcm16_preserves_samples_and_rejects_incomplete_input(self):
         import ctypes
         import struct
-        import wave
-        import io
         with tempfile.TemporaryDirectory() as temp:
-            libpath = pathlib.Path(temp)/'recognition.so'
+            path=pathlib.Path(temp)/'pcm.so'
             subprocess.run(['cc','-std=c11','-shared','-fPIC','-Wall','-Wextra','-Werror',
                 '-I'+str(ROOT/'product/include'),str(ROOT/'product/src/xiaotai_recognition.c'),
-                '-o',str(libpath)],check=True)
-            lib=ctypes.CDLL(str(libpath))
-            decode=lib.xiaotai_recognition_wav
+                '-o',str(path)],check=True)
+            decode=ctypes.CDLL(str(path)).xiaotai_recognition_pcm16
             decode.argtypes=[ctypes.c_void_p,ctypes.c_size_t,ctypes.c_void_p,ctypes.c_size_t,ctypes.POINTER(ctypes.c_size_t)]
             decode.restype=ctypes.c_bool
-            output=(ctypes.c_int16*8000)()
-            count=ctypes.c_size_t()
-            for rate in (8000,16000,24000,44100,48000):
-                for channels in (1,2):
-                    stream=io.BytesIO()
-                    with wave.open(stream,'wb') as audio:
-                        audio.setparams((channels,2,rate,0,'NONE',''))
-                        audio.writeframes(struct.pack('<h',1234)*rate*channels)
-                    data=stream.getvalue()
-                    self.assertTrue(decode(data,len(data),output,8000,ctypes.byref(count)))
-                    self.assertEqual(count.value,8000)
-                    self.assertTrue(all(v==1234 for v in output))
-                    self.assertFalse(decode(data,len(data)-1,output,8000,ctypes.byref(count)))
-                    self.assertFalse(decode(data,len(data),output,7999,ctypes.byref(count)))
-            placeholder=bytearray(data)
-            struct.pack_into('<I',placeholder,4,0xffffffff)
-            struct.pack_into('<I',placeholder,40,0xffffffff)
-            raw=bytes(placeholder)
-            self.assertTrue(decode(raw,len(raw),output,8000,ctypes.byref(count)))
-            for size in range(44):
-                self.assertFalse(decode(raw,size,output,8000,ctypes.byref(count)))
+            values=[-32768,-1234,0,1234,32767]*3200
+            data=struct.pack('<'+'h'*len(values),*values)
+            out=(ctypes.c_int16*len(values))(); count=ctypes.c_size_t()
+            self.assertTrue(decode(data,len(data),out,len(values),ctypes.byref(count)))
+            self.assertEqual(count.value,16000)
+            self.assertEqual(list(out),values)
+            inplace=ctypes.create_string_buffer(data)
+            self.assertTrue(decode(inplace,len(data),inplace,len(values),ctypes.byref(count)))
+            self.assertEqual(inplace.raw[:len(data)],data)
+            for size in (0,1,len(data)-1,2097154):
+                self.assertFalse(decode(data,size,out,len(values),ctypes.byref(count)))
+            self.assertFalse(decode(data,len(data),out,1,ctypes.byref(count)))
+            self.assertFalse(decode(b'RIFFxxxxWAVE',12,out,len(values),ctypes.byref(count)))
 
     def test_worker_http_quota_and_playback(self):
         stubs = {
@@ -184,7 +173,7 @@ int main(void) {
             'freertos/semphr.h': '#pragma once\ntypedef void *SemaphoreHandle_t;\nSemaphoreHandle_t xSemaphoreCreateMutex(void);int xSemaphoreTake(SemaphoreHandle_t,unsigned);void xSemaphoreGive(SemaphoreHandle_t);SemaphoreHandle_t xSemaphoreCreateBinary(void);void vSemaphoreDelete(SemaphoreHandle_t);\n',
             'freertos/task.h': '#pragma once\nvoid vTaskDelay(unsigned);void vTaskDelete(void *);int xTaskCreate(void (*)(void *),const char *,unsigned,void *,unsigned,void *);int xTaskCreateWithCaps(void (*)(void *),const char *,unsigned,void *,unsigned,void *,unsigned);\n',
             'nvs.h': '#pragma once\n#include <stdint.h>\ntypedef unsigned nvs_handle_t;\n#define NVS_READWRITE 1\n#define NVS_READONLY 0\nint nvs_open(const char *,int,nvs_handle_t *);int nvs_get_i64(nvs_handle_t,const char *,int64_t *);int nvs_set_i64(nvs_handle_t,const char *,int64_t);int nvs_commit(nvs_handle_t);void nvs_close(nvs_handle_t);\n',
-            'starter_media.h': '#pragma once\n#include <stdbool.h>\n#include <stdint.h>\n#include <stddef.h>\n#include "esp_err.h"\ntypedef void (*starter_pcm_observer_t)(const int16_t *,size_t,bool,bool,int64_t);\nvoid starter_media_set_pcm_observer(starter_pcm_observer_t);void starter_media_cancel_pcm8k_playback(void);uint32_t starter_media_playback_epoch(void);esp_err_t starter_media_play_pcm8k_at_epoch(const int16_t *,size_t,uint32_t);\n',
+            'starter_media.h': '#pragma once\n#include <stdbool.h>\n#include <stdint.h>\n#include <stddef.h>\n#include "esp_err.h"\ntypedef void (*starter_pcm_observer_t)(const int16_t *,size_t,bool,bool,int64_t);\nvoid starter_media_set_pcm_observer(starter_pcm_observer_t);void starter_media_cancel_recognition_playback(void);uint32_t starter_media_recognition_playback_epoch(void);esp_err_t starter_media_play_recognition_pcm16k(const int16_t *,size_t,uint32_t);\n',
         }
         cjson=pathlib.Path('/usr/include/cjson')
         with tempfile.TemporaryDirectory() as temp:
@@ -199,7 +188,7 @@ int main(void) {
             subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror',
                 *['-I'+str(p) for p in includes],str(ROOT/'tools/tests/fixtures/recognition_worker.c'),
                 str(ROOT/'product/src/xiaotai_recognition.c'),'-lcjson','-lm','-o',str(temp/'worker')],check=True)
-            for scenario in range(15):
+            for scenario in range(20):
                 subprocess.run([str(temp/'worker'),str(scenario)],check=True)
 
 if __name__ == '__main__':
