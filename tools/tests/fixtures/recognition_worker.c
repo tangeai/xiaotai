@@ -47,7 +47,10 @@ void vTaskDelay(unsigned ms)
         char status[1728];starter_recognition_snapshot(status,sizeof(status));
         if(ticks==5000) assert(strstr(status,"等待声音"));
         if(ticks==10000) assert(strstr(status,"录制中") && strstr(status,"/10 秒"));
-        if(ticks==20000) assert(strstr(status,"分析完成，冷却中"));
+        if(ticks==20000) {
+            assert(strstr(status,"声音分析完成") && !strstr(status,"冷却中"));
+            assert(starter_recognition_cooldown_remaining_ms()>0);
+        }
     }
     if(scenario==14 && ticks==80000) {
         char status[1728];starter_recognition_snapshot(status,sizeof(status));
@@ -123,13 +126,22 @@ int main(int argc,char **argv)
     assert(starter_recognition_status_is_active("检测到声音，录制中 4/10 秒"));
     assert(starter_recognition_status_is_active("正在上传声音"));
     assert(starter_recognition_status_is_active("已上传，等待分析"));
-    assert(starter_recognition_status_is_active("分析完成，冷却中 48 秒"));
+    assert(!starter_recognition_status_is_active("声音分析完成"));
     assert(starter_recognition_status_visible("声音识别未开启或不可用",5000,4999));
     assert(!starter_recognition_status_visible("声音识别未开启或不可用",5000,5000));
     assert(starter_recognition_status_visible("检测到声音，录制中 4/10 秒",5000,9000));
     assert(!starter_recognition_status_visible("",5000,0));
     assert(argc==2);scenario=atoi(argv[1]);starter_recognition_init();starter_recognition_allow(true);
     assert(starter_recognition_local_enabled());
+    int64_t original_cooldown=s_recorder.next_ms;
+    assert(starter_recognition_cooldown_remaining_ms()==0); /* server not yet ready */
+    atomic_store(&s_effective_enabled,true);
+    s_recorder.next_ms=clock_ms()+30000;
+    assert(starter_recognition_cooldown_remaining_ms()==30000);
+    s_recorder.next_ms=clock_ms()+70000;
+    assert(starter_recognition_cooldown_remaining_ms()==60000); /* clamped */
+    s_recorder.next_ms=original_cooldown;
+    atomic_store(&s_effective_enabled,false);
     s_recorder.recording=true;
     s_recorder.post_count=16000;
     s_recorder.count=16000;
@@ -144,7 +156,9 @@ int main(int argc,char **argv)
     assert(config_calls>=1);
     if(scenario==12) {assert(!starter_recognition_effective_enabled() && uploads==0);return 0;}
     if(scenario==13) {char status[1728];starter_recognition_snapshot(status,sizeof(status));
-        assert(uploads>=1 && plays==0 && queries==0 && strstr(status,"上传失败，冷却中"));return 0;}
+        assert(uploads>=1 && plays==0 && queries==0 &&
+            strstr(status,"声音上传未受理") && !strstr(status,"冷却中") &&
+            starter_recognition_cooldown_remaining_ms()>0);return 0;}
     if(scenario==0) assert(saw_recording_complete);
     if(scenario==7) {assert(uploads==0 && plays==0 && starter_recognition_binding_revoked());return 0;}
     assert(uploads>=1);

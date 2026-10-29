@@ -90,6 +90,14 @@ int main(void) {
         self.assertIn('XIAOTAI_RECOGNITION_HOME_SWITCH=1',lckfb)
         self.assertNotIn('XIAOTAI_RECOGNITION_HOME_SWITCH=1',m5)
 
+    def test_home_icon_uses_ai_and_cooldown_background(self):
+        source=(ROOT/'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()
+        self.assertIn('lv_label_set_text(s_recognition_ai_text, "AI")', source)
+        self.assertIn('starter_recognition_cooldown_remaining_ms()', source)
+        self.assertIn('lv_obj_set_size(s_recognition_cooldown_fill, 16, height)', source)
+        self.assertIn('lv_obj_set_pos(s_recognition_cooldown_fill, 6, 23 - height)', source)
+        self.assertNotIn('Four-point AI sparkle and two scanner dots', source)
+
     def test_home_status_is_centered_and_idle_notice_expires(self):
         source=(ROOT/'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()
         self.assertIn('lv_obj_set_style_text_align(s_recognition_label, LV_TEXT_ALIGN_CENTER, 0)',source)

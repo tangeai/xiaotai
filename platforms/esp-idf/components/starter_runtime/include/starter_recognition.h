@@ -19,4 +19,6 @@ bool starter_recognition_status_visible(const char *status, int64_t until_ms,
 bool starter_recognition_local_enabled(void);
 void starter_recognition_set_local_enabled(bool enabled);
 bool starter_recognition_effective_enabled(void);
+/* Monotonic remaining cooldown for the home icon: 0 when ready, -1 when busy. */
+int64_t starter_recognition_cooldown_remaining_ms(void);
 #endif

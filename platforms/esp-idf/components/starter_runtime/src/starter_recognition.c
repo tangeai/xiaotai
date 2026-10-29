@@ -96,12 +96,12 @@ void starter_recognition_snapshot(char *text,size_t capacity)
                 status=live;
             } else if(s_recorder.ready) status="录音完成，准备上传";
             else if(s_recorder.next_ms>clock_ms()) {
-                long long seconds=(long long)((s_recorder.next_ms-clock_ms()+999)/1000);
-                const char *prefix=!strcmp(s_text,"声音分析完成")?"分析完成，":
-                    !strcmp(s_text,"声音分析失败或结果待确认")?"分析失败，":
-                    !strcmp(s_text,"声音上传未受理")?"上传失败，":"";
-                snprintf(live,sizeof(live),"%s冷却中 %lld 秒",prefix,seconds);
-                status=live;
+                /* The icon owns cooldown progress; retain short outcome notices. */
+                bool outcome=!strcmp(s_text,"声音分析完成") ||
+                    !strcmp(s_text,"声音分析失败或结果待确认") ||
+                    !strcmp(s_text,"声音分析等待超时") ||
+                    !strcmp(s_text,"声音上传未受理");
+                status=outcome?s_text:"";
             } else if(!strcmp(s_text,"声音分析完成") || !strcmp(s_text,"声音分析失败或结果待确认") ||
                     !strcmp(s_text,"声音分析等待超时") || !strcmp(s_text,"声音上传未受理")) status="等待声音";
         }
@@ -114,7 +114,7 @@ bool starter_recognition_status_is_active(const char *status)
     if(!status) return false;
     return strstr(status,"录制中") || strstr(status,"准备上传") ||
         strstr(status,"正在上传") || strstr(status,"等待分析") ||
-        strstr(status,"正在查询") || strstr(status,"冷却中") ||
+        strstr(status,"正在查询") ||
         strstr(status,"正在获取识别配置");
 }
 bool starter_recognition_status_visible(const char *status,int64_t until_ms,int64_t now_ms)
@@ -126,6 +126,15 @@ bool starter_recognition_local_enabled(void) { return atomic_load(&s_local_enabl
 bool starter_recognition_effective_enabled(void)
 {
     return atomic_load(&s_local_enabled) && atomic_load(&s_effective_enabled) && !atomic_load(&s_revoked);
+}
+int64_t starter_recognition_cooldown_remaining_ms(void)
+{
+    if(!s_lock || !starter_recognition_effective_enabled() || !atomic_load(&s_allowed)) return 0;
+    if(xSemaphoreTake(s_lock,0)!=pdTRUE) return -1;
+    int64_t remaining=s_recorder.next_ms-clock_ms();
+    xSemaphoreGive(s_lock);
+    if(remaining<=0) return 0;
+    return remaining>60000?60000:remaining;
 }
 void starter_recognition_set_local_enabled(bool enabled)
 {
