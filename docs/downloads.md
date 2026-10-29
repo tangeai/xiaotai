@@ -59,7 +59,7 @@ BK 包内的 `-app_pack.rbl` 用于 OTA 升级，不能用于首次串口烧录�
 
 | 适用硬件 | 当前正式版 | 完整镜像（BIN） | 固件包（ZIP） | 发布说明 |
 |---|---|---|---|---|
-| PCB V1.0 | v1.0.1 · build.20 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1-build.20/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.20-merged.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1-build.20/waveshare-esp32p4-touch-lcd-43c-v10-1.0.1%2Bbuild.20-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.0.1-build.20) |
+| PCB V1.0 | v1.1.0 · build.27 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0/waveshare-esp32p4-touch-lcd-43c-v10-1.1.0%2Bbuild.27-merged.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0/waveshare-esp32p4-touch-lcd-43c-v10-1.1.0%2Bbuild.27-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0) |
 
 [烧录指南](boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录) · [硬件资料](boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#规格) · [编译与调试](boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#开发)
 
