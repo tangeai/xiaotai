@@ -7,6 +7,7 @@
 #include "starter_voice.h"
 #include "starter_preroll.h"
 #include "starter_audio_resampler.h"
+#include "starter_raw_recognition.h"
 
 #include <math.h>
 #include <stdatomic.h>
@@ -185,6 +186,9 @@ static atomic_uint_fast32_t s_audio_playback_blocked;
 static atomic_uint_fast32_t s_audio_write_failed;
 static atomic_uint_fast32_t s_audio_playback_pending;
 static atomic_bool s_audio_playback_active;
+static atomic_bool s_prompt_active;
+static atomic_int_fast64_t s_prompt_guard_ms;
+static int16_t *s_recognition_raw_pcm;
 /* Successful I2S writes enqueue PCM; they do not wait for the DAC to finish. */
 static atomic_int_fast64_t s_audio_dma_until_us;
 static atomic_uint_fast32_t s_audio_pcm_frames;
@@ -905,6 +909,7 @@ static void audio_capture_task(void *argument)
     uint8_t candidate_level = 0;
     int64_t candidate_since_ms = 0;
     unsigned mute_epoch = 0;
+    starter_raw_recognition_t raw_recognition = {0};
 
     for (;;) {
         starter_tirtc_mode_t mode = (starter_tirtc_mode_t)atomic_load_explicit(
@@ -952,6 +957,18 @@ static void audio_capture_task(void *argument)
         }
 
         const int64_t captured_ms = esp_timer_get_time() / 1000;
+        /* After the ES7210 swap slot zero is physical MIC2, not MIC3 reference.
+         * Copy raw 16 kHz PCM before AEC touches the input buffer. */
+        bool recognition_safe = !atomic_load(&s_active) && atomic_load(&s_wake_allowed) &&
+            !atomic_load(&s_microphone_muted) && !atomic_load(&s_prompt_active) &&
+            captured_ms >= atomic_load(&s_prompt_guard_ms) &&
+            mute_epoch == atomic_load(&s_mute_epoch) &&
+            capture_epoch == atomic_load(&s_capture_epoch);
+        bool recognition_sound = starter_raw_recognition_feed(&raw_recognition,
+            capture, capture_frames, 2, 0, s_recognition_raw_pcm,
+            starter_aec_frame_samples(), recognition_safe, captured_ms);
+        starter_media_observe_pcm(s_recognition_raw_pcm, capture_frames,
+            recognition_sound, recognition_safe, captured_ms);
         starter_aec_output_t clean = {0};
         int64_t aec_start_us = esp_timer_get_time();
         esp_err_t aec_err = starter_aec_process_capture(capture_bytes, &clean);
@@ -1478,6 +1495,11 @@ esp_err_t starter_media_init(void)
     const uint32_t preroll_rate = PREROLL_RATE;
 #endif
     const size_t preroll_capacity = (size_t)preroll_rate * 20U;
+    s_recognition_raw_pcm = heap_caps_malloc(
+        starter_aec_frame_samples() * sizeof(*s_recognition_raw_pcm),
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_recognition_raw_pcm == NULL || !esp_ptr_external_ram(s_recognition_raw_pcm))
+        return ESP_ERR_NO_MEM;
     int16_t *preroll_pcm = heap_caps_calloc(preroll_capacity,
                                            sizeof(int16_t),
                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -1754,6 +1776,7 @@ esp_err_t starter_media_play_pcm8k_at_epoch(const int16_t *pcm, size_t sample_co
         return ESP_ERR_INVALID_STATE;
     }
 
+    atomic_store(&s_prompt_active, true);
     esp_err_t err = audio_output_set_locked(true);
     int16_t previous = pcm[0];
     size_t offset = 0;
@@ -1796,6 +1819,8 @@ esp_err_t starter_media_play_pcm8k_at_epoch(const int16_t *pcm, size_t sample_co
         vTaskDelay(pdMS_TO_TICKS(40));
     }
     esp_err_t disable_err = audio_output_set_locked(false);
+    atomic_store(&s_prompt_guard_ms, esp_timer_get_time() / 1000 + 1000);
+    atomic_store(&s_prompt_active, false);
     xSemaphoreGive(s_audio_output_mutex);
     if (err == ESP_OK) {
         err = disable_err;

@@ -1,4 +1,4 @@
-#include "starter_raw_recognition.h"
+#include "starter_raw_recognition.h" /* Board code selects the physical mic slot. */
 #include "starter_signal_level.h"
 
 #include <string.h>

@@ -7,7 +7,6 @@ idf_component_register(
     SRCS
         ${XIAOTAI_STARTER_MEDIA_COMMON_SRCS}
         "src/starter_jpeg_collector.c"
-        "src/starter_raw_recognition.c"
         "src/starter_media.c"
         "${board_dir}/board_adapter.c"
     INCLUDE_DIRS "include" "${XIAOTAI_STARTER_MEDIA_COMMON_INCLUDE_DIR}"

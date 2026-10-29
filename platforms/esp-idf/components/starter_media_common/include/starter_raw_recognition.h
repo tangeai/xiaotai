@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Capture-task-owned state. The 300 ms hold matches the existing sound gate. */
+/* Capture-task-owned state shared by S3/P4. The hold matches the sound gate. */
 typedef struct {
     uint32_t smoothed_rms;
     int64_t candidate_since_ms;

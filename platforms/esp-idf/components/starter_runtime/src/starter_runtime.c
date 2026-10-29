@@ -1233,7 +1233,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.0.1\",\"profiles\":{"
+        "\"firmware_version\":\"1.1.0\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
@@ -4225,6 +4225,8 @@ esp_err_t starter_runtime_start(const char *device_id)
 #if CONFIG_IDF_TARGET_ESP32S3
     /* Explicit first-board rollout; P4 must not inherit the fallback model name. */
     if (!strcmp(XIAOTAI_BOARD_MODEL, "lckfb-esp32s3")) starter_recognition_init();
+#elif CONFIG_IDF_TARGET_ESP32P4
+    starter_recognition_init();
 #endif
     /* 必须先注册回调，再由组合根启动 TiRTC，避免丢失早期启动/连接事件。 */
     const starter_tirtc_handlers_t handlers = {

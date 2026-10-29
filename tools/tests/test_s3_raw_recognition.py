@@ -73,7 +73,7 @@ int main(void) {
                 "-I" + str(MEDIA / "include"),
                 "-I" + str(ROOT / "platforms/esp-idf/components/starter_media_common/include"),
                 "-I" + str(ROOT / "product/include"),
-                str(source_path), str(MEDIA / "src/starter_raw_recognition.c"),
+                str(source_path), str(ROOT / "platforms/esp-idf/components/starter_media_common/src/starter_raw_recognition.c"),
                 str(ROOT / "product/src/xiaotai_recognition.c"),
                 "-o", str(program),
             ], check=True)
