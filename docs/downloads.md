@@ -43,7 +43,7 @@ BK 包内的 `-app_pack.rbl` 用于 OTA 升级，不能用于首次串口烧录�
 
 | 适用硬件 | 当前正式版 | 完整镜像（BIN） | 固件包（ZIP） | 发布说明 |
 |---|---|---|---|---|
-| PCB V1.0.1 | v1.1.0 · build.40 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.1.0/lckfb-esp32s3-1.1.0%2Bbuild.40-merged.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.1.0/lckfb-esp32s3-1.1.0%2Bbuild.40-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/lckfb-esp32s3-v1.1.0) |
+| PCB V1.0.1 | v1.1.0 · build.45 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.1.0-build.45/lckfb-esp32s3-1.1.0%2Bbuild.45-merged.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.1.0-build.45/lckfb-esp32s3-1.1.0%2Bbuild.45-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/lckfb-esp32s3-v1.1.0-build.45) |
 
 本版新增 AI 音频识别，功能和验证范围见[版本说明](boards/lckfb-esp32s3/RELEASE_NOTES_1.1.0.md)。
 
