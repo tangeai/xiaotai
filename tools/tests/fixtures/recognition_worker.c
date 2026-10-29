@@ -30,7 +30,7 @@ void starter_media_set_pcm_observer(starter_pcm_observer_t fn) { observer=fn; }
 void starter_media_cancel_recognition_playback(void) {}
 uint32_t starter_media_recognition_playback_epoch(void) { return 0; }
 esp_err_t starter_media_play_recognition_pcm16k(const int16_t *pcm,size_t count,uint32_t epoch)
-{ (void)epoch;assert(!cancelled());assert(count==800);assert(pcm[0]==1234);plays++;
+{ (void)epoch;assert(!cancelled());assert(count==(scenario==20?533U:scenario==21?1600U:scenario==22?400U:800U));assert(pcm[0]==1234);plays++;
   if(scenario==17) return -1;
   if(scenario==4) { starter_recognition_allow(false);resume_at=ticks+2000;return -1; }
   return 0; }
@@ -106,27 +106,36 @@ esp_err_t platform_client_recognition_transfer(const char *path,const char *pref
         else json="{\"code\":200}";
     } else if(strstr(path,"/audio/")) {
         if(scenario==10) {*status=410;const char *b="{\"code\":6006}";*length=strlen(b);memcpy(response,b,*length);return 0;}
-        unsigned char pcm[1600];
-        for(unsigned i=0;i<sizeof(pcm);i+=2) {pcm[i]=0xd2;pcm[i+1]=4;}
-        assert(capacity>=sizeof(pcm));memcpy(response,pcm,sizeof(pcm));
-        *length=scenario==15?1599:scenario==19?1598:sizeof(pcm);return 0;
+        unsigned char wav[1644]={0};
+        memcpy(wav,"RIFF",4);unsigned riff=1636;memcpy(wav+4,&riff,4);memcpy(wav+8,"WAVEfmt ",8);
+        wav[16]=16;wav[20]=1;wav[22]=scenario==22?2:1;
+        unsigned rate=scenario==20?24000:scenario==21?8000:16000;
+        unsigned byte_rate=rate*wav[22]*2;memcpy(wav+24,&rate,4);memcpy(wav+28,&byte_rate,4);
+        wav[32]=wav[22]*2;wav[34]=16;memcpy(wav+36,"data",4);
+        unsigned bytes=1600;memcpy(wav+40,&bytes,4);
+        for(unsigned i=44;i<sizeof(wav);i+=2) {wav[i]=0xd2;wav[i+1]=4;}
+        assert(capacity>=sizeof(wav));memcpy(response,wav,sizeof(wav));
+        *length=scenario==15?1643:scenario==19?1642:sizeof(wav);return 0;
     } else {
         if(scenario==0 && queries==0) {char status[1728];starter_recognition_snapshot(status,sizeof(status));
             assert(strstr(status,"已上传，等待分析"));}
         queries++;
         if(scenario==9) {*status=410;json="{\"code\":6006}";}
-        else json="{\"code\":200,\"data\":{\"status_revision\":2,\"status\":\"succeeded\",\"results\":[{\"item_id\":\"item_1\",\"result\":{\"summary\":\"test sound\"},\"speech\":{\"status\":\"ready\",\"format\":\"pcm_s16le\",\"sample_rate\":16000,\"channels\":1,\"bytes\":1600}}]}}";
+        else json="{\"code\":200,\"data\":{\"status_revision\":2,\"status\":\"succeeded\",\"results\":[{\"item_id\":\"item_1\",\"result\":{\"summary\":\"test sound\"},\"speech\":{\"status\":\"ready\",\"format\":\"wav\",\"sample_rate\":16000,\"channels\":1,\"bytes\":1644}}]}}";
     }
     if(scenario==5 && !prefix && !strstr(path,"/config") && queries%2) {
-        json="{\"code\":200,\"data\":{\"status_revision\":2,\"status\":\"processing\",\"results\":[{\"item_id\":\"item_1\",\"result\":{\"summary\":\"test sound\"},\"speech\":{\"status\":\"ready\",\"format\":\"pcm_s16le\",\"sample_rate\":16000,\"channels\":1,\"bytes\":1600}}]}}";
+        json="{\"code\":200,\"data\":{\"status_revision\":2,\"status\":\"processing\",\"results\":[{\"item_id\":\"item_1\",\"result\":{\"summary\":\"test sound\"},\"speech\":{\"status\":\"ready\",\"format\":\"wav\",\"sample_rate\":16000,\"channels\":1,\"bytes\":1644}}]}}";
     }
-    if((scenario==16 || scenario==18) && strstr(json,"pcm_s16le")) {
+    if((scenario==16 || scenario==18 || scenario>=20) && strstr(json,"sample_rate")) {
         cJSON *root=cJSON_Parse(json);
         cJSON *items=cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItemCaseSensitive(root,"data"),"results");
         cJSON *speech=cJSON_GetObjectItemCaseSensitive(cJSON_GetArrayItem(items,0),"speech");
         cJSON_DeleteItemFromObjectCaseSensitive(speech,"sample_rate");
         if(scenario==16) cJSON_AddNumberToObject(speech,"sample_rate",8000);
-        else {
+        else if(scenario>=20) {
+            cJSON_AddNumberToObject(speech,"sample_rate",scenario==20?24000:scenario==21?8000:16000);
+            if(scenario==22) {cJSON_DeleteItemFromObjectCaseSensitive(speech,"channels");cJSON_AddNumberToObject(speech,"channels",2);}
+        } else {
             cJSON_DeleteItemFromObjectCaseSensitive(speech,"format");
             cJSON_DeleteItemFromObjectCaseSensitive(speech,"channels");
             cJSON_DeleteItemFromObjectCaseSensitive(speech,"bytes");

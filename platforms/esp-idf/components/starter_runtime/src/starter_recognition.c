@@ -17,7 +17,7 @@
 #include <stdlib.h>
 
 #define JSON_BYTES 32768U
-#define PCM_BYTES (2U*1024U*1024U)
+#define WAV_BYTES (2U*1024U*1024U)
 static SemaphoreHandle_t s_lock;
 static atomic_bool s_allowed, s_refresh, s_capture, s_shutdown, s_revoked;
 static atomic_bool s_local_enabled = true, s_effective_enabled;
@@ -268,34 +268,48 @@ static bool play_item(const cJSON *item,const char *request)
     cJSON *channels=cJSON_GetObjectItemCaseSensitive(speech,"channels");
     cJSON *expected=cJSON_GetObjectItemCaseSensitive(speech,"bytes");
     const char *format=str(speech,"format");
-    if((format[0] && strcmp(format,"pcm_s16le")) ||
-       (rate && (!cJSON_IsNumber(rate) || rate->valuedouble!=16000)) ||
-       (channels && (!cJSON_IsNumber(channels) || channels->valuedouble!=1)) ||
-       (expected && (!cJSON_IsNumber(expected) || expected->valuedouble<2 ||
-        expected->valuedouble>PCM_BYTES || (size_t)expected->valuedouble%2 ||
-        expected->valuedouble!=(double)(size_t)expected->valuedouble))) {
+    if((format[0] && strcmp(format,"wav")) ||
+       (rate && (!cJSON_IsNumber(rate) || rate->valuedouble<8000 || rate->valuedouble>48000)) ||
+       (channels && (!cJSON_IsNumber(channels) || (channels->valuedouble!=1 && channels->valuedouble!=2))) ||
+       (expected && (!cJSON_IsNumber(expected) || expected->valuedouble<44 ||
+        expected->valuedouble>WAV_BYTES || expected->valuedouble!=(double)(size_t)expected->valuedouble))) {
         s_speech_failed=true;message("识别语音格式不支持");return true;
     }
     const char *id=str(item,"item_id");
     if(!valid_id(id)) return false;
-    /* Construct a same-service path; never trust arbitrary notification URLs. */
     char path[224];snprintf(path,sizeof(path),"/v1/recognition/requests/%s/audio/%s",request,id);
-    uint8_t *audio=heap_caps_malloc(PCM_BYTES,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
-    /* Raw PCM is decoded in place, one input sample per output sample. */
-    int16_t *pcm=(int16_t *)audio;
-    size_t length=0,samples=0;int status=0;
-    bool ok=audio && pcm && !cancelled() &&
-        platform_client_recognition_transfer(path,NULL,NULL,0,NULL,audio,PCM_BYTES,&length,&status,cancelled)==ESP_OK &&
-        status==200 && (!expected || length==(size_t)expected->valuedouble) && xiaotai_recognition_pcm16(audio,length,pcm,PCM_BYTES/2,&samples);
+    uint8_t *audio=heap_caps_malloc(WAV_BYTES,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+    size_t length=0;int status=0;
+    xiaotai_recognition_wav_t view={0};
+    bool ok=audio && !cancelled() &&
+        platform_client_recognition_transfer(path,NULL,NULL,0,NULL,audio,WAV_BYTES,&length,&status,cancelled)==ESP_OK &&
+        status==200 && (!expected || length==(size_t)expected->valuedouble) &&
+        xiaotai_recognition_wav_parse(audio,length,&view) &&
+        (!rate || rate->valuedouble==view.sample_rate) &&
+        (!channels || channels->valuedouble==view.channels);
+    int16_t *converted=NULL;
+    const int16_t *pcm=NULL;
+    if(ok) {
+        if(view.sample_rate==16000 && view.channels==1) {
+            /* ESP32 is little-endian; validated RIFF chunks are 2-byte aligned.
+             * The ordinary 16 kHz mono WAV therefore needs no PCM conversion. */
+            pcm=(const int16_t *)view.pcm;
+        } else {
+            converted=heap_caps_malloc(view.samples_16k*sizeof(*converted),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+            ok=converted && xiaotai_recognition_wav16(&view,converted,view.samples_16k);
+            pcm=converted;
+            heap_caps_free(audio);audio=NULL;
+        }
+    }
     bool attempted=false;
     if(ok && !cancelled()) {
         uint32_t epoch=starter_media_recognition_playback_epoch();
         if(!cancelled()) {
             attempted=true;
-            ok=starter_media_play_recognition_pcm16k(pcm,samples,epoch)==ESP_OK;
+            ok=starter_media_play_recognition_pcm16k(pcm,view.samples_16k,epoch)==ESP_OK;
         }
     }
-    heap_caps_free(audio);
+    heap_caps_free(converted);heap_caps_free(audio);
     if(status==410) mark_revoked();
     if(!ok && !cancelled()) {s_speech_failed=true;message("识别语音下载或播放失败");}
     return attempted || !cancelled(); /* Never restart an interrupted playback. */

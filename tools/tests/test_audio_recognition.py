@@ -138,31 +138,6 @@ int main(void) {
         self.assertIn('lv_obj_set_style_text_align(s_recognition_label, LV_TEXT_ALIGN_CENTER, 0)',source)
         self.assertIn('starter_recognition_status_visible(s_previous_recognition_status,',source)
 
-    def test_pcm16_preserves_samples_and_rejects_incomplete_input(self):
-        import ctypes
-        import struct
-        with tempfile.TemporaryDirectory() as temp:
-            path=pathlib.Path(temp)/'pcm.so'
-            subprocess.run(['cc','-std=c11','-shared','-fPIC','-Wall','-Wextra','-Werror',
-                '-I'+str(ROOT/'product/include'),str(ROOT/'product/src/xiaotai_recognition.c'),
-                '-o',str(path)],check=True)
-            decode=ctypes.CDLL(str(path)).xiaotai_recognition_pcm16
-            decode.argtypes=[ctypes.c_void_p,ctypes.c_size_t,ctypes.c_void_p,ctypes.c_size_t,ctypes.POINTER(ctypes.c_size_t)]
-            decode.restype=ctypes.c_bool
-            values=[-32768,-1234,0,1234,32767]*3200
-            data=struct.pack('<'+'h'*len(values),*values)
-            out=(ctypes.c_int16*len(values))(); count=ctypes.c_size_t()
-            self.assertTrue(decode(data,len(data),out,len(values),ctypes.byref(count)))
-            self.assertEqual(count.value,16000)
-            self.assertEqual(list(out),values)
-            inplace=ctypes.create_string_buffer(data)
-            self.assertTrue(decode(inplace,len(data),inplace,len(values),ctypes.byref(count)))
-            self.assertEqual(inplace.raw[:len(data)],data)
-            for size in (0,1,len(data)-1,2097154):
-                self.assertFalse(decode(data,size,out,len(values),ctypes.byref(count)))
-            self.assertFalse(decode(data,len(data),out,1,ctypes.byref(count)))
-            self.assertFalse(decode(b'RIFFxxxxWAVE',12,out,len(values),ctypes.byref(count)))
-
     def test_worker_http_quota_and_playback(self):
         stubs = {
             'esp_err.h': '#pragma once\ntypedef int esp_err_t;\n#define ESP_OK 0\n',
@@ -188,7 +163,7 @@ int main(void) {
             subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror',
                 *['-I'+str(p) for p in includes],str(ROOT/'tools/tests/fixtures/recognition_worker.c'),
                 str(ROOT/'product/src/xiaotai_recognition.c'),'-lcjson','-lm','-o',str(temp/'worker')],check=True)
-            for scenario in range(20):
+            for scenario in range(23):
                 subprocess.run([str(temp/'worker'),str(scenario)],check=True)
 
 if __name__ == '__main__':

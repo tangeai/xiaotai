@@ -62,7 +62,7 @@ int main(void) {
         worker=(ROOT/'platforms/esp-idf/components/starter_runtime/src/starter_recognition.c').read_text()
         self.assertIn('starter_media_play_recognition_pcm16k',worker)
         self.assertNotIn('starter_media_play_pcm8k',worker)
-        self.assertNotIn('xiaotai_recognition_wav',worker)
+        self.assertIn('xiaotai_recognition_wav_parse',worker)
         for path in ('platforms/esp-idf/components/starter_media_s3/starter_media.c',
                      'firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/starter_media/src/starter_media.c'):
             board=(ROOT/path).read_text()

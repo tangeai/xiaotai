@@ -17,8 +17,14 @@ void xiaotai_recognition_init(xiaotai_recognition_t *r, int16_t *pcm);
 void xiaotai_recognition_feed(xiaotai_recognition_t *r, const int16_t *pcm,
     size_t count, bool sound, bool allowed, int64_t now_ms);
 void xiaotai_recognition_release(xiaotai_recognition_t *r, int64_t accepted_ms);
-/* Fixed recognition-result contract: mono 16 kHz PCM_S16LE, at most 2 MiB. */
-bool xiaotai_recognition_pcm16(const uint8_t *pcm_le, size_t bytes,
-    int16_t *output, size_t capacity, size_t *samples);
-
+/* Result audio stays WAV on the wire. Parse before deciding whether conversion
+ * is needed; 16 kHz mono PCM can be played directly from the validated view. */
+typedef struct {
+    const uint8_t *pcm;
+    size_t frames, samples_16k;
+    unsigned sample_rate, channels;
+} xiaotai_recognition_wav_t;
+bool xiaotai_recognition_wav_parse(const uint8_t *, size_t, xiaotai_recognition_wav_t *);
+/* Separate output buffer; exactly one rate/channel conversion to mono 16 kHz. */
+bool xiaotai_recognition_wav16(const xiaotai_recognition_wav_t *, int16_t *, size_t);
 #endif
