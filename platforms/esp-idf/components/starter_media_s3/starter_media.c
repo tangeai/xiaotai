@@ -11,6 +11,9 @@
 #include "starter_jpeg_collector.h"
 #include "starter_voice.h"
 #include "starter_preroll.h"
+#if defined(XIAOTAI_S3_RAW_RECOGNITION)
+#include "starter_raw_recognition.h"
+#endif
 #include "board_config.h"
 #include "board_adapter.h"
 
@@ -112,6 +115,9 @@ static const xiaotai_board_camera_adapter_t *s_camera_adapter;
 static atomic_bool s_wake_allowed = true;
 static SemaphoreHandle_t s_preroll_mutex;
 static starter_preroll_t s_preroll;
+#if defined(XIAOTAI_S3_RAW_RECOGNITION)
+static int16_t *s_recognition_raw_pcm;
+#endif
 static uint32_t s_expected_wake_token; /* protected by preroll mutex */
 static atomic_uint s_mute_epoch;
 static atomic_bool s_preroll_gap;
@@ -652,6 +658,9 @@ static void audio_capture_task(void *argument)
     uint8_t candidate_level = 0;
     int64_t candidate_since_ms = 0;
     unsigned mute_epoch = 0;
+#if defined(XIAOTAI_S3_RAW_RECOGNITION)
+    starter_raw_recognition_t raw_recognition = {0};
+#endif
 
     for (;;) {
         starter_tirtc_mode_t mode = (starter_tirtc_mode_t)atomic_load_explicit(
@@ -809,9 +818,23 @@ static void audio_capture_task(void *argument)
                                   memory_order_release);
         }
 
+#if defined(XIAOTAI_S3_RAW_RECOGNITION)
+        /* Recognition receives the original MIC1 samples. AEC-clean still owns
+         * wake, preroll, UI activity and every live uplink path. */
+        bool recognition_safe = wake_listen &&
+            !atomic_load(&s_prompt_active) &&
+            captured_ms >= atomic_load(&s_prompt_guard_ms);
+        bool recognition_sound = starter_raw_recognition_feed(&raw_recognition,
+            capture, clean.samples_16k, STARTER_AEC_CAPTURE_DMA_CHANNELS,
+            STARTER_AEC_MIC_SLOT, s_recognition_raw_pcm,
+            starter_aec_frame_samples(), recognition_safe, captured_ms);
+        starter_media_observe_pcm(s_recognition_raw_pcm, clean.samples_16k,
+            recognition_sound, recognition_safe, captured_ms);
+#else
         starter_media_observe_pcm(clean.pcm_16k, clean.samples_16k,
             atomic_load(&s_voice_active), wake_listen &&
             !atomic_load(&s_prompt_active) && captured_ms >= atomic_load(&s_prompt_guard_ms), captured_ms);
+#endif
         mode = (starter_tirtc_mode_t)atomic_load_explicit(&s_mode,
                                                            memory_order_acquire);
         generation = (uint32_t)atomic_load_explicit(&s_generation,
@@ -1221,6 +1244,14 @@ esp_err_t starter_media_init(void)
         ESP_LOGE(TAG, "board media initialization failed: %s", esp_err_to_name(err));
         return err;
     }
+
+#if defined(XIAOTAI_S3_RAW_RECOGNITION)
+    s_recognition_raw_pcm = heap_caps_malloc(
+        starter_aec_frame_samples() * sizeof(*s_recognition_raw_pcm),
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_recognition_raw_pcm == NULL || !esp_ptr_external_ram(s_recognition_raw_pcm))
+        return ESP_ERR_NO_MEM;
+#endif
 
     s_audio_rx_pool = heap_caps_calloc(AUDIO_RX_QUEUE_DEPTH,
                                        sizeof(*s_audio_rx_pool),

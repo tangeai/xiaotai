@@ -7,6 +7,7 @@ idf_component_register(
     SRCS
         ${XIAOTAI_STARTER_MEDIA_COMMON_SRCS}
         "src/starter_jpeg_collector.c"
+        "src/starter_raw_recognition.c"
         "src/starter_media.c"
         "${board_dir}/board_adapter.c"
     INCLUDE_DIRS "include" "${XIAOTAI_STARTER_MEDIA_COMMON_INCLUDE_DIR}"
@@ -25,3 +26,5 @@ idf_component_register(
         esp_audio_codec
         esp-sr
 )
+
+target_compile_definitions(${COMPONENT_LIB} PRIVATE XIAOTAI_S3_RAW_RECOGNITION=1)
