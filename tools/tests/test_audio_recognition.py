@@ -75,7 +75,10 @@ int main(void) {
     def test_result_scrolls_twice_then_hides(self):
         source=(ROOT/'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()
         self.assertIn('start_recognition_result_scroll(result == NULL ? \"\" : result)', source)
-        self.assertIn('lv_anim_set_values(&anim, 236, -width)', source)
+        self.assertIn('lv_obj_get_content_width(viewport)', source)
+        self.assertIn('lv_anim_set_values(&anim, start, -width)', source)
+        self.assertIn('lv_obj_set_style_width(s_recognition_result, width, 0)', source)
+        self.assertNotIn('lv_obj_set_width(s_recognition_result, width)', source)
         self.assertIn('lv_anim_set_repeat_count(&anim, 1)', source)
         self.assertIn('lv_anim_set_ready_cb(&anim, recognition_result_scroll_done)', source)
         self.assertNotIn('lv_label_set_long_mode(s_recognition_result, LV_LABEL_LONG_SCROLL_CIRCULAR)', source)

@@ -1921,13 +1921,18 @@ static void start_recognition_result_scroll(const char *result)
 {
     if (s_recognition_result == NULL) return;
     lv_anim_del(s_recognition_result, set_recognition_result_x);
-    lv_obj_set_x(s_recognition_result, 236);
+    lv_obj_t *viewport = lv_obj_get_parent(s_recognition_result);
+    lv_obj_update_layout(viewport);
+    lv_coord_t start = lv_obj_get_content_width(viewport);
+    lv_obj_set_x(s_recognition_result, start);
     const lv_font_t *font = product_ui_font();
     lv_coord_t spacing = lv_obj_get_style_text_letter_space(s_recognition_result,
                                                                LV_PART_MAIN);
     lv_coord_t width = lv_txt_get_width(result, strlen(result), font, spacing,
                                         LV_TEXT_FLAG_NONE);
-    lv_obj_set_width(s_recognition_result, width);
+    /* Font metrics and viewport width are physical pixels already. Bypass
+     * the logical-grid width wrapper to avoid scaling the text twice on P4. */
+    lv_obj_set_style_width(s_recognition_result, width, 0);
     lv_label_set_text(s_recognition_result, result);
     if (!result[0]) { s_recognition_result_finished = true; return; }
     s_recognition_result_finished = false;
@@ -1935,8 +1940,8 @@ static void start_recognition_result_scroll(const char *result)
     lv_anim_init(&anim);
     lv_anim_set_var(&anim, s_recognition_result);
     lv_anim_set_exec_cb(&anim, set_recognition_result_x);
-    lv_anim_set_values(&anim, 236, -width);
-    lv_anim_set_time(&anim, 800U + (uint32_t)(236 + width) * 1000U / 50U);
+    lv_anim_set_values(&anim, start, -width);
+    lv_anim_set_time(&anim, 800U + (uint32_t)(start + width) * 1000U / 50U);
     lv_anim_set_repeat_count(&anim, 1);
     lv_anim_set_ready_cb(&anim, recognition_result_scroll_done);
     lv_anim_start(&anim);
