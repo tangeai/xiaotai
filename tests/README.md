@@ -2,6 +2,18 @@
 
 ## 立创 ESP32-S3 空闲声音分析
 
+2026-10-29 用户确认 build.45 实屏效果无问题并授权公开发布；原 BIN 不重编译，
+包的验证状态更新为 `HIL_VERIFIED`。验收依据与范围见
+[build.45 发布说明](../docs/boards/lckfb-esp32s3/RELEASE_NOTES_1.1.0_BUILD45.md)。
+
+同轮微雪 P4 `1.0.1+build.23` 原生编译与 BIN/ELF 身份核对通过，应用 BIN
+SHA-256 为 `b77896da8966b39562fb283b3a810f723e7cc30a9c769e5c26fed07a78c20cea`。
+此板尚未接入声音识别的采集与首页开关；本包供现有大屏、音视频、AI、通话与房间
+功能实板回归，标记 `BUILD_VERIFIED_HIL_PENDING`。优先验证触摸、配网绑定、摄像头、
+H5 双向音视频、AI 连续对话、设备互呼、微信通话、房间进退和会话结束恢复。
+主机覆盖沿用 `test_audio_recognition.py`、`test_s3_raw_recognition.py` 的板级隔离
+和完整 `tools/check.sh`，不把 S3 的实板结论迁移至 P4。
+
 用户后续实屏照片显示 AI 图标到时间的可见间隔略小于时间到 Wi-Fi。按照片与当前
 320 像素布局估算，两段分别约 7 和 12 像素；将触控框 x=210 改为 x=205 后，
 两段约同为 12 像素。原型去掉时钟标签左侧的空白宽度，并对两侧使用同一间距。
