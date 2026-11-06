@@ -9,7 +9,9 @@ INFO 下继续累计计时、DEBUG 恢复明细、轮末及未完成汇总保留
 完整 `bash tools/check.sh`、ASan/UBSan、5 板清单及觅感 release 原生编译通过。
 build.30 的 BIN/ELF 身份和打包文件长度／哈希校验通过，镜像 SHA-256：
 `2c7fb16c3715ce7a9eb44cbd8222e817096f286d9c4c5bc778502d5e23167428`。
-尚未烧录；实际日志降幅、声音及本地结束／切换场景仍需实板验证。
+构建检查时尚未烧录；随后用户于 2026-11-06 确认 build.30 实板验证通过，
+已发布为 `HIL_VERIFIED`，详见[发布记录](../docs/boards/mgkfb-bk7258/RELEASE_NOTES_1.0.3_BUILD30.md)。
+实际日志降幅、开关日志性能对照及取消静音时延尚未量测。
 
 ## BK 本地结束抢占远端尾音排空
 
