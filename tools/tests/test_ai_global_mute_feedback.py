@@ -118,6 +118,7 @@ static void stop_ai(uint32_t gen){stops++;}
 static void arm_runtime_timeout_locked(uint32_t g,uint32_t ms){}
 static void xiaotai_ui_show_status(const char *text){snprintf(shown,sizeof(shown),"%s",text);}
 static void ai_token_response(void){}
+static void ai_timing_begin(uint32_t generation){}
 static int xiaotai_platform_service_request(const char *path,void *body,void (*cb)(void),void *ctx){requests++;return 0;}
 static void finish_ai(uint32_t gen,int rc){}
 static void handle_start(void){

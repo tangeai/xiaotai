@@ -130,6 +130,8 @@ int main(void){
 #define OPUS_FRAME_SAMPLES 320
 #define UPLINK_LEVEL_LOG_INTERVAL_FRAMES 50
 #define BK_LOGI(...) ((void)0)
+typedef struct {int unused;} ai_uplink_timing_t;
+static void ai_audio_uplink_timing(ai_uplink_timing_t *s, uint32_t a, uint32_t b, uint32_t c, uint32_t d, bool e, bool f, bool g, int h){}
 #define BK_LOGD(...) ((void)0)
 #define BK_LOGW(...) ((void)0)
 typedef void *beken_thread_arg_t;

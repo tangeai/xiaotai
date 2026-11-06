@@ -765,11 +765,12 @@ require("#define AI_AUDIO_ID 1U" in tirtc_source and
         "CONTROL_AI_CONNECTED" in app_source and
         "xiaotai_tirtc_ai_prepare_media()" in app_source and
         "AI media prewarmed before start_session" in app_source and
-        "rtos_delay_milliseconds(300)" in app_source and
+        "rtos_delay_milliseconds(300)" not in
+        app_source.split("static void handle_ai_connected(uint32_t generation)\n{", 1)[1].split("static void on_ai_connected", 1)[0] and
         "TIRTC_AUDIO_OPUS" in tirtc_source and
         "TIRTC_AUDIOSAMPLE_16K16B1C" in tirtc_source and
         "XIAOTAI_AUDIO_CODEC_OPUS_16K" in tirtc_source,
-        "AI must use stream 1, 20 ms packets, acknowledge early subscriptions and defer start_session")
+        "AI must use stream 1, 20 ms packets, acknowledge early subscriptions and prewarm before immediate start_session")
 require("static char s_ai_peer_id[512]" in app_source and
         "static char s_ai_token[1024]" in app_source and
         "memcpy(s_ai_peer_id, peer->valuestring, peer_length + 1U)" in

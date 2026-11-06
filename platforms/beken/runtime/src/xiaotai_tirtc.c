@@ -99,6 +99,7 @@ typedef struct {
     uint32_t command;
     void *data;
     uint32_t length;
+    uint32_t received_ms;
 } media_event_t;
 
 static beken_queue_t s_media_queue;
@@ -108,6 +109,7 @@ static atomic_uint_fast32_t s_generation_counter;
 static atomic_uint_fast32_t s_active_generation;
 static atomic_int s_connection_error;
 static atomic_int s_connection_mode;
+static atomic_uint s_ai_cancel_tail_generation;
 static atomic_uint_fast32_t s_pending_ai_generation;
 static atomic_uint_fast32_t s_pending_call_generation;
 static atomic_uint_fast32_t s_pending_outbound_call_generation;
@@ -167,21 +169,34 @@ static int normalize_tirtc_result(int rc)
     return rc < 0 ? rc : BK_OK;
 }
 
-static void drain_ai_playback_after_transport_close(void)
+void xiaotai_tirtc_ai_cancel_tail(uint32_t generation)
+{
+    if (generation == 0U) return;
+    /* Local intent can arrive after on_disconnected cleared the SDK handle,
+     * or while the media worker is draining. Never stop drivers on this core. */
+    atomic_store_explicit(&s_ai_cancel_tail_generation, generation,
+                          memory_order_release);
+}
+
+static void drain_ai_playback_after_transport_close(uint32_t generation)
 {
     xiaotai_audio_log_playback_status("transport-close");
     uint32_t started_ms = rtos_get_time();
-    while (xiaotai_audio_running() &&
+    while (!(generation != 0U && atomic_load_explicit(
+                 &s_ai_cancel_tail_generation, memory_order_acquire) == generation) &&
+           xiaotai_audio_running() &&
            !xiaotai_audio_playback_is_drained(AI_CLOSE_PLAYBACK_QUIET_MS) &&
            (int32_t)(rtos_get_time() - started_ms) <
                (int32_t)AI_CLOSE_DRAIN_TIMEOUT_MS) {
         rtos_delay_milliseconds(AI_CLOSE_DRAIN_POLL_MS);
     }
-    bool drained = xiaotai_audio_playback_is_drained(
+    bool cancelled = generation != 0U && atomic_load_explicit(
+        &s_ai_cancel_tail_generation, memory_order_acquire) == generation;
+    bool drained = !cancelled && xiaotai_audio_playback_is_drained(
         AI_CLOSE_PLAYBACK_QUIET_MS);
-    xiaotai_audio_log_playback_status(drained ? "drained" : "timeout");
+    xiaotai_audio_log_playback_status(cancelled ? "cancelled" : (drained ? "drained" : "timeout"));
     BK_LOGI(TAG, "AI playback after transport close %s elapsed=%u ms\n",
-            drained ? "drained" : "timeout",
+            cancelled ? "cancelled" : (drained ? "drained" : "timeout"),
             (unsigned)(rtos_get_time() - started_ms));
 }
 
@@ -514,6 +529,28 @@ void xiaotai_tirtc_service_close_wakeup(void)
                               memory_order_release);
 }
 
+/* Media worker owns these counters. Callback only timestamps and queues. */
+static void ai_signal_timing(const media_event_t *event)
+{
+    static uint32_t generation, count, maximum, reported_ms;
+    uint32_t now = rtos_get_time();
+    if (generation != event->generation) {
+        generation = event->generation;
+        count = maximum = reported_ms = 0U;
+    }
+    uint32_t delay = now - event->received_ms;
+    if (delay > maximum) maximum = delay;
+    ++count;
+    if (count == 1U || now - reported_ms >= 1000U) {
+        BK_LOGD(TAG, "AI_SIGNAL generation=%u count=%u rx_ms=%u at_ms=%u "
+                "queue_ms=%u queue_max_ms=%u bytes=%u\n",
+                (unsigned)generation, (unsigned)count,
+                (unsigned)event->received_ms, (unsigned)now,
+                (unsigned)delay, (unsigned)maximum, (unsigned)event->length);
+        reported_ms = now;
+    }
+}
+
 static void media_worker(beken_thread_arg_t argument)
 {
     (void)argument;
@@ -536,7 +573,7 @@ static void media_worker(beken_thread_arg_t argument)
                      * that queue; user hangup still stops immediately. */
                     if (event.mode == CONNECTION_AI && event.error != 0) {
                         xiaotai_audio_set_uplink_enabled(false);
-                        drain_ai_playback_after_transport_close();
+                        drain_ai_playback_after_transport_close(event.generation);
                     }
                     (void)xiaotai_audio_stop();
                 }
@@ -678,6 +715,7 @@ static void media_worker(beken_thread_arg_t argument)
             continue;
         }
         if (event.type == MEDIA_EVENT_AI_COMMAND) {
+            ai_signal_timing(&event);
             if (s_handlers.on_ai_command != NULL) {
                 s_handlers.on_ai_command(event.generation, event.command,
                                          event.data, event.length,
@@ -731,7 +769,7 @@ static void media_worker(beken_thread_arg_t argument)
             BK_LOGD(TAG, "[DEBUG-bk-close] worker-video-stopped\n");
             if (event.mode == CONNECTION_AI && xiaotai_audio_running()) {
                 xiaotai_audio_set_uplink_enabled(false);
-                drain_ai_playback_after_transport_close();
+                drain_ai_playback_after_transport_close(event.generation);
             }
             (void)xiaotai_audio_stop();
             BK_LOGD(TAG, "[DEBUG-bk-close] worker-audio-stopped\n");
@@ -971,6 +1009,7 @@ static void on_disconnected(tirtc_conn_t connection)
 static void on_command(tirtc_conn_t connection, uint32_t command,
                        const void *data, uint32_t length)
 {
+    uint32_t received_ms = rtos_get_time();
     if (!connection_matches(connection)) {
         return;
     }
@@ -1041,6 +1080,7 @@ static void on_command(tirtc_conn_t connection, uint32_t command,
         .command = command,
         .data = copy,
         .length = length,
+        .received_ms = received_ms,
     };
     if (rtos_push_to_queue(&s_media_queue, &event, 0) != BK_OK) {
         os_free(copy);

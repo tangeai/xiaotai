@@ -1,5 +1,18 @@
 # 觅感 AI 玩具开发板 BK7258 验证记录
 
+## 本地待验证包：build.30
+
+2026-11-06，`1.0.3+build.30` release 配置，`BUILD_VERIFIED_HIL_PENDING`。
+继承 build.29 优化，将周期诊断与轮内明细降为 DEBUG，默认 INFO 保留关键耗时汇总。
+产物身份、日志命令与验证边界见 [build.30 记录](RELEASE_NOTES_1.0.3_BUILD30.md)。
+
+## 本地待验证包：build.29
+
+2026-11-06 整理 `1.0.3+build.29` release 配置包，状态 `BUILD_VERIFIED_HIL_PENDING`。
+本次优化、毫秒耗时统计、镜像校验值与烧录后验证项见
+[build.29 变更及日志汇总](RELEASE_NOTES_1.0.3_BUILD29.md)。
+完整仓库检查及原生编译通过；最新串口日志未覆盖本地取消尾音排空场景。
+
 ## 当前发布固件
 
 2026-10-24 发布 [觅感 AI 玩具开发板 BK7258 v1.0.3 · build.26](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.26)。
