@@ -2,6 +2,7 @@
 import re
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
+from test_bk_audio_timing import diagnostic_block
 
 AUDIO = ROOT / 'platforms/beken/runtime/src/xiaotai_audio.c'
 
@@ -77,6 +78,7 @@ int main(void){
 #define BK_ERR_BUSY -3
 #define XIAOTAI_AUDIO_CODEC_OPUS_16K 1
 #define BK_LOGW(...) ((void)0)
+#define BK_LOGD(...) ((void)0)
 #define BK_LOGI(tag,...) snprintf(log_text,sizeof(log_text),__VA_ARGS__)
 ''' + constants + r'''
 static atomic_bool s_running=true,s_play_run=true,s_playback_in_progress;
@@ -96,7 +98,7 @@ static int rtos_lock_mutex_timeout(int *m,unsigned ticks){
     return rtos_trylock_mutex(m);
 }
 static void rtos_unlock_mutex(int *m){assert(locked);locked=false;}
-''' + function(source, 'xiaotai_audio_play_opus') + function(source, 'opus_ring_take')
+''' + diagnostic_block(source) + function(source, 'xiaotai_audio_play_opus') + function(source, 'opus_ring_take')
               + function(source, 'xiaotai_audio_log_playback_status') + r'''
 int main(void){
     (void)s_opus_received_frames;(void)s_opus_queue_peak;(void)s_admission_busy;

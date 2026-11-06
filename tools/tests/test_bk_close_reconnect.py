@@ -57,6 +57,7 @@ static atomic_bool s_active_disconnect_queued, s_audio_subscribed, s_video_subsc
 static atomic_bool s_call_is_caller, s_call_accept_seen, s_voip_accept_seen;
 static atomic_bool s_recovery_required, s_outgoing_connect_inflight;
 static media_event_t s_pending_close_event, queue[16];
+static void ai_signal_timing(const media_event_t *e){}
 static xiaotai_tirtc_handlers_t s_handlers;
 static char s_active_call_room[128];
 static unsigned head, tail, notifications, stopped, accepted, disconnected;
@@ -90,7 +91,7 @@ static int xiaotai_audio_stop(void) {
     }
     stopped++; return 0;
 }
-static void drain_ai_playback_after_transport_close(void) {
+static void drain_ai_playback_after_transport_close(uint32_t generation) {
     assert(xiaotai_tirtc_busy() && "AI tail drain still owns media");
 }
 static bool xiaotai_video_running(void) { return false; }

@@ -1,5 +1,6 @@
 """Replay ordered WeChat shortcuts and call-ring lifecycle at BK public seams."""
 import unittest
+from test_bk_audio_timing import diagnostic_block
 from test_s3_product_regressions import ROOT, function, run_c
 
 APP = ROOT/'platforms/beken/runtime/src/xiaotai_app.c'
@@ -14,6 +15,7 @@ class BkCallRingtone(unittest.TestCase):
 #include <assert.h>
 #include <string.h>
 #include "xiaotai_contacts.h"
+#define BK_LOGD(...) ((void)0)
 #define BK_LOGI(...) ((void)0)
 #define BK_LOGW(...) ((void)0)
 static xiaotai_contacts_t s_contacts;
@@ -94,6 +96,7 @@ int main(void){
 #include <stdint.h>
 #include "xiaotai_call_state.h"
 #include "xiaotai_audio.h"
+#define BK_LOGD(...) ((void)0)
 #define BK_LOGI(...) ((void)0)
 static xiaotai_call_state_t s_calls;
 static xiaotai_call_ring_t ring=XIAOTAI_CALL_RING_OUTGOING;
@@ -119,6 +122,7 @@ int main(void){bool outbound=true;uint32_t generation=2;
 #include "xiaotai_audio.h"
 #include "xiaotai_prompt_assets.h"
 #define BK_OK 0
+#define BK_LOGD(...) ((void)0)
 #define BK_LOGI(...) ((void)0)
 static atomic_uint s_volume=5,s_prompt_generation,s_call_ring_started_ms;
 static atomic_bool s_speaker_muted,s_prompt_active;
@@ -204,6 +208,7 @@ int main(void){
 #define BK_OK 0
 #define BK_ERR_BUSY -2
 #define BK_ERR_PARAM -3
+#define BK_LOGD(...) ((void)0)
 #define BK_LOGI(...) ((void)0)
 #define AUDIO_TASK_STOP_TIMEOUT_MS 10
 static atomic_flag s_audio_control_lock=ATOMIC_FLAG_INIT;
@@ -241,11 +246,13 @@ int main(void){
         source = AUDIO.read_text()
         run_c(r'''
 #include <assert.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdatomic.h>
 #include "xiaotai_audio.h"
 #include "xiaotai_prompt_assets.h"
-#define BK_LOGI(...) ((void)0)
+#define BK_LOGD(...) ((void)0)
+#define BK_LOGI(tag,...) do { char log[1024]; snprintf(log,sizeof(log),__VA_ARGS__); } while(0)
 #define BK_LOGW(...) ((void)0)
 #define BK_OK 0
 #define AUDIO_ALAW_FRAME_BYTES 160
@@ -280,12 +287,13 @@ static int write_pcm(void *c,const int16_t *pcm,size_t n,size_t *bytes){
  assert(audible==!s_speaker_muted);*bytes=n*2;writes++;s_play_run=false;return 0;
 }
 static struct {void *context;int (*write_pcm)(void *,const int16_t *,size_t,size_t *);} board={0,write_pcm},*s_board_audio=&board;
-''' + function(source,'call_ringtone_pcm') + function(source,'mix_call_ringtone') +
+''' + diagnostic_block(source) + function(source,'call_ringtone_pcm') + function(source,'mix_call_ringtone') +
             function(source,'playback_task') + r'''
 int main(void){
  for(int codec=0;codec<2;codec++)for(int mute=0;mute<2;mute++)for(packet=0;packet<2;packet++){
   s_codec=codec;s_frame_samples=codec?320:160;s_speaker_muted=mute;
   s_play_run=true;s_downlink_frames=0;s_playback_pcm_ms=0;writes=refs=0;
+  (void)s_ai_packet_stamps;(void)s_ai_rx_seq;(void)s_ai_rx_previous_ms;
   playback_task(0);assert(writes==1 && refs==1);
   assert(s_downlink_frames==(unsigned)packet && s_playback_pcm_ms==(packet?20U:0U));
  }

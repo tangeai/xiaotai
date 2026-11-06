@@ -90,7 +90,7 @@ ILI9342E 的历史 build.47 发布附件当前不可用，可按本板指南从�
 
 | 适用硬件 | 当前正式版 | 完整镜像（BIN） | 固件包（ZIP） | 发布说明 |
 |---|---|---|---|---|
-| 双屏眼睛 · 8 MiB Flash | v1.0.3 · build.26 | 包含在 ZIP 中 | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.26/mgkfb-bk7258-1.0.3%2Bbuild.26-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.26) |
+| 双屏眼睛 · 8 MiB Flash | v1.0.3 · build.30 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.30/mgkfb-bk7258-1.0.3%2Bbuild.30-all-app.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.30/mgkfb-bk7258-1.0.3%2Bbuild.30-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.30) |
 
 [烧录指南](boards/mgkfb-bk7258/README.md#烧录) · [硬件资料](boards/mgkfb-bk7258/README.md#规格) · [编译与调试](boards/mgkfb-bk7258/README.md#开发目录)
 

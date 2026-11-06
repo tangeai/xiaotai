@@ -114,6 +114,9 @@ int xiaotai_tirtc_room_connect(const char *peer_id, const char *token,
 int xiaotai_tirtc_room_start_media(void);
 int xiaotai_tirtc_send_command(uint32_t command,
                                const void *data, uint32_t length);
+/** Cancel only this AI generation's remote-close tail drain on local stop or
+ * handoff. Safe even after transport close; the media worker owns driver stop. */
+void xiaotai_tirtc_ai_cancel_tail(uint32_t generation);
 int xiaotai_tirtc_disconnect(void);
 
 #endif

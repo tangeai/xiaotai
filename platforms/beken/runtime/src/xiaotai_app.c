@@ -257,6 +257,118 @@ static void queue_text_event(control_event_type_t type, uint32_t generation,
     }
 }
 
+/* AI timing state: diagnostic only, protected by s_runtime_mutex. All durations
+ * use the device monotonic clock; no text, token or remote ID is logged. */
+static struct {
+    uint32_t generation, begin_ms, stage_ms, round, round_ms;
+    uint32_t pending_asr_ms, asr_ms, caption_ms;
+    bool live, round_open, pending_asr, has_asr, has_caption;
+} s_ai_timing;
+
+static void ai_timing_round_log(const char *event, uint32_t now)
+{
+    if (strcmp(event, "round_end") == 0) {
+        xiaotai_audio_log_playback_status(event);
+    }
+    int level = (strcmp(event, "round_end") == 0 ||
+                 strcmp(event, "incomplete") == 0) ?
+                    XIAOTAI_LOG_INFO : XIAOTAI_LOG_DEBUG;
+    xiaotai_log_write(level, TAG, "AI_TIMING generation=%u round=%u event=%s round_ms=%u "
+            "asr_to_start_ms=%ld asr_to_caption_ms=%ld first_caption_ms=%ld\n",
+            (unsigned)s_ai_timing.generation, (unsigned)s_ai_timing.round,
+            event, (unsigned)(now - s_ai_timing.round_ms),
+            s_ai_timing.has_asr ?
+                (long)(uint32_t)(s_ai_timing.round_ms - s_ai_timing.asr_ms) : -1L,
+            s_ai_timing.has_asr && s_ai_timing.has_caption ?
+                (long)(uint32_t)(s_ai_timing.caption_ms - s_ai_timing.asr_ms) : -1L,
+            s_ai_timing.has_caption ?
+                (long)(uint32_t)(s_ai_timing.caption_ms - s_ai_timing.round_ms) : -1L);
+}
+
+static void ai_timing_begin(uint32_t generation)
+{
+    rtos_lock_mutex(&s_runtime_mutex);
+    memset(&s_ai_timing, 0, sizeof(s_ai_timing));
+    s_ai_timing.generation = generation;
+    s_ai_timing.begin_ms = s_ai_timing.stage_ms = rtos_get_time();
+    s_ai_timing.live = true;
+    BK_LOGI(TAG, "AI_TIMING generation=%u stage=begin elapsed_ms=0 step_ms=0\n",
+            (unsigned)generation);
+    rtos_unlock_mutex(&s_runtime_mutex);
+}
+
+static void ai_timing_stage(uint32_t generation, const char *stage, int error)
+{
+    rtos_lock_mutex(&s_runtime_mutex);
+    if (s_ai_timing.live && s_ai_timing.generation == generation) {
+        uint32_t now = rtos_get_time();
+        BK_LOGI(TAG, "AI_TIMING generation=%u stage=%s elapsed_ms=%u step_ms=%u error=%d\n",
+                (unsigned)generation, stage,
+                (unsigned)(now - s_ai_timing.begin_ms),
+                (unsigned)(now - s_ai_timing.stage_ms), error);
+        s_ai_timing.stage_ms = now;
+        if (strcmp(stage, "finish") == 0) {
+            if (s_ai_timing.round_open) ai_timing_round_log("incomplete", now);
+            s_ai_timing.live = false;
+        }
+    }
+    rtos_unlock_mutex(&s_runtime_mutex);
+}
+
+static void ai_timing_command(uint32_t generation, const char *json, size_t length)
+{
+    /* Timestamp receipt before parsing, independent of the control/UI queue. */
+    uint32_t now = rtos_get_time();
+    cJSON *root = cJSON_ParseWithLength(json, length);
+    const cJSON *method = cJSON_GetObjectItemCaseSensitive(root, "method");
+    if (!cJSON_IsString(method) || method->valuestring == NULL) {
+        cJSON_Delete(root);
+        return;
+    }
+    const cJSON *params = cJSON_GetObjectItemCaseSensitive(root, "params");
+    const cJSON *type = cJSON_GetObjectItemCaseSensitive(params, "caption_type");
+    const cJSON *text = cJSON_GetObjectItemCaseSensitive(params, "text");
+    const cJSON *final = cJSON_GetObjectItemCaseSensitive(params, "is_final");
+    bool caption = strcmp(method->valuestring, "caption") == 0 &&
+                   cJSON_IsNumber(type) && cJSON_IsString(text) &&
+                   text->valuestring != NULL && text->valuestring[0] != '\0';
+    rtos_lock_mutex(&s_runtime_mutex);
+    if (!s_ai_timing.live || s_ai_timing.generation != generation) {
+        rtos_unlock_mutex(&s_runtime_mutex);
+        cJSON_Delete(root);
+        return;
+    }
+    if (caption && type->valuedouble == 0 && cJSON_IsTrue(final) &&
+        !s_ai_timing.pending_asr) {
+        s_ai_timing.pending_asr = true;
+        s_ai_timing.pending_asr_ms = now;
+        BK_LOGD(TAG, "AI_TIMING generation=%u event=asr_final elapsed_ms=%u\n",
+                (unsigned)generation, (unsigned)(now - s_ai_timing.begin_ms));
+    } else if (strcmp(method->valuestring, "round_start") == 0 &&
+               !s_ai_timing.round_open) {
+        s_ai_timing.round_open = true;
+        s_ai_timing.round++;
+        s_ai_timing.round_ms = now;
+        s_ai_timing.has_asr = s_ai_timing.pending_asr;
+        s_ai_timing.asr_ms = s_ai_timing.pending_asr_ms;
+        s_ai_timing.pending_asr = false;
+        s_ai_timing.has_caption = false;
+        ai_timing_round_log("round_start", now);
+    } else if (caption && type->valuedouble == 1 &&
+               s_ai_timing.round_open && !s_ai_timing.has_caption) {
+        s_ai_timing.has_caption = true;
+        s_ai_timing.caption_ms = now;
+        ai_timing_round_log("first_caption", now);
+    } else if (strcmp(method->valuestring, "round_end") == 0 &&
+               s_ai_timing.round_open) {
+        ai_timing_round_log("round_end", now);
+        s_ai_timing.round_open = false;
+    }
+    rtos_unlock_mutex(&s_runtime_mutex);
+    cJSON_Delete(root);
+}
+/* AI timing end */
+
 static void finish_ai(uint32_t generation, int error)
 {
     rtos_lock_mutex(&s_runtime_mutex);
@@ -271,6 +383,7 @@ static void finish_ai(uint32_t generation, int error)
                     xiaotai_runtime_finish(&s_runtime, generation);
     rtos_unlock_mutex(&s_runtime_mutex);
     if (finished) {
+        ai_timing_stage(generation, "finish", error);
         if (expected_remote_close) {
             BK_LOGI(TAG,
                     "AI active session completed by remote close generation=%u\n",
@@ -291,6 +404,7 @@ static void finish_ai(uint32_t generation, int error)
 
 static void stop_ai(uint32_t generation)
 {
+    xiaotai_tirtc_ai_cancel_tail(generation);
     if (xiaotai_tirtc_connected()) {
         static const char end[] =
             "{\"jsonrpc\":\"2.0\",\"method\":\"end_session\"}";
@@ -306,6 +420,7 @@ static void stop_ai(uint32_t generation)
 
 static void ai_token_response(const char *body, void *context)
 {
+    ai_timing_stage((uint32_t)(uintptr_t)context, "token", 0);
     queue_text_event(CONTROL_AI_TOKEN, (uint32_t)(uintptr_t)context,
                      body, body == NULL ? 0U : strlen(body));
 }
@@ -1088,6 +1203,7 @@ static void handle_intent(xiaotai_intent_t intent)
     arm_runtime_timeout_locked(generation, SESSION_CONNECT_TIMEOUT_MS);
     rtos_unlock_mutex(&s_runtime_mutex);
 
+    ai_timing_begin(generation);
     xiaotai_ui_show_status("AI CONNECT");
     int rc = xiaotai_platform_service_request("/v1/ai/token", NULL,
                                                ai_token_response,
@@ -2513,6 +2629,7 @@ static void handle_ai_call_intent(control_event_t *event)
     s_pending_contact = contact;
     s_pending_dial_generation = event->generation;
     rtos_unlock_mutex(&s_runtime_mutex);
+    xiaotai_tirtc_ai_cancel_tail(event->generation);
     static const char end[] =
         "{\"jsonrpc\":\"2.0\",\"method\":\"end_session\"}";
     (void)xiaotai_tirtc_send_command(XIAOTAI_AI_COMMAND, end,
@@ -3404,10 +3521,10 @@ static void handle_ai_connected(uint32_t generation)
         (void)xiaotai_tirtc_disconnect();
         return;
     }
+    ai_timing_stage(generation, "media", 0);
     BK_LOGI(TAG, "AI media prewarmed before start_session\n");
 
-    /* Let the KCP/media path settle outside the TiRTC callback. */
-    rtos_delay_milliseconds(300);
+    /* Server startup no longer needs the historical 300 ms settle delay. */
     rtos_lock_mutex(&s_runtime_mutex);
     current = runtime->owner == XIAOTAI_OWNER_AI &&
               runtime->generation == generation &&
@@ -3429,6 +3546,7 @@ static void handle_ai_connected(uint32_t generation)
         BK_LOGE(TAG, "AI start_session send failed rc=%d\n", rc);
         (void)xiaotai_tirtc_disconnect();
     } else {
+        ai_timing_stage(generation, "start_sent", 0);
         BK_LOGI(TAG, "AI start_session sent; microphone uplink remains gated\n");
     }
 }
@@ -3436,6 +3554,7 @@ static void handle_ai_connected(uint32_t generation)
 static void on_ai_connected(uint32_t generation, void *context)
 {
     (void)context;
+    ai_timing_stage(generation, "transport", 0);
     control_event_t event = {
         .type = CONTROL_AI_CONNECTED,
         .generation = generation,
@@ -3460,6 +3579,7 @@ static void on_ai_command(uint32_t generation, uint32_t command,
         return;
     }
     if (message == XIAOTAI_AI_MESSAGE_UI) {
+        if (length <= 2048U) ai_timing_command(generation, data, length);
         if (length <= 2048U) {
             queue_text_event(CONTROL_AI_UI, generation,
                              (const char *)data, length);
@@ -3504,6 +3624,7 @@ static void on_ai_command(uint32_t generation, uint32_t command,
     if (s_ui_page == UI_PAGE_HOME) xiaotai_ui_show_ai(s_ai_view.phase, s_ai_view.emotion,
                        s_ai_view.caption, false,
                        s_ai_view.emotion_tag_present);
+    ai_timing_stage(generation, "active", 0);
     BK_LOGI(TAG, "AI talk active generation=%u\n", (unsigned)generation);
 }
 

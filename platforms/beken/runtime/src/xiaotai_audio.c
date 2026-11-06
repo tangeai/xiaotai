@@ -411,6 +411,113 @@ static void mix_call_ringtone(int16_t *pcm, size_t samples, uint32_t rate)
     }
 }
 
+/* AI audio timing begin */
+/* Packet stamps share the Opus ring lock and eviction policy. The current
+ * packet and aggregate structs belong exclusively to their audio worker. */
+typedef struct {
+    uint32_t seq, rx_ms, enqueue_ms, gap_ms, queued;
+} ai_packet_timing_t;
+static ai_packet_timing_t s_ai_packet_stamps[OPUS_PACKET_SLOTS], s_ai_packet;
+static uint32_t s_ai_rx_seq, s_ai_rx_previous_ms;
+typedef struct {
+    uint32_t frames, failed, queue_max, decode_max, write_max, gap_max;
+    uint32_t last_report_ms, last_write_ms;
+    bool pending;
+} ai_playback_timing_t;
+typedef struct {
+    uint32_t frames, sent, rejected, gated, read_max, dsp_max, send_max;
+    uint32_t last_report_ms, last_ns_speech_ms;
+    bool ns_seen, speech_seen;
+} ai_uplink_timing_t;
+
+static uint32_t ai_timing_max(uint32_t a, uint32_t b)
+{
+    return a > b ? a : b;
+}
+
+static void ai_audio_written(ai_playback_timing_t *s, uint32_t take_ms,
+                             uint32_t decoded_ms, uint32_t write_ms,
+                             uint32_t done_ms, bool ok)
+{
+    uint32_t queue = take_ms - s_ai_packet.enqueue_ms;
+    uint32_t decode = decoded_ms - take_ms;
+    uint32_t write = done_ms - write_ms;
+    ++s->frames;
+    if (!ok) ++s->failed;
+    s->queue_max = ai_timing_max(s->queue_max, queue);
+    s->decode_max = ai_timing_max(s->decode_max, decode);
+    s->write_max = ai_timing_max(s->write_max, write);
+    s->gap_max = ai_timing_max(s->gap_max, s_ai_packet.gap_ms);
+    s->last_write_ms = done_ms;
+    s->pending = true;
+    if (s->frames == 1U) {
+        BK_LOGI(TAG, "AI_AUDIO event=first_write rx_ms=%u done_ms=%u rx_to_write_ms=%u ok=%u\n",
+                (unsigned)s_ai_packet.rx_ms, (unsigned)done_ms,
+                (unsigned)(done_ms - s_ai_packet.rx_ms), ok ? 1U : 0U);
+    }
+    /* A burst is only an arrival gap, NOT a server conversation round. */
+    if (s->frames == 1U || s_ai_packet.gap_ms >= 200U ||
+        done_ms - s->last_report_ms >= 1000U) {
+        BK_LOGD(TAG, "AI_AUDIO seq=%u rx_ms=%u done_ms=%u gap_ms=%u queued=%u "
+                "admit_ms=%u queue_ms=%u decode_ms=%u prepare_ms=%u write_ms=%u "
+                "rx_to_write_ms=%u ok=%u frames=%u failed=%u queue_max_ms=%u "
+                "decode_max_ms=%u write_max_ms=%u gap_max_ms=%u\n",
+                (unsigned)s_ai_packet.seq, (unsigned)s_ai_packet.rx_ms,
+                (unsigned)done_ms, (unsigned)s_ai_packet.gap_ms,
+                (unsigned)s_ai_packet.queued,
+                (unsigned)(s_ai_packet.enqueue_ms - s_ai_packet.rx_ms),
+                (unsigned)queue, (unsigned)decode,
+                (unsigned)(write_ms - decoded_ms), (unsigned)write,
+                (unsigned)(done_ms - s_ai_packet.rx_ms), ok ? 1U : 0U,
+                (unsigned)s->frames, (unsigned)s->failed,
+                (unsigned)s->queue_max, (unsigned)s->decode_max,
+                (unsigned)s->write_max, (unsigned)s->gap_max);
+        s->last_report_ms = done_ms;
+    }
+}
+
+static void ai_audio_idle(ai_playback_timing_t *s, uint32_t now)
+{
+    if (!s->pending || now - s->last_write_ms < 200U) return;
+    BK_LOGD(TAG, "AI_AUDIO event=idle at_ms=%u last_write_ms=%u frames=%u "
+            "failed=%u queue_max_ms=%u decode_max_ms=%u write_max_ms=%u gap_max_ms=%u\n",
+            (unsigned)now, (unsigned)s->last_write_ms, (unsigned)s->frames,
+            (unsigned)s->failed, (unsigned)s->queue_max, (unsigned)s->decode_max,
+            (unsigned)s->write_max, (unsigned)s->gap_max);
+    s->pending = false;
+}
+
+static void ai_audio_uplink_timing(ai_uplink_timing_t *s, uint32_t begin,
+                                   uint32_t read_ms, uint32_t dsp_ms,
+                                   uint32_t done_ms, bool enabled,
+                                   bool ns_valid, bool speech, int result)
+{
+    ++s->frames;
+    if (!enabled) ++s->gated;
+    else if (result < 0) ++s->rejected;
+    else ++s->sent;
+    if (ns_valid) s->ns_seen = true;
+    if (ns_valid && speech) {
+        s->speech_seen = true;
+        s->last_ns_speech_ms = read_ms;
+    }
+    s->read_max = ai_timing_max(s->read_max, read_ms - begin);
+    s->dsp_max = ai_timing_max(s->dsp_max, dsp_ms - read_ms);
+    if (enabled) s->send_max = ai_timing_max(s->send_max, done_ms - dsp_ms);
+    if (s->frames == 1U || done_ms - s->last_report_ms >= 1000U) {
+        BK_LOGD(TAG, "AI_UPLINK at_ms=%u frames=%u sent=%u rejected=%u gated=%u "
+                "read_max_ms=%u dsp_max_ms=%u send_max_ms=%u ns_valid=%u "
+                "speech_seen=%u last_ns_speech_ms=%u\n",
+                (unsigned)done_ms, (unsigned)s->frames, (unsigned)s->sent,
+                (unsigned)s->rejected, (unsigned)s->gated,
+                (unsigned)s->read_max, (unsigned)s->dsp_max,
+                (unsigned)s->send_max, s->ns_seen ? 1U : 0U,
+                s->speech_seen ? 1U : 0U, (unsigned)s->last_ns_speech_ms);
+        s->last_report_ms = done_ms;
+    }
+}
+/* AI audio timing end */
+
 static void ring_reset(void)
 {
     if (!s_ring_mutex_ready) return;
@@ -419,6 +526,8 @@ static void ring_reset(void)
     s_ring_count = 0;
     s_opus_head = 0;
     s_opus_count = 0;
+    s_ai_rx_seq = 0;
+    s_ai_rx_previous_ms = 0;
     s_aec_reference_head = 0;
     s_aec_reference_count = 0;
     s_aec_reference_partial_count = 0;
@@ -671,6 +780,7 @@ static size_t opus_ring_take(uint8_t *output, size_t capacity)
     }
     size_t size = s_opus_lengths[s_opus_head];
     if (size > capacity) size = capacity;
+    s_ai_packet = s_ai_packet_stamps[s_opus_head];
     memcpy(output, s_opus_ring + s_opus_head * OPUS_MAX_PACKET_BYTES, size);
     s_opus_head = (s_opus_head + 1U) % OPUS_PACKET_SLOTS;
     --s_opus_count;
@@ -706,12 +816,15 @@ static void capture_task(beken_thread_arg_t argument)
     uint8_t alaw[AUDIO_MAX_FRAME_SAMPLES];
     uint8_t opus[OPUS_MAX_PACKET_BYTES];
     int16_t narrow_pcm[AUDIO_ALAW_FRAME_BYTES];
+    ai_uplink_timing_t timing = {0};
 
     BK_LOGI(TAG, "capture task started: uplink=%s rate=%u DSP-samples=%u\n",
             s_uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? "opus" : "alaw",
             s_uplink_codec == XIAOTAI_AUDIO_CODEC_ALAW_8K ? 8000U : 16000U,
             (unsigned)s_frame_samples);
     while (s_capture_run) {
+        uint32_t capture_ms = rtos_get_time();
+        bool ns_valid = false, ns_speech = false;
         size_t bytes_read = 0U;
         int rc = s_board_audio->read_pcm(s_board_audio->context, pcm,
                                          s_frame_samples,
@@ -725,6 +838,7 @@ static void capture_task(beken_thread_arg_t argument)
             }
             continue;
         }
+        uint32_t read_ms = rtos_get_time();
         aec_process_capture(pcm, s_frame_samples);
         bool muted = atomic_load_explicit(&s_microphone_muted,
                                           memory_order_acquire);
@@ -736,6 +850,8 @@ static void capture_task(beken_thread_arg_t argument)
                 bool speech = false;
                 if (xiaotai_audio_ns_process(&s_uplink_ns, pcm,
                                              s_frame_samples, &speech)) {
+                    ns_valid = true;
+                    ns_speech = speech;
                     if (speech) {
                         ++s_uplink_ns_speech_frames;
                     } else {
@@ -811,11 +927,17 @@ static void capture_task(beken_thread_arg_t argument)
             }
             encoded_size = wire_samples;
         }
+        uint32_t dsp_ms = rtos_get_time();
+        int send_result = 0;
+        uint32_t sent_ms = dsp_ms;
         xiaotai_audio_uplink_fn callback = s_uplink;
-        if (callback != NULL &&
-            atomic_load_explicit(&s_uplink_enabled, memory_order_acquire)) {
+        bool send_enabled = callback != NULL &&
+            atomic_load_explicit(&s_uplink_enabled, memory_order_acquire);
+        if (send_enabled) {
             int rc = callback(encoded, encoded_size, rtos_get_time(),
                               s_uplink_context);
+            sent_ms = rtos_get_time();
+            send_result = rc;
             if (rc >= 0) {
                 ++s_uplink_frames;
                 if (s_uplink_frames == 1U) {
@@ -831,6 +953,11 @@ static void capture_task(beken_thread_arg_t argument)
                 }
             }
         }
+        if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
+            ai_audio_uplink_timing(&timing, capture_ms, read_ms, dsp_ms,
+                                   sent_ms, send_enabled,
+                                   ns_valid, ns_speech, send_result);
+        }
     }
     s_capture_thread = NULL;
     rtos_set_semaphore(&s_capture_stopped);
@@ -843,6 +970,7 @@ static void playback_task(beken_thread_arg_t argument)
     uint8_t alaw[AUDIO_ALAW_FRAME_BYTES];
     uint8_t opus[OPUS_MAX_PACKET_BYTES];
     int16_t pcm[OPUS_MAX_DECODE_SAMPLES];
+    ai_playback_timing_t timing = {0};
 
     BK_LOGI(TAG, "playback task started: codec=%s jitter=%u ms\n",
             s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? "opus" : "alaw",
@@ -850,11 +978,14 @@ static void playback_task(beken_thread_arg_t argument)
                 OPUS_PACKET_SLOTS * 20U : AUDIO_RING_FRAMES * 20U));
     while (s_play_run) {
         bool media_frame = true;
+        uint32_t take_ms = 0U, decoded_ms = 0U;
         size_t samples = s_frame_samples;
         size_t encoded_size = sizeof(alaw);
         if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
             encoded_size = opus_ring_take(opus, sizeof(opus));
+            take_ms = rtos_get_time();
             if (encoded_size == 0U) {
+                ai_audio_idle(&timing, take_ms);
                 if (atomic_load(&s_call_ring_kind) == XIAOTAI_CALL_RING_NONE) {
                     rtos_delay_milliseconds(5);
                     continue;
@@ -865,7 +996,9 @@ static void playback_task(beken_thread_arg_t argument)
             int decoded = media_frame ? opus_decode(s_opus_decoder, opus,
                                       (opus_int32)encoded_size, pcm,
                                       OPUS_MAX_DECODE_SAMPLES, 0) : (int)samples;
+            decoded_ms = rtos_get_time();
             if (decoded <= 0) {
+                ai_audio_written(&timing, take_ms, decoded_ms, decoded_ms, decoded_ms, false);
                 atomic_store_explicit(&s_playback_in_progress, false,
                                       memory_order_release);
                 BK_LOGW(TAG, "Opus decode failed rc=%d bytes=%u\n", decoded,
@@ -900,9 +1033,11 @@ static void playback_task(beken_thread_arg_t argument)
         size_t bytes_written = 0U;
         atomic_store_explicit(&s_playback_in_progress, true,
                               memory_order_release);
+        uint32_t write_ms = rtos_get_time();
         int rc = s_board_audio->write_pcm(s_board_audio->context, pcm,
                                           samples,
                                           &bytes_written);
+        uint32_t written_ms = rtos_get_time();
         if (rc != BK_OK || bytes_written != samples * sizeof(*pcm)) {
             BK_LOGW(TAG, "speaker write failed rc=%d\n", rc);
         } else if (media_frame) {
@@ -942,6 +1077,10 @@ static void playback_task(beken_thread_arg_t argument)
             aec_reference_push(pcm, samples);
         atomic_store_explicit(&s_playback_in_progress, false,
                               memory_order_release);
+        if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K && media_frame) {
+            ai_audio_written(&timing, take_ms, decoded_ms, write_ms, written_ms,
+                             rc == BK_OK && bytes_written == samples * sizeof(*pcm));
+        }
     }
     s_play_thread = NULL;
     rtos_set_semaphore(&s_play_stopped);
@@ -1277,6 +1416,7 @@ int xiaotai_audio_play_alaw(const uint8_t *data, size_t size)
 
 int xiaotai_audio_play_opus(const uint8_t *data, size_t size)
 {
+    uint32_t rx_ms = rtos_get_time();
     if (data == NULL || size == 0U || size > OPUS_MAX_PACKET_BYTES) {
         return BK_ERR_PARAM;
     }
@@ -1302,6 +1442,14 @@ int xiaotai_audio_play_opus(const uint8_t *data, size_t size)
     size_t tail = (s_opus_head + s_opus_count) % OPUS_PACKET_SLOTS;
     memcpy(s_opus_ring + tail * OPUS_MAX_PACKET_BYTES, data, size);
     s_opus_lengths[tail] = (uint16_t)size;
+    ++s_ai_rx_seq;
+    s_ai_packet_stamps[tail] = (ai_packet_timing_t){
+        .seq = s_ai_rx_seq, .rx_ms = rx_ms,
+        .enqueue_ms = rtos_get_time(),
+        .gap_ms = s_ai_rx_seq == 1U ? 0U : rx_ms - s_ai_rx_previous_ms,
+        .queued = (uint32_t)s_opus_count + 1U,
+    };
+    s_ai_rx_previous_ms = rx_ms;
     ++s_opus_count;
     if (s_opus_count > s_opus_queue_peak) s_opus_queue_peak = s_opus_count;
     atomic_fetch_add_explicit(&s_opus_received_frames, 1, memory_order_relaxed);

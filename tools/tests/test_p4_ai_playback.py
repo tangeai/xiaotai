@@ -41,6 +41,10 @@ static int64_t esp_timer_get_time(void){return 1;}
 static bool starter_preroll_bind(int*a,unsigned b,unsigned c,int64_t d){return true;}
 static void starter_preroll_clear(int*a){}
 static void starter_media_cancel_pcm8k_playback(void){canceled++;}
+static int s_recognition_player;
+static void starter_media_cancel_recognition_playback(void){}
+static bool starter_recognition_player_busy(int *p){(void)p;return false;}
+static void vTaskDelay(unsigned ms){(void)ms;}
 static void drain_audio_rx_ready_queue(void){}
 static int xSemaphoreTake(int mutex,int delay){
  if(mutex==2){assert(!s_active && canceled);if(timeout)return 0;locked=true;}return 1;

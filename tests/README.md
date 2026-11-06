@@ -1,4 +1,162 @@
+## BK release AI 日志分级（build.30）
+
+加强已登记 `tools/check.sh` 的 `test_bk_audio_timing.py` 和 `test_bk_ai_timing.py`。
+旧实现因 INFO 输出周期明细及轮内事件而失败，调整后通过；同时覆盖首音频精简日志、
+INFO 下继续累计计时、DEBUG 恢复明细、轮末及未完成汇总保留。
+公开 `xiaotai_log_set_level`／`xiaotai_log_write` 回放验证过滤发生在格式化之前，
+动态切换回 INFO 后停止 DEBUG 输出，WARN/ERROR 保留。
+
+完整 `bash tools/check.sh`、ASan/UBSan、5 板清单及觅感 release 原生编译通过。
+build.30 的 BIN/ELF 身份和打包文件长度／哈希校验通过，镜像 SHA-256：
+`2c7fb16c3715ce7a9eb44cbd8222e817096f286d9c4c5bc778502d5e23167428`。
+构建检查时尚未烧录；随后用户于 2026-11-06 确认 build.30 实板验证通过，
+已发布为 `HIL_VERIFIED`，详见[发布记录](../docs/boards/mgkfb-bk7258/RELEASE_NOTES_1.0.3_BUILD30.md)。
+实际日志降幅、开关日志性能对照及取消静音时延尚未量测。
+
+## BK 本地结束抢占远端尾音排空
+
+`test_bk_disconnect_playback.py` 经生产媒体 worker 重放竞态：远端关闭已触发
+46 帧/920 ms 的尾音排空，此时用户本地结束或接听其他通话。旧实现不响应取消，
+回归断言失败；现在本地 intent 先发布当前代次的取消标记，排空循环每 10 ms 检查，
+由原媒体 worker 继续执行音频停止、功放静音、阻塞写入唤醒和驱动销毁。
+
+主机回放覆盖进入排空前取消（0 ms）、排空中第 30 ms 取消（30 ms，只有此前一帧
+完成）、连接句柄已清空后取消，以及旧代次取消不截断新代次正常尾音。
+按键/菜单结束、接听来电和 AI 呼叫切换均接入；正常远端结束仍排空已收到的音频。
+既有 `tools/check.sh` 入口执行此回归，另验证发送 end_session 前已发布取消。
+
+这次修复只针对本地结束/切换与远端关闭竞态，不把普通 round_end 视为打断，
+也不声称已实现同会话的语音插话清队列。后者需要可靠的打断识别和旧/新轮次音频
+边界；仅凭现有 round_end 清队列会截掉正常尾音。
+仍需本版实板验证本地结束、来电接听、远端关闭竞态、重复会话和实际静音耗时。
+
+完整 `tools/check.sh` 通过（511 项 Python 汇总回归、ASan/UBSan、5 板清单）。
+觅感 `1.0.3+build.29` 发布配置原生编译及验证包身份检查通过，标记
+`BUILD_VERIFIED_HIL_PENDING`。原始烧录镜像仍位于本板原生
+`build/bk7258/mgkfb-bk7258-xiaotai/package/all-app.bin`；SHA-256 为
+`01265a197b620d23f6198bb0183bbcfe0a8a17123384402d00667ada9c09685e`。
+本轮未烧录或执行声学实测。
+
+## BK AI 音频路径计时与取消启动等待
+
+用户确认服务端已修复启动时序后，移除 `handle_ai_connected` 中的 300 ms 延迟。
+仍先准备下行解码/播放，重新检查会话代次，再发送 start_session；上行仍等待服务端确认。
+`test_bk_ai_timing.py` 执行生产连接处理入口，旧实现因实际调用延迟函数失败，
+新实现通过，并保留准备失败、过期连接不能发起启动的断言。
+
+新增 `test_bk_audio_timing.py`（已登记 `tools/check.sh`），回放生产 Opus 入队、出队
+及计时函数。注入时钟验证 admission=3 ms、queue=37 ms、decode=2 ms、write=20 ms；
+覆盖环形队列淘汰后时间戳仍属于同一包、写入失败、空闲只报一次、上行拒绝和信令
+排队最大值及代次重置。这些数字是主机测试输入，不是本次实板性能。
+已有 AI 播放、铃声、关闭重连测试继续覆盖加入诊断后的原业务行为。
+
+新增 INFO 日志：
+
+- `AI_AUDIO`：seq 为本次媒体启动内的接收包序号；rx_ms/done_ms 是设备绝对单调时间。
+  admit_ms 为接收到入队、queue_ms 为入队到出队、decode_ms 为解码、prepare_ms 为
+  解码完成到调用板级输出、write_ms 为输出调用、rx_to_write_ms 为收到到输出返回。
+  queued 为入队后队列深度；gap_ms 为相邻获准入队包到达间隔。每个相隔至少 200 ms
+  的音频段首包及约每秒报告一次；音频段不等同服务端轮次。累计最大值、失败计数
+  保留至本次媒体结束；idle 只表示 200 ms 未再写入，不代表硬件 DMA 已排空。
+- `AI_UPLINK`：每秒汇总采集帧数、成功提交/拒绝/门控帧数，读取、DSP、发送调用的
+  累计最大耗时。NS 的 last_ns_speech_ms 是算法最近一次语音活动观测，不是用户实际
+  停声或服务端断句时间；speech_seen=0 时该时间无效。sent 不证明服务端已收到。
+- `AI_SIGNAL`：SDK 命令回调到媒体 worker 的排队耗时，约每秒报告当前值及本会话最大值。
+- `AI_TIMING`：保留连接和协议轮次计时；round_start/round_end 同时输出音频队列快照，
+  结合上面的绝对时间区分下行到达前等待、本地软件排队和驱动写入。
+
+统计不打印正文或凭据。输出调用完成不等于扬声器实际发声；网络单程、服务端 VAD、
+ASR、模型推理及 TTS 子阶段需要服务端同会话追踪，设备日志不能分解这些时间。
+本次仍需新镜像实板检查首段音频、连续对话、抢占/结束及日志开销。
+
+本轮完整 `bash tools/check.sh` 通过：509 项 Python 汇总回归、ASan/UBSan、5 板清单；
+BK 原生契约检查通过。觅感 `1.0.3+build.28` 发布配置编译、BIN/ELF 身份及验证包
+校验通过，保留 `BUILD_VERIFIED_HIL_PENDING`，未烧录、未执行本版实板耗时测量。
+原始镜像：`firmware/beken/bk7258/mgkfb-bk7258-xiaotai/build/bk7258/mgkfb-bk7258-xiaotai/package/all-app.bin`。
+SHA-256：`6f17ec8f0341a4a6ab8e9e7e8a8343488d898540657b879d1a9894f921a1b74f`。
+
+## BK AI 毫秒计时日志（build.27 初版）
+
+`test_bk_ai_timing.py` 回放生产诊断入口，先因缺少计时实现失败，再验证建连分段、
+两轮对话、无 ASR 的开场白、重复事件、旧代次、结束时未完成轮次及 32 位时钟回绕。
+主机注入时钟测得建连 11655 ms、轮次 2000 ms、ASR 到首字幕 600 ms；这些是
+确定性测试输入，不是实板性能。入口登记于 `tools/check.sh`，静音准入测试的计时依赖
+使用空实现，原有业务断言保留。
+
+INFO 的 `AI_TIMING` 记录同一设备单调时钟，按 generation 和 round 关联。
+`begin → token → transport → media → start_sent → active` 分解启动；
+`elapsed_ms` 从接受启动操作算起，`step_ms` 从上一阶段算起。`active` 表示服务端
+确认且媒体启动成功，含现有 300 ms 等待；未更改等待、缓冲和网络参数。
+`transport` 是应用收到媒体连接通知，包含通知调度耗时；不将其等同于纯网络 RTT。
+`finish` 带原始结束错误码，未结束的轮次标为 `incomplete`。
+
+`round_ms` 是收到平台 round_start 到当前轮次事件的时长，round_end 才是完整轮次。
+`asr_to_start_ms`、`asr_to_caption_ms` 分别从收到用户最终字幕到 round_start、首条 AI
+字幕；`first_caption_ms` 从 round_start 到首字幕。缺少起点/终点为 -1，开场白也如此。
+字幕内容、Token 和远端标识不打印；流式字幕只记录首条，重复 start/end 不另计轮。
+这是协议事件耗时，不是用户实际停声、服务端模型推理耗时或扬声器出声时间。
+本轮保持连接和音频策略，待用户用新固件冷启动及连续对话采集日志后分析。
+
+全量 `bash tools/check.sh` 通过（505 项 Python 汇总回归、ASan/UBSan、5 板清单）。
+觅感 `1.0.3+build.27` 发布配置原生编译及打包身份校验通过，标记
+`BUILD_VERIFIED_HIL_PENDING`；本轮未烧录、未测量新固件实板耗时。
+原始烧录镜像为 `firmware/beken/bk7258/mgkfb-bk7258-xiaotai/build/bk7258/mgkfb-bk7258-xiaotai/package/all-app.bin`，
+SHA-256：`9047f9bdd5c49d2402cdaf293f148438a4ec290f7f0c97808b54cf4a3f1127b9`。
+
 # 小钛测试与硬件验证
+
+## 识别结果 WAV 自适应播放分支
+
+按用户最新要求，服务端保持原有 PCM16 WAV，设备在
+`feat/recognition-wav16-playback` 适配；原始 PCM 分支保持独立保存。
+16 kHz 单声道直接使用已校验 WAV 内的 PCM，无整段复制或重采样；其他受支持的
+8～48 kHz、单/双声道只转换一遍到硬件 16 kHz 单声道，不经过 8 kHz 提示音入口。
+保留识别专用播放状态、缓冲、20 毫秒输出块、音量响应、取消和业务抢占。
+
+`test_recognition_wav16.py` 先因缺少 WAV 视图接口失败，再覆盖 8/12/16/24/44.1/48 kHz
+单/双声道的时长与恒定幅度、16 kHz 原始样本逐个不变、8 kHz 插值、格式/位深/长度
+错误拒绝、已知流式长度占位符及奇数长度填充块。生产 worker 回放 23 种场景，
+额外覆盖 24 kHz、8 kHz、双声道结果与可选元数据一致性；独立播放回放继续验证
+块间调音量和前台接管后不误关功放。各入口登记在 `tools/check.sh`。
+完整检查通过：503 项 Python 回归、ASan/UBSan 与 5 板清单。
+
+三板均完成 ESP-IDF 5.5.5 原生编译和 BIN/ELF 身份核对：
+
+| 板卡 | 测试版本 | 应用 BIN SHA-256 |
+|---|---|---|
+| 立创 S3 | 1.1.0+build.48 | `e56c34a65cf7e271f4814cf7febae202a3c0b719f67f948b9b4818f07902d2fc` |
+| 微雪 P4 | 1.1.0+build.29 | `6659be4eb8cf954c233dc1e194a1b7b754182bba8522a965f540dc053b42184b` |
+| M5 ILI9342C | 1.1.0+build.55 | `efa52b2fcdc19aa8694a70d6a26248e5bca8445d44edf6b5b48a9267360ccd31` |
+
+均为 `BUILD_VERIFIED_HIL_PENDING`。本轮未执行设备试听和真实通话抢占，需实测
+音量/音质、16 kHz 直放、其他采样率时长、播放中调音量/静音、所有业务抢占及尾音。
+高采样率用简单区间平均做一次转换；不额外增益，也不宣称已解决音源响度偏低。
+
+## 识别结果专用 PCM 播放分支
+
+`feat/recognition-pcm16-playback` 仅修改设备端。服务端由另一项工作负责，
+本分支依赖[固定 16 kHz 单声道 PCM16 契约](../docs/product/RECOGNITION_RESULT_AUDIO.md)。
+移除识别结果 WAV/8 kHz 中转，增加独立播放状态、取消序号及 20 毫秒私有输出块；
+不使用通话解码缓冲。块间释放输出锁，允许音量操作，前台启动先取消并有界等待
+识别释放。识别清理不关闭已接管硬件的通话，结果播放失败不再被“分析完成”覆盖。
+
+`test_recognition_pcm_player.py` 先因缺少独立接口/实现失败，再覆盖 1 秒输入的
+16000 个输出帧、左右声道复制、取消、写失败清理；从 S3/P4 的真实板级函数回放
+块间调音量、提示音占用拒绝、通话接管后不误关功放。生产识别 worker 覆盖 20 种
+HTTP/额度/解绑/取消/重复结果及 PCM 完整性场景；包含显式错误采样率、奇数字节、
+与声明字节数不符、无冗余描述字段的固定 PCM、播放失败保留文字等情况。
+相关测试登记在 `tools/check.sh`。完整检查通过：501 项 Python 回归、ASan/UBSan
+与 5 板清单；S3/P4/M5 ILI9342C 均原生编译并通过 BIN/ELF 身份核对。
+
+| 板卡 | 测试版本 | 应用 BIN SHA-256 |
+|---|---|---|
+| 立创 S3 | 1.1.0+build.47 | `402e1e4814a6f2c350e3f66f643aec626f782d57c96d71308b9a3eb14b7b4965` |
+| 微雪 P4 | 1.1.0+build.28 | `85f019079ae3a98b8508f90497b1704859dbee1b672f7a95847c9e28b6be3755` |
+| M5 ILI9342C | 1.1.0+build.54 | `3a2deb6117f7ba11529fdd539da2b6421c46a20156d5da3dfa493b68a50195cd` |
+
+全部为 `BUILD_VERIFIED_HIL_PENDING`。未在设备执行实际声学测试，不能据此确认
+小声问题已解决；服务端需输出正确 PCM 并处理音源响度。联调需检查实际响度/失真、
+播报中调音量/静音、AI/H5/设备互呼/VoIP/房间切换，以及尾音与 1 秒采集隔离。
 
 ## M5 CoreS3-Lite AI 音频分析接入
 

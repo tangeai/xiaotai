@@ -1,6 +1,36 @@
 # 觅感 AI 玩具开发板 BK7258 验证记录
 
-## 当前发布固件
+## 当前发布固件：build.30
+
+2026-11-06 发布 [觅感 AI 玩具开发板 BK7258 v1.0.3 · build.30](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.30)。
+用户确认该镜像已通过实板验证，状态 `HIL_VERIFIED`；使用统一双屏眼睛固件，default 变体。
+移除 AI 建连后 300 ms 等待，本地结束／切换可取消尾音排空；INFO 保留耗时汇总，周期明细降为 DEBUG。
+详细变更及验证边界见 [build.30 记录](RELEASE_NOTES_1.0.3_BUILD30.md)。
+
+| 项目 | 记录 |
+|---|---|
+| 固件 | `1.0.3+build.30`，release |
+| 发布源码提交 | `b34c8c1840a25f284b9fcb1c8b3258c5be384af3` |
+| 标签 | `mgkfb-bk7258-v1.0.3-build.30` |
+| 串口烧录文件 | `mgkfb-bk7258-1.0.3+build.30-all-app.bin`，起始地址 `0x0` |
+| BIN SHA-256 | `2c7fb16c3715ce7a9eb44cbd8222e817096f286d9c4c5bc778502d5e23167428` |
+| ZIP | `mgkfb-bk7258-1.0.3+build.30-validation.zip` |
+| 发布 ZIP SHA-256 | `568600e1d74c508c7ee5650a824f67aacfdeb54b006d61a54e99ae9bcb9aaab0` |
+
+发布复用用户测试的原始 BIN，仅重打包验证状态及源码提交元数据，未重新编译。
+512 项主机回归、完整 `tools/check.sh`、ASan/UBSan、5 板清单及原生 release 编译通过。
+发布标题、标签、目标提交、三个附件长度／SHA-256 已核对，公开 BIN 下载回读校验通过。
+用户使用确认不等于日志开销、实际静音时延、OTA、弱网及长期稳定性专项测量。
+`Task exits abnormally!` 提示仍待定位；没有证据将单条提示认定为崩溃。
+
+## 本地待验证包：build.29
+
+2026-11-06 整理 `1.0.3+build.29` release 配置包，状态 `BUILD_VERIFIED_HIL_PENDING`。
+本次优化、毫秒耗时统计、镜像校验值与烧录后验证项见
+[build.29 变更及日志汇总](RELEASE_NOTES_1.0.3_BUILD29.md)。
+完整仓库检查及原生编译通过；最新串口日志未覆盖本地取消尾音排空场景。
+
+## 历史发布记录：build.26
 
 2026-10-24 发布 [觅感 AI 玩具开发板 BK7258 v1.0.3 · build.26](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.26)。
 修复设备解绑后收到 `HTTP 410 / 6006` 时无限重试，改为保留旧身份并签名重绑。觅感统一为一套包含双屏眼睛显示的固件。

@@ -89,6 +89,11 @@ typedef void (*starter_pcm_observer_t)(const int16_t *, size_t, bool, bool, int6
 void starter_media_set_pcm_observer(starter_pcm_observer_t observer);
 void starter_media_observe_pcm(const int16_t *pcm, size_t samples, bool sound,
                                bool safe, int64_t captured_ms);
+/* Dedicated recognition result lane: 16 kHz mono PCM16, separate admission
+ * and cancellation from prompts and every live media owner. */
+uint32_t starter_media_recognition_playback_epoch(void);
+void starter_media_cancel_recognition_playback(void);
+esp_err_t starter_media_play_recognition_pcm16k(const int16_t *, size_t, uint32_t);
 
 /** 创建固定下行音频队列和播放任务；应在启动其他模块前调用。 */
 esp_err_t starter_media_init(void);
