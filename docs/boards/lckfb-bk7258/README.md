@@ -2,6 +2,8 @@
 
 [返回开发板目录](../README.md) · [固件下载与发布说明](../../downloads.md#lckfb-bk7258)
 
+[中文](README.md) · [English](README.en.md)
+
 板卡 ID：`lckfb-bk7258`。本板通过触摸屏和按键操作，支持 H5（网页端）实时查看与
 双向对讲、AI（人工智能）对讲、设备互呼、微信 VoIP（网络语音通话）和多人对讲。
 
@@ -86,9 +88,8 @@
 
 ### 3. 验证与恢复
 
-依次检查屏幕、触摸、按键、摄像头、麦克风和扬声器，再验证 H5（网页端）双向对讲、
-至少三轮 AI 对话以及微信 VoIP（网络语音通话）双向语音。每次会话结束后应回到
-`READY`，且没有 UsageFault（处理器用法异常）、异常重启或持续内存下降。
+先尝试 AI 对话，再从网页打开实时查看和双向对讲。有微信联系人后可体验微信通话。
+结束会话后设备应恢复“准备就绪”；开发验收项目见“测试”一节。
 
 需要更换网络或重新绑定时，进入“设备设置 → 重置设备”，确认后重新配网并绑定。
 串口也可使用 `ap_cmd wifi-clear` 清除 Wi-Fi，或用 `ap_cmd tirtc-clear` 清除本机绑定凭证。
@@ -99,7 +100,7 @@
 | 项目 | 内容 |
 | --- | --- |
 | 板卡 ID（仓库中的开发板唯一名称） | `lckfb-bk7258` |
-| 芯片与平台 | BK7258 / BK-AVDK SMP 3.1.1.10（实板复验中） |
+| 芯片与平台 | BK7258 / BK-AVDK SMP 3.1.1.10（固定 SDK 配置；实测范围见文末） |
 | 存储与内存 | 8 MiB Flash、16 MiB PSRAM、640 KiB SRAM（均为当前分区/内存配置声明） |
 | 显示与触摸 | ST7789V2 SPI 屏、FT6336 触摸 |
 | 音频 | 板载 ADC/DAC、麦克风、扬声器和功放；AI 支持全双工 AEC，8 kHz 通话当前使用 AGC |
@@ -107,7 +108,7 @@
 | 网络 | 2.4 GHz Wi-Fi |
 | 产品能力 | H5 实时查看/双向对讲、AI 对讲、设备呼叫、微信 VoIP |
 
-板卡照片和 PCB（印刷电路板）版本仍需归档。当前身份要结合实物丝印与启动探针报告核对。
+可辨认 PCB（印刷电路板）版本的照片仍需归档。当前身份要结合实物丝印与启动探针报告核对。
 上述 Flash、PSRAM 和 SRAM 容量来自当前 BK7258 工程的分区与内存区域配置；其中 AP
 启动日志显示约 10.6 MiB 的动态 PSRAM 堆，这是分配给 AP 的可用区域，不是物理 PSRAM
 总容量。当前 AP 探针不能读取 Flash JEDEC ID，因此 8 MiB Flash 尚未获得运行时器件识别
@@ -160,7 +161,7 @@ AI 的 AEC（声学回声消除）按 20 毫秒、320 个采样处理，播放�
 | BK7258 SMP 官方文档 | v3.1.1 | [在线文档](https://docs.bekencorp.com/arminodoc/bk_avdk_smp/smp_doc/bk7258/en/v3.1.1/index.html) | 无 | 已提供 |
 | BK7258 Datasheet | 无 | [PDF](https://docs.bekencorp.com/spec/BK7258/BK7258%C2%A0Datasheet.pdf) | 无 | 已提供 |
 | BK7258 官方硬件资料索引 | v3.1.1 | [在线文档](https://docs.bekencorp.com/arminodoc/bk_ai_smp/bk7258/en/v3.1.1/hw-reference/index.html) | 无 | 已提供 |
-| 立创·实战派 BK7258 官方板卡页 | 无 | | 无 | 未提供 |
+| 立创·实战派 BK7258 官方环境教程 | 无 | [在线教程](https://wiki.lckfb.com/zh-hans/szpi-bk7258/szpi-bk7258/basic/programming-environment-setup.html) | 无 | 已提供；不代替原理图 |
 
 引脚和外设结论以工程 Hardware IR（硬件信息记录）及实板验证为准。
 
@@ -272,7 +273,7 @@ bash tools/check.sh
 python3 tools/build.py --board lckfb-bk7258
 ```
 
-实板验证要覆盖显示、触摸、GC0308 摄像头、8 kHz A-law/AGC、16 kHz Opus/AEC/NS/AGC、H5、AI
+实板验证要覆盖显示、触摸、GC0308 摄像头、8 kHz A-law 通话、AI 上行 16 kHz A-law 与下行 16 kHz Opus、AEC/NS/AGC、H5、AI
 和微信 VoIP。结束会话后确认状态回到 `READY`，音频上下行计数正确，任务数和内存水位
 恢复且设备没有重启。
 
@@ -298,7 +299,7 @@ ap_cmd help
 
 ## 验证状态与已知限制
 
-H5 实时查看/双向对讲、AI 对讲和微信 VoIP 已有实板使用结果，本轮确认当前使用正常。
+H5 实时查看/双向对讲、AI 对讲和微信 VoIP 已有实板使用记录，结论仅适用于对应固件及已测项目。
 build.70 日志确认 iPhone 自动弹出配网页。新发布镜像的身份与实测边界见[验证记录](VALIDATION.md)。
 
 TODO：补齐新镜像的逐项验收、长稳时长、Flash JEDEC 识别、PCB 版本和板卡照片；

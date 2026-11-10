@@ -2,19 +2,21 @@
 
 [快速体验](../README.md) · [开发板目录](boards/README.md) · [架构与二次开发](../ARCHITECTURE.md)
 
+[中文](downloads.md) · [English](downloads.en.md)
+
 选择与你的开发板匹配的正式固件，按烧录指南完成配网和绑定，即可体验该板支持的功能。
 准备修改代码时，可以先用发布固件确认硬件和服务连接正常，再按本页末尾的[二次开发](#二次开发)入口搭建环境。
 
-下载前核对实物型号、PCB 版本和屏幕控制器。同一芯片的不同开发板不能混用固件；
+下载前核对实物型号、PCB（印刷电路板）版本和屏幕控制器。同一芯片的不同开发板不能混用固件；
 M5 需要区分 ILI9342E / ILI9342C 屏幕，觅感 BK7258 使用包含双屏眼睛显示的统一固件。
 
 | 使用场景 | 选择文件 | 烧录方式 |
 |---|---|---|
-| ESP32 首次体验 | 完整镜像 BIN | 从 `0x0` 写入；会覆盖 Wi-Fi、绑定等 NVS 配置，烧录后重新配网和绑定 |
+| ESP32 首次体验 | 完整镜像 BIN | 从 `0x0` 写入；会覆盖 Wi-Fi、绑定等 NVS（非易失性存储）配置，烧录后重新配网和绑定 |
 | ESP32 保留配置升级 | 固件包 ZIP | 解压后按清单分文件烧录，先核对分区与配置兼容性，不执行全片擦除 |
 | BK7258 首次体验 | 固件包 ZIP | 解压后选择 `-all-app.bin`，按本板指南通过串口烧录 |
 
-BK 包内的 `-app_pack.rbl` 用于 OTA 升级，不能用于首次串口烧录；觅感 OTA 尚未专项验收。
+BK 包内的 `-app_pack.rbl` 用于 OTA（无线）升级，不能用于首次串口烧录；觅感 OTA 尚未专项验收。
 
 核验下载文件时，使用对应发布页的 `SHA256SUMS`；包内文件、版本和烧录地址见 `MANIFEST.json`。
 各版本的验证范围和已知问题见发布说明，历史版本可在 [GitHub Releases](https://github.com/tangeai/xiaotai/releases) 中查找。
@@ -45,7 +47,7 @@ BK 包内的 `-app_pack.rbl` 用于 OTA 升级，不能用于首次串口烧录�
 |---|---|---|---|---|
 | PCB V1.0.1 | v1.1.0 · build.45 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.1.0-build.45/lckfb-esp32s3-1.1.0%2Bbuild.45-merged.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.1.0-build.45/lckfb-esp32s3-1.1.0%2Bbuild.45-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/lckfb-esp32s3-v1.1.0-build.45) |
 
-本版新增 AI 音频识别，功能和验证范围见[版本说明](boards/lckfb-esp32s3/RELEASE_NOTES_1.1.0_BUILD45.md)。
+本版支持 AI 音频识别，功能和验证范围见[版本说明](boards/lckfb-esp32s3/RELEASE_NOTES_1.1.0_BUILD45.md)。
 
 [烧录指南](boards/lckfb-esp32s3/README.md#烧录) · [硬件资料](boards/lckfb-esp32s3/README.md#规格) · [编译与调试](boards/lckfb-esp32s3/README.md#开发)
 

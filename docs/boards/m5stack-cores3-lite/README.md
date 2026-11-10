@@ -2,6 +2,8 @@
 
 [返回开发板目录](../README.md) · [固件下载与发布说明](../../downloads.md#m5stack-cores3-lite)
 
+[中文](README.md) · [English](README.en.md)
+
 板卡 ID：`m5stack-cores3-lite`。两种屏幕固件的当前版本见[固件下载](../../downloads.md#m5stack-cores3-lite)。
 短句识别、AI 打断和双讲效果仍需回归；详情见[验证状态与已知限制](#验证状态与已知限制)。
 
@@ -41,7 +43,7 @@
 
 ![M5Stack CoreS3-Lite 完整镜像的文件、0x0 地址与 Program 按钮](../../images/flashing/web-m5stack-cores3-lite.png)
 
-**完整镜像会覆盖 NVS 中的 Wi-Fi、绑定和 EP 覆盖项等持久配置。** 烧录后需重新配网、绑定。
+**完整镜像会覆盖 NVS（非易失性存储）中的 Wi-Fi、绑定和 EP（服务发现地址）覆盖项等持久配置。** 烧录后需重新配网、绑定。
 `keep` 仅保留镜像中的 Flash 参数，不表示保留设备配置。若网页连接失败，按第 2 步进入下载模式后重连；
 若写入或校验失败，检查串口、数据线、文件和地址后重试，不按进度条 100% 判定成功。
 
@@ -106,6 +108,7 @@ cd firmware/esp-idf/esp32s3/m5stack-cores3-lite
 idf.py -p <串口> flash monitor
 ```
 
+示例选择 ILI9342E；实物为 ILI9342C 时，将 `--variant` 改为 `ili9342c`。
 `<串口>` 换成本机实际端口；`idf.py` 会使用工程烧录清单和正确地址。
 普通升级不执行 `erase-flash`。示例命令截图不代表已在当前硬件执行：
 
@@ -125,14 +128,15 @@ idf.py -p <串口> flash monitor
 
 ## 音视频参数
 
-两种屏幕的当前正式版见[固件下载](../../downloads.md#m5stack-cores3-lite)。
-两版使用相同媒体参数。音频均为单声道，每包 20 毫秒。
+以下为当前源码的媒体参数，两种屏幕变体共用。可下载的固件及其功能范围见
+[固件下载](../../downloads.md#m5stack-cores3-lite)。音频均为单声道，每包 20 毫秒。
 
 | 场景 | 方向与流编号 | 编码与采样率 | 包大小或画面参数 |
 |---|---|---|---|
 | AI 对讲 | 上行、下行：流 1 | 上行 A-law / 16 kHz；下行 Opus / 16 kHz | 上行 320 字节；Opus 包长可变 |
 | H5 实时对讲 | 上行：流 10；下行：流 14 | 双向 A-law / 8 kHz | 每包 160 字节 |
-| 设备呼叫、微信语音通话 | 双向：音频流 0 | 双向 A-law / 8 kHz | 每包 160 字节 |
+| 设备呼叫 | 双向：音频流 10 | 双向 A-law / 8 kHz | 每包 160 字节 |
+| 微信语音通话 | 双向：音频流 0 | 双向 A-law / 8 kHz | 每包 160 字节 |
 | H5 实时画面 | 上行：流 11 | MJPEG（逐帧 JPEG） | 320×240，目标上限 8 fps；实际帧率需测量 |
 
 设备间呼叫和微信 VoIP 均为纯音频。微信能力上报 `up_video_mt=none`、
@@ -193,7 +197,7 @@ esp_audio_codec 2.4.0、esp_lcd_ili9341 2.1.0；全部实际解析版本及哈�
 数据手册、BSP 及下载 SHA-256 见[资料与参考取舍](../../../boards/m5stack/cores3-lite/SOURCES.md)。
 
 当前官方页面的音频 GPIO13/14 方向与原理图冲突；实现采用原理图和官方 BSP 一致的
-RX14/TX13。2026-08-07 起官方屏幕由 C 改 E，不能从产品名确定实物屏幕。
+RX14/TX13。同系列存在 C、E 两种屏幕，不能只凭产品名确定面板；选固件前须核对实物。
 
 ## 开发
 
@@ -230,8 +234,7 @@ M5 工程通过组件私有定义 `XIAOTAI_UI_TEXT_PSRAM=1`，将 AI 字幕历�
 . tools/activate_esp_idf.sh
 idf.py --version
 python3 tools/build.py --board m5stack-cores3-lite --variant ili9342e
-# 确认是旧 ILI9342C 屏时改用：
-python3 tools/build.py --board m5stack-cores3-lite --variant ili9342c
+# 若实物为 ILI9342C，将上一条命令的 ili9342e 改为 ili9342c。
 ```
 
 省略 `--variant` 选择 `ili9342e`。切换会重新配置面板命令表，不会运行时猜测屏幕。

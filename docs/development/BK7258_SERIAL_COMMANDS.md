@@ -1,5 +1,7 @@
 # BK7258 串口命令
 
+[中文](BK7258_SERIAL_COMMANDS.md) · [English](BK7258_SERIAL_COMMANDS.en.md)
+
 适用于[立创·实战派 BK7258](../boards/lckfb-bk7258/README.md)和
 [觅感 AI 玩具开发板 BK7258](../boards/mgkfb-bk7258/README.md)。
 两块板共用命令实现，支持的业务由各板固件决定：觅感支持 AI、微信通话和 H5 实时查看，
@@ -73,7 +75,8 @@ ap_cmd wifi-set "Home WiFi" "your-password"
 
 ## AI 与通话
 
-这些命令需要设备已联网、完成绑定，并且联系人已同步。
+开始 AI 或发起呼叫前，设备需已联网并完成绑定。呼叫联系人还需完成联系人同步；
+接听与挂断命令作用于当前来电或通话。
 
 | 命令 | 用途 | 支持的开发板 |
 |---|---|---|
@@ -106,6 +109,7 @@ ap_cmd call-status
 | `ap_cmd room-talk-stop` | 停止发言，恢复收听 |
 | `ap_cmd room-leave` | 退出房间 |
 
+以上为串口维护入口，不增加产品界面的自动刷新触发条件。
 `room-talk-start` 与 `room-talk-stop` 应配对使用；开始发言后需要主动发送停止命令。
 
 ## 修改平台服务发现地址

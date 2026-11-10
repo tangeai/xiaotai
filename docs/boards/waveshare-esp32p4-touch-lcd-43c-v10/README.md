@@ -2,6 +2,8 @@
 
 [返回开发板目录](../README.md) · [固件下载与发布说明](../../downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)
 
+[中文](README.md) · [English](README.en.md)
+
 板卡 ID：`waveshare-esp32p4-touch-lcd-43c-v10`。当前版本见[固件下载](../../downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)。
 实板验证范围见文末记录及下载页对应的发布说明。
 
@@ -29,7 +31,7 @@
 
 ![微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 完整镜像的文件、0x0 地址与 Program 按钮](../../images/flashing/web-waveshare-esp32p4-touch-lcd-43c-v10.png)
 
-**完整镜像会覆盖 NVS 中的 Wi-Fi、绑定和 EP 覆盖项等持久配置。** 烧录后需重新配网、绑定。
+**完整镜像会覆盖 NVS（非易失性存储）中的 Wi-Fi、绑定和 EP（服务发现地址）覆盖项等持久配置。** 烧录后需重新配网、绑定。
 `keep` 仅保留镜像中的 Flash 参数，不表示保留设备配置。若网页连接失败，按第 2 步进入下载模式后重连；
 若写入或校验失败，检查串口、数据线、文件和地址后重试，不按进度条 100% 判定成功。
 
@@ -67,9 +69,8 @@ macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIF
 
 ### 3. 验证与恢复
 
-依次检查屏幕、触摸、摄像头和音频，再验证 H5（网页端）双向对讲、至少三轮 AI 对话、
-设备呼叫和微信 VoIP（网络语音通话）。每次会话结束后应回到首页，且无异常重启、持续
-内存下降或异常音视频计数。
+先尝试 AI 对话，再从网页打开实时查看和双向对讲。有联系人后可体验设备呼叫或
+微信通话。结束会话后应回到首页；开发验收项目见“测试”一节。
 
 配网页打不开时确认手机仍连接设备热点；绑定页没有验证码时检查 IP 地址、系统时间和
 服务发现。需要更换网络或重新绑定时，进入“设备设置 → 重置设备”，确认后重新配网并
@@ -192,9 +193,13 @@ TODO：下一次实板回归时，重新保存主叫、被叫、上行首包和�
 | 主机环境 | Linux/WSL2、Git、Python 3 | [Git](https://git-scm.com/downloads)、[Python](https://www.python.org/downloads/) | 无 |
 | ESP-IDF | `v5.5.5`，提交 `b774170ff46c393eeb5e495ea37936038d3f4f4f` | [Espressif 官方仓库](https://github.com/espressif/esp-idf/tree/b774170ff46c393eeb5e495ea37936038d3f4f4f) | 无 |
 | C/C++ 编译器 | `riscv32-esp-elf-gcc 14.2.0`，构建标识 `esp-14.2.0_20260121` | [ESP-IDF 工具清单](https://github.com/espressif/esp-idf/blob/b774170ff46c393eeb5e495ea37936038d3f4f4f/tools/tools.json) | 无，安装器按工具清单校验下载文件 |
-| TiRTC | 2.5.0，`lib/libTiRTC.a` | [ESP32-P4 发布目录](https://repo-sdk.tange-ai.com/service/rest/repository/browse/tirtc-sdks/releases/espressif_esp32p4/) | `9b4e35c7a2cb203fc463417739199429057c8b036936faa11f844c726455301f` |
+| TiRTC | 2.5.0，`lib/libTiRTC.a` | [ESP32-P4 发布目录](https://repo-sdk.tange-ai.com/service/rest/repository/browse/tirtc-sdks/releases/espressif_esp32p4/) | `6c5c1543f4a099c2f8fdfdff5b50ef728cf181ce09931c2798d34e84d22473b1` |
 | ESP-IDF 组件 | ESP-Hosted 1.4.7、ESP-SR 2.4.6、`esp_h264` 1.3.8、`esp_codec_dev` 1.5.10、Waveshare 4.3 BSP v1.0.1 | [工程依赖锁定文件](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/dependencies.lock) | 无 |
 | C6 从机固件 | 与当前主工程匹配的版本 | 无 | 无 |
+
+当前 TiRTC 库为 `20260922-p4-fixes2` 本地修复批次，运行时仍标记 2.5.0。
+库的来源与验证边界见工程 `third_party/tirtc/VERSION.md` 和 `BUILD_EVIDENCE.md`；
+本表校验值标识仓库中的库，不代表所有历史发布包均采用同一批次。
 
 组件的完整解析版本以工程依赖锁定文件和 TiRTC
 [校验清单](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/third_party/tirtc/SHA256SUMS.txt)为准。
@@ -300,10 +305,11 @@ VoIP。音视频分别记录实际帧率、码率、丢帧、首包、AEC 参考
 
 ## 验证状态与已知限制
 
-本轮 1.1.0 候选固件新增 AI 音频识别：空闲时从 MIC2 原始 16 kHz PCM 检测声音，
+当前源码支持 AI 音频识别：空闲时从 MIC2 原始 16 kHz PCM 检测声音，
 保留最多 5 秒预录并继续录制 10 秒上传，上传后至少冷却 60 秒；通话、实时查看、
 AI 对话和房间业务期间暂停。首页 AI 图标可开关，框内底色显示冷却，文字显示阶段，
-结果滚动两次并播放语音。候选版本尚待本板实测，正式下载入口仍以已发布版本为准。
+结果滚动两次并播放语音。各发布版本的实测范围以[下载页](../../downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)
+所链接的发布说明为准；这些源码参数本身不构成实板验证结论。
 
 已验证的 `1.0.1+build.20` 完整 BIN SHA-256 为
 `f451b706940a551c1ddd4d7f5d164618e514f45495e7e95a14002d67e22dc4d1`；
