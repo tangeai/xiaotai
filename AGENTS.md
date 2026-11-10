@@ -1,5 +1,10 @@
 # Agent guidance
 
+When the user asks for “检查” or a general project check without a scope, follow
+[the unified check workflow](CONTRIBUTING.md#统一检查约定) and cover every category
+in the rule index. For a scoped request, check that scope and affected dependencies.
+Report passed, failed, pending, and not-applicable checks with evidence.
+
 When changing behavior or fixing a defect, read
 [`tests/README.md`](tests/README.md) and use a red-green
 loop through the affected public interface. Add or strengthen a regression test

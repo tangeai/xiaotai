@@ -33,11 +33,24 @@ Each rule is maintained at the authoritative location below; other documents lin
 | Development workflow, versions, release names, and delivery checks | This document | `test_firmware_versions.py`, `test_boot_identity.py`, `test_validation_packaging.py`, `test_esp_merged_firmware.py`; verify GitHub titles before and after publishing |
 | SDK, compiler, ABI, native artifacts, and flash layout | Target board guide, native build scripts, and dependency manifests | Native builds and board contract checks |
 | Product state, interaction, room refresh, and media parameters | [Requirements (Chinese)](docs/product/PRODUCT_REQUIREMENTS.md), [Interaction profiles (Chinese)](docs/product/PRODUCT_INTERACTION_PROFILES.md), [Media contract (Chinese)](docs/product/MEDIA_CONTRACT.md) | Product public-interface and platform regression tests |
+| Documentation, translation scope, and internal retention | [Documentation requirements](#documentation-requirements), [Translation checks](#translation-and-synchronization-checks) | Layout/link checks; manual bilingual review |
+| Third-party sources and permission actions | [Third-party checklist](THIRD_PARTY.en.md) and bundled licenses | Source/path checks; manual permission-evidence review |
 | Test layers, coverage, and hardware evidence | [Testing](tests/README.en.md) | `bash tools/check.sh`; target-board HIL |
 
 Board IDs use lowercase hyphenated names and are permanent build and package identifiers. Public model names help users match hardware. Keep native CMake project and BIN/ELF names, such as `lckfb_esp32s3_xiaotai.bin`; do not rename them just to match the board ID.
 
 Register new names first; changes to existing names and paths require a migration.
+
+### Unified check workflow
+
+An unscoped request to “检查” (check) or run a unified check covers the whole project against this document's rule index. A scoped request covers that scope and affected shared code, documentation, and dependencies.
+
+Use current authoritative documents. Historical records provide evidence, not a separate set of requirements inferred from old conversations or build settings.
+
+1. Read root and applicable board `AGENTS.md` files. Cover directory and board identity, development and tests, SDK/build entry points, interaction/media contracts, documentation/translation, releases, and third-party materials.
+2. Run `bash tools/check.sh`. Manually review what automation does not cover: bilingual content/navigation, internal-material placement, hardware evidence grades, release validation scope, and outstanding third-party permissions.
+3. Record each category as passed, issues found, pending verification, or not applicable, with file references, command results, or validation records. Run builds, HIL, and online Release checks as required by the task and available conditions. Explain omissions; host tests and historical results cannot replace acceptance of the current artifact.
+4. Report evidenced issues, impact, and recommendations first. Checking alone does not trigger all-board rebuilds, flashing, publication, pushes, or deletion. Apply changes within existing authorization and keep unsupported conclusions pending.
 
 ## Choose the development path
 
@@ -189,6 +202,15 @@ Maintain English for the following scope, rather than translating every file. Ro
 For `pitfalls.md`, separate integration timelines and old build records before translating lasting guidance. Translate `tests/README.md` as the contributor testing workflow, but not individual results or historical regressions. Place English files beside their Chinese sources as `<name>.en.md`, with language links.
 
 Preserve commands, board IDs, versions, addresses, and parameters. Keep links to untranslated targets at their original addresses and label their language; never invent English targets.
+
+### Translation and synchronization checks
+
+Chinese is the translation source. Review facts, steps, wording, and scope before translating; correct Chinese issues first. Keep both languages synchronized when content changes so English does not retain obsolete parameters or conclusions.
+
+- Preserve heading levels, technical meaning, limitations, and evidence grades. Pending validation or historical records must not become current guarantees. Use natural, concise technical English and follow existing paragraph-length limits.
+- Preserve executable commands, protocol fields, board IDs, versions, hashes, addresses, and parameters. Explanatory placeholders and comments may be translated; actual input values, log text, and prescribed release names remain unchanged.
+- Provide language switches in both versions. English navigation prefers existing English pages and matching section anchors. Keep original links to untranslated materials and label their language. Download and official-source URLs remain consistent.
+- Before committing, compare paired headings, commands, parameters, and sources; check local links, anchors, language switches, and translation scope, then run `bash tools/check.sh`. Report translation completion separately from technical validation limits.
 
 ### Internal materials and retention
 

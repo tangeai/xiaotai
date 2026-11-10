@@ -1,8 +1,8 @@
 # Tange XiaoTai · Open-source AI Audio and Video Firmware
 
-[Quick start (Chinese)](README.en.md) · [Architecture and development](ARCHITECTURE.en.md) · [Contributing](CONTRIBUTING.en.md) · [Documentation](docs/README.en.md)
+[Quick start](README.en.md) · [Architecture and development](ARCHITECTURE.en.md) · [Contributing](CONTRIBUTING.en.md) · [Documentation](docs/README.en.md)
 
-[中文](README.en.md) · [English (Chinese)](README.en.md)
+[中文](README.md) · [English](README.en.md)
 
 XiaoTai is open-source AI (artificial intelligence) audio and video firmware for devices with or without a display. It supports **AI chat, WeChat calls, device intercom, and remote viewing in a browser**. Download firmware to try it, or build your own device from source.
 
