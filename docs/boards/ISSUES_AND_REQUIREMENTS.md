@@ -56,7 +56,7 @@ QVGA/15 fps/200 kbit/s。两个业务各自的高、低拥塞档位参数相同�
 | S3-04 | 功能需求 / 待验证 | 与 P4 共用 ESP UI，但小屏文字、触摸及各页面仍需独立验收 | 完成第 6 节；检查紧凑布局无缺字、遮挡、误触，绑定刷新、设置保存和 AI 波形表现正常 |
 | S3-05 | 证据补充 | 资料标称 GC0308，实物探测为 GC2145，存在模组/BOM 差异 | 按实际探测记录模组、照片和固件身份，保留 Hardware IR 的证据等级，不静默合并型号 |
 
-依据：[工程验收与 AEC 状态](../../firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/README.md#尚未完成的产品化工作)、
+依据：[工程调试与验证](../../firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/README.md#调试与验证)、
 [开发板指南](lckfb-esp32s3/README.md)、[SDK 与媒体测试说明](../../tests/README.md)。
 
 ## 3. 立创·实战派 BK7258
