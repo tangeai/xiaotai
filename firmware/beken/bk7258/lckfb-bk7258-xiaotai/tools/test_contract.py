@@ -665,13 +665,13 @@ require('"/v1/call/request"' in app_source and
 require("set_poll_timeout_option" in ap_sources and
         "if (applied_ms > 0)" in ap_sources,
         "TGTRP poll timeout's positive applied value must be accepted")
-require(".max_connections = 1" in app_source and
+require(".max_connections = 4" in app_source and
         ".max_send_buffer = 128U * 1024U" in app_source and
         'query_string_value(s_ai_peer_id, "role_id"' in app_source and
         "AI credentials accepted peer-scheme=" in app_source and
         "AI WHIP connect failed rc=" in ap_sources and
         "AI WHIP memory before submit heap=" in ap_sources,
-        "AI WHIP setup must match the one-session ESP reference contract and preserve DTLS headroom")
+        "SDK allows four H5 viewers while AI retains exclusive ownership and bounded send buffers")
 tirtc_source = (REPO_ROOT / "platforms/beken/runtime/src/xiaotai_tirtc.c").read_text()
 audio_callback = re.search(
     r"static void on_audio\(tirtc_conn_t connection,.*?\n}\n\nstatic int on_subscribe_audio",
@@ -683,7 +683,7 @@ require(audio_callback is not None and
         "downlink playback must not reject the peer's independent stream id")
 require("OPUS_CAPTURE_TASK_STACK (40U * 1024U)" in audio_source and
         "OPUS_PLAYBACK_TASK_STACK (40U * 1024U)" in audio_source and
-        "OPUS_PACKET_SLOTS 64U" in audio_source and
+        "OPUS_PACKET_SLOTS XIAOTAI_AI_PACKET_CAPACITY" in audio_source and
         "capture_stack" in audio_source and "playback_stack" in audio_source,
         "Opus encode/decode tasks must retain their measured PSRAM stack headroom")
 require("#include <modules/aec.h>" in audio_source and

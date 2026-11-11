@@ -61,10 +61,10 @@ static void *s_ns_16k,*s_agc_16k=(void *)1,*s_agc_8k=(void *)2;
 static unsigned ns_calls,agc_calls,alaw_calls,sends,reads,returned;
 static bool bad_count,stale,muted,fail_codec,late_mute,late_session;
 static int16_t expected_pcm;
-static atomic_uint s_audio_sent,s_mute_epoch,s_agc_failures;
+static atomic_uint s_audio_sent,s_mute_epoch,s_agc_failures,s_audio_dropped;
 static atomic_bool s_microphone_muted;
 static int s_audio_tx_ready_queue=1,s_audio_tx_free_queue=2;
-typedef struct {int mode;uint32_t generation,timestamp_ms;unsigned mute_epoch;size_t sample_count;int16_t pcm[320];} audio_tx_item_t;
+typedef struct {int mode;uint32_t generation,timestamp_ms,queued_at_ms;unsigned mute_epoch;size_t sample_count;int16_t pcm[320];} audio_tx_item_t;
 static audio_tx_item_t pool[1],*s_audio_tx_pool=pool;
 static jmp_buf done;
 static int64_t esp_timer_get_time(void){return 1000000;}
@@ -74,7 +74,7 @@ static int xQueueReceive(int q,uint8_t *slot,int wait){
  if(reads++==4)longjmp(done,1);
  mode=reads==3 ? STARTER_TIRTC_H5 : STARTER_TIRTC_AI;
  active_generation=reads>2 ? 8:7;
- pool[0]=(audio_tx_item_t){.mode=mode,.generation=stale?1:active_generation,.timestamp_ms=20*reads,
+ pool[0]=(audio_tx_item_t){.mode=mode,.generation=stale?1:active_generation,.timestamp_ms=20*reads,.queued_at_ms=1000,
  .sample_count=bad_count?159:(mode==STARTER_TIRTC_AI?320:160)};
  s_microphone_muted=muted;
  for(unsigned i=0;i<pool[0].sample_count;i++)pool[0].pcm[i]=100;
@@ -127,6 +127,7 @@ int main(void){
 #define AUDIO_MAX_FRAME_SAMPLES 320
 #define AUDIO_ALAW_FRAME_BYTES 160
 #define OPUS_MAX_PACKET_BYTES 512
+#include "xiaotai_media_policy.h"
 #define OPUS_FRAME_SAMPLES 320
 #define UPLINK_LEVEL_LOG_INTERVAL_FRAMES 50
 #define BK_LOGI(...) ((void)0)
@@ -144,6 +145,11 @@ static bool s_capture_run=true;
 static unsigned s_uplink_ns_speech_frames,s_uplink_ns_noise_frames,s_uplink_ns_failures,s_uplink_agc_failures,
  s_uplink_level_frames,s_uplink_frames,s_uplink_rejected,stage,frames,encoded_samples;
 static atomic_bool s_microphone_muted,s_uplink_enabled=true;
+static atomic_uint s_uplink_epoch;
+static bool late_ptt,late_mute_toggle,repeat_gate,stall_dsp;
+static unsigned delay_ms;
+void xiaotai_audio_set_uplink_enabled(bool enabled);
+void xiaotai_audio_set_microphone_muted(bool muted);
 static starter_audio_resampler_16k_to_8k_t s_uplink_resampler;
 static int read_pcm(void *c,int16_t *pcm,size_t count,size_t *bytes){
  if(frames==3)s_capture_run=false;
@@ -152,27 +158,36 @@ static int read_pcm(void *c,int16_t *pcm,size_t count,size_t *bytes){
  *bytes=count*2;return 0;
 }
 static struct {void *context;int (*read_pcm)(void *,int16_t *,size_t,size_t *);} adapter={0,read_pcm},*s_board_audio=&adapter;
-static void aec_process_capture(int16_t *p,size_t n){assert(stage++==0 && n==s_frame_samples);for(unsigned i=0;i<n;i++)p[i]=200;}
+static void aec_process_capture(int16_t *p,size_t n){
+ if(late_ptt){xiaotai_audio_set_uplink_enabled(false);xiaotai_audio_set_uplink_enabled(true);}
+ if(late_mute_toggle){xiaotai_audio_set_microphone_muted(true);xiaotai_audio_set_microphone_muted(false);}
+ if(repeat_gate)xiaotai_audio_set_uplink_enabled(true);
+ if(stall_dsp)delay_ms+=200;
+assert(stage++==0 && n==s_frame_samples);for(unsigned i=0;i<n;i++)p[i]=200;}
 static bool xiaotai_audio_ns_process(void *h,int16_t *p,size_t n,bool *speech){assert(stage++==1 && n==320 && p[0]==200);for(unsigned i=0;i<n;i++)p[i]=300;*speech=true;return true;}
 static bool xiaotai_audio_agc_process(void *h,int16_t *p,size_t n,void *s){assert(stage++==(s_codec==1?2:1) && n==s_frame_samples && p[0]==(s_codec==1?300:200));for(unsigned i=0;i<n;i++)p[i]=400;return true;}
 static int opus_encode(void *h,int16_t *p,unsigned n,uint8_t *o,size_t cap){assert(!"AI must not encode Opus");return -1;}
 static uint8_t linear2alaw(int sample){assert(stage==(s_codec==1?3:2) && sample>=399 && sample<=401);encoded_samples++;return 0x42;}
 static void rtos_delay_milliseconds(int ms){}
-static unsigned rtos_get_time(void){return 1000+frames*20;}
+static unsigned rtos_get_time(void){return 1000+frames*20+delay_ms;}
 static void rtos_set_semaphore(void *p){}
 static void rtos_delete_thread(void *p){}
 static int send(const uint8_t *data,size_t size,uint32_t ts,void *c){assert(size==(s_uplink_codec==2?320:160) && ts==1000+frames*20);for(unsigned i=0;i<size;i++)assert(data[i]==(s_microphone_muted?0xd5:0x42));return 0;}
 static xiaotai_audio_uplink_fn s_uplink=send;
-''' + function(source,'capture_task')+r'''
+''' + function(source,'xiaotai_audio_set_uplink_enabled') + function(source,'xiaotai_audio_set_microphone_muted') + function(source,'capture_task')+r'''
 static void replay(void){frames=0;s_capture_run=true;starter_audio_resampler_16k_to_8k_reset(&s_uplink_resampler);capture_task(NULL);}
 int main(void){
  replay();assert(s_uplink_frames==4 && s_uplink_rejected==0 && encoded_samples==1280);
- s_microphone_muted=true;replay();assert(s_uplink_frames==8 && encoded_samples==1280);
+ s_microphone_muted=true;replay();assert(s_uplink_frames==4 && encoded_samples==1280);
  s_microphone_muted=false;s_codec=0;s_frame_samples=160;
- s_uplink_codec=0;replay();assert(s_uplink_frames==12 && encoded_samples==1920);
- s_uplink_enabled=false;replay();assert(s_uplink_frames==12 && encoded_samples==2560);
+ s_uplink_codec=0;replay();assert(s_uplink_frames==8 && encoded_samples==1920);
+ s_uplink_enabled=false;replay();assert(s_uplink_frames==8 && encoded_samples==2560);
  s_uplink_enabled=true;s_codec=1;s_frame_samples=320;
- replay();assert(s_uplink_frames==16 && encoded_samples==3200);
+ replay();assert(s_uplink_frames==12 && encoded_samples==3200);
+ late_ptt=true;replay();late_ptt=false;assert(s_uplink_frames==12);
+ late_mute_toggle=true;replay();late_mute_toggle=false;assert(s_uplink_frames==12);
+ repeat_gate=true;replay();repeat_gate=false;assert(s_uplink_frames==16);
+ stall_dsp=true;replay();assert(s_uplink_frames==16 && s_uplink_rejected==4);
 }
 ''',include_dirs=[RESAMPLER/'include'])
 

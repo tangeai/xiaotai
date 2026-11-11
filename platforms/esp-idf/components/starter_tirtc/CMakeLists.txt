@@ -10,6 +10,7 @@ idf_component_register(
          "${xiaotai_starter_tirtc_dir}/src/starter_pipeline_diag.c"
          ${audio_trace_sources}
     INCLUDE_DIRS "${xiaotai_starter_tirtc_dir}/include"
+    PRIV_INCLUDE_DIRS "${xiaotai_starter_tirtc_dir}/../../../common/tirtc"
     REQUIRES tirtc_sdk freertos
     PRIV_REQUIRES log esp_timer lwip
 )

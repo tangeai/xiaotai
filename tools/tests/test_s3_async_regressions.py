@@ -22,6 +22,7 @@ class S3AsyncRegressions(unittest.TestCase):
 typedef int starter_tirtc_mode_t;
 #define STARTER_TIRTC_ROOM 5
 static atomic_bool s_uplink_enabled,s_room_pressed;
+static atomic_uint s_mute_epoch;
 ''' + function(source,'uplink_allowed') +
                       function(source,'starter_media_set_room_pressed') +
                       function(source,'starter_media_set_uplink_enabled') + r'''

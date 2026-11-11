@@ -2,6 +2,7 @@
  * hardware is ES8311 DAC playback + ES7210 four-slot TDM capture (MIC2 mic,
  * MIC3 playback reference) on the shared I2S1, and OV5647 CSI. */
 #include "starter_media.h"
+#include "starter_ai_playout.h"
 #include "starter_recognition_player.h"
 #include "starter_playback_scope.h"
 #include "starter_aec.h"
@@ -50,6 +51,9 @@
 #define BOARD_OUTPUT_LCD_CS BIT(0)
 #define BOARD_OUTPUT_PA BIT(1)
 
+#define XIAOTAI_MEDIA_PROFILE 3
+#include "xiaotai_media_policy.h"
+
 #define AUDIO_TRANSPORT_SAMPLE_RATE_HZ 8000U
 #define AUDIO_HW_SAMPLE_RATE_HZ 16000U
 #define AUDIO_I2S_DMA_DESC_NUM 6U
@@ -74,17 +78,12 @@
 #define AUDIO_RX_BYTES 1500U
 /* AI TTS can arrive ahead of the DAC: retain 1.28 s of 20 ms packets.
  * Capacity does not delay playback; human calls keep the 8-slot budget. */
-#define AUDIO_RX_QUEUE_DEPTH 64U
-#define AUDIO_RX_LIVE_QUEUE_DEPTH 8U
-#define AUDIO_TX_QUEUE_DEPTH 12U
+#define AUDIO_RX_QUEUE_DEPTH XIAOTAI_AI_PACKET_CAPACITY
+#define AUDIO_RX_LIVE_QUEUE_DEPTH XIAOTAI_LIVE_RX_SLOTS
+#define AUDIO_TX_QUEUE_DEPTH XIAOTAI_UPLINK_SLOTS
 #define AUDIO_PLAYBACK_UPSAMPLE 2U
 #define AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT (AUDIO_PLAYBACK_UPSAMPLE * 2U)
 #define AUDIO_PLAYBACK_IDLE_MS 60U
-#define AUDIO_RX_PREFILL_START_MS 200U
-#define AUDIO_RX_PREFILL_RECOVER_MS 240U
-#define AUDIO_RX_PREFILL_WAIT_MS 240U
-#define AUDIO_RX_PREFILL_POLL_MS 5U
-#define AUDIO_RX_PREFILL_STABLE_US 10000000LL
 #define PA_STARTUP_MS 120U
 #define MEDIA_CPU_YIELD_MS 1U
 #define MEDIA_REALTIME_CORE 1
@@ -109,6 +108,7 @@ typedef struct {
     uint32_t generation;
     starter_tirtc_frame_t frame;
     uint32_t received_at_ms, arrival_gap_ms;
+    uint16_t pcm_samples;
     uint8_t payload[AUDIO_RX_BYTES];
 } audio_rx_item_t;
 
@@ -120,6 +120,7 @@ typedef struct {
     starter_tirtc_mode_t mode;
     uint32_t generation;
     uint32_t timestamp_ms;
+    uint32_t queued_at_ms;
     unsigned mute_epoch;
     uint16_t sample_count;
     int16_t pcm[AUDIO_PACKET_SAMPLES_MAX];
@@ -185,7 +186,7 @@ static atomic_uint_fast32_t s_audio_trace_pending;
 static atomic_uint_fast32_t s_audio_decode_failed;
 static atomic_uint_fast32_t s_audio_playback_blocked;
 static atomic_uint_fast32_t s_audio_write_failed;
-static atomic_uint_fast32_t s_audio_playback_pending;
+static atomic_uint s_audio_playback_pending;
 static atomic_bool s_audio_playback_active;
 static atomic_bool s_prompt_active;
 static starter_recognition_player_t s_recognition_player;
@@ -197,9 +198,6 @@ static atomic_uint_fast32_t s_audio_pcm_frames;
 static atomic_uint_fast32_t s_audio_rx_last_ms;
 static atomic_uint_fast32_t s_audio_rx_overflow;
 static atomic_uint_fast32_t s_audio_rx_queue_peak;
-static atomic_uint_fast32_t s_audio_rx_prefill_waits;
-static atomic_uint_fast32_t s_audio_rx_rebuffers;
-static atomic_uint_fast32_t s_audio_rx_prefill_target_ms;
 static atomic_int_fast64_t s_audio_playback_started_us;
 static atomic_uint_fast32_t s_aec_processed;
 static atomic_uint_fast32_t s_agc_failures;
@@ -697,15 +695,25 @@ static bool enqueue_uplink_pcm(starter_tirtc_mode_t mode,
         !uplink_allowed(mode)) return false;
     uint8_t slot = 0;
     if (pcm == NULL || sample_count == 0U ||
-        sample_count > AUDIO_PACKET_SAMPLES_MAX || s_audio_tx_free_queue == NULL ||
-        xQueueReceive(s_audio_tx_free_queue, &slot, 0) != pdTRUE) {
+        sample_count > AUDIO_PACKET_SAMPLES_MAX || s_audio_tx_free_queue == NULL || s_audio_tx_ready_queue == NULL) {
         atomic_fetch_add_explicit(&s_audio_dropped, 1, memory_order_relaxed);
         return false;
+    }
+    /* Microphone audio is realtime in every mode. Reclaim only a queued slot,
+     * never the worker-held slot; bounded, nonblocking FreeRTOS receive transfers
+     * ownership even when the consumer races us. Preserve original timestamps. */
+    if (xQueueReceive(s_audio_tx_free_queue, &slot, 0) != pdTRUE) {
+        if (xQueueReceive(s_audio_tx_ready_queue, &slot, 0) != pdTRUE) {
+            atomic_fetch_add_explicit(&s_audio_dropped, 1, memory_order_relaxed);
+            return false;
+        }
+        atomic_fetch_add_explicit(&s_audio_dropped, 1, memory_order_relaxed);
     }
     audio_tx_item_t *item = &s_audio_tx_pool[slot];
     item->mode = mode;
     item->generation = generation;
     item->timestamp_ms = timestamp_ms;
+    item->queued_at_ms = (uint32_t)(esp_timer_get_time() / 1000);
     item->mute_epoch = mute_epoch;
     item->sample_count = (uint16_t)sample_count;
     memcpy(item->pcm, pcm, sample_count * sizeof(*pcm));
@@ -740,8 +748,13 @@ static void audio_uplink_task(void *argument)
         audio_tx_item_t *item = &s_audio_tx_pool[slot];
         size_t expected_samples = item->mode == STARTER_TIRTC_AI
                                       ? OPUS_PACKET_SAMPLES : ALAW_PACKET_SAMPLES;
+        bool expired_before_encode = xiaotai_media_expired(
+            (uint32_t)(esp_timer_get_time() / 1000), item->queued_at_ms,
+            XIAOTAI_UPLINK_MAX_AGE_MS);
+        if (expired_before_encode) atomic_fetch_add(&s_audio_dropped, 1);
         bool ready = item->sample_count == expected_samples &&
                      same_session(item->mode, item->generation) &&
+                     !expired_before_encode &&
                      item->mute_epoch == atomic_load(&s_mute_epoch) &&
                      starter_tirtc_audio_ready() &&
                      !atomic_load_explicit(&s_microphone_muted, memory_order_acquire) &&
@@ -833,7 +846,12 @@ static void audio_uplink_task(void *argument)
             bool encoded_ok = encode_result == ESP_AUDIO_ERR_OK &&
                 output.encoded_bytes > 0U &&
                 (use_opus || output.encoded_bytes == expected_alaw_bytes);
+            bool expired_after_encode = xiaotai_media_expired(
+                (uint32_t)(esp_timer_get_time() / 1000), item->queued_at_ms,
+                XIAOTAI_UPLINK_MAX_AGE_MS);
+            if (expired_after_encode) atomic_fetch_add(&s_audio_dropped, 1);
             if (encoded_ok && same_session(item->mode, item->generation) &&
+                !expired_after_encode &&
                 item->mute_epoch == atomic_load(&s_mute_epoch) &&
                 !atomic_load(&s_microphone_muted) && uplink_allowed(item->mode)) {
                 int ret = use_opus
@@ -1251,7 +1269,10 @@ static bool play_audio_item(const audio_rx_item_t *item)
     update_timing_average(&s_lock_average, item->generation, &s_audio_lock_avg_us, lock_us);
     if (!locked) return false;
     bool played = false;
-    if (same_session(item->mode, item->generation) && s_amp_enabled &&
+    if ((item->mode == STARTER_TIRTC_AI ||
+         !xiaotai_media_expired((uint32_t)(esp_timer_get_time() / 1000),
+             item->received_at_ms, XIAOTAI_LIVE_RX_MS)) &&
+        same_session(item->mode, item->generation) && s_amp_enabled &&
         !atomic_load_explicit(&s_speaker_muted, memory_order_acquire)) {
         bool needs_upsample = item->mode != STARTER_TIRTC_AI;
         if (needs_upsample && s_playback_resampler_generation != item->generation) {
@@ -1286,6 +1307,8 @@ static bool play_audio_item(const audio_rx_item_t *item)
         update_max_counter(&s_audio_write_max_us, write_us);
         update_timing_average(&s_write_average, item->generation, &s_audio_write_avg_us, write_us);
         if (played) {
+            if (item->mode == STARTER_TIRTC_AI)
+                starter_ai_playout_written(item->generation, mono_samples);
             if (item->mode == STARTER_TIRTC_AI) {
                 starter_playback_scope_publish(&s_playback_scope, s_decode_pcm,
                     mono_samples, (uint32_t)(esp_timer_get_time() / 1000),
@@ -1343,55 +1366,35 @@ static bool play_audio_item(const audio_rx_item_t *item)
     return played;
 }
 
-/* AI packets follow the 20 ms media contract. Hold one slot while the
- * remaining packets accumulate; never hold the output mutex while waiting.
- * The DMA deadline is an estimate, so rebuffer counts include reply boundaries
- * and are not a hardware-underrun verdict. Calls retain immediate playback. */
+/* Shared AI playout policy; the adapter supplies its DMA tail estimate. */
+static uint32_t audio_playback_tail_ms(void)
+{
+    int64_t tail_us = atomic_load(&s_audio_dma_until_us);
+    return (uint32_t)(tail_us / 1000);
+}
+
 static bool audio_rx_prefill(const audio_rx_item_t *item)
 {
-    static uint32_t generation;
-    static int mode;
-    static int64_t stable_since_us;
-    static uint32_t target_ms;
     if (!same_session(item->mode, item->generation)) return false;
-    if (item->mode != STARTER_TIRTC_AI) return true;
-    if (atomic_load(&s_speaker_muted)) return false;
-    int64_t now_us = esp_timer_get_time();
-    bool new_session = mode != item->mode || generation != item->generation;
-    int64_t dma_until_us = atomic_load(&s_audio_dma_until_us);
-    if (new_session) {
-        mode = item->mode;
-        generation = item->generation;
-        target_ms = AUDIO_RX_PREFILL_START_MS;
-        stable_since_us = now_us;
-    } else if (dma_until_us > now_us) {
-        if (now_us - stable_since_us >= AUDIO_RX_PREFILL_STABLE_US) {
-            target_ms = AUDIO_RX_PREFILL_START_MS;
-            atomic_store(&s_audio_rx_prefill_target_ms, target_ms);
-        }
-        return true;
-    } else {
-        target_ms = AUDIO_RX_PREFILL_RECOVER_MS;
-        stable_since_us = now_us;
-        atomic_fetch_add(&s_audio_rx_rebuffers, 1);
+    if (item->mode != STARTER_TIRTC_AI) {
+        bool expired = xiaotai_media_expired(
+            (uint32_t)(esp_timer_get_time() / 1000), item->received_at_ms,
+            XIAOTAI_LIVE_RX_MS);
+        if (expired) atomic_fetch_add(&s_audio_dropped, 1);
+        return !expired;
     }
-    atomic_store(&s_audio_rx_prefill_target_ms, target_ms);
-    uint32_t target_packets = target_ms / AUDIO_PACKET_MS;
-    int64_t deadline_us = now_us + (int64_t)AUDIO_RX_PREFILL_WAIT_MS * 1000;
-    bool waited = false;
-    while (uxQueueMessagesWaiting(s_audio_rx_ready_queue) + 1U < target_packets) {
-        if (!same_session(item->mode, item->generation) ||
-            atomic_load(&s_speaker_muted)) return false;
-        if (esp_timer_get_time() >= deadline_us) break;
-        if (!waited) {
-            atomic_fetch_add(&s_audio_rx_prefill_waits, 1);
-            waited = true;
-        }
-        vTaskDelay(pdMS_TO_TICKS(AUDIO_RX_PREFILL_POLL_MS));
+    while (same_session(item->mode, item->generation) &&
+           !atomic_load(&s_speaker_muted)) {
+        if (starter_ai_playout_ready(item->generation,
+                (uint32_t)(esp_timer_get_time() / 1000),
+                item->received_at_ms, audio_playback_tail_ms())) return true;
+        /* Never wait with the output mutex held. A zero-tick conversion must
+         * still yield so stop/new generation and ingress can make progress. */
+        vTaskDelay(pdMS_TO_TICKS(5) > 0 ? pdMS_TO_TICKS(5) : 1);
     }
-    return same_session(item->mode, item->generation) &&
-           !atomic_load(&s_speaker_muted);
+    return false;
 }
+
 
 static void audio_sink_task(void *argument)
 {
@@ -1411,6 +1414,7 @@ static void audio_sink_task(void *argument)
                                   memory_order_release);
             atomic_fetch_sub_explicit(&s_audio_playback_pending, 1,
                                       memory_order_acq_rel);
+            starter_ai_playout_retire(item->generation, item->pcm_samples);
             memset(item, 0, sizeof(*item));
             if (xQueueSend(s_audio_rx_free_queue, &slot, 0) != pdTRUE) {
                 ESP_LOGE(TAG, "audio RX slot %u could not be returned",
@@ -1443,6 +1447,8 @@ static void drain_audio_rx_ready_queue(void)
         if (slot < AUDIO_RX_QUEUE_DEPTH) {
             atomic_fetch_sub_explicit(&s_audio_playback_pending, 1,
                                       memory_order_acq_rel);
+            starter_ai_playout_retire(s_audio_rx_pool[slot].generation,
+                                     s_audio_rx_pool[slot].pcm_samples);
             memset(&s_audio_rx_pool[slot], 0, sizeof(s_audio_rx_pool[slot]));
             (void)xQueueSend(s_audio_rx_free_queue, &slot, 0);
         }
@@ -1938,6 +1944,7 @@ esp_err_t starter_media_start(starter_tirtc_mode_t mode, uint32_t generation)
     /* 铃声/验证码提示音是可中断的；实时通话不能因其占用 I2S 而启动失败。 */
     starter_media_cancel_pcm8k_playback();
     drain_audio_rx_ready_queue();
+    starter_ai_playout_reset(mode == STARTER_TIRTC_AI ? generation : 0U);
     atomic_store_explicit(&s_audio_sent, 0, memory_order_release);
     atomic_store_explicit(&s_audio_received, 0, memory_order_release);
     atomic_store_explicit(&s_audio_dropped, 0, memory_order_release);
@@ -1957,9 +1964,6 @@ esp_err_t starter_media_start(starter_tirtc_mode_t mode, uint32_t generation)
     atomic_store_explicit(&s_audio_rx_last_ms, 0, memory_order_release);
     atomic_store_explicit(&s_audio_rx_overflow, 0, memory_order_release);
     atomic_store_explicit(&s_audio_rx_queue_peak, 0, memory_order_release);
-    atomic_store(&s_audio_rx_prefill_waits, 0);
-    atomic_store(&s_audio_rx_rebuffers, 0);
-    atomic_store(&s_audio_rx_prefill_target_ms, 0);
     atomic_store_explicit(&s_audio_playback_started_us, 0, memory_order_release);
     /* Outstanding pool slots include a canceled old sink slot. Its owner
      * retires it after prefill wakes; resetting here would underflow that count. */
@@ -2055,12 +2059,18 @@ static esp_err_t stop_media(uint32_t preserve_token)
 void starter_media_stop(void) { (void)stop_media(0); }
 void starter_media_set_uplink_enabled(bool enabled)
 {
-    atomic_store_explicit(&s_uplink_enabled, enabled, memory_order_release);
+    bool previous = atomic_exchange_explicit(&s_uplink_enabled, enabled,
+                                             memory_order_acq_rel);
+    if (previous != enabled) atomic_fetch_add(&s_mute_epoch, 1);
 }
 void starter_media_set_room_pressed(bool pressed)
 {
     /* This gate is independent of AI/call/H5, including during owner changes. */
-    atomic_store_explicit(&s_room_pressed, pressed, memory_order_release);
+    bool previous = atomic_exchange_explicit(&s_room_pressed, pressed,
+                                             memory_order_acq_rel);
+    /* Invalidate queued and partially captured PCM across PTT release/repress.
+     * Existing pre/post-encode epoch checks also reject a worker-held frame. */
+    if (previous != pressed) atomic_fetch_add(&s_mute_epoch, 1);
 }
 esp_err_t starter_media_stop_for_ai(uint32_t token) { return stop_media(token); }
 
@@ -2087,17 +2097,44 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
         return;
     }
     uint8_t slot = 0;
-    if ((mode != STARTER_TIRTC_AI &&
-         uxQueueMessagesWaiting(s_audio_rx_free_queue) <=
-             AUDIO_RX_QUEUE_DEPTH - AUDIO_RX_LIVE_QUEUE_DEPTH) ||
-        xQueueReceive(s_audio_rx_free_queue, &slot, 0) != pdTRUE ||
-        slot >= AUDIO_RX_QUEUE_DEPTH) {
-        atomic_fetch_add_explicit(&s_audio_rx_overflow, 1, memory_order_relaxed);
-        atomic_fetch_add_explicit(&s_audio_dropped, 1, memory_order_relaxed);
+    unsigned limit = mode == STARTER_TIRTC_AI
+        ? AUDIO_RX_QUEUE_DEPTH : AUDIO_RX_LIVE_QUEUE_DEPTH;
+    bool acquired = false;
+    /* Reserve before taking a free slot. Checking free-queue depth alone races
+     * another callback and can exceed the live budget. Pending includes ingress
+     * reservations, queued items and the sink-held slot. Two bounded attempts;
+     * no lock, wait or unbounded CAS loop in the SDK callback. */
+    for (unsigned attempt = 0; attempt < 2U && !acquired; ++attempt) {
+        unsigned pending = atomic_load(&s_audio_playback_pending);
+        if (pending < limit) {
+            if (!atomic_compare_exchange_strong(&s_audio_playback_pending,
+                                                  &pending, pending + 1U))
+                continue;
+            if (xQueueReceive(s_audio_rx_free_queue, &slot, 0) == pdTRUE) {
+                acquired = true;
+                break;
+            }
+            atomic_fetch_sub(&s_audio_playback_pending, 1);
+        }
+        if (xiaotai_media_overflow(mode == STARTER_TIRTC_AI) ==
+                XIAOTAI_QUEUE_REPLACE_OLDEST &&
+            xQueueReceive(s_audio_rx_ready_queue, &slot, 0) == pdTRUE) {
+            /* Atomic queue receive transfers the old pending reservation.
+             * A worker-held slot is never present in this queue. */
+            starter_ai_playout_retire(s_audio_rx_pool[slot].generation,
+                                      s_audio_rx_pool[slot].pcm_samples);
+            atomic_fetch_add(&s_audio_rx_overflow, 1);
+            atomic_fetch_add(&s_audio_dropped, 1);
+            acquired = true;
+        }
+    }
+    if (!acquired || slot >= AUDIO_RX_QUEUE_DEPTH) {
+        atomic_fetch_add(&s_audio_rx_overflow, 1);
+        atomic_fetch_add(&s_audio_dropped, 1);
         return;
     }
     uint32_t received_at_ms = (uint32_t)(esp_timer_get_time() / 1000);
-    uint32_t previous_rx_ms = (uint32_t)atomic_load(&s_audio_rx_last_ms);
+    uint32_t previous_rx_ms = atomic_load(&s_audio_rx_last_ms);
     audio_rx_item_t *item = &s_audio_rx_pool[slot];
     *item = (audio_rx_item_t) {
         .received_at_ms = received_at_ms,
@@ -2107,8 +2144,17 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
         .frame = *frame,
     };
     memcpy(item->payload, data, frame->length);
-    atomic_fetch_add_explicit(&s_audio_playback_pending, 1,
-                              memory_order_acq_rel);
+    if (mode == STARTER_TIRTC_AI) {
+        item->pcm_samples = starter_ai_playout_admit(generation, data, frame->length);
+        if (item->pcm_samples == 0U) {
+            atomic_fetch_sub(&s_audio_playback_pending, 1);
+            atomic_fetch_add(&s_audio_dropped, 1);
+            memset(item, 0, sizeof(*item));
+            (void)xQueueSend(s_audio_rx_free_queue, &slot, 0);
+            return;
+        }
+    }
+    /* Admission already owns a pending reservation before publication. */
     if (xQueueSend(s_audio_rx_ready_queue, &slot, 0) == pdTRUE) {
         update_max_counter(&s_audio_rx_queue_peak,
                            uxQueueMessagesWaiting(s_audio_rx_ready_queue));
@@ -2120,6 +2166,7 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
         atomic_fetch_add_explicit(&s_audio_rx_overflow, 1, memory_order_relaxed);
         atomic_fetch_sub_explicit(&s_audio_playback_pending, 1,
                                   memory_order_acq_rel);
+        starter_ai_playout_retire(item->generation, item->pcm_samples);
         memset(item, 0, sizeof(*item));
         (void)xQueueSend(s_audio_rx_free_queue, &slot, 0);
         atomic_fetch_add_explicit(&s_audio_dropped, 1, memory_order_relaxed);
@@ -2128,6 +2175,7 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
 
 starter_media_status_t starter_media_status(void)
 {
+    starter_ai_playout_status_t playout = starter_ai_playout_status();
     /* Read software ownership before DMA. The sink publishes the new DMA
      * deadline before releasing its final pending frame; mixing an old DMA
      * deadline with a new empty queue would truncate the last audio packet. */
@@ -2171,9 +2219,11 @@ starter_media_status_t starter_media_status(void)
         .audio_write_avg_us = (uint32_t)atomic_load(&s_audio_write_avg_us),
         .audio_pcm_last_samples = (uint32_t)atomic_load(&s_audio_pcm_last_samples),
         .audio_rx_queue_peak = (uint32_t)atomic_load(&s_audio_rx_queue_peak),
-        .audio_rx_prefill_waits = (uint32_t)atomic_load(&s_audio_rx_prefill_waits),
-        .audio_rx_rebuffers = (uint32_t)atomic_load(&s_audio_rx_rebuffers),
-        .audio_rx_prefill_target_ms = (uint32_t)atomic_load(&s_audio_rx_prefill_target_ms),
+        .audio_rx_prefill_waits = playout.waits,
+        .audio_rx_buffered_ms = playout.queued_samples / 16U,
+        .audio_rx_timeout_releases = playout.timeout_releases,
+        .audio_rx_rebuffers = playout.underruns,
+        .audio_rx_prefill_target_ms = playout.target_ms,
         .audio_rx_queue_capacity = atomic_load(&s_mode) == STARTER_TIRTC_AI
             ? AUDIO_RX_QUEUE_DEPTH : AUDIO_RX_LIVE_QUEUE_DEPTH,
         .audio_rx_last_ms = (uint32_t)atomic_load(&s_audio_rx_last_ms),

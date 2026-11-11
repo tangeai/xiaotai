@@ -198,7 +198,10 @@ int main(void){
         run_c(r'''
 #include <assert.h>
 #include <stdio.h>
+#include <cjson/cJSON.h>
 #include "xiaotai_ai_history.h"
+static int begins, ends;
+static void xiaotai_audio_playback_boundary(bool ended){if(ended)ends++;else begins++;}
 #define XIAOTAI_OWNER_AI 1
 #define UI_PAGE_HOME 0
 #define UI_PAGE_AI_CHAT 1
@@ -227,7 +230,13 @@ int main(void){
  s_ui_page=UI_PAGE_AI_CHAT;handle_ai_ui(&e);assert(history_renders==1 && face_renders==0);
  s_ui_page=UI_PAGE_HOME;handle_ai_ui(&e);assert(face_renders==1);
  e.generation=6;handle_ai_ui(&e);assert(face_renders==1);
+ e.text="{\"method\":\"round_end\"}";handle_ai_ui(&e);assert(ends==0);
+ e.generation=7;handle_ai_ui(&e);assert(ends==1);
+ e.text="{\"method\":\"round_start\"}";handle_ai_ui(&e);assert(begins==1);
+ e.text="{}";handle_ai_ui(&e);assert(begins==1 && ends==1);
+ s_runtime.owner=0;e.text="{\"method\":\"round_end\"}";
+ handle_ai_ui(&e);assert(ends==1);
 }
-''', include_dirs=(ROOT/'product/include',))
+''', include_dirs=(ROOT/'product/include',), libraries=('cjson',))
 
 if __name__=='__main__':unittest.main()

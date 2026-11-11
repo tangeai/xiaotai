@@ -2,6 +2,7 @@
 import re
 import unittest
 from test_s3_product_regressions import MEDIA, ROOT, function, run_c
+from test_esp_ai_playout import run_media_c as run_c
 
 def playback_fixture(source):
     board = (ROOT / 'boards/lckfb/esp32s3/board_config.h').read_text()
@@ -16,7 +17,7 @@ static uint64_t s_audio_pcm_frames;
 static int64_t s_audio_dma_until_us;
 '''
     helpers = ''.join(function(source, name) for name in (
-        'audio_playback_timing_reset', 'audio_playback_track_write', 'audio_playback_timing'))
+        'audio_playback_tail_ms', 'audio_playback_timing_reset', 'audio_playback_track_write', 'audio_playback_timing'))
     return '\n'+constants+'\n'+state+helpers+'\n'
 
 def runtime_drain_fixture():
@@ -86,7 +87,7 @@ static void xSemaphoreGive(int mutex){if(mutex==2){assert(locked);locked=false;}
 static int audio_output_set_locked(bool enabled){assert(locked&&!s_active);amp=enabled;return 0;}
 static void audio_playback_timing_reset(bool reset_total){assert(locked && !s_active && reset_total);timing_resets++;}
 ''' + body + r'''
-int main(void){s_ready=true;s_audio_playback_pending=1;
+int main(void){starter_ai_playout_reset(7);s_ready=true;s_audio_playback_pending=1;
  assert(starter_media_start(3,7)==0&&s_active&&amp&&timing_resets==1);
  assert(s_audio_playback_pending==1); /* old sink still owns a slot */
  s_active=false;amp=false;timeout=true;
@@ -104,7 +105,7 @@ int main(void){s_ready=true;s_audio_playback_pending=1;
         status = function(source, 'starter_media_status')
         existing = {'s_audio_received','s_audio_dropped','s_audio_rx_overflow','s_audio_rx_prefill_waits','s_audio_rx_burst_window','s_audio_rx_burst_max','s_audio_rx_queue_peak'}
         atomics = sorted(set(re.findall(r'atomic_\w+\(\s*&([a-zA-Z_][a-zA-Z_0-9]*)', status)) - existing)
-        atomics = sorted(set(atomics) | {'s_audio_playback_pending','s_audio_playback_active','s_audio_rx_last_ms'})
+        atomics = sorted(set(atomics) | {'s_speaker_muted','s_audio_playback_pending','s_audio_playback_active','s_audio_rx_last_ms'})
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>
@@ -127,13 +128,13 @@ typedef unsigned TickType_t;
 typedef int starter_tirtc_mode_t;
 typedef struct {size_t length;uint32_t timestamp_ms;} starter_tirtc_frame_t;
 typedef struct {int mode;uint32_t generation;starter_tirtc_frame_t frame;
-    uint8_t payload[AUDIO_RX_BYTES];} audio_rx_item_t;
+    uint32_t received_at_ms;uint16_t pcm_samples;uint8_t payload[AUDIO_RX_BYTES];} audio_rx_item_t;
 typedef struct {uint8_t slots[64];unsigned head,count;} queue_t;
 static queue_t ready,free_slots;
 static queue_t *s_audio_rx_ready_queue=&ready,*s_audio_rx_free_queue=&free_slots;
 static audio_rx_item_t pool[AUDIO_RX_QUEUE_DEPTH],*s_audio_rx_pool=pool;
 static atomic_uint s_audio_dropped,s_audio_received;
-static atomic_uint s_audio_rx_overflow,s_audio_rx_prefill_waits;
+static atomic_uint s_audio_rx_overflow;
 static atomic_uint_fast32_t s_audio_rx_burst_window,s_audio_rx_burst_max,
     s_audio_rx_queue_peak;
 static unsigned clock_ms=1000,played,expected_packets=19;
@@ -176,14 +177,14 @@ static void finish_last_write_during_status(void){
     audio_playback_track_write(320);
     s_audio_playback_active=false;s_audio_playback_pending=0;
 }
-int main(void){
+int main(void){starter_ai_playout_reset(7);
     s_audio_playback_pending=1;s_audio_playback_active=true;
     playback_unlock_hook=finish_last_write_during_status;
     starter_media_status_t racing=starter_media_status();
     assert(racing.audio_playback_pending || racing.audio_playback_active);
     audio_playback_timing_reset(true);
     for(unsigned i=0;i<AUDIO_RX_QUEUE_DEPTH;i++){uint8_t slot=i;xQueueSend(&free_slots,&slot,0);}
-    uint8_t payload[31]={0};
+    uint8_t payload[31]={0x08};
     for(unsigned i=0;i<19;i++){
         starter_tirtc_frame_t frame={.length=31,.timestamp_ms=i*20};
         starter_media_submit_audio(2,7,&frame,payload);
@@ -224,6 +225,7 @@ int main(void){
     assert(starter_media_status().audio_playback_pending==0 && free_slots.count==64);
     fail_publish=true;starter_media_submit_audio(2,7,&frame,payload);
     assert(starter_media_status().audio_playback_pending==0 && free_slots.count==64);
+    assert(starter_ai_playout_status().queued_samples==0);
     starter_media_submit_audio(2,6,&frame,payload); /* stale generation */
     assert(starter_media_status().audio_playback_pending==0);
     played=0;discard_while_held=true;

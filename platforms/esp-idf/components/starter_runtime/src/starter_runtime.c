@@ -758,7 +758,7 @@ static void log_ai_playback_status(const char *stage)
 {
     starter_media_status_t media = starter_media_status();
     ESP_LOGI(TAG,
-             "AI playback stage=%s generation=%lu rx=%lu decoded=%lu written=%lu overflow=%lu pending=%lu active=%d pcm-ms=%lu dma-ms=%lu last-rx-age-ms=%lu",
+             "AI playback stage=%s generation=%lu rx=%lu decoded=%lu written=%lu overflow=%lu pending=%lu active=%d pcm-ms=%lu dma-ms=%lu queued-ms=%lu target-ms=%lu underruns=%lu timeout-releases=%lu last-rx-age-ms=%lu",
              stage, (unsigned long)session_generation(),
              (unsigned long)media.audio_received,
              (unsigned long)media.audio_decoded,
@@ -768,6 +768,10 @@ static void log_ai_playback_status(const char *stage)
              media.audio_playback_active ? 1 : 0,
              (unsigned long)media.audio_playback_pcm_ms,
              (unsigned long)media.audio_playback_dma_ms,
+             (unsigned long)media.audio_rx_buffered_ms,
+             (unsigned long)media.audio_rx_prefill_target_ms,
+             (unsigned long)media.audio_rx_rebuffers,
+             (unsigned long)media.audio_rx_timeout_releases,
              (unsigned long)(media.audio_rx_last_ms != 0U
                  ? (uint32_t)now_ms() - media.audio_rx_last_ms : 0U));
 }
@@ -782,6 +786,7 @@ static void begin_ai_end_drain(uint32_t arrival_grace_ms,
                                (uint32_t)now_ms(),
                                arrival_grace_ms,
                                timeout_ms);
+    starter_media_ai_playback_boundary(generation, true);
     s_ai_transport_closed = transport_closed;
     starter_media_set_uplink_enabled(false);
     log_ai_playback_status(transport_closed ? "transport-close" : "end-session");
@@ -2949,8 +2954,10 @@ static void handle_ai_command(const runtime_event_t *event)
                                                   STARTER_AI_UI_LISTENING));
                 }
             } else if (strcmp(method->valuestring, "round_start") == 0) {
+                starter_media_ai_playback_boundary(session_generation(), false);
                 product_set_phase(STARTER_AI_UI_SPEAKING);
             } else if (strcmp(method->valuestring, "round_end") == 0) {
+                starter_media_ai_playback_boundary(session_generation(), true);
                 product_set_phase(STARTER_AI_UI_LISTENING);
             } else if ((strcmp(method->valuestring, "call_intent") == 0 ||
                         strcmp(method->valuestring, "ai_call_intent") == 0 ||

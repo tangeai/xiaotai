@@ -16,9 +16,12 @@
 #include <stdatomic.h>
 #include <string.h>
 
+#define XIAOTAI_MEDIA_PROFILE 1
+#include "../../../common/include/xiaotai_media_policy.h"
+
 #define TAG "xiaotai_audio"
 
-#define AUDIO_RING_FRAMES 8U
+#define AUDIO_RING_FRAMES XIAOTAI_LIVE_RX_SLOTS
 #define AUDIO_MAX_FRAME_SAMPLES XIAOTAI_AUDIO_OPUS_FRAME_SAMPLES
 #define AUDIO_ALAW_FRAME_BYTES XIAOTAI_AUDIO_ALAW_FRAME_SAMPLES
 #define AUDIO_RING_BYTES (AUDIO_RING_FRAMES * AUDIO_ALAW_FRAME_BYTES)
@@ -36,8 +39,8 @@
 #define OPUS_FRAME_SAMPLES XIAOTAI_AUDIO_OPUS_FRAME_SAMPLES
 #define OPUS_BITRATE_BPS 16000
 #define OPUS_MAX_PACKET_BYTES 512U
-/* Retain AI TTS bursts ahead of the DAC, without delaying playback. */
-#define OPUS_PACKET_SLOTS 64U
+/* Retain AI TTS bursts; the playout gate separately bounds startup delay. */
+#define OPUS_PACKET_SLOTS XIAOTAI_AI_PACKET_CAPACITY
 #define OPUS_MAX_DECODE_SAMPLES 960U
 #define AEC_DELAY_SAMPLE_POINTS_MAX 1000U
 #define AEC_DELAY_POINTS 211U
@@ -75,6 +78,7 @@ static atomic_uint s_volume = 7U;
 static atomic_bool s_speaker_muted;
 static atomic_bool s_microphone_muted;
 static atomic_bool s_uplink_enabled = true;
+static atomic_uint s_uplink_epoch;
 
 /* Seven short-time amplitude slices drive the compact dot mouth. This is a
  * display hint only; the audio worker never waits for the UI. */
@@ -168,8 +172,20 @@ static xiaotai_audio_uplink_fn s_uplink;
 static void *s_uplink_context;
 
 static uint8_t s_alaw_ring[AUDIO_RING_BYTES];
+/* Byte timestamps preserve age even for split/coalesced A-law packets.
+ * The pinned SDK reserves PSRAM_SECTION; do not spend internal audio SRAM. */
+#if CONFIG_AP_PSRAM_SECTION_ADDR
+static uint32_t s_alaw_arrival_ms[AUDIO_RING_BYTES]
+    __attribute__((section(".psram.bss")));
+#else
+static uint32_t s_alaw_arrival_ms[AUDIO_RING_BYTES];
+#endif
 static uint8_t *s_opus_ring;
 static uint16_t s_opus_lengths[OPUS_PACKET_SLOTS];
+static uint16_t s_opus_samples[OPUS_PACKET_SLOTS];
+static uint32_t s_opus_queued_samples;
+static xiaotai_audio_buffer_t s_ai_buffer;
+static bool s_ai_buffer_ended;
 static size_t s_opus_head;
 static size_t s_opus_count;
 static size_t s_opus_queue_peak;
@@ -415,7 +431,7 @@ static void mix_call_ringtone(int16_t *pcm, size_t samples, uint32_t rate)
 /* Packet stamps share the Opus ring lock and eviction policy. The current
  * packet and aggregate structs belong exclusively to their audio worker. */
 typedef struct {
-    uint32_t seq, rx_ms, enqueue_ms, gap_ms, queued;
+    uint32_t seq, rx_ms, enqueue_ms, gap_ms, queued, media_ms;
 } ai_packet_timing_t;
 static ai_packet_timing_t s_ai_packet_stamps[OPUS_PACKET_SLOTS], s_ai_packet;
 static uint32_t s_ai_rx_seq, s_ai_rx_previous_ms;
@@ -526,6 +542,9 @@ static void ring_reset(void)
     s_ring_count = 0;
     s_opus_head = 0;
     s_opus_count = 0;
+    s_opus_queued_samples = 0U;
+    s_ai_buffer_ended = false;
+    xiaotai_audio_buffer_reset(&s_ai_buffer);
     s_ai_rx_seq = 0;
     s_ai_rx_previous_ms = 0;
     s_aec_reference_head = 0;
@@ -774,7 +793,13 @@ static size_t opus_ring_take(uint8_t *output, size_t capacity)
     if (!s_ring_mutex_ready || rtos_trylock_mutex(&s_ring_mutex) != BK_OK) {
         return 0U;
     }
-    if (s_opus_count == 0U) {
+    uint32_t now_ms = rtos_get_time();
+    bool ready = xiaotai_audio_buffer_ready(&s_ai_buffer, now_ms,
+        s_opus_queued_samples / (OPUS_SAMPLE_RATE_HZ / 1000U),
+        s_opus_count == 0U ? now_ms : s_ai_packet_stamps[s_opus_head].rx_ms,
+        atomic_load_explicit(&s_playback_tail_ms, memory_order_acquire),
+        s_ai_buffer_ended);
+    if (!ready || s_opus_count == 0U) {
         rtos_unlock_mutex(&s_ring_mutex);
         return 0U;
     }
@@ -782,6 +807,7 @@ static size_t opus_ring_take(uint8_t *output, size_t capacity)
     if (size > capacity) size = capacity;
     s_ai_packet = s_ai_packet_stamps[s_opus_head];
     memcpy(output, s_opus_ring + s_opus_head * OPUS_MAX_PACKET_BYTES, size);
+    s_opus_queued_samples -= s_opus_samples[s_opus_head];
     s_opus_head = (s_opus_head + 1U) % OPUS_PACKET_SLOTS;
     --s_opus_count;
     /* Dequeue transfers ownership to the decoder, before write_pcm begins. */
@@ -794,6 +820,13 @@ static size_t ring_take(uint8_t *output, size_t size)
 {
     if (!s_ring_mutex_ready || rtos_trylock_mutex(&s_ring_mutex) != BK_OK) {
         return 0;
+    }
+    uint32_t now = rtos_get_time();
+    while (s_ring_count != 0U && xiaotai_media_expired(now,
+            s_alaw_arrival_ms[s_ring_head], XIAOTAI_LIVE_RX_MS)) {
+        s_ring_head = (s_ring_head + 1U) % AUDIO_RING_BYTES;
+        --s_ring_count;
+        ++s_dropped_bytes;
     }
     if (s_ring_count < size) {
         rtos_unlock_mutex(&s_ring_mutex);
@@ -823,6 +856,7 @@ static void capture_task(beken_thread_arg_t argument)
             s_uplink_codec == XIAOTAI_AUDIO_CODEC_ALAW_8K ? 8000U : 16000U,
             (unsigned)s_frame_samples);
     while (s_capture_run) {
+        unsigned capture_epoch = atomic_load(&s_uplink_epoch);
         uint32_t capture_ms = rtos_get_time();
         bool ns_valid = false, ns_speech = false;
         size_t bytes_read = 0U;
@@ -930,11 +964,16 @@ static void capture_task(beken_thread_arg_t argument)
         uint32_t dsp_ms = rtos_get_time();
         int send_result = 0;
         uint32_t sent_ms = dsp_ms;
+        bool expired = xiaotai_media_expired(dsp_ms, read_ms,
+                                              XIAOTAI_UPLINK_MAX_AGE_MS);
+        if (expired) ++s_uplink_rejected;
         xiaotai_audio_uplink_fn callback = s_uplink;
         bool send_enabled = callback != NULL &&
-            atomic_load_explicit(&s_uplink_enabled, memory_order_acquire);
+            atomic_load_explicit(&s_uplink_enabled, memory_order_acquire) &&
+            !atomic_load_explicit(&s_microphone_muted, memory_order_acquire) &&
+            capture_epoch == atomic_load(&s_uplink_epoch) && !expired;
         if (send_enabled) {
-            int rc = callback(encoded, encoded_size, rtos_get_time(),
+            int rc = callback(encoded, encoded_size, read_ms,
                               s_uplink_context);
             sent_ms = rtos_get_time();
             send_result = rc;
@@ -1066,6 +1105,11 @@ static void playback_task(beken_thread_arg_t argument)
                 xiaotai_audio_playback_tail_after_write(
                     tail_ms, now_ms, frame_duration_ms),
                 memory_order_release);
+            if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
+                rtos_lock_mutex(&s_ring_mutex);
+                xiaotai_audio_buffer_written(&s_ai_buffer, frame_duration_ms);
+                rtos_unlock_mutex(&s_ring_mutex);
+            }
             aec_reference_push(pcm, samples);
             ++s_downlink_frames;
             if (s_downlink_frames == 1U) {
@@ -1380,6 +1424,12 @@ int xiaotai_audio_play_alaw(const uint8_t *data, size_t size)
         return BK_ERR_NOT_INIT;
     }
 
+    if (size > AUDIO_RING_BYTES - s_ring_count &&
+        xiaotai_media_overflow(false) == XIAOTAI_QUEUE_REJECT_NEW) {
+        s_dropped_bytes += (uint32_t)size;
+        rtos_unlock_mutex(&s_ring_mutex);
+        return BK_ERR_BUSY;
+    }
     if (size > AUDIO_RING_BYTES) {
         data += size - AUDIO_RING_BYTES;
         s_dropped_bytes += (uint32_t)(size - AUDIO_RING_BYTES);
@@ -1397,6 +1447,9 @@ int xiaotai_audio_play_alaw(const uint8_t *data, size_t size)
     if (first > size) first = size;
     memcpy(&s_alaw_ring[tail], data, first);
     if (first < size) memcpy(s_alaw_ring, data + first, size - first);
+    uint32_t admitted_ms = rtos_get_time();
+    for (size_t i = 0; i < size; ++i)
+        s_alaw_arrival_ms[(tail + i) % AUDIO_RING_BYTES] = admitted_ms;
     s_ring_count += size;
     atomic_store_explicit(&s_last_downlink_ms, rtos_get_time(),
                           memory_order_release);
@@ -1414,7 +1467,7 @@ int xiaotai_audio_play_alaw(const uint8_t *data, size_t size)
     return (int)size;
 }
 
-int xiaotai_audio_play_opus(const uint8_t *data, size_t size)
+int xiaotai_audio_play_opus(const uint8_t *data, size_t size, uint32_t timestamp_ms)
 {
     uint32_t rx_ms = rtos_get_time();
     if (data == NULL || size == 0U || size > OPUS_MAX_PACKET_BYTES) {
@@ -1422,6 +1475,9 @@ int xiaotai_audio_play_opus(const uint8_t *data, size_t size)
     }
     if (!s_running || !s_play_run ||
         s_codec != XIAOTAI_AUDIO_CODEC_OPUS_16K) return BK_ERR_NOT_INIT;
+    int samples = opus_packet_get_nb_samples(data, (opus_int32)size,
+                                              OPUS_SAMPLE_RATE_HZ);
+    if (samples <= 0 || samples > OPUS_MAX_DECODE_SAMPLES) return BK_ERR_PARAM;
     /* The pinned SMP SDK takes ticks here despite the timeout_ms parameter
      * name. Allow one scheduler tick for a short ring/AEC copy to finish;
      * never wait indefinitely inside the TiRTC receive callback. */
@@ -1435,16 +1491,23 @@ int xiaotai_audio_play_opus(const uint8_t *data, size_t size)
         return BK_ERR_NOT_INIT;
     }
     if (s_opus_count == OPUS_PACKET_SLOTS) {
+        ++s_dropped_bytes;
+        if (xiaotai_media_overflow(true) == XIAOTAI_QUEUE_REJECT_NEW) {
+            rtos_unlock_mutex(&s_ring_mutex);
+            return BK_ERR_BUSY;
+        }
+        s_opus_queued_samples -= s_opus_samples[s_opus_head];
         s_opus_head = (s_opus_head + 1U) % OPUS_PACKET_SLOTS;
         --s_opus_count;
-        ++s_dropped_bytes;
     }
     size_t tail = (s_opus_head + s_opus_count) % OPUS_PACKET_SLOTS;
     memcpy(s_opus_ring + tail * OPUS_MAX_PACKET_BYTES, data, size);
     s_opus_lengths[tail] = (uint16_t)size;
+    s_opus_samples[tail] = (uint16_t)samples;
+    s_opus_queued_samples += (uint32_t)samples;
     ++s_ai_rx_seq;
     s_ai_packet_stamps[tail] = (ai_packet_timing_t){
-        .seq = s_ai_rx_seq, .rx_ms = rx_ms,
+        .seq = s_ai_rx_seq, .rx_ms = rx_ms, .media_ms = timestamp_ms,
         .enqueue_ms = rtos_get_time(),
         .gap_ms = s_ai_rx_seq == 1U ? 0U : rx_ms - s_ai_rx_previous_ms,
         .queued = (uint32_t)s_opus_count + 1U,
@@ -1537,6 +1600,26 @@ bool xiaotai_audio_running(void)
     return s_running;
 }
 
+void xiaotai_audio_playback_boundary(bool ended)
+{
+    /* Control/media workers only; never block a transport callback. Session
+     * generation is checked by the caller before delivering this boundary. */
+    if (!s_ring_mutex_ready) return;
+    rtos_lock_mutex(&s_ring_mutex);
+    if (s_running && s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
+        if (!ended) {
+            if (s_ai_buffer_ended)
+                xiaotai_audio_buffer_begin_round(&s_ai_buffer);
+            /* A start also clears an unclassified gap when the previous end
+             * was lost. Duplicate starts must not restart a pending deadline
+             * or interrupt audio already playing. */
+            s_ai_buffer.recovering = false;
+        }
+        s_ai_buffer_ended = ended;
+    }
+    rtos_unlock_mutex(&s_ring_mutex);
+}
+
 bool xiaotai_audio_playback_is_drained(uint32_t quiet_ms)
 {
     bool running = atomic_load_explicit(&s_running, memory_order_acquire);
@@ -1566,11 +1649,13 @@ void xiaotai_audio_log_playback_status(const char *stage)
     size_t queued = s_opus_count;
     size_t peak = s_opus_queue_peak;
     uint32_t dropped = s_dropped_bytes; /* Opus mode counts evicted packets. */
+    uint32_t queued_ms = s_opus_queued_samples / (OPUS_SAMPLE_RATE_HZ / 1000U);
+    xiaotai_audio_buffer_t buffer = s_ai_buffer;
     rtos_unlock_mutex(&s_ring_mutex);
     uint32_t now_ms = rtos_get_time();
     int32_t tail_ms = (int32_t)(atomic_load(&s_playback_tail_ms) - now_ms);
     BK_LOGI(TAG,
-            "AI playback stage=%s rx=%u written=%u overflow=%u pending=%u peak=%u slots=%u active=%d pcm-ms=%u tail-ms=%u last-rx-age-ms=%u busy=%u\n",
+            "AI playback stage=%s rx=%u written=%u overflow=%u pending=%u peak=%u slots=%u active=%d pcm-ms=%u tail-ms=%u last-rx-age-ms=%u busy=%u queued-ms=%u target-ms=%u underruns=%u timeout-releases=%u\n",
             stage, (unsigned)atomic_load(&s_opus_received_frames),
             (unsigned)atomic_load(&s_downlink_frames),
             (unsigned)dropped, (unsigned)queued, (unsigned)peak,
@@ -1579,7 +1664,9 @@ void xiaotai_audio_log_playback_status(const char *stage)
             (unsigned)atomic_load(&s_playback_pcm_ms),
             (unsigned)(tail_ms > 0 ? tail_ms : 0),
             (unsigned)(now_ms - atomic_load(&s_last_opus_rx_ms)),
-            (unsigned)atomic_load(&s_admission_busy));
+            (unsigned)atomic_load(&s_admission_busy),
+            (unsigned)queued_ms, (unsigned)buffer.target_ms,
+            (unsigned)buffer.underruns, (unsigned)buffer.timeout_releases);
 }
 
 uint32_t xiaotai_audio_playback_columns(void)
@@ -1617,7 +1704,9 @@ void xiaotai_audio_set_speaker_muted(bool muted)
 
 void xiaotai_audio_set_microphone_muted(bool muted)
 {
-    atomic_store_explicit(&s_microphone_muted, muted, memory_order_release);
+    bool previous = atomic_exchange_explicit(&s_microphone_muted, muted,
+                                             memory_order_acq_rel);
+    if (previous != muted) atomic_fetch_add(&s_uplink_epoch, 1);
 }
 
 int xiaotai_audio_set_microphone_sensitivity(unsigned sensitivity)
@@ -1639,7 +1728,9 @@ int xiaotai_audio_set_microphone_sensitivity(unsigned sensitivity)
 
 void xiaotai_audio_set_uplink_enabled(bool enabled)
 {
-    atomic_store_explicit(&s_uplink_enabled, enabled, memory_order_release);
+    bool previous = atomic_exchange_explicit(&s_uplink_enabled, enabled,
+                                             memory_order_acq_rel);
+    if (previous != enabled) atomic_fetch_add(&s_uplink_epoch, 1);
 }
 
 bool xiaotai_audio_uplink_enabled(void)

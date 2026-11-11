@@ -10,6 +10,7 @@
 
 #include "cJSON.h"
 #include "tirtc/tiRTC.h"
+#include "../../../common/tirtc/h5_fanout_api.h"
 #include "xiaotai_audio.h"
 #include "xiaotai_tirtc_recovery.h"
 #include "xiaotai_video.h"
@@ -180,6 +181,7 @@ void xiaotai_tirtc_ai_cancel_tail(uint32_t generation)
 
 static void drain_ai_playback_after_transport_close(uint32_t generation)
 {
+    xiaotai_audio_playback_boundary(true);
     xiaotai_audio_log_playback_status("transport-close");
     uint32_t started_ms = rtos_get_time();
     while (!(generation != 0U && atomic_load_explicit(
@@ -588,6 +590,11 @@ static void media_worker(beken_thread_arg_t argument)
             continue;
         }
         if (event.type == MEDIA_EVENT_CONNECTED) {
+            /* First viewer may leave before this queued start is serviced.
+             * Remaining viewers retain the same product generation/encoder. */
+            if (event.generation == atomic_load(&s_active_generation) &&
+                atomic_load(&s_connection_mode) == CONNECTION_STREAM)
+                event.connection = (tirtc_conn_t)atomic_load(&s_connection);
             if (!connection_matches(event.connection)) continue;
             xiaotai_audio_set_uplink_enabled(false);
             bool accepted = s_handlers.on_stream_connected == NULL ||
@@ -734,8 +741,11 @@ static void media_worker(beken_thread_arg_t argument)
             continue;
         }
         if (event.type == MEDIA_EVENT_VIDEO_START) {
+            if (event.generation == atomic_load(&s_active_generation) &&
+                atomic_load(&s_connection_mode) == CONNECTION_STREAM)
+                event.connection = (tirtc_conn_t)atomic_load(&s_connection);
             if (connection_matches(event.connection) &&
-                !xiaotai_video_running()) {
+                atomic_load(&s_video_subscribed) && !xiaotai_video_running()) {
                 int rc = xiaotai_video_start(send_h264, NULL);
                 if (rc != BK_OK) {
                     atomic_store_explicit(&s_video_subscribed, false,
@@ -751,10 +761,13 @@ static void media_worker(beken_thread_arg_t argument)
             continue;
         }
         if (event.type == MEDIA_EVENT_VIDEO_STOP) {
-            (void)xiaotai_video_stop();
+            if (!atomic_load(&s_video_subscribed)) (void)xiaotai_video_stop();
             continue;
         }
         if (event.type == MEDIA_EVENT_KEYFRAME) {
+            if (event.generation == atomic_load(&s_active_generation) &&
+                atomic_load(&s_connection_mode) == CONNECTION_STREAM)
+                event.connection = (tirtc_conn_t)atomic_load(&s_connection);
             if (connection_matches(event.connection)) {
                 (void)xiaotai_video_request_keyframe();
             }
@@ -1117,7 +1130,7 @@ static void on_audio(tirtc_conn_t connection,
     }
     echo_diag_audio_rx(mode, frame);
     int rc = is_ai_opus ?
-        xiaotai_audio_play_opus((const uint8_t *)data, frame->length) :
+        xiaotai_audio_play_opus((const uint8_t *)data, frame->length, frame->ts) :
         xiaotai_audio_play_alaw((const uint8_t *)data, frame->length);
     uint32_t received = (uint32_t)atomic_fetch_add_explicit(
                             &s_received_audio_frames, 1,
@@ -1214,18 +1227,32 @@ static void on_request_key_frame(tirtc_conn_t connection, uint8_t stream_id)
     }
 }
 
+static unsigned h5_fanout_lock(void) { return rtos_enter_critical(); }
+static void h5_fanout_unlock(unsigned token) { rtos_exit_critical(token); }
+#define H5_FANOUT_ACTIVE() (atomic_load(&s_connection_mode) == CONNECTION_STREAM)
+#define H5_FANOUT_ACCEPTING() (!atomic_load(&s_outgoing_connect_inflight) && \
+    atomic_load(&s_pending_close_state) == 0 && !atomic_load(&s_active_disconnect_queued))
+#define H5_FANOUT_NOW_MS() rtos_get_time()
+#define H5_FANOUT_AUDIO_ID STREAM_UP_AUDIO_ID
+#define H5_FANOUT_VIDEO_ID STREAM_UP_VIDEO_ID
+#define H5_FANOUT_DOWN_AUDIO_ID STREAM_DOWN_AUDIO_ID
+#define H5_FANOUT_SEND_LIMIT() (128U * 1024U)
+#define H5_FANOUT_LAST_CLOSED() ((void)0)
+#define H5_FANOUT_UPLINK_CHANGED() xiaotai_audio_set_uplink_enabled(atomic_load(&s_audio_subscribed))
+#include "../../../common/tirtc/h5_fanout_impl.h"
+
 static const TIRTCCALLBACKS s_callbacks = {
     .on_event = on_event,
-    .on_conn_accepted = on_conn_accepted,
-    .on_conn_error = on_conn_error,
-    .on_disconnected = on_disconnected,
-    .on_audio = on_audio,
-    .on_command = on_command,
-    .on_request_key_frame = on_request_key_frame,
-    .on_subscribe_video = on_subscribe_video,
-    .on_unsubscribe_video = on_unsubscribe_video,
-    .on_subscribe_audio = on_subscribe_audio,
-    .on_unsubscribe_audio = on_unsubscribe_audio,
+    .on_conn_accepted = h5_fanout_on_conn_accepted,
+    .on_conn_error = h5_fanout_on_conn_error,
+    .on_disconnected = h5_fanout_on_disconnected,
+    .on_audio = h5_fanout_on_audio,
+    .on_command = h5_fanout_on_command,
+    .on_request_key_frame = h5_fanout_on_request_key_frame,
+    .on_subscribe_video = h5_fanout_on_subscribe_video,
+    .on_unsubscribe_video = h5_fanout_on_unsubscribe_video,
+    .on_subscribe_audio = h5_fanout_on_subscribe_audio,
+    .on_unsubscribe_audio = h5_fanout_on_unsubscribe_audio,
 };
 
 void xiaotai_tirtc_set_handlers(const xiaotai_tirtc_handlers_t *handlers)

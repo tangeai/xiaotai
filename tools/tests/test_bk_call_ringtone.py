@@ -280,14 +280,16 @@ static void rtos_delay_milliseconds(unsigned n){assert(n==5);s_play_run=false;}
 static void rtos_set_semaphore(int *s){}
 static void rtos_delete_thread(void *t){}
 static unsigned playback_columns_pack(void *p,size_t n){return 0;}
-static unsigned xiaotai_audio_playback_tail_after_write(unsigned a,unsigned b,unsigned c){return 0;}
+static int s_ring_mutex;
+static void rtos_lock_mutex(int *m){}
+static void rtos_unlock_mutex(int *m){}
 static void aec_reference_push(const int16_t *pcm,size_t n){refs++;}
 static int write_pcm(void *c,const int16_t *pcm,size_t n,size_t *bytes){
  bool audible=false;for(size_t i=0;i<n;i++)audible|=pcm[i]!=0;
  assert(audible==!s_speaker_muted);*bytes=n*2;writes++;s_play_run=false;return 0;
 }
 static struct {void *context;int (*write_pcm)(void *,const int16_t *,size_t,size_t *);} board={0,write_pcm},*s_board_audio=&board;
-''' + diagnostic_block(source) + function(source,'call_ringtone_pcm') + function(source,'mix_call_ringtone') +
+''' + (AUDIO.parent / 'xiaotai_audio_policy.c').read_text() + '\nstatic xiaotai_audio_buffer_t s_ai_buffer;\n' + diagnostic_block(source) + function(source,'call_ringtone_pcm') + function(source,'mix_call_ringtone') +
             function(source,'playback_task') + r'''
 int main(void){
  for(int codec=0;codec<2;codec++)for(int mute=0;mute<2;mute++)for(packet=0;packet<2;packet++){

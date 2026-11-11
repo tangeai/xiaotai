@@ -14,6 +14,13 @@ or mechanical refactors that preserve behavior, state which existing tests
 cover the change instead of adding a tautological test. Report the test evidence
 and any remaining hardware verification in the final handoff.
 
+When adding a board or changing media behavior or buffering parameters, read
+[the cross-board media policy](docs/product/MEDIA_CONTRACT.md#跨板策略一致性).
+Select policy by business, reuse the common implementation on every board, and
+limit board overrides to resource budgets. Add each adapter to the same behavior
+replays in `tools/tests/test_media_queue_policy.py`; policy changes require all
+affected board builds. Keep unverified hardware outcomes explicit.
+
 When adding a board, changing project layout, or editing build dispatch, read
 [the architecture](ARCHITECTURE.md) first. Register hardware in
 `boards/<vendor>/<board>/board.json`, then run:

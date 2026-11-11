@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 import test_s3_opus_media as fixture
 from test_s3_product_regressions import MEDIA, function, run_c
+from test_esp_ai_playout import run_media_c as run_c
 
 
 class S3OpusPacketDuration(unittest.TestCase):

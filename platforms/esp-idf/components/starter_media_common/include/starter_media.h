@@ -32,7 +32,9 @@ typedef struct {
     uint32_t audio_received;     /**< 成功复制到播放队列的音频帧数。 */
     uint32_t audio_dropped;      /**< 参数无效、队列满或代次过期的帧数。 */
     uint32_t audio_rx_overflow;  /**< 下行队列容量不足的丢包数，独立于上行。 */
-    uint32_t audio_rx_rebuffers; /**< P4 estimated DMA drain/reply-boundary recoveries. */
+    uint32_t audio_rx_rebuffers; /**< Supply interruptions, not network packet loss. */
+    uint32_t audio_rx_buffered_ms;
+    uint32_t audio_rx_timeout_releases;
     uint32_t audio_rx_prefill_target_ms;
     uint32_t audio_rx_prefill_waits; /**< 为吸收下行抖动进行预缓冲的次数。 */
     uint32_t audio_rx_queue_capacity; /**< 接收缓冲容量；0 表示未提供该诊断。 */
@@ -115,6 +117,8 @@ esp_err_t starter_media_set_speaker_muted(bool muted);
 void starter_media_set_microphone_muted(bool muted);
 esp_err_t starter_media_set_microphone_sensitivity(uint8_t sensitivity);
 void starter_media_set_uplink_enabled(bool enabled);
+/** Current-session AI start/end boundary; never rejects late tail packets. */
+void starter_media_ai_playback_boundary(uint32_t generation, bool ended);
 /** Immediate PTT gate; affects only Room, including after an owner switch. */
 void starter_media_set_room_pressed(bool pressed);
 /** Runtime publishes foreground admission; microphone mute is also enforced. */

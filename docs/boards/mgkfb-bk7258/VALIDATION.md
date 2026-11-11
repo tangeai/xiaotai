@@ -107,3 +107,27 @@ OTA、长期运行、弱网恢复、双讲 AEC、音量边界与重启保存、�
 硬件 PCB 修订、Flash JEDEC 和物理 PSRAM 容量等证据继续补充。
 
 旧版记录见 [GitHub Releases](https://github.com/tangeai/xiaotai/releases)。
+
+## 2026-11-11：v1.0.3 build.34 预发布
+
+应用户要求发布为 [GitHub pre-release](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.34)，
+正式下载入口不变。本次 AI 下行增加轻量自适应缓冲，以及单包短回复、400 ms 缓冲等待上限、
+轮次结束释放和旧会话清理保护。具体策略见[媒体处理合同](../../product/MEDIA_CONTRACT.md#bk7258-ai-下行自适应缓冲)。
+
+- 身份：`mgkfb-bk7258` / `default` / `eyes-key` / `compact`，release 配置，`1.0.3+build.34`。
+- 源码基线：`9d96854a68a00b308f39ba4131c104a282a82553`，包含未提交修改；Release 附带
+  `mgkfb-bk7258-1.0.3+build.34-source.patch`，标签只指向基线。此发布记录在上传完成后补充，不属于构建补丁。
+- SDK：AVDK SMP `release/v3.1.1.10`，`398cab28b938e69ba2071a597daf00845dd080b6`。
+- 原始烧录产物：`firmware/beken/bk7258/mgkfb-bk7258-xiaotai/build/bk7258/mgkfb-bk7258-xiaotai/package/all-app.bin`，3,614,016 字节。
+- BIN SHA-256：`3214e92f34f0b9a8c122044c75abc8df8bb28dc8d3ac6439175a7be2fddbb712`。
+- ZIP SHA-256：`bc738d5c471c4336fa0108de9daae4a2a33eaba7760a0127e6f4e3d526b55951`。
+- 主机检查通过：1005 项 Python 测试，产品核心 ASan/UBSan、清单校验；觅感 AP/CP release
+  原生构建及打包身份/尺寸/校验和检查通过。
+- 远端回读确认标题、标签、pre-release 状态及四个附件；全部远端 SHA-256 与本地一致。
+  未认证公开链接回下载 BIN，完整字节 SHA-256 一致。
+- 实板状态：`BUILD_VERIFIED_HIL_PENDING`，未烧录此 release 镜像。单字回复、长句、弱网、
+  打断/重入、尾音及双讲/AEC 待实板验收，不能用旧镜像结果替代。
+
+## 2026-11-11 统一媒体策略发布
+
+本轮精确版本、镜像 SHA-256、用户实板反馈和未修复限制见[五板发布验证记录](../../product/MEDIA_CONTRACT.md#2026-11-11-五板发布验证记录)。

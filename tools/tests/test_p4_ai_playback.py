@@ -3,6 +3,9 @@ import re
 import unittest
 
 from test_s3_product_regressions import ROOT, function, run_c
+from test_esp_ai_playout import run_media_c
+from functools import partial
+run_c = partial(run_media_c, profile=3)
 from test_s3_opus_media import COMMON
 
 P4_MEDIA = ROOT / 'firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/starter_media/src/starter_media.c'
@@ -53,7 +56,7 @@ static void xSemaphoreGive(int mutex){if(mutex==2){assert(locked);locked=false;}
 static int audio_output_set_locked(bool enabled){assert(locked&&!s_active);amp=enabled;return 0;}
 static void p4_video_set_session(int mode,unsigned gen,bool video){assert(s_active&&amp&&!locked);video_started++;}
 ''' + body + r'''
-int main(void){s_ready=true;
+int main(void){starter_ai_playout_reset(7);s_ready=true;
  assert(starter_media_start(3,7)==0&&s_active&&amp&&video_started==1);
  s_active=false;amp=false;timeout=true;
  assert(starter_media_start(3,8)==-2&&!s_active&&s_generation==0&&video_started==1);
@@ -86,15 +89,14 @@ int main(void){s_ready=true;
 typedef int starter_tirtc_mode_t;
 typedef struct {size_t length;unsigned sequence;} starter_tirtc_frame_t;
 typedef struct {int mode;uint32_t generation;starter_tirtc_frame_t frame;
-    uint32_t received_at_ms,arrival_gap_ms;uint8_t payload[AUDIO_RX_BYTES];} audio_rx_item_t;
+    uint32_t received_at_ms,arrival_gap_ms;uint16_t pcm_samples;uint8_t payload[AUDIO_RX_BYTES];} audio_rx_item_t;
 typedef struct {uint8_t slots[256];unsigned head,count;} queue_t;
 static queue_t ready,free_slots;
 static queue_t *s_audio_rx_ready_queue=&ready,*s_audio_rx_free_queue=&free_slots;
 static audio_rx_item_t pool[AUDIO_RX_QUEUE_DEPTH],*s_audio_rx_pool=pool;
 static atomic_uint s_audio_dropped,s_audio_received,s_audio_rx_overflow,
     s_audio_playback_pending,s_audio_rx_last_ms,s_audio_rx_prefill_waits,
-    s_audio_rx_burst_max,s_audio_rx_burst_window,
-    s_audio_rx_rebuffers,s_audio_rx_prefill_target_ms;
+    s_audio_rx_burst_max,s_audio_rx_burst_window;
 static atomic_int_fast64_t s_audio_dma_until_us;
 static atomic_uint_fast32_t s_audio_rx_queue_peak;
 static atomic_bool s_audio_playback_active,s_speaker_muted;
@@ -125,17 +127,17 @@ static bool play_audio_item(const audio_rx_item_t *item){
     now_ms+=20;s_audio_dma_until_us=(int64_t)(now_ms+100)*1000;return true;
 }
 ''' + (function(source, 'update_max_counter') if 'static void update_max_counter(' in source else '')
-              + (function(source, 'audio_rx_prefill') if 'static bool audio_rx_prefill(' in source else '')
+              + function(source, 'audio_playback_tail_ms') + (function(source, 'audio_rx_prefill') if 'static bool audio_rx_prefill(' in source else '')
               + function(source, 'starter_media_submit_audio')
               + function(source, 'audio_sink_task')
               + function(source, 'drain_audio_rx_ready_queue') + '\nstatic void restart_accounting(void){' + restart_accounting + '}\n' + r'''
 static void submit(unsigned count){
     for(unsigned i=0;i<count;i++){
-        starter_tirtc_frame_t frame={.length=31,.sequence=i};uint8_t data[31]={0};
+        starter_tirtc_frame_t frame={.length=31,.sequence=i};uint8_t data[31]={0x08};
         starter_media_submit_audio(active_mode,generation,&frame,data);
     }
 }
-int main(void){
+int main(void){starter_ai_playout_reset(7);
     (void)s_speaker_muted;(void)s_audio_rx_prefill_waits;(void)s_audio_rx_queue_peak;
     (void)s_audio_rx_burst_max;(void)s_audio_rx_burst_window;
     for(unsigned i=0;i<AUDIO_RX_QUEUE_DEPTH;i++){uint8_t slot=i;xQueueSend(&free_slots,&slot,0);}
@@ -153,12 +155,12 @@ int main(void){
     active_mode=3;generation=8;submit(16);
     assert(ready.count==8 && "human calls keep their original low-latency budget");
     drain_audio_rx_ready_queue();assert(s_audio_playback_pending==0);
-    starter_tirtc_frame_t frame={.length=31};uint8_t data[31]={0};
+    starter_tirtc_frame_t frame={.length=31};uint8_t data[31]={0x08};
     starter_media_submit_audio(2,7,&frame,data);assert(ready.count==0); /* stale */
     assert(free_slots.count==AUDIO_RX_QUEUE_DEPTH);
     /* Restart while the sink owns one slot in prefill; execute production reset
      * statements while retaining the real queue producer, sink and drainer. */
-    active_mode=2;generation=9;s_audio_dma_until_us=0;submit(1);
+    active_mode=2;generation=9;starter_ai_playout_reset(9);s_audio_dma_until_us=0;submit(1);
     restart_in_prefill=true;
     if(!setjmp(done))audio_sink_task(NULL);
     assert(s_audio_playback_pending==0 && "retiring an old held slot must not underflow new-session pending");
@@ -167,64 +169,8 @@ int main(void){
 ''')
 
     def test_ai_prefill_is_bounded_adaptive_and_cancellable(self):
-        source = P4_MEDIA.read_text()
-        constants = '\n'.join(line for line in source.splitlines()
-                              if line.startswith('#define AUDIO_RX_PREFILL_'))
-        run_c(r'''
-#include <assert.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdatomic.h>
-#define STARTER_TIRTC_AI 2
-#define AUDIO_PACKET_MS 20U
-#define pdMS_TO_TICKS(x) (x)
-''' + constants + r'''
-typedef struct {int mode;uint32_t generation;} audio_rx_item_t;
-static atomic_int_fast64_t s_audio_dma_until_us;
-static atomic_uint_fast32_t s_audio_rx_prefill_waits,s_audio_rx_rebuffers,s_audio_rx_prefill_target_ms;
-static int s_audio_rx_ready_queue;
-static int mode=2;static uint32_t generation=7;
-static int64_t now_us=1000000,wait_start;
-static unsigned queued,arrivals,cancel_ms,mute_ms;
-static atomic_bool s_speaker_muted;
-static bool same_session(int m,uint32_t g){return m==mode && g==generation;}
-static int64_t esp_timer_get_time(void){return now_us;}
-static unsigned uxQueueMessagesWaiting(int q){return queued;}
-static void vTaskDelay(unsigned ms){now_us+=ms*1000;
-    if(arrivals && (now_us-wait_start)/20000 > queued && queued<arrivals)queued++;
-    if(cancel_ms && now_us-wait_start>=cancel_ms*1000)generation++;
-    if(mute_ms && now_us-wait_start>=mute_ms*1000)s_speaker_muted=true;
-}
-''' + function(source, 'audio_rx_prefill') + r'''
-int main(void){audio_rx_item_t item={.mode=2,.generation=7};
- wait_start=now_us;arrivals=9;
- assert(audio_rx_prefill(&item));
- assert(now_us-wait_start==180000 && queued==9);
- assert(s_audio_rx_prefill_target_ms==200 && s_audio_rx_prefill_waits==1);
- /* A temporarily empty software queue with DMA audio left is not an underrun. */
- queued=0;arrivals=0;s_audio_dma_until_us=now_us+100000;wait_start=now_us;
- assert(audio_rx_prefill(&item));assert(now_us==wait_start && s_audio_rx_rebuffers==0);
- /* A drained output raises the budget to 240 ms, bounded to 12 packets. */
- now_us+=120000;wait_start=now_us;arrivals=11;
- assert(audio_rx_prefill(&item));assert(now_us-wait_start==220000);
- assert(s_audio_rx_prefill_target_ms==240 && s_audio_rx_rebuffers==1);
- s_audio_dma_until_us=now_us+20000000;now_us+=11000000;
- assert(audio_rx_prefill(&item));assert(s_audio_rx_prefill_target_ms==200);
- /* A one-packet reply must play even if no more packets ever arrive. */
- generation=8;item.generation=8;queued=0;arrivals=0;wait_start=now_us;
- assert(audio_rx_prefill(&item));assert(now_us-wait_start==240000);
- /* Ending/replacing a session during prefill releases the held slot promptly. */
- generation=9;item.generation=9;wait_start=now_us;cancel_ms=10;
- assert(!audio_rx_prefill(&item));assert(now_us-wait_start==10000);
- cancel_ms=0;mode=2;generation=11;item.generation=11;queued=0;arrivals=0;
- s_speaker_muted=true;wait_start=now_us;
- assert(!audio_rx_prefill(&item));assert(now_us==wait_start);
- s_speaker_muted=false;generation=12;item.generation=12;mute_ms=10;wait_start=now_us;
- assert(!audio_rx_prefill(&item));assert(now_us-wait_start==10000);
- mute_ms=0;s_speaker_muted=false;mode=3;item.mode=3;item.generation=generation;wait_start=now_us;
- assert(audio_rx_prefill(&item));assert(now_us==wait_start);
-}
-''')
+        from test_esp_ai_playout import check_prefill
+        check_prefill(P4_MEDIA.read_text())
 
     def test_dma_audio_remains_active_after_write_returns(self):
         source = P4_MEDIA.read_text()
@@ -297,7 +243,7 @@ static bool finish_during_snapshot;
     value; \
 })
 ''' + status + r'''
-int main(void){
+int main(void){starter_ai_playout_reset(7);
     audio_rx_item_t item={.mode=STARTER_TIRTC_AI,.generation=7,.frame.length=37};
     (void)s_audio_dma_until_us;
     clock_us=2000000;
@@ -388,7 +334,7 @@ static starter_media_status_t starter_media_status(void){return media;}
 static char log_text[512];
 #define ESP_LOGI(tag,...) snprintf(log_text,sizeof(log_text),__VA_ARGS__)
 ''' + function(source, 'log_ai_playback_status') + r'''
-int main(void){
+int main(void){starter_ai_playout_reset(7);
     media=(starter_media_status_t){.audio_received=2614,.audio_decoded=2600,
         .audio_played=2599,.audio_rx_overflow=2,.audio_playback_pending=15,
         .audio_playback_active=true,.audio_playback_pcm_ms=51980,
@@ -396,7 +342,7 @@ int main(void){
     log_ai_playback_status("transport-close");
     assert(strstr(log_text,"stage=transport-close generation=7"));
     assert(strstr(log_text,"rx=2614 decoded=2600 written=2599 overflow=2"));
-    assert(strstr(log_text,"pending=15 active=1 pcm-ms=51980 dma-ms=90 last-rx-age-ms=50"));
+    assert(strstr(log_text,"pending=15 active=1 pcm-ms=51980 dma-ms=90 queued-ms=0 target-ms=0 underruns=0 timeout-releases=0 last-rx-age-ms=50"));
     media.audio_playback_pending=0;media.audio_playback_active=false;
     media.audio_playback_dma_ms=0;
     log_ai_playback_status("drained");

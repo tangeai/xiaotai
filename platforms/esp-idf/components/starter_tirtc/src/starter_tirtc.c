@@ -3,7 +3,7 @@
 /*
  * TiRTC SDK 适配层，也是工程中唯一直接依赖 tiRTC.h 的模块。
  *
- * 模块最多持有一条连接：H5 是 SDK 接受的入站连接，AI 是 WHIP 外连。原子
+ * H5 最多四个观看端共用一个媒体所有者，其他业务仍为单连接。原子
  * connection/mode/generation 让 SDK 回调与会话任务能识别当前连接，并拒绝
  * 断连后到达的旧回调。SDK 回调只转换参数并通知 starter_runtime/media，
  * 不执行 HTTP、阻塞等待、TiRtcStop 或 TiRtcUninit。
@@ -21,6 +21,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "tirtc/tiRTC.h"
+#include "h5_fanout_api.h"
 #if CONFIG_IDF_TARGET_ESP32P4 && CONFIG_STARTER_PIPELINE_DIAGNOSTICS
 #include "tirtc/tgtrp.h"
 #endif
@@ -619,20 +620,35 @@ int starter_tirtc_set_video_bitrate_range(uint32_t min_bps, uint32_t max_bps,
                                          min_bps, max_bps, start_bps);
 }
 
+/* Fanout metadata is tiny; SDK calls and callbacks always run outside this lock. */
+static portMUX_TYPE s_h5_lock = portMUX_INITIALIZER_UNLOCKED;
+static unsigned h5_fanout_lock(void) { portENTER_CRITICAL(&s_h5_lock); return 0; }
+static void h5_fanout_unlock(unsigned token) { (void)token; portEXIT_CRITICAL(&s_h5_lock); }
+#define H5_FANOUT_ACTIVE() (atomic_load(&s_mode) == STARTER_TIRTC_H5)
+#define H5_FANOUT_ACCEPTING() atomic_load(&s_accept_h5)
+#define H5_FANOUT_NOW_MS() ((uint32_t)(esp_timer_get_time() / 1000))
+#define H5_FANOUT_AUDIO_ID H5_AUDIO_STREAM
+#define H5_FANOUT_VIDEO_ID H5_VIDEO_STREAM
+#define H5_FANOUT_DOWN_AUDIO_ID H5_DOWN_AUDIO_STREAM
+#define H5_FANOUT_SEND_LIMIT() atomic_load(&s_send_buffer_limit)
+#define H5_FANOUT_LAST_CLOSED() atomic_store(&s_accept_h5, false)
+#define H5_FANOUT_UPLINK_CHANGED() ((void)0)
+#include "h5_fanout_impl.h"
+
 static const TIRTCCALLBACKS s_callbacks = {
     /* SDK 在自己的线程调用这些函数；每个函数都必须快速返回。 */
     .on_event = on_event,
-    .on_conn_accepted = on_conn_accepted,
-    .on_conn_error = on_conn_error,
-    .on_disconnected = on_disconnected,
-    .on_audio = on_audio,
+    .on_conn_accepted = h5_fanout_on_conn_accepted,
+    .on_conn_error = h5_fanout_on_conn_error,
+    .on_disconnected = h5_fanout_on_disconnected,
+    .on_audio = h5_fanout_on_audio,
     .on_video = on_video,
-    .on_command = on_command,
-    .on_request_key_frame = on_request_key_frame,
-    .on_subscribe_video = on_subscribe_video,
-    .on_unsubscribe_video = on_unsubscribe_video,
-    .on_subscribe_audio = on_subscribe_audio,
-    .on_unsubscribe_audio = on_unsubscribe_audio,
+    .on_command = h5_fanout_on_command,
+    .on_request_key_frame = h5_fanout_on_request_key_frame,
+    .on_subscribe_video = h5_fanout_on_subscribe_video,
+    .on_unsubscribe_video = h5_fanout_on_unsubscribe_video,
+    .on_subscribe_audio = h5_fanout_on_subscribe_audio,
+    .on_unsubscribe_audio = h5_fanout_on_unsubscribe_audio,
     .on_update_bitrate = on_update_bitrate,
 };
 
@@ -764,7 +780,7 @@ int starter_tirtc_start(const starter_tirtc_config_t *config)
         return rollback_start("TiRtcSetOption(CLIENT_ID)", rc);
     }
     int network_type = TIRTC_NETCONN_WIFI;
-    int max_connections = 1;
+    int max_connections = XIAOTAI_H5_VIEWERS;
     rc = TiRtcSetOption(TIRTC_OPT_NETWORK_TYPE,
                         &network_type,
                         sizeof(network_type));

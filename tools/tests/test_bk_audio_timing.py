@@ -19,6 +19,7 @@ class AudioTiming(unittest.TestCase):
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include "xiaotai_media_policy.h"
 #define OPUS_PACKET_SLOTS 64
 #define OPUS_MAX_PACKET_BYTES 512
 #define XIAOTAI_AUDIO_CODEC_OPUS_16K 1
@@ -44,7 +45,21 @@ static uint16_t s_opus_lengths[64];
 static size_t s_opus_head,s_opus_count,s_opus_queue_peak;
 static unsigned s_dropped_bytes;
 static atomic_bool s_playback_in_progress;
+static atomic_uint s_playback_tail_ms;
 static atomic_uint s_admission_busy,s_opus_received_frames,s_last_opus_rx_ms,s_last_downlink_ms;
+''' + (AUDIO.parent / 'xiaotai_audio_policy.c').read_text() + r'''
+#define OPUS_SAMPLE_RATE_HZ 16000U
+#define OPUS_MAX_DECODE_SAMPLES 960U
+typedef int opus_int32;
+static int packet_samples=320;
+static int opus_packet_get_nb_samples(const uint8_t *p,opus_int32 n,int rate) {
+    (void)p;(void)n;assert(rate==16000);return packet_samples;
+}
+static uint16_t s_opus_samples[64];
+static uint32_t s_opus_queued_samples;
+static xiaotai_audio_buffer_t s_ai_buffer={.target_ms=100};
+/* Legacy ownership/timing cases release immediately; adaptive cases override. */
+static bool s_ai_buffer_ended=true;
 ''' + diagnostic_block(s) + function(s,'xiaotai_audio_play_opus') + function(s,'opus_ring_take') + r'''
 int main(void){
  ai_playback_timing_t quiet={0}; ai_uplink_timing_t quiet_up={0};
@@ -58,22 +73,22 @@ int main(void){
  assert(quiet.frames==2 && quiet_up.sent==1); /* Measurements continue. */
  log_level=4;
  uint8_t p=42,out;lock_delay=3;
- assert(xiaotai_audio_play_opus(&p,1)==1);
+ assert(xiaotai_audio_play_opus(&p,1,0)==1);
  now=1040;assert(opus_ring_take(&out,1)==1 && out==42);
  assert(s_ai_packet.seq==1 && s_ai_packet.rx_ms==1000 && s_ai_packet.enqueue_ms==1003);
  ai_playback_timing_t stats={0};
  ai_audio_written(&stats,1040,1042,1043,1063,true);
  assert(strstr(logs,"rx_ms=1000") && strstr(logs,"admit_ms=3 queue_ms=37 decode_ms=2 prepare_ms=1 write_ms=20 rx_to_write_ms=63"));
- now=2000;p=43;assert(xiaotai_audio_play_opus(&p,1)==1);
+ now=2000;p=43;assert(xiaotai_audio_play_opus(&p,1,0)==1);
  now=2001;assert(opus_ring_take(&out,1)==1 && out==43);
  ai_audio_written(&stats,2001,2002,2002,2022,false);
  assert(strstr(logs,"gap_ms=1000") && strstr(logs,"ok=0"));
- /* Oldest eviction must evict its diagnostic stamp too. */
- for(unsigned i=0;i<80;i++){now=3000+i;p=i;assert(xiaotai_audio_play_opus(&p,1)==1);}
- now=4000;assert(opus_ring_take(&out,1)==1 && out==16);
- assert(s_ai_packet.rx_ms==3016 && s_ai_packet.seq==19);
+ /* Overflow preserves accepted packets and their diagnostic stamps. */
+ for(unsigned i=0;i<80;i++){now=3000+i;p=i;assert(xiaotai_audio_play_opus(&p,1,0)==(i<64?1:BK_ERR_BUSY));}
+ now=4000;assert(opus_ring_take(&out,1)==1 && out==0);
+ assert(s_ai_packet.rx_ms==3000 && s_ai_packet.seq==3);
  ai_audio_written(&stats,4000,4001,4001,4021,true);
- assert(strstr(logs,"queue_max_ms=984"));
+ assert(strstr(logs,"queue_max_ms=1000"));
  ai_audio_idle(&stats,4221);assert(strstr(logs,"event=idle"));
  size_t len=strlen(logs);ai_audio_idle(&stats,5000);assert(strlen(logs)==len);
  /* Uplink measurements include NS activity only when its result is valid. */
@@ -84,7 +99,7 @@ int main(void){
  assert(strstr(logs,"last_ns_speech_ms=120") && strstr(logs,"rejected=1"));
  puts("AI audio timing PASS: admission=3 ms queue=37 ms decode=2 ms write=20 ms; overflow stamp ownership and idle covered");
 }
-''')
+''', [ROOT / 'platforms/beken/runtime/include', ROOT / 'platforms/common/include'])
 
     def test_signal_queue_delay(self):
         s=(ROOT/'platforms/beken/runtime/src/xiaotai_tirtc.c').read_text()
@@ -111,13 +126,14 @@ int main(void){
  e.generation=8;e.received_ms=1300;now=1302;ai_signal_timing(&e);
  assert(strstr(logs,"generation=8") && strstr(logs,"queue_max_ms=2"));
 }
-''')
+''', [ROOT / 'platforms/beken/runtime/include', ROOT / 'platforms/common/include'])
 
     def test_public_logger_filters_before_formatting(self):
         source=(ROOT/'platforms/beken/runtime/src/xiaotai_log.c').read_text()
         run_c(r'''
 #include <assert.h>
 #include <stdarg.h>
+#include "xiaotai_media_policy.h"
 #include <stdio.h>
 #define XIAOTAI_LOG_NONE 0
 #define XIAOTAI_APP_LOG_MAX 4
@@ -139,7 +155,7 @@ int main(void){
  xiaotai_log_write(2,"audio","warning");assert(written==3);
  xiaotai_log_write(1,"audio","error");assert(written==4);
 }
-''')
+''', [ROOT / 'platforms/beken/runtime/include', ROOT / 'platforms/common/include'])
 
     def test_playback_and_capture_use_real_boundaries(self):
         s=AUDIO.read_text()

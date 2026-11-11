@@ -149,6 +149,13 @@ int main(void) {
             assert(atomic_load(&s_connection) == 0x3333);
         }
     }
+    /* Primary handover can precede the original queued STREAM start. */
+    s_connection=0x4444;s_connection_mode=CONNECTION_STREAM;s_active_generation=8;
+    accepted=0;
+    assert(queue_media_event(MEDIA_EVENT_CONNECTED,(void*)0x3333,8,0));
+    run_worker();assert(accepted==1 && s_connection==0x4444);
+    assert(queue_media_event(MEDIA_EVENT_CONNECTED,(void*)0x3333,7,0));
+    run_worker();assert(accepted==1); /* stale group must not start media */
     return 0;
 }
 ''')

@@ -1,6 +1,7 @@
 """Exercise S3 media workers at the codec, TiRTC and board PCM boundaries."""
 import unittest
 from test_s3_product_regressions import MEDIA, ROOT, function, run_c
+from test_esp_ai_playout import run_media_c as run_c
 from test_s3_playback_drain import playback_fixture
 
 COMMON = f'#include "{ROOT / "platforms/esp-idf/components/starter_media_common/include/starter_playback_scope.h"}"\n' + f'#include "{ROOT / "platforms/esp-idf/components/starter_media_common/include/starter_audio_capture.h"}"\n' + r'''
@@ -54,6 +55,7 @@ static int esp_opus_dec_reset(void *handle){resets++;return 0;}
 static bool same_session(int m,uint32_t g){return m==mode && g==active_generation;}
 '''
 
+COMMON += f'#include "{ROOT / "platforms/common/include/xiaotai_media_policy.h"}"\n'
 COMMON += f'#include "{ROOT / "platforms/esp-idf/components/starter_media_common/include/starter_send_log.h"}"\n'
 
 class S3OpusMedia(unittest.TestCase):
@@ -98,7 +100,7 @@ static const cJSON *cJSON_GetObjectItemCaseSensitive(const cJSON *p,const char *
     return &channels;
 }
 ''' + function(MEDIA.read_text(),'opus_init') + function(runtime,'ai_audio_profile_valid') + r'''
-int main(void){
+int main(void){starter_ai_playout_reset(7);
     assert(opus_init()==0 && s_opus_encoder && s_opus_decoder);
     decoder_fails=true;assert(opus_init()==-1 && !s_opus_encoder && closes==1);
     cJSON profile={1,0,NULL};assert(ai_audio_profile_valid(&profile, false));
@@ -146,7 +148,7 @@ static bool enqueue_uplink_pcm(int m,uint32_t g,uint32_t ts,const int16_t *pcm,s
 static void capture_step(void){uint32_t generation=7;unsigned mute_epoch=0;do{
 ''' + body + r'''
 }while(0);}
-int main(void){
+int main(void){starter_ai_playout_reset(7);
     int16_t memory[1000],history[173],live[294];
     for(int i=0;i<173;i++)history[i]=i;
     for(int i=0;i<294;i++)live[i]=1000+i;
@@ -177,7 +179,7 @@ int main(void){
 
     def test_uplink_discards_frames_invalidated_during_encoding(self):
         for g711 in (False, True):
-            for interruption in range(1, 8):
+            for interruption in range(1, 9):
                 with self.subTest(g711=g711, interruption=interruption):
                     self.check_uplink(g711, interruption)
 
@@ -185,18 +187,18 @@ int main(void){
         run_c(f'#define CONFIG_STARTER_AI_UPLINK_G711A {int(g711)}\n'
               f'#define CONFIG_STARTER_AI_UPLINK_G711A_16K {int(alaw16)}\n'
               f'#define INTERRUPT_CASE {interruption}\n' + COMMON + r'''
-typedef struct {int mode;uint32_t generation,timestamp_ms;unsigned mute_epoch;
+typedef struct {int mode;uint32_t generation,timestamp_ms,queued_at_ms;unsigned mute_epoch;
     size_t sample_count;int16_t pcm[320];} audio_tx_item_t;
 static audio_tx_item_t pool[1],*s_audio_tx_pool=pool;
 static int s_audio_tx_ready_queue=1,s_audio_tx_free_queue=2;
-static atomic_uint s_mute_epoch,s_audio_sent;
+static atomic_uint s_mute_epoch,s_audio_sent,s_audio_dropped;
 static atomic_bool s_microphone_muted,s_uplink_enabled=true,s_room_pressed;
 static jmp_buf done;
 static unsigned reads,opus_enc,alaw_enc,opus_send,alaw_send;
 static size_t encoded_size=37;
 static unsigned interrupt_encode, encode_warnings;
 static void *s_ai_g711_encoder=(void *)2;
-static bool transport_ready=true;
+static bool transport_ready=true,expired_input;
 #undef ESP_LOGW
 #define ESP_LOGW(...) ((void)++encode_warnings)
 static int64_t clock_us;
@@ -218,6 +220,7 @@ static int encode(esp_audio_enc_in_frame_t *in,esp_audio_enc_out_frame_t *out,bo
     case 5: s_uplink_enabled=false;break;
     case 6: s_room_pressed=false;break;
     case 7: transport_ready=false;break;
+    case 8: clock_us+=XIAOTAI_UPLINK_MAX_AGE_MS*1000;break;
     }
     out->encoded_bytes=opus ? encoded_size :
         (CONFIG_STARTER_AI_UPLINK_G711A_16K && mode==STARTER_TIRTC_AI ? 320 : 160);
@@ -243,12 +246,12 @@ static int starter_tirtc_send_opus(uint32_t ts,const void *data,uint32_t size){
 }
 ''' + playback_fixture(MEDIA.read_text()) + function(MEDIA.read_text(), 'update_max_counter') + function(MEDIA.read_text(), 'update_timing_average') + function(MEDIA.read_text(), 'uplink_allowed') + function(MEDIA.read_text(), 'audio_uplink_task') + r'''
 static void replay(void){
-    reads=0;pool[0]=(audio_tx_item_t){.mode=mode,.generation=active_generation,.timestamp_ms=100,
+    reads=0;pool[0]=(audio_tx_item_t){.mode=mode,.generation=active_generation,.timestamp_ms=100,.queued_at_ms=(uint32_t)(clock_us/1000)-(expired_input?XIAOTAI_UPLINK_MAX_AGE_MS:0),
         .sample_count=mode==STARTER_TIRTC_AI && (!CONFIG_STARTER_AI_UPLINK_G711A ||
                        CONFIG_STARTER_AI_UPLINK_G711A_16K) ? 320 : 160};pool[0].pcm[0]=42;
     if(setjmp(done)==0) audio_uplink_task(NULL);
 }
-int main(void){
+int main(void){starter_ai_playout_reset(7);
     for(int i=0;i<100;i++){
         active_generation=7+i;
         mode=STARTER_TIRTC_AI;encoded_size=37+i;replay();
@@ -261,6 +264,8 @@ int main(void){
     assert(atomic_load(&s_audio_encode_max_us)==(CONFIG_STARTER_AI_UPLINK_G711A ? 800 : 3000));
     mode=STARTER_TIRTC_AI;codec_error=-1;replay();assert(opus_send==expected_opus && alaw_send==expected_alaw);
     codec_error=0;s_microphone_muted=true;replay();assert(opus_enc+alaw_enc==201);
+    s_microphone_muted=false;expired_input=true;replay();expired_input=false;
+    assert(opus_enc+alaw_enc==201 && s_audio_dropped==1);
     if (INTERRUPT_CASE) {
         s_microphone_muted=false;s_room_pressed=true;
         mode=INTERRUPT_CASE==6 ? STARTER_TIRTC_ROOM : STARTER_TIRTC_AI;
@@ -283,7 +288,7 @@ int main(void){
 #define AUDIO_TRACE_WRITTEN 4
 static void starter_audio_trace_record(unsigned s,uint32_t g,uint32_t t,uint32_t l,unsigned m,unsigned f,unsigned id,const void*d,uint32_t at,uint32_t detail){}
 typedef struct {int mode;uint32_t generation;struct {size_t length;uint32_t timestamp_ms,media,flags,stream_id;} frame;
-    uint8_t payload[1500];} audio_rx_item_t;
+    uint32_t received_at_ms;uint8_t payload[1500];} audio_rx_item_t;
 static int16_t s_decode_pcm[1500],s_play_stereo[6000];
 static uint32_t s_playback_resampler_generation;
 static int16_t s_playback_previous;
@@ -320,8 +325,8 @@ static int write_pcm(void *context,const int16_t *pcm,size_t frames,size_t *writ
 }
 static struct {void *context;int (*write_pcm)(void *,const int16_t *,size_t,size_t *);} adapter={NULL,write_pcm},*s_audio_adapter=&adapter;
 ''' + playback_fixture(MEDIA.read_text()) + function(MEDIA.read_text(), 'update_max_counter') + function(MEDIA.read_text(), 'update_timing_average') + function(MEDIA.read_text(), 'play_audio_item') + r'''
-static bool play(audio_rx_item_t *item){memset(s_play_stereo,0x55,sizeof(s_play_stereo));return play_audio_item(item);}
-int main(void){
+static bool play(audio_rx_item_t *item){item->received_at_ms=(uint32_t)(esp_timer_get_time()/1000);memset(s_play_stereo,0x55,sizeof(s_play_stereo));return play_audio_item(item);}
+int main(void){starter_ai_playout_reset(7);
     audio_rx_item_t item={.generation=7,.frame.length=37};
     for(int i=0;i<100;i++){
         item.generation=active_generation=7+i;
@@ -335,6 +340,7 @@ int main(void){
         assert(s_playback_scope.at_ms==published_ms); /* non-AI audio leaves scope alone */
     }
     assert(opus_dec==100 && alaw_dec==100 && writes==200 && resets==100);
+
     assert(atomic_load(&s_audio_decode_max_us)==5000);
     assert(atomic_load(&s_audio_lock_max_us)==1000);
     assert(atomic_load(&s_audio_write_max_us)==20000);
@@ -363,6 +369,10 @@ int main(void){
     assert(!memcmp(evidence+48+37,s_decode_pcm,640));
     starter_audio_capture_stop(&s_audio_capture);
     assert(play(&item) && s_audio_capture.count==1);
+    unsigned before=writes;mode=item.mode=STARTER_TIRTC_H5;
+    item.received_at_ms=(uint32_t)(esp_timer_get_time()/1000)-159;
+    memset(s_play_stereo,0x55,sizeof(s_play_stereo));
+    assert(!play_audio_item(&item) && writes==before); /* expired during decode/lock */
 }
 ''')
 

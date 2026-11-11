@@ -40,6 +40,7 @@ static bool running=true,uplink=true,stuck;
 static bool connection_matches(tirtc_conn_t c){return c==current;}
 static bool xiaotai_audio_running(void){return running;}
 static bool xiaotai_audio_playback_is_drained(unsigned quiet){(void)quiet;drain_checks++;return pending==0;}
+static void xiaotai_audio_playback_boundary(bool ended){assert(ended);}
 static void xiaotai_audio_log_playback_status(const char *s){(void)s;}
 static void xiaotai_audio_set_uplink_enabled(bool enabled){uplink=enabled;}
 static unsigned rtos_get_time(void){return clock_ms;}

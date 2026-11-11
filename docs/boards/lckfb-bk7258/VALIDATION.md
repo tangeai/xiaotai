@@ -79,3 +79,7 @@ OTA、长期运行、弱网恢复、双讲 AEC、音量边界与重启保存、�
 硬件 PCB 修订、Flash JEDEC 和物理 PSRAM 容量等证据继续补充。
 
 旧版记录见 [GitHub Releases](https://github.com/tangeai/xiaotai/releases)。
+
+## 2026-11-11 统一媒体策略发布
+
+本轮精确版本、镜像 SHA-256、用户实板反馈和未修复限制见[五板发布验证记录](../../product/MEDIA_CONTRACT.md#2026-11-11-五板发布验证记录)。

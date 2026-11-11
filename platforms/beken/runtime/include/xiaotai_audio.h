@@ -34,7 +34,10 @@ int xiaotai_audio_start_duplex(xiaotai_audio_codec_t uplink_codec,
  * Returns the number of bytes accepted, or a negative error code.
  */
 int xiaotai_audio_play_alaw(const uint8_t *data, size_t size);
-int xiaotai_audio_play_opus(const uint8_t *data, size_t size);
+int xiaotai_audio_play_opus(const uint8_t *data, size_t size, uint32_t timestamp_ms);
+/** Current-session control/media workers: begin(false) or release tail(true).
+ * End does not reject late audio; the next explicit round start clears it. */
+void xiaotai_audio_playback_boundary(bool ended);
 
 int xiaotai_audio_stop(void);
 bool xiaotai_audio_running(void);

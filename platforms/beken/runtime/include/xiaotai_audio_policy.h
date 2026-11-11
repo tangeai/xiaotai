@@ -38,4 +38,7 @@ bool xiaotai_audio_playback_drained(bool running, size_t queued_frames,
                                     uint32_t now_ms,
                                     uint32_t quiet_ms);
 
+/* One pure playout policy shared with the ESP-IDF adapters. */
+#include "../../../common/include/xiaotai_audio_buffer.h"
+
 #endif

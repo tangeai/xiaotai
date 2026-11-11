@@ -2255,6 +2255,16 @@ static void handle_ai_ui(control_event_t *event)
     rtos_unlock_mutex(&s_runtime_mutex);
     if (!current || event->text == NULL) return;
 
+    cJSON *boundary = cJSON_Parse(event->text);
+    const cJSON *method = cJSON_GetObjectItemCaseSensitive(boundary, "method");
+    if (cJSON_IsString(method)) {
+        if (strcmp(method->valuestring, "round_start") == 0)
+            xiaotai_audio_playback_boundary(false);
+        else if (strcmp(method->valuestring, "round_end") == 0)
+            xiaotai_audio_playback_boundary(true);
+    }
+    cJSON_Delete(boundary);
+
     char previous_emotion[sizeof(s_ai_view.emotion)];
     snprintf(previous_emotion, sizeof(previous_emotion), "%s",
              s_ai_view.emotion);
@@ -2298,6 +2308,7 @@ static void handle_ai_end(uint32_t generation)
     rtos_unlock_mutex(&s_runtime_mutex);
     if (!current) return;
     xiaotai_audio_set_uplink_enabled(false);
+    xiaotai_audio_playback_boundary(true);
     xiaotai_audio_log_playback_status("end-session");
     xiaotai_ui_show_status("ENDING");
     BK_LOGI(TAG,
@@ -3818,7 +3829,7 @@ static void supervisor_task(beken_thread_arg_t argument)
         .max_send_buffer = 128U * 1024U,
         /* The product arbiter owns one media session at a time. This matches
          * the TiRTC ESP32 reference and avoids reserving an unused slot. */
-        .max_connections = 1,
+        .max_connections = 4,
         .poll_timeout_ms = 20,
     };
     s_tirtc_config_ready = true;

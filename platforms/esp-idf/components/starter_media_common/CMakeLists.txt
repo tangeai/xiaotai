@@ -2,6 +2,7 @@
 # component. This file deliberately does not call idf_component_register():
 # codec, camera and DMA ownership remain with the selected board component.
 set(XIAOTAI_STARTER_MEDIA_COMMON_SRCS
+    "${CMAKE_CURRENT_LIST_DIR}/src/starter_ai_playout.c"
     "${CMAKE_CURRENT_LIST_DIR}/src/starter_pcm_observer.c"
     "${CMAKE_CURRENT_LIST_DIR}/src/starter_recognition_player.c"
     "${CMAKE_CURRENT_LIST_DIR}/src/starter_raw_recognition.c"
