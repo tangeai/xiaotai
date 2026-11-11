@@ -626,6 +626,7 @@ static bool enqueue_uplink_pcm(starter_tirtc_mode_t mode,
 static void audio_uplink_task(void *argument)
 {
     starter_send_log_t send_log = {0};
+    starter_send_log_t encode_log = {0};
     (void)argument;
     uint8_t encoded_packet[OPUS_MAX_PACKET_BYTES];
 #if !CONFIG_STARTER_AI_UPLINK_G711A
@@ -704,10 +705,12 @@ static void audio_uplink_task(void *argument)
                                  (unsigned long)item->timestamp_ms);
                     }
                 }
-            } else if (!encoded_ok) {
-                ESP_LOGW(TAG, "uplink encode failed mode=%d ret=%s bytes=%u",
+            } else if (!encoded_ok && starter_error_log_due(&encode_log, item->generation,
+                        (uint32_t)(esp_timer_get_time() / 1000))) {
+                ESP_LOGW(TAG, "uplink encode failed mode=%d ret=%s bytes=%u failures=%lu",
                          (int)item->mode,
-                         esp_err_to_name(encoded), (unsigned)output.encoded_bytes);
+                         esp_err_to_name(encoded), (unsigned)output.encoded_bytes,
+                         (unsigned long)encode_log.failures);
             }
         }
         memset(item, 0, sizeof(*item));

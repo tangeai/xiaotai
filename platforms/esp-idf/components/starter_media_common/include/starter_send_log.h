@@ -11,6 +11,21 @@ typedef struct {
     bool failing;
 } starter_send_log_t;
 
+/* Error-only source: bound output even if failures alternate with successes. */
+static inline bool starter_error_log_due(starter_send_log_t *state,
+    uint32_t generation, uint32_t now_ms)
+{
+    if (state->generation != generation)
+        *state = (starter_send_log_t){.generation = generation};
+    if (state->failures != UINT32_MAX) ++state->failures;
+    if (!state->failing || (uint32_t)(now_ms - state->last_log_ms) >= 5000U) {
+        state->failing = true;
+        state->last_log_ms = now_ms;
+        return true;
+    }
+    return false;
+}
+
 static inline void starter_send_log_record(starter_send_log_t *state,
     const char *tag, uint32_t generation, int mode, int result, uint32_t now_ms)
 {

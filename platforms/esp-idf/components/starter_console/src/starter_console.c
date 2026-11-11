@@ -39,10 +39,13 @@ static esp_console_repl_t *s_repl;
 #if CONFIG_STARTER_AUDIO_PACKET_TRACE
 static int command_audio_trace(int argc, char **argv)
 {
-    if (argc != 2) { puts("Usage: audio-trace arm|stop|status|dump"); return 1; }
+    if (argc != 2) { puts("Usage: audio-trace arm|stop|status|dump|clear"); return 1; }
     if (!strcmp(argv[1], "arm")) {
         bool ok = !starter_media_status().active && starter_audio_trace_arm();
         printf("AUDIO_TRACE_ARM ok=%u\n", (unsigned)ok); return ok ? 0 : 1;
+    }
+    if (!strcmp(argv[1], "clear")) {
+        starter_audio_trace_clear(); puts("AUDIO_TRACE_CLEARED"); return 0;
     }
     if (!strcmp(argv[1], "stop")) starter_audio_trace_stop();
     else if (strcmp(argv[1], "status") && strcmp(argv[1], "dump")) return 1;

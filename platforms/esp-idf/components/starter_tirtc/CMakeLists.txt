@@ -1,9 +1,14 @@
 set(xiaotai_starter_tirtc_dir "${CMAKE_CURRENT_LIST_DIR}")
 
+set(audio_trace_sources)
+if(CONFIG_STARTER_AUDIO_PACKET_TRACE)
+    list(APPEND audio_trace_sources "${xiaotai_starter_tirtc_dir}/src/starter_audio_trace.c")
+endif()
+
 idf_component_register(
     SRCS "${xiaotai_starter_tirtc_dir}/src/starter_tirtc.c"
          "${xiaotai_starter_tirtc_dir}/src/starter_pipeline_diag.c"
-         "${xiaotai_starter_tirtc_dir}/src/starter_audio_trace.c"
+         ${audio_trace_sources}
     INCLUDE_DIRS "${xiaotai_starter_tirtc_dir}/include"
     REQUIRES tirtc_sdk freertos
     PRIV_REQUIRES log esp_timer lwip

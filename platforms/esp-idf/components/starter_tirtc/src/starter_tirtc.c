@@ -430,7 +430,7 @@ static void on_audio(tirtc_conn_t connection,
         uint32_t rejected = (uint32_t)atomic_fetch_add_explicit(
                                 &s_downlink_audio_rejected, 1,
                                 memory_order_relaxed) + 1U;
-        if (rejected <= 3U || rejected % 100U == 0U) {
+        if (rejected <= 3U) {
             ESP_LOGW(TAG,
                      "downlink rejected mode=%d stream=%u media=%u flags=%u len=%lu",
                      (int)mode,

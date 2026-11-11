@@ -36,10 +36,16 @@ int main(void){TIRTCFRAMEINFO frame={.stream_id=1,.media=4,.flags=1,.length=61};
  for(unsigned i=0;i<1000;i++)on_audio((void *)1,&frame,"payload");
  assert(delivered==1000 && s_downlink_audio_accepted==1000);
  assert(infos==0 && "successful media delivery must not perform INFO serial IO in the SDK callback");
- frame.flags=0;on_audio((void *)1,&frame,"payload");
- assert(warnings==1 && delivered==1000 && s_downlink_audio_rejected==1);
+ frame.flags=0;for(unsigned i=0;i<10000;i++)on_audio((void *)1,&frame,"payload");
+ assert(warnings<=3 && delivered==1000 && s_downlink_audio_rejected==10000);
 }
 ''')
+
+    def test_encode_error_burst_has_bounded_logging(self):
+        header=ROOT/'platforms/esp-idf/components/starter_media_common/include/starter_send_log.h'
+        code = '#include <assert.h>\n#include <stdint.h>\n#include <stdbool.h>\n#define ESP_LOGI(...) ((void)0)\n#define ESP_LOGW(...) ((void)0)\n#include "'+str(header)+'"\n'
+        code += 'int main(void){starter_send_log_t s={0};unsigned logs=0;for(unsigned i=0;i<1000;i++)logs+=starter_error_log_due(&s,7,i*20);assert(logs==4&&s.failures==1000);assert(starter_error_log_due(&s,8,20000));assert(s.failures==1);assert(starter_error_log_due(&s,9,UINT32_MAX-10));assert(starter_error_log_due(&s,9,4990));}'
+        run_c(code)
 
     def test_ringtone_handoff_cancellation_stays_quiet(self):
         source=(ROOT/'platforms/esp-idf/components/starter_product/src/starter_product.c').read_text()

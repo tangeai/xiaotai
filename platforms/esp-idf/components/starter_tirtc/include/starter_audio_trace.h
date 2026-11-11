@@ -13,6 +13,7 @@ typedef struct {
 } starter_audio_trace_row_t;
 bool starter_audio_trace_arm(void);
 void starter_audio_trace_stop(void);
+void starter_audio_trace_clear(void);
 void starter_audio_trace_status(size_t *count, uint32_t *lost, bool *armed);
 bool starter_audio_trace_read(size_t index, starter_audio_trace_row_t *row);
 void starter_audio_trace_record(unsigned stage, uint32_t generation,

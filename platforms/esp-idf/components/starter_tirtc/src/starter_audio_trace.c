@@ -51,6 +51,18 @@ void starter_audio_trace_stop(void)
 {
     lock_wait(); atomic_store(&trace_armed, false); unlock();
 }
+void starter_audio_trace_clear(void)
+{
+    /* Serialize against record/read; epoch invalidates an in-flight old writer. */
+    lock_wait();
+    atomic_store(&trace_armed, false);
+    atomic_fetch_add(&trace_epoch, 1);
+    free(trace_rows);
+    trace_rows = NULL;
+    trace_count = 0;
+    atomic_store(&trace_lost, 0);
+    unlock();
+}
 void starter_audio_trace_status(size_t *count, uint32_t *lost, bool *armed)
 {
     lock_wait();

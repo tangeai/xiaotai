@@ -17,7 +17,13 @@ static long long esp_timer_get_time(void){return 0;}
 void starter_audio_trace_record(unsigned s,uint32_t g,uint32_t t,uint32_t l,unsigned m,unsigned f,unsigned id,const void*d,uint32_t at,uint32_t detail){traced++;}
 """
         code=captured[0];last=code.rfind('}')
-        run_c(pre+code[:last]+'assert(traced==1001);'+code[last:])
+        run_c(pre+code[:last]+'assert(traced==11000);'+code[last:])
+
+    def test_clear_releases_trace_and_allows_rearm(self):
+        base=ROOT/'platforms/esp-idf/components/starter_tirtc'
+        code = '#include "'+str(base/'src/starter_audio_trace.c')+'"\n'
+        code += '#include <assert.h>\nint main(void){assert(starter_audio_trace_arm()); starter_audio_trace_clear(); assert(trace_rows==NULL); size_t n;uint32_t lost;bool armed;starter_audio_trace_status(&n,&lost,&armed);assert(!n&&!lost&&!armed); assert(starter_audio_trace_arm());starter_audio_trace_clear();starter_audio_trace_clear();assert(trace_rows==NULL);}'
+        run_c(code, [base/"include"])
 
     def test_opt_in_bounded_capture_and_stopped_read(self):
         base=ROOT/'platforms/esp-idf/components/starter_tirtc'
