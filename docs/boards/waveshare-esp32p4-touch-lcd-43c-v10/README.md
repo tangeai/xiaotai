@@ -198,13 +198,13 @@ TODO：下一次实板回归时，重新保存主叫、被叫、上行首包和�
 | C6 从机固件 | 与当前主工程匹配的版本 | 无 | 无 |
 
 当前 TiRTC 库为 `20260922-p4-fixes2` 本地修复批次，运行时仍标记 2.5.0。
-库的来源与验证边界见工程 `third_party/tirtc/VERSION.md` 和 `BUILD_EVIDENCE.md`；
+库的来源与验证边界见 `platforms/esp-idf/third_party/tirtc/esp32p4/VERSION.md` 和 `BUILD_EVIDENCE.md`；
 本表校验值标识仓库中的库，不代表所有历史发布包均采用同一批次。
 
 组件的完整解析版本以工程依赖锁定文件和 TiRTC
-[校验清单](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/third_party/tirtc/SHA256SUMS.txt)为准。
+[校验清单](../../../platforms/esp-idf/third_party/tirtc/esp32p4/SHA256SUMS.txt)为准。
 
-TiRTC SDK 与 S3 工程采用相同目录划分：`third_party/tirtc/` 存放厂商库、
+P4 的 TiRTC SDK 统一存放在平台目录：`platforms/esp-idf/third_party/tirtc/esp32p4/` 存放厂商库、
 头文件、版本和编译契约；`components/tirtc_sdk/CMakeLists.txt` 保留项目的
 ABI 校验和链接配置。升级时仅替换前者，并核对后者锁定的库 SHA-256、
 目标芯片和 ABI 要求；不要用 SDK 包覆盖整个 component。P4 与 S3 的库不能混用。

@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Configure the production S3 SDK component and validate the linked archives."""
 from pathlib import Path
+import hashlib
 import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parents[2]
 for name in ("lckfb-esp32s3-xiaotai",):
     project = root / "firmware/esp-idf/esp32s3" / name
-    sdk = project / "third_party/tirtc"
-    component = project / "components/tirtc_sdk"
+    sdk = root / "platforms/esp-idf/third_party/tirtc/esp32s3"
+    component = root / "platforms/esp-idf/components/tirtc_sdk"
     with tempfile.TemporaryDirectory(prefix="s3-sdk-link-") as directory:
         p = Path(directory)
         (p / "dummy.c").write_text("int sdk_link_test;\n")
@@ -35,8 +36,9 @@ for name in ("lckfb-esp32s3-xiaotai",):
         archive = Path((p / "build/sdk-archive.txt").read_text())
         assert archive.resolve() == (sdk / "lib/libTiRTC.a").resolve()
         data = archive.read_bytes()
-        assert b"v2.5.0\x00" in data and b'"tirtc":"v2.5.0-' in data
+        assert hashlib.sha256(data).hexdigest() == "4739ec70b895bde848205c36a114c34b2ed4ab27761f2c6bf37d1b2a982a451d"
+        assert b"v2.6.0\x00" in data and b'"tirtc":"v2.6.0-' in data
         with (p / "member.o").open("wb") as output:
             subprocess.run(["ar", "p", str(archive), "crc32.o"], stdout=output, check=True)
         assert "Xtensa" in subprocess.check_output(["readelf", "-h", str(p / "member.o")], text=True)
-    print("PASS: actual S3 component selects the supplied Xtensa TiRTC 2.5.0 archive")
+    print("PASS: actual S3 component selects the supplied Xtensa TiRTC 2.6.0 archive")

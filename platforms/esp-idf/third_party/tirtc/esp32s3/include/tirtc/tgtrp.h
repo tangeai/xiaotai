@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-#define TGTRP_INTERFACE_VERSION "tag.v1.5.18"
+#define TGTRP_INTERFACE_VERSION "tag.v1.5.29" // tag.v1.5.29版本修改完成
 
 #define MAX_TGTRP_ADDR_INFO_SIZE 40
 
@@ -339,10 +339,48 @@ typedef struct tgtrp_connection_time_stats {
 void tgtrp_init(size_t max_snd_buff_size);
 
 /**
+ * @brief 启用可选媒体传输；嵌入式端库默认关闭。
+ * @note 启动时串行调用，且须在创建 listener/连接之前调用。
+ *       本接口幂等，启用状态在 init/uninit 之间保留。
+ *       APP端库默认支持媒体传输，本接口仅为兼容保留，不执行额外操作。
+ *       若要使嵌入式端库的静态可执行程序不包含媒体传输实现，
+ *       不要引用本函数或媒体传输实现符号，
+ *       也不要通过 --whole-archive 强制链接整个静态库。
+ */
+void tgtrp_enable_media_transport(void);
+
+/**
  * @brief 反初始化TIRTC库，释放全局资源
- * @note 异步调用: 否 (非阻塞)
+ * @note APP端库仅支持受控反初始化：先 destroy 所有连接、close 所有 listener，
+ *       再由应用控制线程调用；本函数会等待已发起的内部关闭和统计上传清理完成。
+ *       不支持仍有存活对象、SDK 回调内调用或任意时机卸载。
  */
 void tgtrp_uninit(void);
+
+/** Results of synchronous library cleanup. */
+enum TGTRP_SYNC_RESULT {
+    TGTRP_SYNC_OK = 0,
+    TGTRP_SYNC_ERROR = -1,
+    TGTRP_SYNC_BUSY = -3,
+    TGTRP_SYNC_UNSUPPORTED = -4
+};
+
+/**
+ * @brief 反初始化库；嵌入式端库等待本轮异步销毁完成，APP端库执行受控同步清理。
+ * @return 嵌入式端库：OK 可再次 init；BUSY 尚有未请求关闭的连接/listener；
+ *         ERROR 清理投递失败，可重试；UNSUPPORTED 当前实现不支持。
+ *         APP端库：满足受控调用前提并完成清理后返回 OK。
+ * @note APP端库会等待已请求的连接/listener 关闭及内部统计上传取消完成，
+ *       但不会代替应用关闭仍存活的对象，也不支持任意时机卸载。
+ * @note 由应用控制线程串行调用，不在 SDK 回调内调用，不持有回调需要的锁。
+ *       先 destroy 连接、close listener，再调用本接口。嵌入式端库也可先调用得到 BUSY，
+ *       关闭剩余对象后重试；BUSY/ERROR 后仅允许关闭和重试，不能重新 init。
+ * @note 嵌入式端库不设等待超时，等待内部清理及回调退出，不只等待用户 close 回调。
+ *       库及依赖必须保持加载；允许 SCTP 内部资源延迟释放，OK 不允许 dlclose。
+ *       安全流程使用本接口，不与旧 tgtrp_uninit 混用。
+ */
+int tgtrp_uninit_sync(void);
+
 
 /**
  * @brief 获取SIGNAL_INTERFACE_VERSION
@@ -355,7 +393,7 @@ const char* tgtrp_get_version(void);
 /**
  * @brief 设置全局网络socket轮询超时时间
  * @details 对当前运行中及后续创建的监听、连接和共享线程生效。
- *          普通构建下，传入值会被限制到1~50毫秒；Google WebRTC构建仍使用0毫秒非阻塞轮询。
+ *          嵌入式端库将传入值限制到1~50毫秒；APP端库仍使用0毫秒非阻塞轮询。
  * @note 同步调用。当前正在进行的轮询仍使用旧值，下一轮开始使用新值。
  *
  * @param timeout_ms 轮询超时时间（毫秒）
@@ -364,10 +402,20 @@ const char* tgtrp_get_version(void);
 int tgtrp_set_net_sock_poll_timeout(int timeout_ms);
 
 /**
+ * @brief 设置全局 TGTRP 音频冗余丢包率阈值，默认 10%。
+ * @param loss_percent 百分比，限制到 0~100；0 始终开启，100 始终关闭。
+ *        1~99 时，有效对端丢包率严格大于阈值才开启。
+ * @note 对所有 TGTRP 连接生效；仍受对端 BUNDLE 版本、历史帧和 MTU 限制。
+ *       无内部加锁，应在启动连接前串行设置；可在 tgtrp_init 前调用。
+ * @return 实际保存的百分比；嵌入式端库未启用 media transport，或APP端库已加载的旧动态库不支持时返回 -1。
+ */
+int tgtrp_set_audio_redundancy_loss_threshold(int loss_percent);
+
+/**
  * @brief 创建一个新的监听器对象
  * @note 异步调用: 非阻塞
  *
- * @param max_conn_num 允许的最大并发连接数。示例: 10
+ * @param max_conn_num 允许的最大并发连接数，仅嵌入式端库生效；APP端库当前不限制连接数。示例: 10
  * @return tgtrp_listener 成功返回监听器句柄，失败返回NULL
  */
 tgtrp_listener tgtrp_listener_new(int max_conn_num);
@@ -449,6 +497,18 @@ void tgtrp_close(tgtrp_listener obj, void (*close_finish_cb)(void* context), voi
  * @return tgtrp_connection 成功返回连接句柄，失败返回NULL
  */
 tgtrp_connection tgtrp_connection_new(void);
+
+/**
+ * Set an outgoing connection option before tgtrp_connection_call().
+ * Supports TGTRP_TURN_SERVER_ADDR_DOMAIN only: 0 (default) or 1.
+ * With a v20-aware signal server, either endpoint requesting a domain makes
+ * both endpoints receive TURN/TGRelay domain names.
+ * Returns 0 on success, -1 for invalid/unsupported input, an incoming or
+ * closed connection, a call already started, or an unsupported loaded library.
+ * Serialize this setter with call/close; it does not update an active call.
+ */
+int tgtrp_connection_set_opt(tgtrp_connection conn,
+                             enum TGTRP_LISTENER_OPTION opt, int value);
 
 /**
  * @brief 设置连接超时时间
@@ -565,7 +625,8 @@ void tgtrp_connection_set_on_channel(tgtrp_connection pconn, void (*on_newchanne
  * @note 异步调用: 否 (非阻塞)
  *
  * @param pconn 连接句柄 (参数名补充)。示例: 由 tgtrp_connection_new 返回的指针
- * @param label_name Channel的标签名称，长度不超过12字节。示例: "data_ch_1"
+ * @param label_name Channel的标签名称。为兼容嵌入式端库，必须是以 `\0` 结尾的非空字符串，
+ *                   标签内容长度为1~11字节（不含结尾 `\0`）；不支持12字节标签。示例: "data_ch_1"
  */
 void tgtrp_channel_new(tgtrp_connection pconn, const char label_name[12]);
 
@@ -741,7 +802,7 @@ int tgtrp_channel_sendv(tgtrp_connection pc, tgtrp_channel c, struct tgtrp_chann
  *
  * @param pc 连接句柄
  * @param c Channel句柄
- * @param stream_id TGTRP媒体流ID，非TGTRP传输模式下忽略；TGTRP模式下0xe0~0xff为内部保留值
+ * @param stream_id TGTRP媒体流ID，0xe0~0xff为内部保留值，所有传输模式下均拒绝
  * @param frame_type 视频帧类型，参见 enum TGTRP_CHANNEL_VIDEO_FRAME_TYPE
  * @param vec 数据向量数组
  * @param vec_cnt 向量数组的元素个数
@@ -760,7 +821,7 @@ int tgtrp_channel_video_sndv(tgtrp_connection pc, tgtrp_channel c, uint8_t strea
  *
  * @param pc 连接句柄
  * @param c Channel句柄
- * @param stream_id TGTRP媒体流ID，非TGTRP传输模式下忽略；TGTRP模式下0xe0~0xff为内部保留值
+ * @param stream_id TGTRP媒体流ID，0xe0~0xff为内部保留值，所有传输模式下均拒绝
  * @param vec 数据向量数组
  * @param vec_cnt 向量数组的元素个数
  * @return >0 表示底层已接受本次音频帧，返回所有vec的应用载荷长度之和；内部协议头和调试头不计入。
@@ -778,7 +839,7 @@ int tgtrp_channel_audio_sndv(tgtrp_connection pc, tgtrp_channel c, uint8_t strea
  *
  * @param pc 连接句柄
  * @param c Channel句柄
- * @param stream_id TGTRP媒体流ID，非TGTRP传输模式下忽略；TGTRP模式下0xe0~0xff为内部保留值
+ * @param stream_id TGTRP媒体流ID，0xe0~0xff为内部保留值，所有传输模式下均拒绝
  * @param vec 数据向量数组
  * @param vec_cnt 向量数组的元素个数
  * @return >0 表示底层已接受本次数据帧，返回所有vec的应用载荷长度之和；内部协议头和调试头不计入。

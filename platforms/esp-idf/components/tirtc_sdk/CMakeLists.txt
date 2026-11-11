@@ -4,7 +4,7 @@ if(NOT DEFINED TIRTC_SDK_DIR OR TIRTC_SDK_DIR STREQUAL "")
         set(TIRTC_SDK_DIR "$ENV{TIRTC_SDK_DIR}")
     else()
         get_filename_component(TIRTC_SDK_DIR
-            "${CMAKE_CURRENT_LIST_DIR}/../../third_party/tirtc" ABSOLUTE)
+            "${CMAKE_CURRENT_LIST_DIR}/../../third_party/tirtc/esp32s3" ABSOLUTE)
     endif()
 endif()
 

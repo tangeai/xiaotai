@@ -1,5 +1,3 @@
 *.patch -whitespace
-# Keep the supplied S3 SDK headers byte-identical, including vendor CRLF endings.
-firmware/esp-idf/esp32s3/*/third_party/tirtc/include/**/*.h whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
-# The pinned CoreS3 SDK also has vendor trailing spaces; preserve SHA256SUMS.
-firmware/esp-idf/esp32s3/m5stack-cores3-lite/third_party/tirtc/include/**/*.h whitespace=-blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Preserve vendor SDK headers and their checksum identity after relocation.
+platforms/esp-idf/third_party/tirtc/esp32s3/include/**/*.h whitespace=-blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

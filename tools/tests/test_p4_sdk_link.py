@@ -7,7 +7,7 @@ import tempfile
 
 root = Path(__file__).resolve().parents[2]
 project = root / "firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c"
-sdk = project / "third_party/tirtc"
+sdk = root / "platforms/esp-idf/third_party/tirtc/esp32p4"
 component = project / "components/tirtc_sdk"
 expected = "6c5c1543f4a099c2f8fdfdff5b50ef728cf181ce09931c2798d34e84d22473b1"
 assert hashlib.sha256((sdk / "lib/libTiRTC.a").read_bytes()).hexdigest() == expected, "P4 SDK candidate not installed"

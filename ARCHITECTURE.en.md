@@ -10,6 +10,13 @@ The ESP32-S3 and ESP32-P4 projects use **ESP-IDF v5.5.5**, commit `b774170ff46c3
 
 Historical compiler versions for third-party SDKs are recorded in their manifests.
 
+The LCKFB and M5 ESP32-S3 projects share the SDK in
+`platforms/esp-idf/third_party/tirtc/esp32s3/`. The shared
+`platforms/esp-idf/components/tirtc_sdk/` validates the ABI and links it.
+Update the library, matching headers, build contract, and checksums together,
+and build both boards. P4 uses the sibling `esp32p4/` SDK directory and retains
+its dedicated integration component.
+
 ## Product capabilities
 
 XiaoTai supports browser-based live view and two-way audio (H5), AI voice conversations, device-to-device calls, and WeChat VoIP calls.

@@ -168,11 +168,13 @@ Screen changes require registered resolution, orientation, and layout plus font,
 | ESP-IDF components | ESP-Hosted 1.4.7, ESP-SR 2.4.6, `esp_h264` 1.3.8, `esp_codec_dev` 1.5.10, Waveshare 4.3 BSP v1.0.1 | [Dependency lockfile](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/dependencies.lock) | — |
 | C6 slave firmware | Version matching the current host project | — | — |
 
-The TiRTC library is local fix batch `20260922-p4-fixes2`, still reporting runtime 2.5.0. Project `third_party/tirtc/VERSION.md` and `BUILD_EVIDENCE.md` describe provenance and validation limits. The checksum identifies the repository library, not necessarily every historical release's library.
+The TiRTC library is local fix batch `20260922-p4-fixes2`, still reporting runtime 2.5.0. `platforms/esp-idf/third_party/tirtc/esp32p4/VERSION.md` and `BUILD_EVIDENCE.md` describe provenance and validation limits. The checksum identifies the repository library, not necessarily every historical release's library.
 
-Full resolved versions come from the lockfile and TiRTC [checksum manifest](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/third_party/tirtc/SHA256SUMS.txt).
+Full resolved versions come from the lockfile and TiRTC [checksum manifest](../../../platforms/esp-idf/third_party/tirtc/esp32p4/SHA256SUMS.txt).
 
-TiRTC uses the same layout as S3: `third_party/tirtc/` holds vendor libraries, headers, versions, and build contracts; `components/tirtc_sdk/CMakeLists.txt` retains project ABI checks and linking. Upgrade only the former and verify the latter's library SHA-256, target, and ABI requirements.
+The P4 project uses the platform SDK directory: `platforms/esp-idf/third_party/tirtc/esp32p4/` holds vendor libraries, headers, versions, and build contracts; `components/tirtc_sdk/CMakeLists.txt` retains project ABI checks and linking.
+
+Upgrade only the former and verify the latter's library SHA-256, target, and ABI requirements.
 
 Do not overwrite the entire component with an SDK package. P4 and S3 libraries are not interchangeable.
 

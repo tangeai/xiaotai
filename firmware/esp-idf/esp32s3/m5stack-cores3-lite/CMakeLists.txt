@@ -7,7 +7,15 @@ set(XIAOTAI_BOARD_VARIANT "ili9342e" CACHE STRING "CoreS3-Lite LCD revision")
 if(NOT XIAOTAI_BOARD_VARIANT MATCHES "^(ili9342c|ili9342e)$")
     message(FATAL_ERROR "Select ili9342c or ili9342e")
 endif()
-set(TIRTC_SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/third_party/tirtc" CACHE PATH "TiRTC ESP32-S3 SDK")
+# Migrate only the former board-local default; preserve explicit SDK overrides.
+if(TIRTC_SDK_DIR STREQUAL "${CMAKE_CURRENT_LIST_DIR}/third_party/tirtc")
+    unset(TIRTC_SDK_DIR CACHE)
+    unset(TIRTC_SDK_DIR)
+endif()
+set(TIRTC_SDK_DIR "${XIAOTAI_REPO_ROOT}/platforms/esp-idf/third_party/tirtc/esp32s3"
+    CACHE PATH "TiRTC ESP32-S3 SDK root")
+list(APPEND EXTRA_COMPONENT_DIRS "${XIAOTAI_REPO_ROOT}/platforms/esp-idf/components/tirtc_sdk")
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(m5stack_cores3_lite_xiaotai)
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/check_memory_config.cmake")

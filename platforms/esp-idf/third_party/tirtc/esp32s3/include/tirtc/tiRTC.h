@@ -171,7 +171,7 @@ extern "C" {
 #endif
 
 #define TIRTC_VERSION_MAJOR     2
-#define TIRTC_VERSION_MINOR     5
+#define TIRTC_VERSION_MINOR     6
 #define TIRTC_VERSION_PATCH     0
 /* -------------------------------------------------------------------------
  * 错误码
@@ -298,8 +298,12 @@ typedef enum TIRTCOPTION {
     /** tgtrp轮询超时时间(ms). 取值 1~50. 一般为1, 加大可减少系统负载，但会增加响应时间。慎用!
      * 返回: 实际生效的值
      */
-    TIRTC_OPT_TGTRP_POLL_TIMEOUT
+    TIRTC_OPT_TGTRP_POLL_TIMEOUT,
 
+    /** 本sdk内部所有线程的优先级.
+     * 仅对 rtos 系统有效
+     */
+    TIRTC_OPT_SDK_TASK_PRIORITY
     /** 是否在连接关闭时打印统计日志 （`int *`, 0 不打印 / 1 打印). 默认 0. */
     //TIRTC_OPT_PRINT_CONN_STAT
 

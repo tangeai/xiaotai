@@ -1,6 +1,6 @@
 # Keep vendor files outside the component so SDK replacement preserves project gates.
 get_filename_component(TIRTC_SDK_DIR
-    "${CMAKE_CURRENT_LIST_DIR}/../../third_party/tirtc" ABSOLUTE)
+    "${CMAKE_CURRENT_LIST_DIR}/../../../../../../platforms/esp-idf/third_party/tirtc/esp32p4" ABSOLUTE)
 foreach(required IN ITEMS include/tirtc/tiRTC.h lib/libTiRTC.a manifest/build-contract.env)
     if(NOT EXISTS "${TIRTC_SDK_DIR}/${required}")
         message(FATAL_ERROR "Incomplete TiRTC P4 SDK: ${TIRTC_SDK_DIR}/${required}")

@@ -181,7 +181,7 @@ AEC 输出的 16 kHz PCM；H5 和语音呼叫仍降采样到 8 kHz，AI 下行�
 | 主机环境 | Linux/WSL2、Git、Python 3 | [Git](https://git-scm.com/downloads)、[Python](https://www.python.org/downloads/) | 无 |
 | ESP-IDF | `v5.5.5`，提交 `b774170ff46c393eeb5e495ea37936038d3f4f4f` | [Espressif 官方仓库](https://github.com/espressif/esp-idf/tree/b774170ff46c393eeb5e495ea37936038d3f4f4f) | 无 |
 | C/C++ 编译器 | `xtensa-esp-elf-gcc 14.2.0`，构建标识 `esp-14.2.0_20260121` | [ESP-IDF 工具清单](https://github.com/espressif/esp-idf/blob/b774170ff46c393eeb5e495ea37936038d3f4f4f/tools/tools.json) | 无，安装器按工具清单校验下载文件 |
-| TiRTC | 2.5.0，`libTiRTC.a` | 无 | `7334e846ed4261b5297607c85acafe1d586a22374f7c8e37b102b2742e47c7aa` |
+| TiRTC | 2.6.0，`libTiRTC.a` | 无 | `4739ec70b895bde848205c36a114c34b2ed4ab27761f2c6bf37d1b2a982a451d` |
 | ESP-IDF 组件 | ESP-SR 2.4.7、LVGL 8.3.11、`esp_codec_dev` 1.6.2、`esp32-camera` 2.1.7、`esp_jpeg` 1.3.1 | [工程依赖锁定文件](../../../firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/dependencies.lock) | 无 |
 | 板级组件 | ES7210、ES8311、触摸与屏幕组件 | 无 | 无 |
 
@@ -212,14 +212,13 @@ xiaotai/
 ├── product/                                # 跨芯片复用的业务状态、协议与测试
 ├── platforms/esp-idf/
 │   ├── main/app_main.c                     # ESP32-S3 公共启动入口
-│   └── components/                         # 公共运行时、页面、联网、语音和 TiRTC 组件
+│   ├── components/                         # 公共运行时、页面、联网、语音和 TiRTC 组件
+│   └── third_party/tirtc/esp32s3/           # 两个 S3 板共用的 SDK
 └── firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/
     ├── main/                               # 选择公共入口并配置本工程
     ├── components/starter_media/           # GC2145、音频和 JPEG 媒体适配
     ├── components/starter_voice/           # 唤醒模型和板级语音配置
     ├── components/starter_product/         # 本板使用的页面资源和产品资源
-    ├── components/tirtc_sdk/                # TiRTC 库接入与任务策略
-    ├── third_party/tirtc/                   # 当前工程使用的 TiRTC 库
     ├── tools/                               # 本工程主机测试入口
     └── *-contract.json                      # 硬件、交互和媒体契约
 ```
@@ -238,7 +237,7 @@ xiaotai/
 | 麦克风、扬声器、AEC、GC2145 和 JPEG | 工程 `components/starter_media/`、`platforms/esp-idf/components/starter_media_common/` | 引脚和外设时序留在板级适配 |
 | 离线唤醒和语音模型 | 工程 `components/starter_voice/`、`platforms/esp-idf/components/starter_voice/` | 模型文件和运行逻辑分开维护 |
 | 配网、绑定、MQTT、配置和串口命令 | `platforms/esp-idf/components/` 下对应组件 | 板级工程只选择和配置公共组件 |
-| TiRTC 连接、流编号和媒体收发 | `platforms/esp-idf/components/starter_tirtc/`、工程 `components/tirtc_sdk/` | 不把 H5、设备呼叫和微信流配置混用 |
+| TiRTC 连接、流编号和媒体收发 | `platforms/esp-idf/components/starter_tirtc/`、`platforms/esp-idf/components/tirtc_sdk/` | 不把 H5、设备呼叫和微信流配置混用 |
 | 回归测试和构建约束 | `product/tests/`、工程 `tools/`、`tools/tests/` | 修改行为时先补失败用例，再改实现 |
 
 ### 推荐修改顺序

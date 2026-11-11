@@ -185,7 +185,7 @@ H5 和通话仍使用原有 8 kHz 路径。
 `bash tools/setup_esp_idf.sh esp32s3` 安装仓库指定版本。
 组件声明的 `>=5.5,<5.6` 只是兼容范围，不是本次使用版本。
 
-TiRTC SDK 2.5.0 使用本工程 `third_party/tirtc`，受其 ABI 构建合同约束。
+TiRTC SDK 2.6.0 使用公共目录 `platforms/esp-idf/third_party/tirtc/esp32s3`，受其 ABI 构建合同约束。
 LVGL 8.3.11、esp_lvgl_port 2.7.2、esp32-camera 2.1.7、esp-sr 2.4.7、
 esp_audio_codec 2.4.0、esp_lcd_ili9341 2.1.0；全部实际解析版本及哈希见 `dependencies.lock`。
 编译不读取 `.references` 或用户提供的旧工程。

@@ -151,7 +151,7 @@ LCKFB S3, Waveshare P4, and BK7258 use the same AI network formats while retaini
 
 The application toolchain is **ESP-IDF v5.5.5**, commit `b774170ff46c393eeb5e495ea37936038d3f4f4f`. Run `. tools/activate_esp_idf.sh` from the root and verify `idf.py --version`. Install missing tools with `bash tools/setup_esp_idf.sh esp32s3`. `>=5.5,<5.6` is a compatibility range, not the selected version.
 
-TiRTC SDK 2.5.0 comes from this project's `third_party/tirtc` and follows its ABI build contract. Dependencies include LVGL 8.3.11, esp_lvgl_port 2.7.2, esp32-camera 2.1.7, esp-sr 2.4.7, esp_audio_codec 2.4.0, and esp_lcd_ili9341 2.1.0. `dependencies.lock` records resolved versions and hashes.
+TiRTC SDK 2.6.0 comes from shared `platforms/esp-idf/third_party/tirtc/esp32s3` and follows its ABI build contract. Dependencies include LVGL 8.3.11, esp_lvgl_port 2.7.2, esp32-camera 2.1.7, esp-sr 2.4.7, esp_audio_codec 2.4.0, and esp_lcd_ili9341 2.1.0. `dependencies.lock` records resolved versions and hashes.
 
 Builds do not read `.references` or user-supplied old projects.
 

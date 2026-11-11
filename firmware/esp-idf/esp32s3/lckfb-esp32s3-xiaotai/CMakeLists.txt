@@ -8,10 +8,14 @@ xiaotai_find_repository_root(XIAOTAI_REPO_ROOT)
 set(PROJECT_VER "1.1.0")
 include("${XIAOTAI_REPO_ROOT}/platforms/esp-idf/cmake/xiaotai_build_version.cmake")
 
-# 生成器把 SDK 复制到 third_party/tirtc，使生成工程可以离开本仓库独立构建。
-# 高级用户仍可通过 -DTIRTC_SDK_DIR=<path> 指向另一份兼容 SDK。
-set(TIRTC_SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/third_party/tirtc"
+# Migrate only the former board-local default; preserve explicit SDK overrides.
+if(TIRTC_SDK_DIR STREQUAL "${CMAKE_CURRENT_LIST_DIR}/third_party/tirtc")
+    unset(TIRTC_SDK_DIR CACHE)
+    unset(TIRTC_SDK_DIR)
+endif()
+set(TIRTC_SDK_DIR "${XIAOTAI_REPO_ROOT}/platforms/esp-idf/third_party/tirtc/esp32s3"
     CACHE PATH "TiRTC ESP32-S3 SDK root")
+list(APPEND EXTRA_COMPONENT_DIRS "${XIAOTAI_REPO_ROOT}/platforms/esp-idf/components/tirtc_sdk")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(lckfb_esp32s3_xiaotai)

@@ -11,6 +11,10 @@
 `. tools/activate_esp_idf.sh`，再用 `idf.py --version` 核对。组件清单中的
 `>=5.5,<5.6` 是兼容范围，不是当前构建版本；第三方 SDK 的历史编译版本另见其清单。
 
+ESP32-S3 的立创与 M5 工程共用 `platforms/esp-idf/third_party/tirtc/esp32s3/` 中的 SDK，
+由 `platforms/esp-idf/components/tirtc_sdk/` 统一校验 ABI 并链接。更新 SDK 时同时更新
+库、配套头文件、构建契约和校验清单，并编译两个板卡。P4 的独立目标库位于同级 `esp32p4/` 目录，保留其专用接入组件。
+
 ## 产品能力
 
 小钛目前支持 H5（网页端）实时查看与双向对讲、AI（人工智能）语音对话、设备呼叫和微信网络通话。

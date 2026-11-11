@@ -243,10 +243,10 @@
     "verification": "build_verified",
     "tirtc": {
       "platform": "espressif-esp32s3",
-      "version": "2.5.0",
-      "sdk_path": "third_party/tirtc",
+      "version": "2.6.0",
+      "sdk_path": "../../../../platforms/esp-idf/third_party/tirtc/esp32s3",
       "build_contract": "manifest/build-contract.env",
-      "archive_sha256": "7334e846ed4261b5297607c85acafe1d586a22374f7c8e37b102b2742e47c7aa",
+      "archive_sha256": "4739ec70b895bde848205c36a114c34b2ed4ab27761f2c6bf37d1b2a982a451d",
       "required_config": {
         "CONFIG_FREERTOS_HZ": "1000",
         "CONFIG_FREERTOS_USE_TRACE_FACILITY": "off",

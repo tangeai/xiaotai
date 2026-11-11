@@ -250,8 +250,8 @@
     "verification": "corroborated",
     "tirtc": {
       "platform": "espressif-esp32s3",
-      "version": "2.5.0",
-      "sdk_path": "../../../firmware/esp-idf/esp32s3/m5stack-cores3-lite/third_party/tirtc",
+      "version": "2.6.0",
+      "sdk_path": "../../../platforms/esp-idf/third_party/tirtc/esp32s3",
       "build_contract": "manifest/build-contract.env"
     },
     "source_refs": [

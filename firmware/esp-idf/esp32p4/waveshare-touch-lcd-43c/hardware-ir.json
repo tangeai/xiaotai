@@ -85,7 +85,7 @@
     "tirtc": {
       "platform": "espressif-esp32p4",
       "version": "2.5.0",
-      "sdk_path": "third_party/tirtc",
+      "sdk_path": "../../../../platforms/esp-idf/third_party/tirtc/esp32p4",
       "build_contract": "manifest/build-contract.env",
       "archive_sha256": "6c5c1543f4a099c2f8fdfdff5b50ef728cf181ce09931c2798d34e84d22473b1"
     },

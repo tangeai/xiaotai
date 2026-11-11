@@ -370,7 +370,7 @@ class RepositoryLayoutTests(unittest.TestCase):
             "lckfb-esp32s3": (
                 "b774170ff46c393eeb5e495ea37936038d3f4f4f",
                 "xtensa-esp-elf-gcc 14.2.0",
-                "7334e846ed4261b5297607c85acafe1d586a22374f7c8e37b102b2742e47c7aa",
+                "4739ec70b895bde848205c36a114c34b2ed4ab27761f2c6bf37d1b2a982a451d",
             ),
             "waveshare-esp32p4-touch-lcd-43c-v10": (
                 "b774170ff46c393eeb5e495ea37936038d3f4f4f",
@@ -531,7 +531,7 @@ class RepositoryLayoutTests(unittest.TestCase):
     def test_third_party_checklist_tracks_current_asset_locations(self):
         checklist = (ROOT / "THIRD_PARTY.md").read_text(encoding="utf-8")
         for expected in (
-            "firmware/**/third_party/tirtc/",
+            "platforms/**/third_party/tirtc/",
             "platforms/esp-idf/components/starter_voice/vendor/",
             "product/assets/models/nihaoxiaotai/",
             "main/ui/font/lv_font_cn_14.c",

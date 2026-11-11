@@ -3,8 +3,9 @@ set -euo pipefail
 
 project_dir=${1:-.}
 elf=${2:-}
-cmake_file="$project_dir/components/tirtc_sdk/CMakeLists.txt"
-policy_source="$project_dir/components/tirtc_sdk/src/tirtc_task_stack_policy.c"
+repo_root=$(cd "$project_dir/../../../.." && pwd)
+cmake_file="$repo_root/platforms/esp-idf/components/tirtc_sdk/CMakeLists.txt"
+policy_source="$repo_root/platforms/esp-idf/components/tirtc_sdk/src/tirtc_task_stack_policy.c"
 
 fail() {
     echo "TiRTC thread stack policy failed: $1" >&2
