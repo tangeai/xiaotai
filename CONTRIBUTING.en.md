@@ -316,6 +316,20 @@ This preserves the existing ZIP bytes. When adding a merged BIN to an existing R
 
 Uploading still requires user authorization and does not perform an automatic `git push`.
 
+### Release notes template
+
+Use the [bilingual release notes template](.github/release_notes_template.md) for every release, Chinese first and English second. Keep this order: Overview, Added, Changed, Fixed, Known issues, Validation, Downloads and upgrade.
+
+This is a project workflow convention. GitHub does not automatically apply this template to Release bodies.
+
+- Review actual differences from an explicit baseline for the same board and variant. Do not substitute commit titles, work logs, or test checklists for release notes.
+- Added explains new user capabilities; Changed explains previous and new behavior and upgrade impact; Fixed states the trigger, previous failure, and resulting behavior.
+- Retain applicable earlier known issues and outstanding work. Use “无 / None” for an empty category.
+- Include only changes applicable to the board. Never describe plans, unverified outcomes, or known SDK problems as resolved.
+- Verify Chinese facts before translating. Versions, parameters, scope, limitations, and evidence levels must match. Keep the prescribed release title format.
+- Put validation and flashing details after changes. Distinguish user feedback, automated results, and measured hardware evidence; state configuration and compatibility effects.
+- Remove placeholders before publication, then read back both languages, release flags, and assets. Generated commit lists are input material, not a substitute for the release body.
+
 ### Maintaining download links
 
 [Firmware downloads](docs/downloads.en.md) is the sole current-release index. Root README, board directory, and guides link to `docs/downloads.md#<board-id>` rather than duplicating versions or versioned URLs. Use full board names for section headings and explicit HTML anchors for board IDs.

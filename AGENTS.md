@@ -46,6 +46,12 @@ Use its naming table and completion checks. Native build scripts and board
 guides define artifact paths; the rule index in
 [CONTRIBUTING.md](CONTRIBUTING.md#约束规则索引) identifies each other authority.
 
+When drafting or editing release notes, use the
+[bilingual release template](.github/release_notes_template.md) and follow
+[the release-note rules](CONTRIBUTING.md#发布说明模板).
+Verify board-specific changes against an explicit baseline and publish matching
+Chinese and English sections, including unresolved issues and validation scope.
+
 When changing UI, buttons, voice controls, or user-visible flow, read
 [`PRODUCT_INTERACTION_PROFILES.md`](docs/product/PRODUCT_INTERACTION_PROFILES.md)
 and [`product/interaction/README.md`](product/interaction/README.md). Keep

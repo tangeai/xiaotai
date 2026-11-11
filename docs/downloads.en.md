@@ -28,7 +28,7 @@ Use firmware for LCKFB BK7258. The ZIP contains the complete image for initial f
 
 | Hardware | Current release | Merged image (BIN) | Firmware package (ZIP) | Release notes |
 |---|---|---|---|---|
-| LCKFB BK7258 | v1.0.2 · build.73 | Included in ZIP | [Download ZIP](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.2-build.73/lckfb-bk7258-1.0.2%2Bbuild.73-validation.zip) | [Release notes](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.2-build.73) |
+| LCKFB BK7258 | v1.0.2 · build.86 | Included in ZIP | [Download ZIP](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.2-build.86/lckfb-bk7258-1.0.2%2Bbuild.86-validation.zip) | [Release notes](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.2-build.86) |
 
 [Flashing guide](boards/lckfb-bk7258/README.en.md#flashing) · [Hardware](boards/lckfb-bk7258/README.en.md#specifications) · [Build and debug](boards/lckfb-bk7258/README.en.md#development-directories)
 
@@ -46,6 +46,12 @@ For PCB V1.0.1. Check the revision printed on the board before downloading.
 
 This release supports AI audio recognition. See the [release notes (Chinese)](boards/lckfb-esp32s3/RELEASE_NOTES_1.1.0_BUILD45.md) for features and validation scope.
 
+Preview: **v1.1.0 · build.68 (pre-release)**. The AI intercom issue attributed to TiRTC SDK remains; retest after the SDK update. The stable entry above remains unchanged.
+
+- [Download BIN](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.1.0-build.68/lckfb-esp32s3-1.1.0%2Bbuild.68-merged.bin)
+- [Download ZIP](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.1.0-build.68/lckfb-esp32s3-1.1.0%2Bbuild.68-validation.zip)
+- [Release notes](https://github.com/tangeai/xiaotai/releases/tag/lckfb-esp32s3-v1.1.0-build.68)
+
 [Flashing guide](boards/lckfb-esp32s3/README.en.md#flashing) · [Hardware](boards/lckfb-esp32s3/README.en.md#specifications) · [Build and debug](boards/lckfb-esp32s3/README.en.md#development)
 
 <a id="waveshare-esp32p4-touch-lcd-43c-v10"></a>
@@ -58,7 +64,7 @@ For the 4.3-inch display model with PCB V1.0. Check both display size and board 
 
 | Hardware | Current release | Merged image (BIN) | Firmware package (ZIP) | Release notes |
 |---|---|---|---|---|
-| PCB V1.0 | v1.1.0 · build.27 | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0/waveshare-esp32p4-touch-lcd-43c-v10-1.1.0%2Bbuild.27-merged.bin) | [Download ZIP](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0/waveshare-esp32p4-touch-lcd-43c-v10-1.1.0%2Bbuild.27-validation.zip) | [Release notes](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0) |
+| PCB V1.0 | v1.1.0 · build.40 | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0-build.40/waveshare-esp32p4-touch-lcd-43c-v10-1.1.0%2Bbuild.40-merged.bin) | [Download ZIP](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0-build.40/waveshare-esp32p4-touch-lcd-43c-v10-1.1.0%2Bbuild.40-validation.zip) | [Release notes](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0-build.40) |
 
 [Flashing guide](boards/waveshare-esp32p4-touch-lcd-43c-v10/README.en.md#flashing) · [Hardware](boards/waveshare-esp32p4-touch-lcd-43c-v10/README.en.md#specifications) · [Build and debug](boards/waveshare-esp32p4-touch-lcd-43c-v10/README.en.md#development)
 
@@ -72,10 +78,10 @@ For model K128-Lite. Identify whether the display controller is ILI9342E or ILI9
 
 | Hardware | Current release | Merged image (BIN) | Firmware package (ZIP) | Release notes |
 |---|---|---|---|---|
-| ILI9342E | No release assets available | — | — | [Historical validation (Chinese)](../boards/m5stack/cores3-lite/VALIDATION.md) |
+| ILI9342E | v1.1.0 · build.71 | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.1.0-build.71-ili9342e/m5stack-cores3-lite-1.1.0%2Bbuild.71-merged.bin) | [Download ZIP](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.1.0-build.71-ili9342e/m5stack-cores3-lite-1.1.0%2Bbuild.71-validation.zip) | [Release notes](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.1.0-build.71-ili9342e) |
 | ILI9342C | v1.0.1 · build.48 | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1-build.48-ili9342c/m5stack-cores3-lite-1.0.1%2Bbuild.48-merged.bin) | [Download ZIP](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1-build.48-ili9342c/m5stack-cores3-lite-1.0.1%2Bbuild.48-validation.zip) | [Release notes](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1-build.48-ili9342c) |
 
-Historical ILI9342E build.47 assets are currently unavailable. Build from source using the board guide and validate it yourself; do not substitute ILI9342C firmware.
+ILI9342E build.71 uses the unified media policy; do not substitute ILI9342C firmware.
 
 [Flashing guide](boards/m5stack-cores3-lite/README.en.md#flashing) · [Hardware](boards/m5stack-cores3-lite/README.en.md#specifications) · [Build and debug](boards/m5stack-cores3-lite/README.en.md#development)
 
@@ -89,7 +95,7 @@ For the MGKFB board with dual eye displays and 8 MiB Flash, using one firmware i
 
 | Hardware | Current release | Merged image (BIN) | Firmware package (ZIP) | Release notes |
 |---|---|---|---|---|
-| Dual eye displays · 8 MiB Flash | v1.0.3 · build.30 | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.30/mgkfb-bk7258-1.0.3%2Bbuild.30-all-app.bin) | [Download ZIP](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.30/mgkfb-bk7258-1.0.3%2Bbuild.30-validation.zip) | [Release notes](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.30) |
+| Dual eye displays · 8 MiB Flash | v1.0.3 · build.39 | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.39/mgkfb-bk7258-1.0.3%2Bbuild.39-all-app.bin) | [Download ZIP](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.39/mgkfb-bk7258-1.0.3%2Bbuild.39-validation.zip) | [Release notes](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.39) |
 
 [Flashing guide](boards/mgkfb-bk7258/README.en.md#flashing) · [Hardware](boards/mgkfb-bk7258/README.en.md#specifications) · [Build and debug](boards/mgkfb-bk7258/README.en.md#development-directories)
 

@@ -31,7 +31,7 @@ BK 包内的 `-app_pack.rbl` 用于 OTA（无线）升级，不能用于首次�
 
 | 适用硬件 | 当前正式版 | 完整镜像（BIN） | 固件包（ZIP） | 发布说明 |
 |---|---|---|---|---|
-| 立创·实战派 BK7258 | v1.0.2 · build.73 | 包含在 ZIP 中 | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.2-build.73/lckfb-bk7258-1.0.2%2Bbuild.73-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.2-build.73) |
+| 立创·实战派 BK7258 | v1.0.2 · build.86 | 包含在 ZIP 中 | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/bk7258-v1.0.2-build.86/lckfb-bk7258-1.0.2%2Bbuild.86-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/bk7258-v1.0.2-build.86) |
 
 [烧录指南](boards/lckfb-bk7258/README.md#烧录) · [硬件资料](boards/lckfb-bk7258/README.md#规格) · [编译与调试](boards/lckfb-bk7258/README.md#开发目录)
 
@@ -49,6 +49,12 @@ BK 包内的 `-app_pack.rbl` 用于 OTA（无线）升级，不能用于首次�
 
 本版支持 AI 音频识别，功能和验证范围见[版本说明](boards/lckfb-esp32s3/RELEASE_NOTES_1.1.0_BUILD45.md)。
 
+预发布：**v1.1.0 · build.68（pre-release）**。AI 对讲仍有已锁定的 TiRTC SDK 问题，待 SDK 更新后复测；上方正式版入口保留。
+
+- [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.1.0-build.68/lckfb-esp32s3-1.1.0%2Bbuild.68-merged.bin)
+- [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/lckfb-esp32s3-v1.1.0-build.68/lckfb-esp32s3-1.1.0%2Bbuild.68-validation.zip)
+- [查看说明](https://github.com/tangeai/xiaotai/releases/tag/lckfb-esp32s3-v1.1.0-build.68)
+
 [烧录指南](boards/lckfb-esp32s3/README.md#烧录) · [硬件资料](boards/lckfb-esp32s3/README.md#规格) · [编译与调试](boards/lckfb-esp32s3/README.md#开发)
 
 <a id="waveshare-esp32p4-touch-lcd-43c-v10"></a>
@@ -61,7 +67,7 @@ BK 包内的 `-app_pack.rbl` 用于 OTA（无线）升级，不能用于首次�
 
 | 适用硬件 | 当前正式版 | 完整镜像（BIN） | 固件包（ZIP） | 发布说明 |
 |---|---|---|---|---|
-| PCB V1.0 | v1.1.0 · build.27 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0/waveshare-esp32p4-touch-lcd-43c-v10-1.1.0%2Bbuild.27-merged.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0/waveshare-esp32p4-touch-lcd-43c-v10-1.1.0%2Bbuild.27-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0) |
+| PCB V1.0 | v1.1.0 · build.40 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0-build.40/waveshare-esp32p4-touch-lcd-43c-v10-1.1.0%2Bbuild.40-merged.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0-build.40/waveshare-esp32p4-touch-lcd-43c-v10-1.1.0%2Bbuild.40-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/waveshare-esp32p4-touch-lcd-43c-v10-v1.1.0-build.40) |
 
 [烧录指南](boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录) · [硬件资料](boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#规格) · [编译与调试](boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#开发)
 
@@ -75,10 +81,10 @@ BK 包内的 `-app_pack.rbl` 用于 OTA（无线）升级，不能用于首次�
 
 | 适用硬件 | 当前正式版 | 完整镜像（BIN） | 固件包（ZIP） | 发布说明 |
 |---|---|---|---|---|
-| ILI9342E | 暂无可用发布附件 | — | — | [历史验证记录](../boards/m5stack/cores3-lite/VALIDATION.md) |
+| ILI9342E | v1.1.0 · build.71 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.1.0-build.71-ili9342e/m5stack-cores3-lite-1.1.0%2Bbuild.71-merged.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.1.0-build.71-ili9342e/m5stack-cores3-lite-1.1.0%2Bbuild.71-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.1.0-build.71-ili9342e) |
 | ILI9342C | v1.0.1 · build.48 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1-build.48-ili9342c/m5stack-cores3-lite-1.0.1%2Bbuild.48-merged.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/m5stack-cores3-lite-v1.0.1-build.48-ili9342c/m5stack-cores3-lite-1.0.1%2Bbuild.48-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/m5stack-cores3-lite-v1.0.1-build.48-ili9342c) |
 
-ILI9342E 的历史 build.47 发布附件当前不可用，可按本板指南从源码编译并自行验证；不要使用 ILI9342C 固件替代。
+ILI9342E build.71 已同步统一媒体策略；不要使用 ILI9342C 固件替代。
 
 [烧录指南](boards/m5stack-cores3-lite/README.md#烧录) · [硬件资料](boards/m5stack-cores3-lite/README.md#规格) · [编译与调试](boards/m5stack-cores3-lite/README.md#开发)
 
@@ -92,7 +98,7 @@ ILI9342E 的历史 build.47 发布附件当前不可用，可按本板指南从�
 
 | 适用硬件 | 当前正式版 | 完整镜像（BIN） | 固件包（ZIP） | 发布说明 |
 |---|---|---|---|---|
-| 双屏眼睛 · 8 MiB Flash | v1.0.3 · build.30 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.30/mgkfb-bk7258-1.0.3%2Bbuild.30-all-app.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.30/mgkfb-bk7258-1.0.3%2Bbuild.30-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.30) |
+| 双屏眼睛 · 8 MiB Flash | v1.0.3 · build.39 | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.39/mgkfb-bk7258-1.0.3%2Bbuild.39-all-app.bin) | [下载 ZIP](https://github.com/tangeai/xiaotai/releases/download/mgkfb-bk7258-v1.0.3-build.39/mgkfb-bk7258-1.0.3%2Bbuild.39-validation.zip) | [查看说明](https://github.com/tangeai/xiaotai/releases/tag/mgkfb-bk7258-v1.0.3-build.39) |
 
 [烧录指南](boards/mgkfb-bk7258/README.md#烧录) · [硬件资料](boards/mgkfb-bk7258/README.md#规格) · [编译与调试](boards/mgkfb-bk7258/README.md#开发目录)
 
