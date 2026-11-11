@@ -379,13 +379,14 @@ static void *s_opus_decoder;
 static uint8_t *s_jpeg_buffer;
 
 /* 下行会话和启动期绑定播报复用这些缓冲，不放到任务栈上。 */
-EXT_RAM_BSS_ATTR static int16_t s_decode_pcm[AUDIO_RX_BYTES];
+EXT_RAM_BSS_ATTR static int16_t s_decode_pcm[1920]; /* Opus: up to 120 ms at 16 kHz. */
 /* ES8311 consumes ordinary interleaved 16-bit stereo PCM.  Keep this exactly
  * aligned with the validated device-monitor board adapter. */
 EXT_RAM_BSS_ATTR static int16_t
     s_play_stereo[AUDIO_RX_BYTES * AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT];
 static uint32_t s_playback_resampler_generation;
 static int16_t s_playback_previous;
+
 
 static void update_max_counter(atomic_uint_fast32_t *counter, uint32_t value)
 {
@@ -461,7 +462,7 @@ static esp_err_t opus_init(void)
     esp_opus_dec_cfg_t decoder = ESP_OPUS_DEC_CONFIG_DEFAULT();
     decoder.sample_rate = ESP_AUDIO_SAMPLE_RATE_16K;
     decoder.channel = ESP_AUDIO_MONO;
-    decoder.frame_duration = ESP_OPUS_DEC_FRAME_DURATION_20_MS;
+    decoder.frame_duration = ESP_OPUS_DEC_FRAME_DURATION_120_MS;
     if (esp_opus_enc_open(&encoder, sizeof(encoder), &s_opus_encoder) !=
         ESP_AUDIO_ERR_OK) return ESP_FAIL;
     if (esp_opus_dec_open(&decoder, sizeof(decoder), &s_opus_decoder) !=
@@ -945,8 +946,12 @@ static bool play_audio_item(const audio_rx_item_t *item)
     update_max_counter(&s_audio_decode_max_us, decode_us);
     update_timing_average(&s_decode_average, item->generation,
                           &s_audio_decode_avg_us, decode_us);
-    if (result != ESP_AUDIO_ERR_OK ||
-        output.decoded_size == 0U) {
+    if (result != ESP_AUDIO_ERR_OK || output.decoded_size == 0U ||
+        output.decoded_size > sizeof(s_decode_pcm) ||
+        output.decoded_size % sizeof(int16_t) != 0U ||
+        (item->mode == STARTER_TIRTC_AI &&
+         (input.consumed != input.len || info.sample_rate != 16000 ||
+          info.channel != 1 || info.bits_per_sample != 16))) {
         atomic_fetch_add_explicit(&s_audio_decode_failed, 1, memory_order_relaxed);
         return false;
     }
@@ -954,7 +959,9 @@ static bool play_audio_item(const audio_rx_item_t *item)
 
     size_t mono_samples = output.decoded_size / sizeof(int16_t);
     atomic_store_explicit(&s_audio_pcm_last_samples, mono_samples, memory_order_relaxed);
-    if (mono_samples > AUDIO_RX_BYTES) {
+    size_t expansion = item->mode == STARTER_TIRTC_AI ? 2U : AUDIO_PLAYBACK_I2S_VALUES_PER_INPUT;
+    if (mono_samples > sizeof(s_play_stereo) / sizeof(s_play_stereo[0]) / expansion) {
+        atomic_fetch_add_explicit(&s_audio_decode_failed, 1, memory_order_relaxed);
         return false;
     }
     int64_t lock_start_us = esp_timer_get_time();

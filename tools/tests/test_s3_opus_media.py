@@ -36,7 +36,7 @@ typedef int esp_err_t;
 typedef int esp_audio_err_t;
 typedef struct {uint8_t *buffer;size_t len;} esp_audio_enc_in_frame_t;
 typedef struct {uint8_t *buffer;size_t len,encoded_bytes;} esp_audio_enc_out_frame_t;
-typedef struct {uint8_t *buffer;size_t len;} esp_audio_dec_in_raw_t;
+typedef struct {uint8_t *buffer;size_t len,consumed;} esp_audio_dec_in_raw_t;
 typedef struct {uint8_t *buffer;size_t len,decoded_size;} esp_audio_dec_out_frame_t;
 typedef struct {int sample_rate,channel,bits_per_sample;} esp_audio_dec_info_t;
 void *s_g711_encoder,*s_opus_encoder,*s_g711_decoder,*s_opus_decoder;
@@ -65,6 +65,7 @@ class S3OpusMedia(unittest.TestCase):
 #define ESP_AUDIO_BIT16 16
 #define ESP_OPUS_ENC_FRAME_DURATION_20_MS 20
 #define ESP_OPUS_DEC_FRAME_DURATION_20_MS 20
+#define ESP_OPUS_DEC_FRAME_DURATION_120_MS 120
 #define ESP_OPUS_ENC_APPLICATION_VOIP 1
 typedef struct {int sample_rate,channel,bits_per_sample,bitrate,frame_duration,
     application_mode,complexity;bool enable_vbr;} esp_opus_enc_config_t;
@@ -81,7 +82,7 @@ static int esp_opus_enc_open(void *cfg,unsigned size,void **handle){
 }
 static int esp_opus_dec_open(void *cfg,unsigned size,void **handle){
     esp_opus_dec_cfg_t *c=cfg;assert(size==sizeof(*c));
-    assert(c->sample_rate==16000 && c->channel==1 && c->frame_duration==20);
+    assert(c->sample_rate==16000 && c->channel==1 && c->frame_duration==120);
     *handle=decoder_fails ? NULL : (void *)2;return decoder_fails ? -1 : 0;
 }
 static void esp_opus_enc_close(void *handle){assert(handle==(void *)1);closes++;}
@@ -301,7 +302,7 @@ static int decode(esp_audio_dec_out_frame_t *o,esp_audio_dec_info_t *info,bool o
     info->channel=1;info->bits_per_sample=16;return codec_error;
 }
 static int esp_g711a_dec_decode(void *h,esp_audio_dec_in_raw_t *i,esp_audio_dec_out_frame_t *o,esp_audio_dec_info_t *n){alaw_dec++;return decode(o,n,false);}
-static int esp_opus_dec_decode(void *h,esp_audio_dec_in_raw_t *i,esp_audio_dec_out_frame_t *o,esp_audio_dec_info_t *n){opus_dec++;return decode(o,n,true);}
+static int esp_opus_dec_decode(void *h,esp_audio_dec_in_raw_t *i,esp_audio_dec_out_frame_t *o,esp_audio_dec_info_t *n){opus_dec++;i->consumed=i->len;return decode(o,n,true);}
 static int xSemaphoreTake(int h,int t){assert(s_play_stereo[0]==0x5555);clock_us+=1000;return pdTRUE;}
 static void xSemaphoreGive(int h){}
 static int write_pcm(void *context,const int16_t *pcm,size_t frames,size_t *written){
