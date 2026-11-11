@@ -9,9 +9,9 @@ root = Path(__file__).resolve().parents[2]
 project = root / "firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c"
 sdk = root / "platforms/esp-idf/third_party/tirtc/esp32p4"
 component = project / "components/tirtc_sdk"
-expected = "6c5c1543f4a099c2f8fdfdff5b50ef728cf181ce09931c2798d34e84d22473b1"
+expected = "554295a06173478ba51cb6fc4fc42a09431787377aef7e4ded4ab17165f39cac"
 assert hashlib.sha256((sdk / "lib/libTiRTC.a").read_bytes()).hexdigest() == expected, "P4 SDK candidate not installed"
-assert "LIB_SHA256=" + expected in (sdk / "manifest/build-contract.env").read_text()
+assert "CONFIG_LWIP_MAX_SOCKETS=10" in (sdk / "manifest/build-contract.env").read_text()
 
 with tempfile.TemporaryDirectory(prefix="p4-sdk-link-") as directory:
     p = Path(directory)
@@ -24,7 +24,7 @@ set(IDF_VERSION_MINOR 5)
 set(IDF_VERSION_PATCH 5)
 set(CONFIG_FREERTOS_HZ 1000)
 set(CONFIG_MBEDTLS_CERTIFICATE_BUNDLE ON)
-set(CONFIG_LWIP_MAX_SOCKETS 16)
+set(CONFIG_LWIP_MAX_SOCKETS 10)
 function(idf_component_register)
   add_library(sdk_component STATIC "${{CMAKE_SOURCE_DIR}}/dummy.c")
   set(COMPONENT_LIB sdk_component PARENT_SCOPE)
@@ -41,10 +41,19 @@ file(WRITE "${{CMAKE_BINARY_DIR}}/sdk-archive.txt" "${{archive}}")
     archive = Path((p / "build/sdk-archive.txt").read_text())
     assert archive.resolve() == (sdk / "lib/libTiRTC.a").resolve()
     data = archive.read_bytes()
-    assert b"v2.5.0\x00" in data and b'"tirtc":"v2.5.0-' in data
+    assert b"v2.6.0\x00" in data and b'"tirtc":"v2.6.0-' in data
     with (p / "member.o").open("wb") as output:
         subprocess.run(["ar", "p", str(archive), "crc32.o"], stdout=output, check=True)
     assert "RISC-V" in subprocess.check_output(["readelf", "-h", str(p / "member.o")], text=True)
+    # A stale application socket count must not silently pass the new ABI gate.
+    cmake = p / "CMakeLists.txt"
+    valid_config = cmake.read_text()
+    cmake.write_text(valid_config.replace("set(CONFIG_LWIP_MAX_SOCKETS 10)",
+                                          "set(CONFIG_LWIP_MAX_SOCKETS 16)"))
+    result = subprocess.run(["cmake", "-S", str(p), "-B", str(p / "old-sockets")],
+                            capture_output=True, text=True)
+    assert result.returncode != 0 and "10 application sockets" in result.stderr
+    cmake.write_text(valid_config)
     # The application baseline is deliberately upgraded; incompatible IDF
     # versions remain rejected rather than bypassing the component gate.
     cmake = p / "CMakeLists.txt"
@@ -53,4 +62,4 @@ file(WRITE "${{CMAKE_BINARY_DIR}}/sdk-archive.txt" "${{archive}}")
     result = subprocess.run(["cmake", "-S", str(p), "-B", str(p / "old-idf")],
                             capture_output=True, text=True)
     assert result.returncode != 0 and "requires ESP-IDF 5.5.5" in result.stderr
-print("PASS: actual P4 component selects the supplied RISC-V TiRTC 2.5.0 archive")
+print("PASS: actual P4 component selects the supplied RISC-V TiRTC 2.6.0 archive")

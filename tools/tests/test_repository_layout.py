@@ -375,7 +375,7 @@ class RepositoryLayoutTests(unittest.TestCase):
             "waveshare-esp32p4-touch-lcd-43c-v10": (
                 "b774170ff46c393eeb5e495ea37936038d3f4f4f",
                 "riscv32-esp-elf-gcc 14.2.0",
-                "6c5c1543f4a099c2f8fdfdff5b50ef728cf181ce09931c2798d34e84d22473b1",
+                "554295a06173478ba51cb6fc4fc42a09431787377aef7e4ded4ab17165f39cac",
             ),
             "lckfb-bk7258": (
                 "398cab28b938e69ba2071a597daf00845dd080b6",

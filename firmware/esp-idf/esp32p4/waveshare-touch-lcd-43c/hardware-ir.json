@@ -84,10 +84,10 @@
     "verification": "build_verified",
     "tirtc": {
       "platform": "espressif-esp32p4",
-      "version": "2.5.0",
+      "version": "2.6.0",
       "sdk_path": "../../../../platforms/esp-idf/third_party/tirtc/esp32p4",
       "build_contract": "manifest/build-contract.env",
-      "archive_sha256": "6c5c1543f4a099c2f8fdfdff5b50ef728cf181ce09931c2798d34e84d22473b1"
+      "archive_sha256": "554295a06173478ba51cb6fc4fc42a09431787377aef7e4ded4ab17165f39cac"
     },
     "source_refs": [
       "kit-src"
@@ -353,7 +353,7 @@
   "product_notes": {
     "room_intercom": "产品 V2.2 多人对讲（6 位房间码/可选 4 位密码/100 人/PTT）由参考工程 main/application 与协议侧承载；Skill FEATURES 无对应门禁，随参考实现整树迁移，不单独新增 gate。",
     "display": "用户确认横屏 800×480：原生 480×800 ST7701 面板经 esp_lv_adapter 旋转 90°，沿用现有 480×320 横屏布局比例并适配到 800×480。",
-    "sdk_policy": "保留参考工程实测过的 TiRTC P4 SDK 2.3.0 验证重建（a7a01ffd…，含 feedback-stack 批）；kit 的 2.5.0 基线（9b4e35c7…）作为后续可切换钉扎，不在本次板卡移植中同时变更 SDK。",
+    "sdk_policy": "使用用户提供的 P4 SDK v2.6.0-894972fb，按新包契约配置 10 个 socket；旧修复批次的实板结论不自动适用于新库。",
     "issues": [
       {
         "id": "es7210-slot-mapping",

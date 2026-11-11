@@ -1,3 +1,5 @@
 *.patch -whitespace
 # Preserve vendor SDK headers and their checksum identity after relocation.
 platforms/esp-idf/third_party/tirtc/esp32s3/include/**/*.h whitespace=-blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Preserve supplied P4 SDK header bytes, including vendor CRLF endings.
+platforms/esp-idf/third_party/tirtc/esp32p4/include/**/*.h whitespace=-blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
