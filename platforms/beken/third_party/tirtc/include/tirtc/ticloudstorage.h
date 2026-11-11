@@ -298,7 +298,11 @@ struct TiCloudStorageUploadResult {
     /* 最早上传成功逻辑槽的开始时间（Tss）；没有成功区间时为 0。 */
     uint64_t start_time_ms;
 
-    /* 最晚上传成功逻辑槽的右开结束时间（Tss+5000）；没有成功区间时为 0。 */
+    /*
+     * 最晚上传成功逻辑槽的右开结束时间（Tss+5000）；没有成功区间时为 0。
+     * 结束边界落在逻辑槽内部时取所在槽的末尾，因此该值可能晚于
+     * requested_end_time_ms，相差小于一个槽长（5000ms）。
+     */
     uint64_t end_time_ms;
 
     /*
@@ -308,6 +312,9 @@ struct TiCloudStorageUploadResult {
      * 存在缺口时：
      *
      *     net_duration_ms < end_time_ms - start_time_ms
+     *
+     * 结束边界落在槽内时该式同样成立（净时长裁剪到请求边界，区间终点
+     * 取槽尾），此时不能据此推断存在缺口。
      */
     uint64_t net_duration_ms;
 
@@ -330,6 +337,19 @@ struct TiCloudStorageUploadResult {
 /* ------------------------------------------------------------------------- */
 /* 第 2 步：创建并配置 Service                                              */
 /* ------------------------------------------------------------------------- */
+
+/*
+ * 上传模式。
+ *
+ * SLICED 是默认模式：切片关闭、整片缓冲完成后一次性 PUT。
+ * STREAMING 是流式模式：切片的字节在打包过程中经 chunked PUT 持续送出
+ * （每切片一次 PUT）。两种模式的切片粒度、TSTR 文件格式、对象路径、
+ * 索引与回调语义完全相同，只影响媒体字节何时离开设备（见 ADR 0005）。
+ */
+enum TiCloudStorageUploadMode {
+    TICLOUDSTORAGE_UPLOAD_SLICED = 0,
+    TICLOUDSTORAGE_UPLOAD_STREAMING = 1
+};
 
 /*
  * Service 创建配置。
@@ -462,12 +482,45 @@ struct TiCloudStorageServiceOptions {
      * 无 SSL 编译（CONFIG_SSL_SUPPORT==0）恒为 http，本字段无效果。
      */
     uint32_t upload_force_http;
+
+    /*
+     * 上传模式，使用 TiCloudStorageUploadMode。默认 TICLOUDSTORAGE_UPLOAD_SLICED。
+     *
+     * 流式模式（STREAMING）下：
+     *   - 切片在打包过程中经 chunked PUT 边打包边发送，切片关闭即发送零块
+     *     收尾并读取云端响应；
+     *   - 流开始发送后的一切失败不重试，该切片立即计入缺口；开流前
+     *     （建连/签名/凭证）失败沿用切片式的重试逻辑；
+     *   - 网络落后于码率、流缓冲满时丢弃视频帧直到下一个关键帧（尽量
+     *     保留音频），切片边界仍按到达视频帧的时间戳计算；丢帧造成该
+     *     切片录像的视频冻结，不构成上传缺口。
+     * 其他非法值使 TiCloudStorageServiceCreate() 返回
+     * TICLOUDSTORAGE_E_INVALID_ARGUMENT。
+     */
+    int upload_mode;
+
+    /*
+     * 流式上传每切片流缓冲容量，单位字节。
+     *
+     * 仅 upload_mode == TICLOUDSTORAGE_UPLOAD_STREAMING 时读取本字段；
+     * 切片式（SLICED）完全忽略本字段：不读取、不做范围校验，任意值都
+     * 不影响 TiCloudStorageServiceCreate() 的结果。
+     *
+     * 流式模式下：传 0 使用默认值
+     * TICLOUDSTORAGE_DEFAULT_STREAM_BUFFER_SIZE（128KB）；非 0 值允许范围
+     * 64KB～1MB，越界时 TiCloudStorageServiceCreate() 返回
+     * TICLOUDSTORAGE_E_INVALID_ARGUMENT。容量小于单帧最大尺寸时，超出部分
+     * 的视频帧会被丢弃（视频丢帧）。
+     */
+    uint32_t stream_buffer_size_bytes;
 };
+
+#define TICLOUDSTORAGE_DEFAULT_STREAM_BUFFER_SIZE (128U * 1024U)
 
 #define TICLOUDSTORAGE_SERVICE_OPTIONS_INITIALIZER \
     { \
         (uint32_t)sizeof(struct TiCloudStorageServiceOptions), \
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 \
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 \
     }
 
 /*
@@ -608,6 +661,7 @@ struct TiCloudStorageUploadRequestOptions {
      * service_id 标识本请求所属 Service。range 表示融合录像文件的连续
      * 媒体范围，不包含 channel_id。物理时间片可能被多个逻辑请求共享，
      * SDK 仍只上传一次，但会分别使用各请求配置的回调和 user_data 通知。
+     * 请求触发 on_result 后不再触发 on_progress（SDK 丢弃迟到投递）。
      *
      * user_data 来自本 TiCloudStorageUploadRequestOptions.user_data，属于请求级
      * 上下文。range 只在回调执行期间有效。回调必须快速返回；不需要时
@@ -690,7 +744,9 @@ struct TiCloudStorageUploadRequestOptions {
  * 返回正数只表示请求已创建；SDK 随后异步查找关键帧、等待媒体时间线到达
  * 结束边界，并根据 Token、网络和重试状态执行实际上传。
  *
- * Service 必须已经成功启动，否则返回 TICLOUDSTORAGE_E_SERVICE_INVALID_STATE。
+ * Service 必须已经成功启动，否则返回 TICLOUDSTORAGE_E_SERVICE_INVALID_STATE；
+ * Service Stop 后同样返回 TICLOUDSTORAGE_E_SERVICE_INVALID_STATE（此时受理的
+ * 请求不会激活）。
  * upload_id 由 SDK 生成，在 Service 生命周期内唯一，只用于
  * TiCloudStorageUploadSetEnd() 等请求控制，不承载业务含义。开发者不需要使用
  * upload_id 关联回调和业务上下文。

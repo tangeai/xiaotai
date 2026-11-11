@@ -380,7 +380,7 @@ class RepositoryLayoutTests(unittest.TestCase):
             "lckfb-bk7258": (
                 "398cab28b938e69ba2071a597daf00845dd080b6",
                 "arm-none-eabi-gcc 10.3.1",
-                "1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9",
+                "ae5c9e85b8247c8a8d6ed2ef50e2c2199276c3e113d6a71c57e235d934dde968",
             ),
         }
         for board_id, facts in expected.items():

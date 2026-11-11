@@ -19,7 +19,7 @@ def require(condition: bool, message: str) -> None:
 
 manifest = (REPO_ROOT / "platforms/beken/third_party/tirtc/manifest/build-info.env").read_text()
 for fact in (
-    "SDK_VERSION=v2.5.0",
+    "SDK_VERSION=v2.6.1",
     "TARGET=beken-bk7258",
     "VARIANT=mini",
     "ABI=eabi-hard-float",
@@ -38,7 +38,7 @@ archive = REPO_ROOT / "platforms/beken/third_party/tirtc/lib/libTiRTC.a"
 require(archive.stat().st_size > 100_000,
         "TiRTC archive is missing or unexpectedly small")
 require(hashlib.sha256(archive.read_bytes()).hexdigest() ==
-        "1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9",
+        "ae5c9e85b8247c8a8d6ed2ef50e2c2199276c3e113d6a71c57e235d934dde968",
         "TiRTC archive identity changed")
 
 config = (ROOT / "ap/config/bk7258_ap/config").read_text()

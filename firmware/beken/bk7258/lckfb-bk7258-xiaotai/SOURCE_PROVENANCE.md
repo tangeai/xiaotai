@@ -23,13 +23,17 @@ product and do not define the TiRTC business API.
 ## TiRTC
 
 - Source package:
-  `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini`
+  `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.6.1__mini`
 - Vendored destination: `platforms/beken/third_party/tirtc`（仓库根目录相对路径）
 - Archive SHA-256:
-  `1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9`
+  `ae5c9e85b8247c8a8d6ed2ef50e2c2199276c3e113d6a71c57e235d934dde968`
 - Package target: `beken-bk7258`
 - Package build baseline: `BK-AVDK 3.1.1.10-official-398cab28`, matching the
   product's official public SDK baseline
+
+The delivered manifest labels this package `v2.6.1`, while the archive embeds
+`v2.6.0-01439660` (runtime version `v2.6.0`). The SHA-256 above identifies
+the exact delivered binary; the version-label discrepancy remains unresolved.
 
 ## Product behavior
 

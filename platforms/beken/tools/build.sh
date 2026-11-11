@@ -18,7 +18,7 @@ ap_release_config="$project_dir/ap/config/bk7258_ap/release.config"
 cp_release_config="$project_dir/cp/config/bk7258/release.config"
 tirtc_archive="$support_dir/third_party/tirtc/lib/libTiRTC.a"
 tirtc_manifest="$support_dir/third_party/tirtc/manifest/build-info.env"
-expected_tirtc_sha256="1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9"
+expected_tirtc_sha256="ae5c9e85b8247c8a8d6ed2ef50e2c2199276c3e113d6a71c57e235d934dde968"
 sdk_patches=(
     "$support_dir/tools/patches/bk-avdk-scheduler-snapshot.patch"
     "$support_dir/tools/patches/bk-avdk-dvp-sccb-diagnostics.patch"
@@ -115,7 +115,7 @@ fi
 actual_tirtc_sha256=$(sha256sum "$tirtc_archive" | cut -d ' ' -f 1)
 if [ "$actual_tirtc_sha256" != "$expected_tirtc_sha256" ]; then
     echo "Refusing unverified TiRTC archive: $actual_tirtc_sha256" >&2
-    echo "Expected BK7258 v2.5.0 mini archive: $expected_tirtc_sha256" >&2
+    echo "Expected BK7258 v2.6.1 mini archive: $expected_tirtc_sha256" >&2
     exit 1
 fi
 

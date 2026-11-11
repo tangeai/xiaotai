@@ -6,10 +6,11 @@
 | Board | Default LCKFB BK7258 development board configuration |
 | Platform SDK | Official BK-AVDK SMP `release/v3.1.1.10` (fetched from Gitee) |
 | Platform SDK commit | `398cab28b938e69ba2071a597daf00845dd080b6` |
-| TiRTC | TiRTC-Nano v2.5.0 mini |
-| TiRTC package | `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini` |
+| TiRTC | TiRTC-Nano v2.6.1 mini (delivered manifest label) |
+| TiRTC embedded runtime version | `v2.6.0-01439660`; differs from manifest, pending supplier clarification |
+| TiRTC package | `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.6.1__mini` |
 | TiRTC target | `beken-bk7258`, built for BK-AVDK `3.1.1.10-official-398cab28` |
-| TiRTC archive SHA-256 | `1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9` |
+| TiRTC archive SHA-256 | `ae5c9e85b8247c8a8d6ed2ef50e2c2199276c3e113d6a71c57e235d934dde968` |
 | TiRTC crypto provider | Official BK SDK `psa_mbedtls` component, Mbed TLS 3.5.2; no bundled/project-vendored Mbed TLS |
 | TiRTC HTTP SSL | Disabled by the package (`SSL=disabled`) |
 | TiRTC media DTLS | Disabled by the package (`DTLS=disabled`); current sessions also use `use_dtls=0` |

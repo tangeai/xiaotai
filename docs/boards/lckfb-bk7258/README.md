@@ -143,7 +143,7 @@ AI 的 AEC（声学回声消除）按 20 毫秒、320 个采样处理，播放�
 | 主机环境 | Linux/WSL2、Git、Python 3 | [Git](https://git-scm.com/downloads)、[Python](https://www.python.org/downloads/) | 无 |
 | BK-AVDK SMP | `release/v3.1.1.10`，提交 `398cab28b938e69ba2071a597daf00845dd080b6` | [Beken 官方发布](https://github.com/bekencorp/bk_avdk_smp/releases/tag/release%2Fv3.1.1.10) | 无 |
 | C/C++ 编译器 | `arm-none-eabi-gcc 10.3.1 20210824`，`gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2` | [Beken 官方 Arm 工具链目录](https://dl.bekencorp.com/tools/toolchain/arm) | `97dbb4f019ad1650b732faffcc881689cedc14e2b7ee863d390e0a41ef16c9a3` |
-| TiRTC-Nano | 本地交付的 `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini`，manifest 指向 BK-AVDK 3.1.1.10 | 公开下载链接待核实 | 工程内静态库：`1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9` |
+| TiRTC-Nano | 本地交付的 `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.6.1__mini`，manifest 指向 BK-AVDK 3.1.1.10 | 公开下载链接待核实 | 工程内静态库：`ae5c9e85b8247c8a8d6ed2ef50e2c2199276c3e113d6a71c57e235d934dde968` |
 | 厂商组件 | AP/CP 多媒体、网络、显示、触摸、DVP（数字视频端口）和音频组件 | [BK-AVDK SMP 源码](https://github.com/bekencorp/bk_avdk_smp/tree/398cab28b938e69ba2071a597daf00845dd080b6) | 无 |
 
 本工程使用独立的 AP/CP 配置、分区、TLS（安全传输）库和 TiRTC 静态库，

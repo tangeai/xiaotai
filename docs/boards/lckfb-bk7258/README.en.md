@@ -127,7 +127,7 @@ Flashing a release does not require a development environment. Source builds req
 | Host | Linux/WSL2, Git, Python 3 | [Git](https://git-scm.com/downloads), [Python](https://www.python.org/downloads/) | — |
 | BK-AVDK SMP | `release/v3.1.1.10`, commit `398cab28b938e69ba2071a597daf00845dd080b6` | [Official release](https://github.com/bekencorp/bk_avdk_smp/releases/tag/release%2Fv3.1.1.10) | — |
 | C/C++ compiler | `arm-none-eabi-gcc 10.3.1 20210824`, `gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2` | [Official Arm toolchains](https://dl.bekencorp.com/tools/toolchain/arm) | `97dbb4f019ad1650b732faffcc881689cedc14e2b7ee863d390e0a41ef16c9a3` |
-| TiRTC-Nano | Locally delivered `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.5.0__mini`; manifest targets BK-AVDK 3.1.1.10 | Public download URL unconfirmed | Project static library: `1a6327ebed1d74b5008d56896a2110dc872633321124ad1267eeb740a80d4cf9` |
+| TiRTC-Nano | Locally delivered `tirtc__beken-bk7258__gcc-arm-none-eabi-10.3-2021.10__v2.6.1__mini`; manifest targets BK-AVDK 3.1.1.10 | Public download URL unconfirmed | Project static library: `ae5c9e85b8247c8a8d6ed2ef50e2c2199276c3e113d6a71c57e235d934dde968` |
 | Vendor components | AP/CP multimedia, network, display, touch, digital video port (DVP), and audio | [SDK source](https://github.com/bekencorp/bk_avdk_smp/tree/398cab28b938e69ba2071a597daf00845dd080b6) | — |
 
 The project has independent AP/CP configuration, partitions, TLS libraries, and TiRTC static libraries. Compiler and library binary interfaces must match.
