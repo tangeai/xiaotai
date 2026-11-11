@@ -208,6 +208,15 @@ void starter_media_playback_waveform(starter_playback_waveform_t *out);
 /** Volatile diagnostic control: bypass PCM visualization and face animation. */
 void starter_media_set_face_animation_enabled(bool enabled);
 bool starter_media_face_animation_enabled(void);
+#if CONFIG_STARTER_AUDIO_PACKET_TRACE
+/* Opt-in private audio evidence; stop before reading. Clear erases and frees it. */
+esp_err_t starter_media_audio_capture_arm(void);
+void starter_media_audio_capture_stop(void);
+void starter_media_audio_capture_clear(void);
+void starter_media_audio_capture_status(size_t *bytes, uint32_t *frames,
+                                        bool *armed, uint32_t *reason);
+size_t starter_media_audio_capture_read(size_t offset, void *out, size_t capacity);
+#endif
 /** Select call video before starting a confirmed media session. */
 void starter_media_set_call_video(bool video);
 #if CONFIG_IDF_TARGET_ESP32P4

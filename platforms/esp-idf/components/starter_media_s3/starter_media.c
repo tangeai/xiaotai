@@ -6,6 +6,8 @@
  * Downlink PCM is normalized to stereo at 16 kHz for the board audio adapter.
  */
 #include "starter_media.h"
+#include "starter_audio_capture.h"
+#include "starter_audio_trace.h"
 #include "starter_recognition_player.h"
 #include "starter_playback_scope.h"
 #include "starter_aec.h"
@@ -387,6 +389,76 @@ EXT_RAM_BSS_ATTR static int16_t
 static uint32_t s_playback_resampler_generation;
 static int16_t s_playback_previous;
 
+#if CONFIG_STARTER_AUDIO_PACKET_TRACE
+/* Allocated only for an explicit idle-console capture. All access is serialized
+ * by the output mutex; no recorder allocation or serial output in the sink. */
+static starter_audio_capture_t s_audio_capture;
+
+esp_err_t starter_media_audio_capture_arm(void)
+{
+    if (!s_audio_output_mutex) return ESP_ERR_INVALID_STATE;
+    if (xSemaphoreTake(s_audio_output_mutex, pdMS_TO_TICKS(500)) != pdTRUE)
+        return ESP_ERR_TIMEOUT;
+    esp_err_t err = ESP_OK;
+    if (atomic_load(&s_active)) {
+        err = ESP_ERR_INVALID_STATE; /* Start at the next decoder generation. */
+    } else {
+        uint8_t *storage = s_audio_capture.storage;
+        if (!storage) storage = heap_caps_malloc(256U * 1024U, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!storage) err = ESP_ERR_NO_MEM;
+        else starter_audio_capture_arm(&s_audio_capture, storage, 256U * 1024U);
+    }
+    xSemaphoreGive(s_audio_output_mutex);
+    return err;
+}
+
+void starter_media_audio_capture_stop(void)
+{
+    if (!s_audio_output_mutex) return;
+    xSemaphoreTake(s_audio_output_mutex, portMAX_DELAY);
+    starter_audio_capture_stop(&s_audio_capture);
+    xSemaphoreGive(s_audio_output_mutex);
+}
+
+void starter_media_audio_capture_clear(void)
+{
+    if (!s_audio_output_mutex) return;
+    xSemaphoreTake(s_audio_output_mutex, portMAX_DELAY);
+    if (s_audio_capture.storage) {
+        memset(s_audio_capture.storage, 0, s_audio_capture.capacity);
+        free(s_audio_capture.storage);
+    }
+    s_audio_capture = (starter_audio_capture_t){0};
+    xSemaphoreGive(s_audio_output_mutex);
+}
+
+void starter_media_audio_capture_status(size_t *bytes, uint32_t *frames,
+                                        bool *armed, uint32_t *reason)
+{
+    *bytes = 0; *frames = 0; *armed = false; *reason = 0;
+    if (!s_audio_output_mutex) return;
+    xSemaphoreTake(s_audio_output_mutex, portMAX_DELAY);
+    *bytes = s_audio_capture.used; *frames = s_audio_capture.count;
+    *armed = s_audio_capture.armed; *reason = s_audio_capture.reason;
+    xSemaphoreGive(s_audio_output_mutex);
+}
+
+size_t starter_media_audio_capture_read(size_t offset, void *out, size_t capacity)
+{
+    if (!s_audio_output_mutex || !out) return 0;
+    xSemaphoreTake(s_audio_output_mutex, portMAX_DELAY);
+    size_t size = 0;
+    if (!s_audio_capture.armed && offset < s_audio_capture.used) {
+        size = s_audio_capture.used - offset;
+        if (size > capacity) size = capacity;
+        memcpy(out, s_audio_capture.storage + offset, size);
+    }
+    xSemaphoreGive(s_audio_output_mutex);
+    return size;
+}
+
+
+#endif
 
 static void update_max_counter(atomic_uint_fast32_t *counter, uint32_t value)
 {
@@ -922,6 +994,12 @@ static bool play_audio_item(const audio_rx_item_t *item)
     if (item == NULL || !same_session(item->mode, item->generation)) {
         return false;
     }
+#if CONFIG_STARTER_AUDIO_PACKET_TRACE
+    if (item->mode == STARTER_TIRTC_AI) starter_audio_trace_record(AUDIO_TRACE_DEQUEUE,
+        item->generation, item->frame.timestamp_ms, item->frame.length,
+        item->frame.media, item->frame.flags, item->frame.stream_id, item->payload,
+        (uint32_t)(esp_timer_get_time()/1000), 0);
+#endif
     if (item->mode == STARTER_TIRTC_AI && opus_generation != item->generation) {
         if (esp_opus_dec_reset(s_opus_decoder) != ESP_AUDIO_ERR_OK) {
             atomic_fetch_add_explicit(&s_audio_decode_failed, 1, memory_order_relaxed);
@@ -1008,6 +1086,12 @@ static bool play_audio_item(const audio_rx_item_t *item)
         update_timing_average(&s_write_average, item->generation,
                               &s_audio_write_avg_us, write_us);
         if (played) {
+#if CONFIG_STARTER_AUDIO_PACKET_TRACE
+            if (item->mode == STARTER_TIRTC_AI) starter_audio_trace_record(AUDIO_TRACE_WRITTEN,
+                item->generation, item->frame.timestamp_ms, item->frame.length,
+                item->frame.media, item->frame.flags, item->frame.stream_id, item->payload,
+                (uint32_t)(esp_timer_get_time()/1000), mono_samples);
+#endif
             audio_playback_track_write(frames);
             if (item->mode == STARTER_TIRTC_AI) {
                 starter_playback_scope_publish_dots(&s_playback_scope, s_decode_pcm,
@@ -1023,6 +1107,19 @@ static bool play_audio_item(const audio_rx_item_t *item)
         atomic_fetch_add_explicit(&s_audio_playback_blocked, 1,
                                   memory_order_relaxed);
     }
+#if CONFIG_STARTER_AUDIO_PACKET_TRACE
+    if (item->mode == STARTER_TIRTC_AI && s_audio_capture.armed) {
+        starter_audio_capture_meta_t meta = {
+            .generation=item->generation, .timestamp_ms=item->frame.timestamp_ms,
+            .sample_rate=info.sample_rate, .channels=info.channel,
+            .bits=info.bits_per_sample, .consumed=input.consumed,
+            .decode_ms=(uint32_t)(decode_start_us/1000),
+            .write_ms=(uint32_t)(esp_timer_get_time()/1000), .played=played,
+        };
+        starter_audio_capture_record(&s_audio_capture, &meta, item->payload,
+            item->frame.length, s_decode_pcm, output.decoded_size);
+    }
+#endif
     xSemaphoreGive(s_audio_output_mutex);
     return played;
 }
@@ -1902,6 +1999,12 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
     /* Publish ownership before the queue can wake the consumer. */
     atomic_fetch_add(&s_audio_playback_pending, 1);
     if (xQueueSend(s_audio_rx_ready_queue, &slot, 0) == pdTRUE) {
+#if CONFIG_STARTER_AUDIO_PACKET_TRACE
+        /* Use callback-owned bytes: the sink may already have recycled item. */
+        if (mode == STARTER_TIRTC_AI) starter_audio_trace_record(AUDIO_TRACE_ENQUEUE,
+            generation, frame->timestamp_ms, frame->length, frame->media,
+            frame->flags, frame->stream_id, data, (uint32_t)(esp_timer_get_time()/1000), 0);
+#endif
         atomic_store(&s_audio_rx_last_ms, (uint32_t)(esp_timer_get_time() / 1000));
         update_max_counter(&s_audio_rx_queue_peak,
                            uxQueueMessagesWaiting(s_audio_rx_ready_queue));

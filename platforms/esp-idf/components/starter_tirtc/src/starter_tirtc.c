@@ -1,3 +1,5 @@
+#include "starter_audio_trace.h"
+#include "esp_timer.h"
 /*
  * TiRTC SDK 适配层，也是工程中唯一直接依赖 tiRTC.h 的模块。
  *
@@ -414,6 +416,11 @@ static void on_audio(tirtc_conn_t connection,
      * 对端下行流号。设备呼叫和 VoIP 均可能从服务端收到不同的流号。
      * 连接句柄已经完成会话隔离；这里仅验证本产品的可播放编码格式。
      */
+#if CONFIG_STARTER_AUDIO_PACKET_TRACE
+    if (mode == STARTER_TIRTC_AI) starter_audio_trace_record(AUDIO_TRACE_CALLBACK,
+        generation, frame->ts, frame->length, frame->media, frame->flags,
+        frame->stream_id, data, (uint32_t)(esp_timer_get_time()/1000), 0);
+#endif
     bool expected = mode == STARTER_TIRTC_AI
                         ? frame->media == TIRTC_AUDIO_OPUS &&
                               frame->flags == TIRTC_AUDIOSAMPLE_16K16B1C

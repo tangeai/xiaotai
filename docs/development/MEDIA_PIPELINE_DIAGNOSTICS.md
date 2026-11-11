@@ -1,5 +1,49 @@
 # 音视频链路诊断
 
+## S3 AI 原始音频与包边界导出
+
+调试固件显式启用 `CONFIG_STARTER_AUDIO_PACKET_TRACE=y`，再通过
+`tools/build.py` 构建目标板。此开关默认关闭，同时控制 `audio-capture` 和
+`audio-trace`；已有本地 sdkconfig 会保留曾启用的值，需要手动关闭后重新构建。
+启用功能不等于开始录音，必须串口执行 arm。SDK 回调不直接打印日志或写文件。
+
+先关闭串口监视器以外的串口占用，只测一轮短回复：
+
+1. 执行 `ai-stop`，再用 `status` 确认 `Media: active=no`、播放 `pending=0`。
+2. 执行 `audio-trace status`、`audio-capture status`。若有旧证据，先导出；arm 会重置旧数据。
+3. 执行 `audio-trace arm` 和 `audio-capture arm`，必须分别看到 `ok=1`、`rc=0`。
+   会话中开启会被拒绝；不能因为命令已发送就通知测试者开始。
+4. 执行 `ai-start` 或操作设备开启 AI，完成一轮短句；记录原话、缺字位置及固件身份。
+5. 等待回复结束，再执行 `ai-stop`，确认媒体停止且播放排空，然后分别执行
+   `audio-capture stop`、`audio-trace stop`。
+6. 用串口终端保存 `audio-capture dump` 和 `audio-trace dump` 的完整输出到
+   `tests/.local/` 下的两个文件，包含 DATA/ROW 和 END 行。导出期间不要重新 arm。
+
+音频缓冲上限 256 KiB，同时保存原始载荷和解码 PCM；通常只够数秒语音。
+`reason=2` 表示存满，`reason=3` 表示会话代次改变，不能把这些记录当作完整回复。
+追踪最多 4096 条、约 160 KiB，`lost` 必须为零。两种缓冲均在 arm 时分配，
+音频可用 `audio-capture clear` 清空释放，追踪缓冲保留到重启。
+
+在仓库根目录导出；输出目录必须尚不存在，以免覆盖旧证据：
+
+```bash
+python3 tools/decode_ai_audio_capture.py tests/.local/capture.log --output tests/.local/audio-export
+python3 tools/analyze_audio_trace.py tests/.local/trace.log > tests/.local/trace-result.json
+```
+
+解析器拒绝缺块、乱序或缺 END 的导出。可重新 dump，不能用补零或删掉异常行
+把不完整数据包装成成功。电脑端 Opus 解码需要系统 libopus；只做离线解析，不连接服务端。
+输出包括 `raw-packets/*.bin` 原始逐包载荷、`packets.json` 时间戳和 SHA-256、
+`device.wav` 设备解码结果、`host-opus.wav` 独立解码结果及 `comparison.json` 比较结果。
+原始 bin 是单包 Opus 载荷，不是可直接播放的 Ogg 文件。
+
+载荷记录点在播放处理处；四阶段追踪覆盖有效当前连接的 SDK 回调、入队、出队、成功写入。
+校验指纹一致只能支持这些观测点间未发现丢包或改包，不等于已抓到服务端发送数据。
+解码失败或进入载荷记录点前被拒绝的包可能仅留在追踪中，两种证据必须一起核对。
+WAV 连续拼接解码帧，不补时间戳空隙，也不是扬声器录音；听感比较不能单独证明播放节奏一致。
+原始录音、串口日志和导出文件保留在忽略目录，不提交到仓库。
+
+
 ## ESP UI 回调与屏幕刷新分开观测
 
 ESP-IDF v5.5.5 下，`UI refresh slow` 是 100 ms 产品 tick 的墙钟耗时；

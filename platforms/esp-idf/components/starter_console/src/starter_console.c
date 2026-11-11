@@ -7,6 +7,7 @@
  */
 #include "starter_console.h"
 #include "starter_pipeline_diag.h"
+#include "starter_audio_trace.h"
 #include "sdkconfig.h"
 
 #include <stdio.h>
@@ -34,6 +35,83 @@
 #include "wifi_manager.h"
 
 static esp_console_repl_t *s_repl;
+
+#if CONFIG_STARTER_AUDIO_PACKET_TRACE
+static int command_audio_trace(int argc, char **argv)
+{
+    if (argc != 2) { puts("Usage: audio-trace arm|stop|status|dump"); return 1; }
+    if (!strcmp(argv[1], "arm")) {
+        bool ok = !starter_media_status().active && starter_audio_trace_arm();
+        printf("AUDIO_TRACE_ARM ok=%u\n", (unsigned)ok); return ok ? 0 : 1;
+    }
+    if (!strcmp(argv[1], "stop")) starter_audio_trace_stop();
+    else if (strcmp(argv[1], "status") && strcmp(argv[1], "dump")) return 1;
+    size_t count; uint32_t lost; bool armed;
+    starter_audio_trace_status(&count, &lost, &armed);
+    printf("AUDIO_TRACE_STATUS count=%u lost=%lu armed=%u\n",
+           (unsigned)count, (unsigned long)lost, (unsigned)armed);
+    if (strcmp(argv[1], "dump")) return 0;
+    if (armed) return 1;
+    for (size_t i=0; i<count; ++i) {
+        starter_audio_trace_row_t r;
+        if (!starter_audio_trace_read(i, &r)) return 1;
+        printf("AUDIO_TRACE_ROW %u %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu\n",
+            (unsigned)i, (unsigned long)r.stage, (unsigned long)r.generation,
+            (unsigned long)r.timestamp_ms, (unsigned long)r.length,
+            (unsigned long)r.media, (unsigned long)r.flags, (unsigned long)r.stream_id,
+            (unsigned long)r.hash, (unsigned long)r.at_ms, (unsigned long)r.detail);
+    }
+    printf("AUDIO_TRACE_END count=%u lost=%lu\n", (unsigned)count, (unsigned long)lost);
+    return 0;
+}
+#endif
+
+
+#if CONFIG_STARTER_AUDIO_PACKET_TRACE
+static int command_audio_capture(int argc, char **argv)
+{
+    if (argc != 2) {
+        printf("Usage: audio-capture arm|stop|status|dump|clear\n");
+        return 1;
+    }
+    if (strcmp(argv[1], "arm") == 0) {
+        esp_err_t err = starter_media_audio_capture_arm();
+        printf("AUDIO_CAPTURE_ARM rc=%d (arm while idle, then start AI)\n", err);
+        return err == ESP_OK ? 0 : 1;
+    }
+    if (strcmp(argv[1], "clear") == 0) {
+        starter_media_audio_capture_clear();
+        printf("AUDIO_CAPTURE_CLEARED\n");
+        return 0;
+    }
+    if (strcmp(argv[1], "stop") == 0) starter_media_audio_capture_stop();
+    else if (strcmp(argv[1], "status") != 0 && strcmp(argv[1], "dump") != 0) return 1;
+    size_t bytes; uint32_t frames, reason; bool armed;
+    starter_media_audio_capture_status(&bytes, &frames, &armed, &reason);
+    printf("AUDIO_CAPTURE bytes=%u frames=%lu armed=%u reason=%lu\n",
+           (unsigned)bytes, (unsigned long)frames, (unsigned)armed, (unsigned long)reason);
+    if (strcmp(argv[1], "dump") != 0) return 0;
+    if (armed) {
+        printf("AUDIO_CAPTURE_ERROR stop before dump\n");
+        return 1;
+    }
+    uint8_t chunk[96]; char hex[193];
+    const char digits[] = "0123456789abcdef";
+    size_t offset = 0;
+    while (offset < bytes) {
+        size_t size = starter_media_audio_capture_read(offset, chunk, sizeof(chunk));
+        if (!size) return 1;
+        for (size_t i = 0; i < size; i++) {
+            hex[i*2] = digits[chunk[i] >> 4]; hex[i*2+1] = digits[chunk[i] & 15];
+        }
+        hex[size*2] = '\0';
+        printf("AUDIO_CAPTURE_DATA %u %s\n", (unsigned)offset, hex);
+        offset += size;
+    }
+    printf("AUDIO_CAPTURE_END bytes=%u\n", (unsigned)offset);
+    return 0;
+}
+#endif
 
 static void print_firmware_identity(void)
 {
@@ -726,8 +804,16 @@ esp_err_t starter_console_start(void)
                         "starter_console", "register video-submit");
     ESP_RETURN_ON_ERROR(register_command("media-diag", "Development pipeline counters: on|off|show|reset", command_media_diag),
                         "starter_console", "register media-diag");
+#if CONFIG_STARTER_AUDIO_PACKET_TRACE
+    ESP_RETURN_ON_ERROR(register_command("audio-trace", "AI packet boundary evidence", command_audio_trace),
+                        "starter_console", "register audio-trace");
+#endif
     ESP_RETURN_ON_ERROR(register_command("status", "Show starter status", command_status),
                         "starter_console", "register status");
+#if CONFIG_STARTER_AUDIO_PACKET_TRACE
+    ESP_RETURN_ON_ERROR(register_command("audio-capture", "Opt-in private AI audio evidence (arm while idle)", command_audio_capture),
+                        "starter_console", "register audio capture");
+#endif
     ESP_RETURN_ON_ERROR(register_command("face-animation", "face-animation [on|off]; volatile A/B control", command_face_animation),
                         "starter_console", "register face-animation");
     ESP_RETURN_ON_ERROR(register_command("voice-config", "Set volatile Voicute threshold (50..990)", command_voice_config),

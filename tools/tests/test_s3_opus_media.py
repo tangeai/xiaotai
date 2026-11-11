@@ -3,7 +3,8 @@ import unittest
 from test_s3_product_regressions import MEDIA, ROOT, function, run_c
 from test_s3_playback_drain import playback_fixture
 
-COMMON = f'#include "{ROOT / "platforms/esp-idf/components/starter_media_common/include/starter_playback_scope.h"}"\n' + r'''
+COMMON = f'#include "{ROOT / "platforms/esp-idf/components/starter_media_common/include/starter_playback_scope.h"}"\n' + f'#include "{ROOT / "platforms/esp-idf/components/starter_media_common/include/starter_audio_capture.h"}"\n' + r'''
+starter_audio_capture_t s_audio_capture;
 starter_playback_scope_t s_playback_scope = {.lock=ATOMIC_FLAG_INIT};
 #include <assert.h>
 #include <stdbool.h>
@@ -277,7 +278,11 @@ int main(void){
 
     def check_downlink(self, g711):
         run_c(f'#define CONFIG_STARTER_AI_UPLINK_G711A {int(g711)}\n' + COMMON + r'''
-typedef struct {int mode;uint32_t generation;struct {size_t length;} frame;
+#define CONFIG_STARTER_AUDIO_PACKET_TRACE 1
+#define AUDIO_TRACE_DEQUEUE 3
+#define AUDIO_TRACE_WRITTEN 4
+static void starter_audio_trace_record(unsigned s,uint32_t g,uint32_t t,uint32_t l,unsigned m,unsigned f,unsigned id,const void*d,uint32_t at,uint32_t detail){}
+typedef struct {int mode;uint32_t generation;struct {size_t length;uint32_t timestamp_ms,media,flags,stream_id;} frame;
     uint8_t payload[1500];} audio_rx_item_t;
 static int16_t s_decode_pcm[1500],s_play_stereo[6000];
 static uint32_t s_playback_resampler_generation;
@@ -347,6 +352,17 @@ int main(void){
     s_speaker_muted=false;mode=item.mode=3; /* VoIP: 40ms packets as on BK. */
     item.generation=active_generation=200;alaw_samples=320;
     assert(play(&item) && writes==201);
+    assert(s_audio_capture.used==0); /* No automatic recording. */
+    uint8_t evidence[1024];starter_audio_capture_arm(&s_audio_capture,evidence,sizeof(evidence));
+    mode=item.mode=STARTER_TIRTC_AI;item.frame.timestamp_ms=456;
+    memset(item.payload,0x48,item.frame.length);
+    assert(play(&item) && writes==202);
+    assert(s_audio_capture.count==1 && s_audio_capture.used==48+37+640);
+    assert(evidence[24]==37 && evidence[44]==1); /* consumed input, successful write */
+    assert(!memcmp(evidence+48,item.payload,37));
+    assert(!memcmp(evidence+48+37,s_decode_pcm,640));
+    starter_audio_capture_stop(&s_audio_capture);
+    assert(play(&item) && s_audio_capture.count==1);
 }
 ''')
 

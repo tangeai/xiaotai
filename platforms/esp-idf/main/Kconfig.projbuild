@@ -14,6 +14,15 @@ config STARTER_AI_UPLINK_G711A_16K
         Send the 16 kHz AEC output directly as A-law on AI sessions.
         The AI server must accept alaw/16000/1. Other sessions stay at 8 kHz.
 
+config STARTER_AUDIO_PACKET_TRACE
+    bool "Development AI audio capture and packet trace"
+    depends on IDF_TARGET_ESP32S3
+    default n
+    help
+        Opt-in console capture of raw audio, decoded PCM and packet fingerprints.
+        Capture uses up to 256 KiB and trace up to 160 KiB, allocated on arm.
+        No serial logging from the audio or SDK callback tasks.
+
 config XIAOTAI_DISCOVERY_URL
     string "ThingConnect service discovery URL"
     default "http://ep-open.tangeopen.com/services"
