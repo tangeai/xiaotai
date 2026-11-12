@@ -79,7 +79,12 @@ class P4ReleaseContractTest(unittest.TestCase):
         self.assertIn(
             "#define OPUS_WORKER_TASK_STACK_BYTES (40U * 1024U)", media
         )
-        task_setup = media[media.index("xTaskCreateWithCaps(audio_sink_task"):]
+        self.assertIn("s_media_workers[0].function = audio_sink_task;", media)
+        self.assertIn("s_media_workers[1].function = audio_uplink_task;", media)
+        task_setup = media[media.index("xTaskCreateWithCaps(starter_media_worker_entry"):]
+        for name in ("board_audio_rx", "rtc_audio_tx"):
+            self.assertRegex(task_setup,
+                             rf'"{name}",\s*OPUS_WORKER_TASK_STACK_BYTES,')
         self.assertGreaterEqual(
             task_setup.count("OPUS_WORKER_TASK_STACK_BYTES"), 2
         )

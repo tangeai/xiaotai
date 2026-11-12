@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReleaseIdentityTests(unittest.TestCase):
-    def plan(self, directory, board, version, *, corrupt=False):
+    def plan(self, directory, board, version, *, corrupt=False, notes=None):
         path = directory / f'{board}-{version}-validation.zip'
         payload = b'firmware'
         manifest = {'board_id': board, 'project_version': version,
@@ -23,8 +23,37 @@ class ReleaseIdentityTests(unittest.TestCase):
         with zipfile.ZipFile(path, 'w') as z:
             z.writestr('MANIFEST.json', json.dumps(manifest))
             z.writestr('app.bin', b'corrupt' if corrupt else payload)
-        return subprocess.run([sys.executable, str(ROOT/'tools/release_firmware.py'),
-                               '--package', str(path)], capture_output=True, text=True)
+        command = [sys.executable, str(ROOT/'tools/release_firmware.py'), '--package', str(path)]
+        if notes is not None:
+            note_path = directory / 'notes.md'
+            note_path.write_text(notes)
+            command.extend(['--notes-file', str(note_path)])
+        return subprocess.run(command, capture_output=True, text=True)
+
+    def test_release_notes_reject_incomplete_or_unfilled_bilingual_body(self):
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from release_firmware import validate_release_notes
+        template = (ROOT / '.github/release_notes_template.md').read_text()
+        with self.assertRaises(ValueError):
+            validate_release_notes(template)
+        import re
+        complete = re.sub(r'<!--.*?-->', '', template, flags=re.S)
+        complete = re.sub(r'\{\{.*?\}\}', 'None', complete)
+        validate_release_notes(complete)
+        with tempfile.TemporaryDirectory() as tmp:
+            result = self.plan(Path(tmp), 'lckfb-esp32s3', '1.1.0+build.1', notes=complete)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(json.loads(result.stdout)['notes_validated'])
+            bad = self.plan(Path(tmp), 'lckfb-esp32s3', '1.1.0+build.1', notes=template)
+            self.assertNotEqual(bad.returncode, 0)
+            unchecked = self.plan(Path(tmp), 'lckfb-esp32s3', '1.1.0+build.1')
+            self.assertFalse(json.loads(unchecked.stdout)['notes_validated'])
+        for broken in (complete.split('## English')[0],
+                       complete.replace('### Fixed', '### Repairs'),
+                       complete.replace('### 修复\n\n- None', '### 修复'),
+                       complete + '\n{{source_commit}}'):
+            with self.assertRaises(ValueError):
+                validate_release_notes(broken)
 
     def test_all_boards_have_same_title_rule_with_actual_independent_builds(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -9,7 +9,7 @@ PROJECT = ROOT / 'firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c'
 class P4AudioScheduling(unittest.TestCase):
     def test_audio_workers_preempt_sustained_packet_forwarding(self):
         source = (PROJECT / 'components/starter_media/src/starter_media.c').read_text()
-        start = source.index('    if (xTaskCreateWithCaps(audio_sink_task,')
+        start = source.index('    s_media_workers[0].function = audio_sink_task;')
         end = source.index('    atomic_store_explicit(&s_ready', start)
         creation = source[start:end]
         policy = (PROJECT / 'main/platform/app_task_affinity.h').read_text()
@@ -28,6 +28,9 @@ class P4AudioScheduling(unittest.TestCase):
 #define MALLOC_CAP_SPIRAM 1
 #define MALLOC_CAP_8BIT 2
 ''' + priorities + '\n#define FORWARDING_PRIORITY ' + forwarding + r'''
+typedef struct {void (*function)(void*);void *handle;} starter_media_worker_t;
+static starter_media_worker_t s_media_workers[4];
+static void starter_media_worker_entry(void *p) {}
 static unsigned created, fail_at, playback, uplink, capture, camera;
 static void audio_sink_task(void *p) {}
 static void audio_uplink_task(void *p) {}
@@ -35,6 +38,8 @@ static void audio_capture_task(void *p) {}
 static void camera_task(void *p) {}
 static int create(void (*entry)(void *), const char *name, unsigned stack,
                   void *arg, unsigned priority, void *handle, int core, unsigned caps) {
+    assert(entry == starter_media_worker_entry);
+    entry = ((starter_media_worker_t*)arg)->function;
     ++created;
     assert(caps == (MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     if (entry == audio_sink_task) {assert(strcmp(name,"board_audio_rx")==0);playback=priority;}
@@ -46,8 +51,11 @@ static int create(void (*entry)(void *), const char *name, unsigned stack,
 #define xTaskCreateWithCaps(a,b,c,d,e,f,g) create(a,b,c,d,e,f,-1,g)
 #define xTaskCreatePinnedToCoreWithCaps(a,b,c,d,e,f,g,h) create(a,b,c,d,e,f,g,h)
 static int start_workers(void) {
+    int err = 0;
 ''' + creation + r'''
     return 0;
+fail:
+    return err;
 }
 int main(void) {
     assert(start_workers()==0 && created==4);

@@ -415,6 +415,22 @@ static esp_err_t audio_codecs_init(void)
     return audio_amplifier_clock_init();
 }
 
+/* Called only before media workers start, after a failed hardware open. */
+static void audio_init_rollback(void)
+{
+    if (s_microphone_dev) { esp_codec_dev_close(s_microphone_dev); esp_codec_dev_delete(s_microphone_dev); s_microphone_dev = NULL; }
+    if (s_speaker_dev) { esp_codec_dev_close(s_speaker_dev); esp_codec_dev_delete(s_speaker_dev); s_speaker_dev = NULL; }
+    if (s_es7210_codec_if) { audio_codec_delete_codec_if(s_es7210_codec_if); s_es7210_codec_if = NULL; }
+    if (s_es7210_ctrl_if) { audio_codec_delete_ctrl_if(s_es7210_ctrl_if); s_es7210_ctrl_if = NULL; }
+    if (s_amp_codec_if) { audio_codec_delete_codec_if(s_amp_codec_if); s_amp_codec_if = NULL; }
+    if (s_amp_ctrl_if) { audio_codec_delete_ctrl_if(s_amp_ctrl_if); s_amp_ctrl_if = NULL; }
+    if (s_i2s_data_if) { audio_codec_delete_data_if(s_i2s_data_if); s_i2s_data_if = NULL; }
+    if (s_i2s_rx) { (void)i2s_channel_disable(s_i2s_rx); (void)i2s_del_channel(s_i2s_rx); s_i2s_rx = NULL; }
+    if (s_i2s_tx) { (void)i2s_channel_disable(s_i2s_tx); (void)i2s_del_channel(s_i2s_tx); s_i2s_tx = NULL; }
+    s_capture_probe_ready = false;
+    s_audio_ready = false;
+}
+
 esp_err_t szpi_board_audio_init(void)
 {
     if (s_audio_ready) {
@@ -430,6 +446,8 @@ esp_err_t szpi_board_audio_init(void)
     /* esp_codec_dev owns paired-channel enable; no direct I2S enable here. */
     if (err == ESP_OK) {
         s_audio_ready = true;
+    } else {
+        audio_init_rollback();
     }
     return err;
 }

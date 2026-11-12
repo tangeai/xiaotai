@@ -1,3 +1,4 @@
+#include "starter_media_startup.h"
 /* P4 board adapter. Queue/preroll/playback behavior derives from XiaoTai S3;
  * hardware is ES8311 DAC playback + ES7210 four-slot TDM capture (MIC2 mic,
  * MIC3 playback reference) on the shared I2S1, and OV5647 CSI. */
@@ -129,6 +130,8 @@ typedef struct {
 static const char *TAG = "starter_media";
 
 static atomic_bool s_ready;
+static atomic_bool s_initializing;
+static starter_media_worker_t s_media_workers[4];
 static atomic_bool s_call_video;
 void starter_media_set_call_video(bool video) { atomic_store(&s_call_video, video); }
 void starter_media_set_remote_video_presentation(uint16_t rotation,
@@ -275,6 +278,9 @@ static const audio_codec_data_if_t *s_i2s_data_if;
 static const audio_codec_ctrl_if_t *s_es8311_ctrl_if;
 static const audio_codec_gpio_if_t *s_es8311_gpio_if;
 static const audio_codec_if_t *s_es8311_codec_if;
+static const audio_codec_ctrl_if_t *s_es7210_ctrl_if;
+static const audio_codec_if_t *s_es7210_codec_if;
+static bool s_audio_ready;
 static esp_codec_dev_handle_t s_microphone_dev;
 static esp_codec_dev_handle_t s_speaker_dev;
 static const xiaotai_board_audio_adapter_t *s_audio_adapter;
@@ -479,21 +485,21 @@ static esp_err_t audio_codecs_init(void)
         .port = BOARD_I2C_PORT, .addr = (uint16_t)(es7210_addr << 1),
         .bus_handle = s_i2c_bus,
     };
-    const audio_codec_ctrl_if_t *es7210_ctrl_if =
+    s_es7210_ctrl_if =
         audio_codec_new_i2c_ctrl(&es7210_i2c);
-    if (!es7210_ctrl_if) return ESP_ERR_NO_MEM;
+    if (!s_es7210_ctrl_if) return ESP_ERR_NO_MEM;
     es7210_codec_cfg_t es7210_cfg = {
-        .ctrl_if = es7210_ctrl_if,
+        .ctrl_if = s_es7210_ctrl_if,
         .master_mode = false,
         .mic_selected = ES7210_SEL_MIC1 | ES7210_SEL_MIC2 |
                         ES7210_SEL_MIC3 | ES7210_SEL_MIC4,
         .mclk_div = AUDIO_MCLK_MULTIPLE,
     };
-    const audio_codec_if_t *es7210_codec_if = es7210_codec_new(&es7210_cfg);
-    if (!es7210_codec_if) return ESP_ERR_NO_MEM;
+    s_es7210_codec_if = es7210_codec_new(&es7210_cfg);
+    if (!s_es7210_codec_if) return ESP_ERR_NO_MEM;
     esp_codec_dev_cfg_t microphone_cfg = {
         .dev_type = ESP_CODEC_DEV_TYPE_IN,
-        .codec_if = es7210_codec_if, .data_if = s_i2s_data_if,
+        .codec_if = s_es7210_codec_if, .data_if = s_i2s_data_if,
     };
     s_microphone_dev = esp_codec_dev_new(&microphone_cfg);
     if (!s_microphone_dev) return ESP_ERR_NO_MEM;
@@ -519,12 +525,31 @@ static esp_err_t audio_codecs_init(void)
     return ESP_OK;
 }
 
+/* Called only before media workers start, after a failed hardware open. */
+static void audio_init_rollback(void)
+{
+    if (s_microphone_dev) { esp_codec_dev_close(s_microphone_dev); esp_codec_dev_delete(s_microphone_dev); s_microphone_dev = NULL; }
+    if (s_speaker_dev) { esp_codec_dev_close(s_speaker_dev); esp_codec_dev_delete(s_speaker_dev); s_speaker_dev = NULL; }
+    if (s_es7210_codec_if) { audio_codec_delete_codec_if(s_es7210_codec_if); s_es7210_codec_if = NULL; }
+    if (s_es7210_ctrl_if) { audio_codec_delete_ctrl_if(s_es7210_ctrl_if); s_es7210_ctrl_if = NULL; }
+    if (s_es8311_codec_if) { audio_codec_delete_codec_if(s_es8311_codec_if); s_es8311_codec_if = NULL; }
+    if (s_es8311_ctrl_if) { audio_codec_delete_ctrl_if(s_es8311_ctrl_if); s_es8311_ctrl_if = NULL; }
+    if (s_es8311_gpio_if) { audio_codec_delete_gpio_if(s_es8311_gpio_if); s_es8311_gpio_if = NULL; }
+    if (s_i2s_data_if) { audio_codec_delete_data_if(s_i2s_data_if); s_i2s_data_if = NULL; }
+    if (s_i2s_rx) { (void)i2s_channel_disable(s_i2s_rx); (void)i2s_del_channel(s_i2s_rx); s_i2s_rx = NULL; }
+    if (s_i2s_tx) { (void)i2s_channel_disable(s_i2s_tx); (void)i2s_del_channel(s_i2s_tx); s_i2s_tx = NULL; }
+    s_audio_ready = false;
+}
+
 static int p4_audio_start(void *context)
 {
     (void)context;
+    if (s_audio_ready) return ESP_OK;
     esp_err_t err = audio_i2s_init();
     if (err == ESP_OK) err = audio_codecs_init();
     if (err == ESP_OK) err = audio_i2s_start();
+    if (err == ESP_OK) s_audio_ready = true;
+    else audio_init_rollback();
     return err;
 }
 
@@ -1455,16 +1480,54 @@ static void drain_audio_rx_ready_queue(void)
     }
 }
 
+/* Application-owned resources only. Board buses/camera/audio singletons are
+ * retained by their adapters and reused; partial hardware start rolls back there. */
+static void media_init_rollback(void)
+{
+    starter_media_workers_abort(s_media_workers, 4);
+    if (s_audio_rx_ready_queue) { vQueueDelete(s_audio_rx_ready_queue); s_audio_rx_ready_queue = NULL; }
+    if (s_audio_rx_free_queue) { vQueueDelete(s_audio_rx_free_queue); s_audio_rx_free_queue = NULL; }
+    if (s_audio_tx_ready_queue) { vQueueDelete(s_audio_tx_ready_queue); s_audio_tx_ready_queue = NULL; }
+    if (s_audio_tx_free_queue) { vQueueDelete(s_audio_tx_free_queue); s_audio_tx_free_queue = NULL; }
+    if (s_audio_output_mutex) { vSemaphoreDelete(s_audio_output_mutex); s_audio_output_mutex = NULL; }
+    if (s_preroll_mutex) { vSemaphoreDelete(s_preroll_mutex); s_preroll_mutex = NULL; }
+    heap_caps_free(s_audio_rx_pool); s_audio_rx_pool = NULL;
+    heap_caps_free(s_audio_tx_pool); s_audio_tx_pool = NULL;
+    heap_caps_free(s_preroll.pcm); s_preroll.pcm = NULL;
+    heap_caps_free(s_recognition_raw_pcm); s_recognition_raw_pcm = NULL;
+    if (s_g711_encoder) { esp_g711_enc_close(s_g711_encoder); s_g711_encoder = NULL; }
+    if (s_ai_g711_encoder) { esp_g711_enc_close(s_ai_g711_encoder); s_ai_g711_encoder = NULL; }
+    if (s_g711_decoder) { esp_g711_dec_close(s_g711_decoder); s_g711_decoder = NULL; }
+    if (s_opus_encoder) { esp_opus_enc_close(s_opus_encoder); s_opus_encoder = NULL; }
+    if (s_opus_decoder) { esp_opus_dec_close(s_opus_decoder); s_opus_decoder = NULL; }
+    if (s_ns_16k) { ns_destroy(s_ns_16k); s_ns_16k = NULL; }
+    if (s_agc_16k) { esp_agc_close(s_agc_16k); s_agc_16k = NULL; }
+    if (s_agc_8k) { esp_agc_close(s_agc_8k); s_agc_8k = NULL; }
+    starter_aec_deinit();
+    memset(&s_preroll, 0, sizeof(s_preroll));
+}
+
 esp_err_t starter_media_init(void)
 {
     if (atomic_load_explicit(&s_ready, memory_order_acquire)) {
         return ESP_OK;
     }
+    bool expected = false;
+    if (!atomic_compare_exchange_strong(&s_initializing, &expected, true))
+        return ESP_ERR_INVALID_STATE;
+    /* Another initializer may have committed between the fast-path load and
+     * acquiring ownership. Recheck before allocating a second instance. */
+    if (atomic_load_explicit(&s_ready, memory_order_acquire)) {
+        atomic_store(&s_initializing, false);
+        return ESP_OK;
+    }
+    esp_err_t err = ESP_OK;
     s_audio_output_mutex = xSemaphoreCreateMutex();
     if (s_audio_output_mutex == NULL) {
-        return ESP_ERR_NO_MEM;
+        err = ESP_ERR_NO_MEM;
+        goto fail;
     }
-    esp_err_t err = board_i2c_init();
+    err = board_i2c_init();
     if (err == ESP_OK) {
         s_audio_adapter = &s_p4_audio_adapter;
         xiaotai_board_audio_format_t format = s_audio_adapter->format(
@@ -1489,7 +1552,7 @@ esp_err_t starter_media_init(void)
     }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "board media initialization failed: %s", esp_err_to_name(err));
-        return err;
+        goto fail;
     }
 
     s_audio_rx_pool = heap_caps_calloc(AUDIO_RX_QUEUE_DEPTH,
@@ -1507,14 +1570,16 @@ esp_err_t starter_media_init(void)
     s_recognition_raw_pcm = heap_caps_malloc(
         starter_aec_frame_samples() * sizeof(*s_recognition_raw_pcm),
         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (s_recognition_raw_pcm == NULL || !esp_ptr_external_ram(s_recognition_raw_pcm))
-        return ESP_ERR_NO_MEM;
-    int16_t *preroll_pcm = heap_caps_calloc(preroll_capacity,
+    if (s_recognition_raw_pcm == NULL || !esp_ptr_external_ram(s_recognition_raw_pcm)) {
+        err = ESP_ERR_NO_MEM;
+        goto fail;
+    }
+    s_preroll.pcm = heap_caps_calloc(preroll_capacity,
                                            sizeof(int16_t),
                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     s_preroll_mutex = xSemaphoreCreateMutex();
-    if (preroll_pcm == NULL || s_preroll_mutex == NULL) return ESP_ERR_NO_MEM;
-    starter_preroll_init_rate(&s_preroll, preroll_pcm, preroll_capacity, preroll_rate);
+    if (s_preroll.pcm == NULL || s_preroll_mutex == NULL) { err = ESP_ERR_NO_MEM; goto fail; }
+    starter_preroll_init_rate(&s_preroll, s_preroll.pcm, preroll_capacity, preroll_rate);
     s_audio_rx_ready_queue = xQueueCreate(AUDIO_RX_QUEUE_DEPTH, sizeof(uint8_t));
     s_audio_rx_free_queue = xQueueCreate(AUDIO_RX_QUEUE_DEPTH, sizeof(uint8_t));
     s_audio_tx_ready_queue = xQueueCreate(AUDIO_TX_QUEUE_DEPTH, sizeof(uint8_t));
@@ -1526,16 +1591,19 @@ esp_err_t starter_media_init(void)
         !esp_ptr_external_ram(s_play_stereo) ||
         s_audio_rx_ready_queue == NULL || s_audio_rx_free_queue == NULL ||
         s_audio_tx_ready_queue == NULL || s_audio_tx_free_queue == NULL) {
-        return ESP_ERR_NO_MEM;
+        err = ESP_ERR_NO_MEM;
+        goto fail;
     }
     for (uint8_t slot = 0; slot < AUDIO_RX_QUEUE_DEPTH; ++slot) {
         if (xQueueSend(s_audio_rx_free_queue, &slot, 0) != pdTRUE) {
-            return ESP_FAIL;
+            err = ESP_FAIL;
+            goto fail;
         }
     }
     for (uint8_t slot = 0; slot < AUDIO_TX_QUEUE_DEPTH; ++slot) {
         if (xQueueSend(s_audio_tx_free_queue, &slot, 0) != pdTRUE) {
-            return ESP_FAIL;
+            err = ESP_FAIL;
+            goto fail;
         }
     }
     /* Audio must preempt sustained SDIO packet forwarding (priority 16), while
@@ -1545,41 +1613,52 @@ esp_err_t starter_media_init(void)
      * These long-running workers use only PSRAM-backed frame pools and board
      * drivers. Keeping their stacks in PSRAM preserves internal/DMA SRAM for
      * Wi-Fi and TiRTC bootstrap allocations. */
-    if (xTaskCreateWithCaps(audio_sink_task,
+    s_media_workers[0].function = audio_sink_task;
+    s_media_workers[1].function = audio_uplink_task;
+    s_media_workers[2].function = audio_capture_task;
+    s_media_workers[3].function = camera_task;
+    if (xTaskCreateWithCaps(starter_media_worker_entry,
                             "board_audio_rx",
                             OPUS_WORKER_TASK_STACK_BYTES,
-                            NULL,
+                            &s_media_workers[0],
                             APP_TASK_PRIORITY_AUDIO_PLAYBACK,
-                            NULL,
+                            &s_media_workers[0].handle,
                             MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS ||
-        xTaskCreateWithCaps(audio_uplink_task,
+        xTaskCreateWithCaps(starter_media_worker_entry,
                             "rtc_audio_tx",
                             OPUS_WORKER_TASK_STACK_BYTES,
-                            NULL,
+                            &s_media_workers[1],
                             APP_TASK_PRIORITY_AUDIO_PLAYBACK,
-                            NULL,
+                            &s_media_workers[1].handle,
                             MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS ||
-        xTaskCreatePinnedToCoreWithCaps(audio_capture_task,
-                                        "board_audio_tx",
-                                        6144,
-                                        NULL,
-                                        APP_TASK_PRIORITY_AUDIO_CAPTURE,
-                                        NULL,
+        xTaskCreatePinnedToCoreWithCaps(starter_media_worker_entry,
+                            "board_audio_tx",
+                            6144,
+                            &s_media_workers[2],
+                            APP_TASK_PRIORITY_AUDIO_CAPTURE,
+                            &s_media_workers[2].handle,
                                         MEDIA_REALTIME_CORE,
                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS ||
-        xTaskCreatePinnedToCoreWithCaps(camera_task,
-                                        "p4_video_owner",
-                                        8192,
-                                        NULL,
-                                        5,
-                                        NULL,
+        xTaskCreatePinnedToCoreWithCaps(starter_media_worker_entry,
+                            "p4_video_owner",
+                            8192,
+                            &s_media_workers[3],
+                            5,
+                            &s_media_workers[3].handle,
                                         MEDIA_REALTIME_CORE,
                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
-        return ESP_ERR_NO_MEM;
+        err = ESP_ERR_NO_MEM;
+        goto fail;
     }
     atomic_store_explicit(&s_ready, true, memory_order_release);
+    starter_media_workers_commit(s_media_workers, 4);
+    atomic_store(&s_initializing, false);
     ESP_LOGI(TAG, "P4 ES8311 DAC + ES7210 TDM MIC2/MIC3-ref AEC ready; OV5647 H264 video owner ready");
     return ESP_OK;
+fail:
+    media_init_rollback();
+    atomic_store(&s_initializing, false);
+    return err;
 }
 
 i2c_master_bus_handle_t starter_media_i2c_bus(void)

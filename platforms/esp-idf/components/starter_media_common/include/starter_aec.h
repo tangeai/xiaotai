@@ -34,6 +34,8 @@ typedef struct {
 
 /** 创建常驻的 ESP-SR 全双工 AEC，并在 PSRAM 中分配其状态和工作帧。 */
 esp_err_t starter_aec_init(void);
+/* Owner must stop all AEC users first; also valid after partial initialization. */
+void starter_aec_deinit(void);
 
 /** 返回一次 I2S 读取必须填满的双通道压紧 DMA 字节数。 */
 size_t starter_aec_capture_bytes(void);

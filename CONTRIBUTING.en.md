@@ -386,6 +386,10 @@ Use the [bilingual release notes template](.github/release_notes_template.md) fo
 
 This is a project workflow convention. GitHub does not automatically apply this template to Release bodies.
 
+Before publication, run `tools/release_firmware.py --package <ZIP> --notes-file <bilingual-notes>`; add `--merged <BIN>` for an ESP merged image. Missing, misordered or empty sections and unfilled placeholders are rejected. Success reports `notes_validated: true`.
+
+Without notes, the tool checks artifacts only and reports `notes_validated: false`. Structural checks cannot establish translation accuracy or factual claims; review those separately.
+
 - Review actual differences from an explicit baseline for the same board and variant. Do not substitute commit titles, work logs, or test checklists for release notes.
 - Added explains new user capabilities; Changed explains previous and new behavior and upgrade impact; Fixed states the trigger, previous failure, and resulting behavior.
 - Retain applicable earlier known issues and outstanding work. Use “无 / None” for an empty category.

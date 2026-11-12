@@ -37,7 +37,7 @@ typedef struct {
 static const char *TAG = "starter_aec";
 static starter_aec_context_t s_aec;
 
-static void starter_aec_release(void)
+void starter_aec_deinit(void)
 {
     heap_caps_free(s_aec.tdm);
     heap_caps_free(s_aec.mic);
@@ -87,7 +87,7 @@ esp_err_t starter_aec_init(void)
     if (chunk <= 0 || (chunk & 1) != 0 ||
         (size_t)chunk > AEC_MAX_FRAME_SAMPLES) {
         ESP_LOGE(TAG, "unsupported AEC chunk size: %d", chunk);
-        starter_aec_release();
+        starter_aec_deinit();
         return ESP_ERR_NOT_SUPPORTED;
     }
     s_aec.frame_samples = (size_t)chunk;
@@ -110,7 +110,7 @@ esp_err_t starter_aec_init(void)
         !esp_ptr_external_ram(s_aec.clean) ||
         !esp_ptr_external_ram(s_aec.output_8k)) {
         ESP_LOGE(TAG, "AEC aligned work-buffer allocation failed");
-        starter_aec_release();
+        starter_aec_deinit();
         return ESP_ERR_NO_MEM;
     }
 
