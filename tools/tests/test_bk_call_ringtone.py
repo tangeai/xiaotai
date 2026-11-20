@@ -273,7 +273,13 @@ typedef int opus_int32;
 typedef int beken_thread_arg_t;
 static unsigned rtos_get_time(void){return 200;}
 static size_t opus_ring_take(void *p,size_t n){if(packet){memset(p,0,n);return 5;}return 0;}
-static int opus_decode(void *d,void *p,int n,int16_t *pcm,int max,int fec){memset(pcm,0,320*2);return 320;}
+#include "xiaotai_opus_plc.h"
+int xiaotai_opus_plc_decode(xiaotai_opus_plc_t *s,struct OpusDecoder *d,
+ const xiaotai_opus_stamp_t *stamp,const uint8_t *p,int n,int16_t *pcm,int max){
+ int samples=packet==2?960:320;assert(max>=samples);
+ for(int i=0;i<samples;i++)pcm[i]=packet==2?2048:0;
+ return samples;
+}
 static size_t ring_take(void *p,size_t n){if(packet){memset(p,0,n);return n;}return 0;}
 static int16_t alaw2linear(unsigned char c){return 0;}
 static void rtos_delay_milliseconds(unsigned n){assert(n==5);s_play_run=false;}
@@ -286,7 +292,9 @@ static void rtos_unlock_mutex(int *m){}
 static void aec_reference_push(const int16_t *pcm,size_t n){refs++;}
 static int write_pcm(void *c,const int16_t *pcm,size_t n,size_t *bytes){
  bool audible=false;for(size_t i=0;i<n;i++)audible|=pcm[i]!=0;
- assert(audible==!s_speaker_muted);*bytes=n*2;writes++;s_play_run=false;return 0;
+ assert(audible==!s_speaker_muted);
+ if(packet==2){assert(n==960 && pcm[0]==1024 && pcm[959]==1024);}
+ *bytes=n*2;writes++;s_play_run=false;return 0;
 }
 static struct {void *context;int (*write_pcm)(void *,const int16_t *,size_t,size_t *);} board={0,write_pcm},*s_board_audio=&board;
 ''' + (AUDIO.parent / 'xiaotai_audio_policy.c').read_text() + '\nstatic xiaotai_audio_buffer_t s_ai_buffer;\n' + diagnostic_block(source) + function(source,'call_ringtone_pcm') + function(source,'mix_call_ringtone') +
@@ -295,12 +303,15 @@ int main(void){
  for(int codec=0;codec<2;codec++)for(int mute=0;mute<2;mute++)for(packet=0;packet<2;packet++){
   s_codec=codec;s_frame_samples=codec?320:160;s_speaker_muted=mute;
   s_play_run=true;s_downlink_frames=0;s_playback_pcm_ms=0;writes=refs=0;
-  (void)s_ai_packet_stamps;(void)s_ai_rx_seq;(void)s_ai_rx_previous_ms;
+  (void)s_ai_packet_stamps;(void)s_ai_rx_seq;(void)s_ai_rx_previous_ms;(void)s_plc_epoch;
   playback_task(0);assert(writes==1 && refs==1);
   assert(s_downlink_frames==(unsigned)packet && s_playback_pcm_ms==(packet?20U:0U));
  }
  s_call_ring_kind=XIAOTAI_CALL_RING_NONE;packet=0;s_play_run=true;writes=0;
  playback_task(0);assert(writes==0);
+ s_codec=XIAOTAI_AUDIO_CODEC_OPUS_16K;s_speaker_muted=false;s_volume=5;
+ s_ai_packet.opus.samples=320;packet=2;s_play_run=true;s_playback_pcm_ms=0;refs=0;
+ playback_task(0);assert(writes==1 && refs==1 && s_plc_rendered_ms==40 && s_playback_pcm_ms==60);
 }
 ''',[ROOT/'platforms/beken/runtime/include',ROOT/'platforms/beken/runtime/assets'])
 

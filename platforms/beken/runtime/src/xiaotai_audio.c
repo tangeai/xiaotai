@@ -4,6 +4,7 @@
 #include "xiaotai_audio_agc.h"
 #include "xiaotai_audio_ns.h"
 #include "xiaotai_audio_policy.h"
+#include "xiaotai_opus_plc.h"
 #include "board_audio.h"
 
 #include <common/bk_err.h>
@@ -182,7 +183,6 @@ static uint32_t s_alaw_arrival_ms[AUDIO_RING_BYTES];
 #endif
 static uint8_t *s_opus_ring;
 static uint16_t s_opus_lengths[OPUS_PACKET_SLOTS];
-static uint16_t s_opus_samples[OPUS_PACKET_SLOTS];
 static uint32_t s_opus_queued_samples;
 static xiaotai_audio_buffer_t s_ai_buffer;
 static bool s_ai_buffer_ended;
@@ -431,10 +431,12 @@ static void mix_call_ringtone(int16_t *pcm, size_t samples, uint32_t rate)
 /* Packet stamps share the Opus ring lock and eviction policy. The current
  * packet and aggregate structs belong exclusively to their audio worker. */
 typedef struct {
-    uint32_t seq, rx_ms, enqueue_ms, gap_ms, queued, media_ms;
+    xiaotai_opus_stamp_t opus;
+    uint32_t seq, enqueue_ms, gap_ms, queued;
 } ai_packet_timing_t;
 static ai_packet_timing_t s_ai_packet_stamps[OPUS_PACKET_SLOTS], s_ai_packet;
-static uint32_t s_ai_rx_seq, s_ai_rx_previous_ms;
+static uint32_t s_ai_rx_seq, s_ai_rx_previous_ms, s_plc_epoch;
+static atomic_uint s_plc_rendered_ms;
 typedef struct {
     uint32_t frames, failed, queue_max, decode_max, write_max, gap_max;
     uint32_t last_report_ms, last_write_ms;
@@ -468,8 +470,8 @@ static void ai_audio_written(ai_playback_timing_t *s, uint32_t take_ms,
     s->pending = true;
     if (s->frames == 1U) {
         BK_LOGI(TAG, "AI_AUDIO event=first_write rx_ms=%u done_ms=%u rx_to_write_ms=%u ok=%u\n",
-                (unsigned)s_ai_packet.rx_ms, (unsigned)done_ms,
-                (unsigned)(done_ms - s_ai_packet.rx_ms), ok ? 1U : 0U);
+                (unsigned)s_ai_packet.opus.rx_ms, (unsigned)done_ms,
+                (unsigned)(done_ms - s_ai_packet.opus.rx_ms), ok ? 1U : 0U);
     }
     /* A burst is only an arrival gap, NOT a server conversation round. */
     if (s->frames == 1U || s_ai_packet.gap_ms >= 200U ||
@@ -478,13 +480,13 @@ static void ai_audio_written(ai_playback_timing_t *s, uint32_t take_ms,
                 "admit_ms=%u queue_ms=%u decode_ms=%u prepare_ms=%u write_ms=%u "
                 "rx_to_write_ms=%u ok=%u frames=%u failed=%u queue_max_ms=%u "
                 "decode_max_ms=%u write_max_ms=%u gap_max_ms=%u\n",
-                (unsigned)s_ai_packet.seq, (unsigned)s_ai_packet.rx_ms,
+                (unsigned)s_ai_packet.seq, (unsigned)s_ai_packet.opus.rx_ms,
                 (unsigned)done_ms, (unsigned)s_ai_packet.gap_ms,
                 (unsigned)s_ai_packet.queued,
-                (unsigned)(s_ai_packet.enqueue_ms - s_ai_packet.rx_ms),
+                (unsigned)(s_ai_packet.enqueue_ms - s_ai_packet.opus.rx_ms),
                 (unsigned)queue, (unsigned)decode,
                 (unsigned)(write_ms - decoded_ms), (unsigned)write,
-                (unsigned)(done_ms - s_ai_packet.rx_ms), ok ? 1U : 0U,
+                (unsigned)(done_ms - s_ai_packet.opus.rx_ms), ok ? 1U : 0U,
                 (unsigned)s->frames, (unsigned)s->failed,
                 (unsigned)s->queue_max, (unsigned)s->decode_max,
                 (unsigned)s->write_max, (unsigned)s->gap_max);
@@ -796,7 +798,7 @@ static size_t opus_ring_take(uint8_t *output, size_t capacity)
     uint32_t now_ms = rtos_get_time();
     bool ready = xiaotai_audio_buffer_ready(&s_ai_buffer, now_ms,
         s_opus_queued_samples / (OPUS_SAMPLE_RATE_HZ / 1000U),
-        s_opus_count == 0U ? now_ms : s_ai_packet_stamps[s_opus_head].rx_ms,
+        s_opus_count == 0U ? now_ms : s_ai_packet_stamps[s_opus_head].opus.rx_ms,
         atomic_load_explicit(&s_playback_tail_ms, memory_order_acquire),
         s_ai_buffer_ended);
     if (!ready || s_opus_count == 0U) {
@@ -807,7 +809,7 @@ static size_t opus_ring_take(uint8_t *output, size_t capacity)
     if (size > capacity) size = capacity;
     s_ai_packet = s_ai_packet_stamps[s_opus_head];
     memcpy(output, s_opus_ring + s_opus_head * OPUS_MAX_PACKET_BYTES, size);
-    s_opus_queued_samples -= s_opus_samples[s_opus_head];
+    s_opus_queued_samples -= s_ai_packet_stamps[s_opus_head].opus.samples;
     s_opus_head = (s_opus_head + 1U) % OPUS_PACKET_SLOTS;
     --s_opus_count;
     /* Dequeue transfers ownership to the decoder, before write_pcm begins. */
@@ -1010,6 +1012,10 @@ static void playback_task(beken_thread_arg_t argument)
     uint8_t opus[OPUS_MAX_PACKET_BYTES];
     int16_t pcm[OPUS_MAX_DECODE_SAMPLES];
     ai_playback_timing_t timing = {0};
+    /* Only one playback worker runs. Keep history off the codec task stack. */
+    static xiaotai_opus_plc_t plc;
+    memset(&plc, 0, sizeof(plc));
+    atomic_store(&s_plc_rendered_ms, 0U);
 
     BK_LOGI(TAG, "playback task started: codec=%s jitter=%u ms\n",
             s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? "opus" : "alaw",
@@ -1032,9 +1038,13 @@ static void playback_task(beken_thread_arg_t argument)
                 media_frame = false;
                 memset(pcm, 0, samples * sizeof(*pcm));
             }
-            int decoded = media_frame ? opus_decode(s_opus_decoder, opus,
-                                      (opus_int32)encoded_size, pcm,
-                                      OPUS_MAX_DECODE_SAMPLES, 0) : (int)samples;
+            int decoded = media_frame ? xiaotai_opus_plc_decode(&plc, s_opus_decoder,
+                &s_ai_packet.opus, opus, (int)encoded_size, pcm, OPUS_MAX_DECODE_SAMPLES)
+                : (int)samples;
+            if (decoded == 0) {
+                atomic_store_explicit(&s_playback_in_progress, false, memory_order_release);
+                continue;
+            }
             decoded_ms = rtos_get_time();
             if (decoded <= 0) {
                 ai_audio_written(&timing, take_ms, decoded_ms, decoded_ms, decoded_ms, false);
@@ -1081,6 +1091,9 @@ static void playback_task(beken_thread_arg_t argument)
             BK_LOGW(TAG, "speaker write failed rc=%d\n", rc);
         } else if (media_frame) {
             if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
+                if (samples > s_ai_packet.opus.samples)
+                    atomic_fetch_add_explicit(&s_plc_rendered_ms,
+                        (samples - s_ai_packet.opus.samples) / 16U, memory_order_relaxed);
                 atomic_store_explicit(&s_playback_columns,
                     playback_columns_pack(pcm, samples), memory_order_relaxed);
                 atomic_store_explicit(&s_playback_columns_at_ms,
@@ -1469,6 +1482,12 @@ int xiaotai_audio_play_alaw(const uint8_t *data, size_t size)
 
 int xiaotai_audio_play_opus(const uint8_t *data, size_t size, uint32_t timestamp_ms)
 {
+    return xiaotai_audio_play_opus_stream(data, size, timestamp_ms, 0);
+}
+
+int xiaotai_audio_play_opus_stream(const uint8_t *data, size_t size,
+                                   uint32_t timestamp_ms, uint8_t stream)
+{
     uint32_t rx_ms = rtos_get_time();
     if (data == NULL || size == 0U || size > OPUS_MAX_PACKET_BYTES) {
         return BK_ERR_PARAM;
@@ -1496,18 +1515,19 @@ int xiaotai_audio_play_opus(const uint8_t *data, size_t size, uint32_t timestamp
             rtos_unlock_mutex(&s_ring_mutex);
             return BK_ERR_BUSY;
         }
-        s_opus_queued_samples -= s_opus_samples[s_opus_head];
+        s_opus_queued_samples -= s_ai_packet_stamps[s_opus_head].opus.samples;
         s_opus_head = (s_opus_head + 1U) % OPUS_PACKET_SLOTS;
         --s_opus_count;
     }
     size_t tail = (s_opus_head + s_opus_count) % OPUS_PACKET_SLOTS;
     memcpy(s_opus_ring + tail * OPUS_MAX_PACKET_BYTES, data, size);
     s_opus_lengths[tail] = (uint16_t)size;
-    s_opus_samples[tail] = (uint16_t)samples;
     s_opus_queued_samples += (uint32_t)samples;
     ++s_ai_rx_seq;
     s_ai_packet_stamps[tail] = (ai_packet_timing_t){
-        .seq = s_ai_rx_seq, .rx_ms = rx_ms, .media_ms = timestamp_ms,
+        .seq = s_ai_rx_seq,
+        .opus = {.rx_ms = rx_ms, .media_ms = timestamp_ms, .epoch = s_plc_epoch,
+                 .samples = (uint16_t)samples, .stream = stream},
         .enqueue_ms = rtos_get_time(),
         .gap_ms = s_ai_rx_seq == 1U ? 0U : rx_ms - s_ai_rx_previous_ms,
         .queued = (uint32_t)s_opus_count + 1U,
@@ -1615,6 +1635,7 @@ void xiaotai_audio_playback_boundary(bool ended)
              * or interrupt audio already playing. */
             s_ai_buffer.recovering = false;
         }
+        ++s_plc_epoch;
         s_ai_buffer_ended = ended;
     }
     rtos_unlock_mutex(&s_ring_mutex);
@@ -1655,7 +1676,7 @@ void xiaotai_audio_log_playback_status(const char *stage)
     uint32_t now_ms = rtos_get_time();
     int32_t tail_ms = (int32_t)(atomic_load(&s_playback_tail_ms) - now_ms);
     BK_LOGI(TAG,
-            "AI playback stage=%s rx=%u written=%u overflow=%u pending=%u peak=%u slots=%u active=%d pcm-ms=%u tail-ms=%u last-rx-age-ms=%u busy=%u queued-ms=%u target-ms=%u underruns=%u timeout-releases=%u\n",
+            "AI playback stage=%s rx=%u written=%u overflow=%u pending=%u peak=%u slots=%u active=%d pcm-ms=%u tail-ms=%u last-rx-age-ms=%u busy=%u queued-ms=%u target-ms=%u underruns=%u timeout-releases=%u plc-ms=%u\n",
             stage, (unsigned)atomic_load(&s_opus_received_frames),
             (unsigned)atomic_load(&s_downlink_frames),
             (unsigned)dropped, (unsigned)queued, (unsigned)peak,
@@ -1666,7 +1687,8 @@ void xiaotai_audio_log_playback_status(const char *stage)
             (unsigned)(now_ms - atomic_load(&s_last_opus_rx_ms)),
             (unsigned)atomic_load(&s_admission_busy),
             (unsigned)queued_ms, (unsigned)buffer.target_ms,
-            (unsigned)buffer.underruns, (unsigned)buffer.timeout_releases);
+            (unsigned)buffer.underruns, (unsigned)buffer.timeout_releases,
+            (unsigned)atomic_load(&s_plc_rendered_ms));
 }
 
 uint32_t xiaotai_audio_playback_columns(void)
