@@ -52,12 +52,80 @@ static void check_timeline(void)
     opus_decoder_destroy(dec);
 }
 
+/* Preserve media time for scoring. A slot with no emitted PCM is scored
+ * as silence. The baseline skips the same packets in the same decoder. */
+static double envelope_error(const short *expected, const short *actual)
+{
+    double error = 0;
+    for (int k = 0; k < FRAME; k += 80) {
+        double a = 0, b = 0;
+        for (int j = k; j < k + 80; ++j) {
+            a += (double)expected[j] * expected[j];
+            if (actual) b += (double)actual[j] * actual[j];
+        }
+        error += fabs(sqrt(a / 80) - sqrt(b / 80));
+    }
+    return error;
+}
+
+static void check_thirty_percent(int count, int bursty)
+{
+    count -= count % 10;
+    int lost[256] = {0}, dropped = 0, concealed = 0, err;
+    unsigned seed = 7;
+    while (dropped < 3 * count / 10) {
+        seed = seed * 1664525U + 1013904223U;
+        int i = 3 + (int)((seed >> 8) % (unsigned)(count - 4));
+        int run = bursty ? 2 : 1;
+        while (run-- && i < count-1 && !lost[i] && dropped < 3 * count / 10) {
+            lost[i++] = 1;
+            ++dropped;
+        }
+    }
+    short ref_pcm[256][FRAME], played[256][FRAME] = {{0}}, old[256][FRAME] = {{0}};
+    OpusDecoder *ref = opus_decoder_create(16000, 1, &err);
+    OpusDecoder *dec = opus_decoder_create(16000, 1, &err);
+    OpusDecoder *skip = opus_decoder_create(16000, 1, &err);
+    assert(ref && dec && skip);
+    xiaotai_opus_plc_t state = {0};
+    for (int i = 0; i < count; ++i) {
+        assert(opus_decode(ref, packets[i], lengths[i], ref_pcm[i], FRAME, 0) == FRAME);
+        if (lost[i]) continue;
+        assert(opus_decode(skip, packets[i], lengths[i], old[i], FRAME, 0) == FRAME);
+        xiaotai_opus_stamp_t stamp = {.media_ms=i*20U, .rx_ms=i*20U, .samples=FRAME};
+        int n = xiaotai_opus_plc_decode(&state, dec, &stamp, packets[i], lengths[i],
+                                        repaired, CAPACITY);
+        assert(n >= FRAME && n <= CAPACITY && n % FRAME == 0);
+        int prefix = n / FRAME - 1;
+        for (int j = 1; j <= prefix; ++j) assert(i >= j && lost[i-j]);
+        memcpy(played[i-prefix], repaired, n*sizeof(*repaired));
+        concealed += prefix;
+    }
+    double before = 0, after = 0;
+    for (int i = 0; i < count; ++i) {
+        before += envelope_error(ref_pcm[i], old[i]);
+        after += envelope_error(ref_pcm[i], played[i]);
+    }
+    printf("30%% %s: dropped %d/%d, filled %d, whole-stream envelope MAE %.1f (baseline %.1f)\n",
+           bursty ? "clustered" : "random", dropped, count, concealed,
+           after/(4*count), before/(4*count));
+    assert(dropped*10 == count*3 && concealed > 0 && concealed <= dropped && after < before);
+    opus_decoder_destroy(ref);
+    opus_decoder_destroy(dec);
+    opus_decoder_destroy(skip);
+}
+
 int main(void)
 {
     int err, count = 0;
     OpusEncoder *encoder = opus_encoder_create(16000, 1, OPUS_APPLICATION_VOIP, &err);
     assert(encoder && err == OPUS_OK);
-    assert(opus_encoder_ctl(encoder, OPUS_SET_BITRATE(16000)) == OPUS_OK);
+    assert(xiaotai_opus_configure_loss(encoder) == OPUS_OK);
+    opus_int32 loss, fec;
+    assert(opus_encoder_ctl(encoder, OPUS_GET_PACKET_LOSS_PERC(&loss)) == OPUS_OK && loss == 30);
+    assert(opus_encoder_ctl(encoder, OPUS_GET_INBAND_FEC(&fec)) == OPUS_OK && fec == 1);
+    assert(opus_encoder_ctl(encoder, OPUS_SET_COMPLEXITY(3)) == OPUS_OK);
+    assert(opus_encoder_ctl(encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE)) == OPUS_OK);
     while (count < 256 && fread(input, sizeof(short), FRAME, stdin) == FRAME) {
         lengths[count] = opus_encode(encoder, input, FRAME, packets[count], 512);
         assert(lengths[count++] > 0);
@@ -65,6 +133,8 @@ int main(void)
     opus_encoder_destroy(encoder);
     assert(count > 10);
     check_timeline();
+    check_thirty_percent(count, 0);
+    check_thirty_percent(count, 1);
     for (int burst = 0; burst <= 2; ++burst) {
         double energy_error = 0, silence_error = 0, join = 0, skip_join = 0;
         double recovery_error = 0, skipped_error = 0, compressed_error = 0;

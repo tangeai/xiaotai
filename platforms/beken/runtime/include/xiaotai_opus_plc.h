@@ -4,6 +4,10 @@
 #include <stdint.h>
 
 struct OpusDecoder;
+struct OpusEncoder;
+
+/* The loss expectation is an encoder setting; the receiver uses real gaps. */
+int xiaotai_opus_configure_loss(struct OpusEncoder *encoder);
 typedef struct {
     uint32_t media_ms, rx_ms, epoch;
     uint16_t samples;
@@ -14,7 +18,6 @@ typedef struct {
 typedef struct {
     xiaotai_opus_stamp_t last;
     uint32_t repair_start_ms, repair_rx_ms;
-    int16_t history[320];
     uint8_t steady_intervals, repair_frames;
 } xiaotai_opus_plc_t;
 

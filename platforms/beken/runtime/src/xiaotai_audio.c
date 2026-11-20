@@ -38,7 +38,6 @@
 #define AUDIO_TASK_STOP_TIMEOUT_MS 1000U
 #define OPUS_SAMPLE_RATE_HZ 16000U
 #define OPUS_FRAME_SAMPLES XIAOTAI_AUDIO_OPUS_FRAME_SAMPLES
-#define OPUS_BITRATE_BPS 16000
 #define OPUS_MAX_PACKET_BYTES 512U
 /* Retain AI TTS bursts; the playout gate separately bounds startup delay. */
 #define OPUS_PACKET_SLOTS XIAOTAI_AI_PACKET_CAPACITY
@@ -1012,9 +1011,7 @@ static void playback_task(beken_thread_arg_t argument)
     uint8_t opus[OPUS_MAX_PACKET_BYTES];
     int16_t pcm[OPUS_MAX_DECODE_SAMPLES];
     ai_playback_timing_t timing = {0};
-    /* Only one playback worker runs. Keep history off the codec task stack. */
-    static xiaotai_opus_plc_t plc;
-    memset(&plc, 0, sizeof(plc));
+    xiaotai_opus_plc_t plc = {0};
     atomic_store(&s_plc_rendered_ms, 0U);
 
     BK_LOGI(TAG, "playback task started: codec=%s jitter=%u ms\n",
@@ -1252,8 +1249,8 @@ static int audio_start_duplex_locked(xiaotai_audio_codec_t uplink_codec,
         s_opus_decoder = opus_decoder_create(OPUS_SAMPLE_RATE_HZ, 1,
                                               &opus_error);
         if (s_opus_decoder == NULL || opus_error != OPUS_OK ||
-            opus_encoder_ctl(s_opus_encoder,
-                             OPUS_SET_BITRATE(OPUS_BITRATE_BPS)) != OPUS_OK ||
+            (uplink_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K &&
+             xiaotai_opus_configure_loss(s_opus_encoder) != OPUS_OK) ||
             opus_encoder_ctl(s_opus_encoder,
                              OPUS_SET_COMPLEXITY(3)) != OPUS_OK ||
             opus_encoder_ctl(s_opus_encoder,
@@ -1263,7 +1260,7 @@ static int audio_start_duplex_locked(xiaotai_audio_codec_t uplink_codec,
             goto fail;
         }
         BK_LOGI(TAG,
-                "Opus ready rate=16000 frame=20ms bitrate=16000 state=%d+%d heap=%u\n",
+                "Opus ready rate=16000 frame=20ms state=%d+%d heap=%u\n",
                 opus_encoder_get_size(1), opus_decoder_get_size(1),
                 (unsigned)rtos_get_free_heap_size());
         if (!xiaotai_audio_ns_start(&s_uplink_ns, required_rate,
