@@ -179,7 +179,7 @@ Public documentation serves first-time users and developers. Technical prose sho
 
 The root README prioritizes purpose, board selection, downloads, and first use; board and development guides hold details without repeating parameters, internal diagnostics, or historical processes.
 
-Maintain English for the following scope, rather than translating every file. Root `README.md` already has `README.en.md`; the following 15 Chinese sources are also in scope. Inclusion in this list does not itself indicate translation completion.
+Maintain English for the following scope, rather than translating every file. Root `README.md` already has `README.en.md`; the following 16 Chinese sources are also in scope. Inclusion in this list does not itself indicate translation completion.
 
 | Category | Chinese source |
 |---|---|
@@ -196,6 +196,7 @@ Maintain English for the following scope, rather than translating every file. Ro
 | M5Stack CoreS3-Lite | `docs/boards/m5stack-cores3-lite/README.md` |
 | MGKFB BK7258 | `docs/boards/mgkfb-bk7258/README.md` |
 | BK7258 serial commands | `docs/development/BK7258_SERIAL_COMMANDS.md` |
+| BK7258 Opus packet loss concealment | `docs/development/bk-opus-plc.md` |
 | Development pitfalls | `docs/development/pitfalls.md` |
 | Testing guide | `tests/README.md` |
 
