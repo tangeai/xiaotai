@@ -36,9 +36,17 @@ for name in ("lckfb-esp32s3-xiaotai",):
         archive = Path((p / "build/sdk-archive.txt").read_text())
         assert archive.resolve() == (sdk / "lib/libTiRTC.a").resolve()
         data = archive.read_bytes()
-        assert hashlib.sha256(data).hexdigest() == "4739ec70b895bde848205c36a114c34b2ed4ab27761f2c6bf37d1b2a982a451d"
-        assert b"v2.6.0\x00" in data and b'"tirtc":"v2.6.0-' in data
+        assert hashlib.sha256(data).hexdigest() == "87f9fc6eac5d1c5bd1bd4877fc00abdd115101e85181c035e76089343486f850"
+        assert b"v2.6.3\x00" in data and b'"tirtc":"v2.6.3-' in data
+        header = (sdk / "include/tirtc/tiRTC.h").read_text()
+        assert "#define TIRTC_VERSION_PATCH     3" in header
+        assert "TiRtcSetAudioRedundancyLossThreshold" in header
+        symbols = subprocess.check_output(["nm", "--defined-only", str(archive)], text=True)
+        assert " T TiRtcSetAudioRedundancyLossThreshold" in symbols
+        for line in (sdk / "SHA256SUMS.txt").read_text().splitlines():
+            digest, relative = line.split(maxsplit=1)
+            assert hashlib.sha256((sdk / relative).read_bytes()).hexdigest() == digest, relative
         with (p / "member.o").open("wb") as output:
             subprocess.run(["ar", "p", str(archive), "crc32.o"], stdout=output, check=True)
         assert "Xtensa" in subprocess.check_output(["readelf", "-h", str(p / "member.o")], text=True)
-    print("PASS: actual S3 component selects the supplied Xtensa TiRTC 2.6.0 archive")
+    print("PASS: actual S3 component selects the supplied Xtensa TiRTC 2.6.3 archive")

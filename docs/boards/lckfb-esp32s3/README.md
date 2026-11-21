@@ -181,7 +181,7 @@ AEC 输出的 16 kHz PCM；H5 和语音呼叫仍降采样到 8 kHz，AI 下行�
 | 主机环境 | Linux/WSL2、Git、Python 3 | [Git](https://git-scm.com/downloads)、[Python](https://www.python.org/downloads/) | 无 |
 | ESP-IDF | `v5.5.5`，提交 `b774170ff46c393eeb5e495ea37936038d3f4f4f` | [Espressif 官方仓库](https://github.com/espressif/esp-idf/tree/b774170ff46c393eeb5e495ea37936038d3f4f4f) | 无 |
 | C/C++ 编译器 | `xtensa-esp-elf-gcc 14.2.0`，构建标识 `esp-14.2.0_20260121` | [ESP-IDF 工具清单](https://github.com/espressif/esp-idf/blob/b774170ff46c393eeb5e495ea37936038d3f4f4f/tools/tools.json) | 无，安装器按工具清单校验下载文件 |
-| TiRTC | 2.6.0，`libTiRTC.a` | 无 | `4739ec70b895bde848205c36a114c34b2ed4ab27761f2c6bf37d1b2a982a451d` |
+| TiRTC | 2.6.3，`libTiRTC.a` | 无 | `87f9fc6eac5d1c5bd1bd4877fc00abdd115101e85181c035e76089343486f850` |
 | ESP-IDF 组件 | ESP-SR 2.4.7、LVGL 8.3.11、`esp_codec_dev` 1.6.2、`esp32-camera` 2.1.7、`esp_jpeg` 1.3.1 | [工程依赖锁定文件](../../../firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/dependencies.lock) | 无 |
 | 板级组件 | ES7210、ES8311、触摸与屏幕组件 | 无 | 无 |
 
