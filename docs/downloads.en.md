@@ -18,6 +18,21 @@ The BK package's `-app_pack.rbl` is for over-the-air (OTA) updates, not initial 
 
 Verify downloads with the release's `SHA256SUMS`. Package files, versions, and flash addresses are listed in `MANIFEST.json`. Release notes describe validation scope and known issues. Historical versions are available in [GitHub Releases](https://github.com/tangeai/xiaotai/releases).
 
+## Beta testing: v1.2.0-beta.1
+
+These six images for five boards form a unified test distribution. Download BINs directly; no extraction is needed. Hardware acceptance is pending, and this beta does not replace the stable releases below. Prepare to configure Wi-Fi and binding again after full flashing; select the correct M5 display variant.
+
+The distribution version is `1.2.0-beta.1`. These reused builds retain the embedded versions listed below. See the [unified pre-release notes](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1) for checksums, known issues, and flashing parameters.
+
+| Board | Variant | Embedded version | Complete BIN |
+|---|---|---|---|
+| 立创·实战派 BK7258<br>LCKFB ShiZhanPai BK7258 | default | `1.0.2+build.99` | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_lckfb-bk7258.bin) |
+| 立创·实战派 ESP32-S3<br>LCKFB ShiZhanPai ESP32-S3 | default | `1.1.0+build.82` | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_lckfb-esp32s3.bin) |
+| M5Stack CoreS3-Lite（K128-Lite）<br>M5Stack CoreS3-Lite (K128-Lite) | ili9342c | `1.1.0+build.91` | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_m5stack-cores3-lite_ili9342c.bin) |
+| M5Stack CoreS3-Lite（K128-Lite）<br>M5Stack CoreS3-Lite (K128-Lite) | ili9342e | `1.1.0+build.90` | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_m5stack-cores3-lite_ili9342e.bin) |
+| 觅感 AI 玩具开发板 BK7258<br>MGKFB AI Toy Development Board BK7258 | default | `1.0.3+build.49` | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_mgkfb-bk7258.bin) |
+| 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3（PCB V1.0）<br>Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 (PCB V1.0) | default | `1.1.0+build.48` | [Download BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_waveshare-esp32p4-touch-lcd-43c-v10.bin) |
+
 <a id="lckfb-bk7258"></a>
 
 ## LCKFB BK7258

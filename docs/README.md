@@ -22,6 +22,7 @@
 ## 开发与维护
 
 - [架构与二次开发](../ARCHITECTURE.md)：产品分层、会话与媒体生命周期、目录边界。
+- [统一发行规则](development/release-policy.md)：版本时间线、BIN 命名与发布门槛。
 - [参与开发](../CONTRIBUTING.md)：适配流程、测试、文档与发布要求。
 - [第三方依赖核对清单](../THIRD_PARTY.md)：依赖来源、授权状态与待办事项。
 - [BK7258 串口命令](development/BK7258_SERIAL_COMMANDS.md)：状态查询、配网、通话、服务地址和 NTP 时间服务器设置。

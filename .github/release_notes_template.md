@@ -1,5 +1,7 @@
 <!--
-Copy this bilingual template for each board release. Fill every {{placeholder}}.
+Copy this bilingual template for each unified release. Fill every {{placeholder}}.
+Follow docs/development/release-policy.md for public names and the board download map.
+Within each section, distinguish changes and validation for every board/variant.
 Follow CONTRIBUTING.md: review actual changes since a stated baseline, limit claims
  to this board/variant, and keep Chinese and English facts identical.
 Use “无 / None” for an empty change category. Do not copy examples as facts.
@@ -17,8 +19,12 @@ This file is a project convention, not an automatically applied GitHub feature.
 | 项目 | 内容 |
 | --- | --- |
 | 开发板 / 变体 | {{完整板名、board ID、硬件/屏幕变体}} |
-| 版本 / 类型 | {{产品版本 + build 编号}} · {{正式发布 / pre-release}} |
+| 版本 / 类型 | {{统一发行版本}} · {{正式发布 / pre-release}} |
 | 比较基线 | {{同板同变体的上一版本或明确的源码提交；缺失时如实说明}} |
+
+| 开发板（中文） | Board (English) | 硬件 / 屏幕变体 | BIN 下载链接 | 内嵌固件身份 |
+| --- | --- | --- | --- | --- |
+| {{中文型号}} | {{English model}} | {{变体}} | {{实际 BIN 链接}} | {{实际产品版本与 build}} |
 
 ### 新增
 
@@ -44,7 +50,7 @@ This file is a project convention, not an automatically applied GitHub feature.
 
 ### 下载与升级
 
-- 附件：{{BIN / ZIP / SHA256SUMS 的用途；使用实际资产名称。}}
+- 附件：{{每个板卡/变体一个 BIN；使用实际资产名称与 SHA-256，无固件 ZIP。}}
 - 升级影响：{{烧录地址、配置是否保留、分区/硬件兼容性、必要的迁移步骤。}}
 - 来源：{{源码提交与验证记录链接；如实区分原始构建身份和打包提交。}}
 
@@ -57,8 +63,12 @@ This file is a project convention, not an automatically applied GitHub feature.
 | Item | Details |
 | --- | --- |
 | Board / variant | {{Full board name, board ID, hardware/display variant}} |
-| Version / channel | {{Product version + build number}} · {{Stable / pre-release}} |
+| Version / channel | {{Unified distribution version}} · {{Stable / pre-release}} |
 | Comparison baseline | {{Previous version for the same board/variant or explicit source commit; disclose if unavailable}} |
+
+| 开发板（中文） | Board (English) | Hardware / display variant | BIN download link | Embedded firmware identity |
+| --- | --- | --- | --- | --- |
+| {{Chinese model}} | {{English model}} | {{Variant}} | {{Actual BIN link}} | {{Actual product version and build}} |
 
 ### Added
 
@@ -84,6 +94,6 @@ This file is a project convention, not an automatically applied GitHub feature.
 
 ### Downloads and upgrade
 
-- Assets: {{Purpose of BIN / ZIP / SHA256SUMS; use actual asset names.}}
+- Assets: {{One BIN per board/variant; give actual asset names and SHA-256, with no firmware ZIP.}}
 - Upgrade impact: {{Flash addresses, configuration retention, partition/hardware compatibility, and required migration.}}
 - Provenance: {{Source commit and validation-record link; distinguish original build identity from the packaging commit.}}

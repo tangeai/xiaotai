@@ -21,6 +21,23 @@ BK 包内的 `-app_pack.rbl` 用于 OTA（无线）升级，不能用于首次�
 核验下载文件时，使用对应发布页的 `SHA256SUMS`；包内文件、版本和烧录地址见 `MANIFEST.json`。
 各版本的验证范围和已知问题见发布说明，历史版本可在 [GitHub Releases](https://github.com/tangeai/xiaotai/releases) 中查找。
 
+## Beta 测试版：v1.2.0-beta.1
+
+以下为五板六变体的统一测试发行，只需下载 BIN，无需解压。尚未完成实板验收，
+不替代下方正式版。完整烧录后准备重新配网和绑定；M5 必须按屏幕控制器选文件。
+
+发行版本是 `1.2.0-beta.1`，本次复用原构建，设备显示的内嵌版本见表中映射。
+校验值、已知问题及烧录参数见[统一预发布说明](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1)。
+
+| 板卡 | 变体 | 内嵌版本 | 完整 BIN |
+|---|---|---|---|
+| 立创·实战派 BK7258<br>LCKFB ShiZhanPai BK7258 | default | `1.0.2+build.99` | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_lckfb-bk7258.bin) |
+| 立创·实战派 ESP32-S3<br>LCKFB ShiZhanPai ESP32-S3 | default | `1.1.0+build.82` | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_lckfb-esp32s3.bin) |
+| M5Stack CoreS3-Lite（K128-Lite）<br>M5Stack CoreS3-Lite (K128-Lite) | ili9342c | `1.1.0+build.91` | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_m5stack-cores3-lite_ili9342c.bin) |
+| M5Stack CoreS3-Lite（K128-Lite）<br>M5Stack CoreS3-Lite (K128-Lite) | ili9342e | `1.1.0+build.90` | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_m5stack-cores3-lite_ili9342e.bin) |
+| 觅感 AI 玩具开发板 BK7258<br>MGKFB AI Toy Development Board BK7258 | default | `1.0.3+build.49` | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_mgkfb-bk7258.bin) |
+| 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3（PCB V1.0）<br>Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 (PCB V1.0) | default | `1.1.0+build.48` | [下载 BIN](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.1/v1.2.0-beta.1_waveshare-esp32p4-touch-lcd-43c-v10.bin) |
+
 <a id="lckfb-bk7258"></a>
 
 ## 立创·实战派 BK7258

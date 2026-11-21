@@ -20,6 +20,7 @@ Each board guide covers flashing, first use, specifications, media parameters, d
 ## Development and maintenance
 
 - [Architecture and development](../ARCHITECTURE.en.md): product layers, session and media lifecycles, and directory boundaries.
+- [Unified release policy](development/release-policy.en.md): version timeline, BIN names, and release gates.
 - [Contributing](../CONTRIBUTING.en.md): adaptation workflow, tests, documentation, and releases.
 - [Third-party checklist](../THIRD_PARTY.en.md): dependency sources, permission status, and outstanding actions.
 - [BK7258 serial commands](development/BK7258_SERIAL_COMMANDS.en.md): status, Wi-Fi setup, calls, service addresses, and NTP time-server configuration.

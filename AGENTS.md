@@ -49,7 +49,9 @@ grade. A build selects exactly one board and one variant.
 
 Before building, packaging, creating or editing a GitHub Release, or replacing
 online assets, read [firmware versions and releases](CONTRIBUTING.md#固件版本与发布).
-Use its naming table and completion checks. Native build scripts and board
+For tag creation, release notes, assets, or download-link changes, also read
+[the unified release policy](docs/development/release-policy.md) and use its
+public naming rules and completion checks. Native build scripts and board
 guides define artifact paths; the rule index in
 [CONTRIBUTING.md](CONTRIBUTING.md#约束规则索引) identifies each other authority.
 

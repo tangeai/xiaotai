@@ -42,7 +42,7 @@ their fork, and open a PR targeting this repository's `main`.
 4. Validate after merging: record the actual merged commit on `main` and rerun the full
    checks on it. For firmware changes, validate the corresponding builds and hardware
    images. PR branch results do not replace validation of the merged commit.
-5. Release: after validation, select board versions following
+5. Release: after validation, select the unified distribution version and board firmware identities following
    [Firmware versions and releases](#firmware-versions-and-releases), create version
    tags and GitHub Releases at the validated commit, and retain artifacts, hashes, and
    bilingual notes. Documentation changes alone do not bump firmware versions.
@@ -68,8 +68,7 @@ these settings in this repository:
   when used; do not copy job names from other repositories.
 - Default Actions permissions to read-only and disable permission to create and approve
   PRs. Grant write permissions individually to release jobs as needed.
-- Protect all board tag patterns in the [naming table](#versions-and-names) against
-  updates and deletion; matching only `v*` is insufficient.
+- Protect unified `refs/tags/v*` and historical `refs/tags/*-v*` against updates and deletion.
 - Use a small PR to verify that failing checks block merging, passing checks permit
   Squash merging, and the branch is deleted afterward. Verify merged-commit validation
   and the production release entry point. Mark incomplete acceptance checks as pending.
@@ -94,7 +93,7 @@ Each rule is maintained at the authoritative location below; other documents lin
 | Agent operations and when to read detailed rules | Root `AGENTS.md`; board-level files add only board-specific requirements | Agent execution; documentation and test-entry checks |
 | Product, platform, board, driver, and firmware boundaries | [Architecture](ARCHITECTURE.en.md#directory-guide) | `test_repository_layout.py` |
 | Public model names, permanent board IDs, project directories, and chips | `boards/<vendor>/<board>/board.json` | `tools/build.py --validate`, `test_board_registry.py` |
-| Development workflow, versions, release names, and delivery checks | This document | `test_firmware_versions.py`, `test_boot_identity.py`, `test_validation_packaging.py`, `test_esp_merged_firmware.py`; verify GitHub titles before and after publishing |
+| Development workflow, versions, release names, and delivery checks | This document and the [unified release policy](docs/development/release-policy.en.md) | `test_firmware_versions.py`, `test_boot_identity.py`, `test_validation_packaging.py`, `test_esp_merged_firmware.py`; verify GitHub titles before and after publishing |
 | SDK, compiler, ABI, native artifacts, and flash layout | Target board guide, native build scripts, and dependency manifests | Native builds and board contract checks |
 | Product state, interaction, room refresh, and media parameters | [Requirements (Chinese)](docs/product/PRODUCT_REQUIREMENTS.md), [Interaction profiles (Chinese)](docs/product/PRODUCT_INTERACTION_PROFILES.md), [Media contract (Chinese)](docs/product/MEDIA_CONTRACT.md) | Product public-interface and platform regression tests |
 | Documentation, translation scope, and internal retention | [Documentation requirements](#documentation-requirements), [Translation checks](#translation-and-synchronization-checks) | Layout/link checks; manual bilingual review |
@@ -243,7 +242,7 @@ Public documentation serves first-time users and developers. Technical prose sho
 
 The root README prioritizes purpose, board selection, downloads, and first use; board and development guides hold details without repeating parameters, internal diagnostics, or historical processes.
 
-Maintain English for the following scope, rather than translating every file. Root `README.md` already has `README.en.md`; the following 16 Chinese sources are also in scope. Inclusion in this list does not itself indicate translation completion.
+Maintain English for the following scope, rather than translating every file. Root `README.md` already has `README.en.md`; the following 17 Chinese sources are also in scope. Inclusion in this list does not itself indicate translation completion.
 
 | Category | Chinese source |
 |---|---|
@@ -262,6 +261,7 @@ Maintain English for the following scope, rather than translating every file. Ro
 | BK7258 serial commands | `docs/development/BK7258_SERIAL_COMMANDS.md` |
 | BK7258 Opus packet loss concealment | `docs/development/bk-opus-plc.md` |
 | Development pitfalls | `docs/development/pitfalls.md` |
+| Unified release policy | `docs/development/release-policy.md` |
 | Testing guide | `tests/README.md` |
 
 For `pitfalls.md`, separate integration timelines and old build records before translating lasting guidance. Translate `tests/README.md` as the contributor testing workflow, but not individual results or historical regressions. Place English files beside their Chinese sources as `<name>.en.md`, with language links.
@@ -288,6 +288,8 @@ Chinese is the translation source. Review facts, steps, wording, and scope befor
 These rules do not require bulk moves or deletions. Check references, build dependencies, and evidence uses before reorganizing tracked files. Ignore rules do not untrack existing files. Update this list when adding public documents or changing translation scope.
 
 ## Firmware versions and releases
+
+Public distribution follows the [unified version and BIN policy](docs/development/release-policy.en.md), which supersedes the legacy board tag/title and public ZIP conventions below. Retain the native build identity, internal validation package, and historical release checks below. This migration does not rebuild firmware; distribution and embedded versions are recorded separately.
 
 ### Versions and names
 
