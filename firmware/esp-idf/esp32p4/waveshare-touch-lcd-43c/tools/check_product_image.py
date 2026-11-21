@@ -14,7 +14,7 @@ required = {
     "platform_client_start", "p4_video_submit", "camera_pipeline_set_rtc_video_enabled",
     "call_video_renderer_submit_mjpeg",
     "starter_tirtc_send_h264", "starter_tirtc_send_mjpeg",
-    "starter_runtime_call_contact_video",
+    "starter_runtime_call_target",
 }
 for name in required:
     if name not in names:
