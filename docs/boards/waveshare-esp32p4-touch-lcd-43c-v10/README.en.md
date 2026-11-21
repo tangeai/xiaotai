@@ -293,3 +293,41 @@ User call logs show a 10-second uplink window at 7.9 fps with 80 frames sent and
 Older build.87 and build.101/103 H.264 experiments are historical comparisons only. See [Call diagnostics (Chinese)](../../development/MEDIA_PIPELINE_DIAGNOSTICS.md) and [Video performance records (Chinese)](../../product/P4_VIDEO_PERFORMANCE.md) for paired logs, conditions, and limits.
 
 Board configuration is in `boards/waveshare/esp32p4-touch-lcd-43c/`; project `hardware-ir.json` contains hardware facts and evidence grades.
+
+## Serial time-server configuration
+
+`ntp-show` displays the saved primary NTP override (`default` means no override).
+Use `ntp-set time.example.com` or `ntp-set 192.168.1.10` to save it;
+`ntp-reset` restores the default.
+
+Successful set/reset restarts the device
+and interrupts active calls. A save failure does not restart it.
+
+Accepts a DNS hostname or IPv4 address, up to 253 characters; no URL, port, path,
+spaces or IPv6. NTP uses UDP/123. Existing backup servers remain available, so
+this is a primary-server preference, not an exclusive time source.
+
+Factory reset
+clears the override. Confirm synchronization after reboot before testing calls.
+
+## Serial recovery during startup failures
+
+Recovery configuration commands open before media, UI, and networking initialization. They do not depend on
+Wi-Fi connectivity, binding, time synchronization, authentication, or platform availability.
+
+Use `wifi-set`, `wifi-clear`, `tirtc-clear`, `ntp-show/set/reset`, `ep-show/set/reset`, and `restart`
+with the arguments documented for your board. Prefix BK commands with `ap_cmd`; enter ESP32 commands directly.
+
+Until the local runtime is ready, `status` reports recovery mode; calls, media, and voice diagnostics return
+`Local runtime not ready`. Follow the command's restart message after a successful configuration change.
+
+A failed write must not report success or reboot the device.
+
+This entry cannot repair an unavailable serial driver, a system hang, or damaged Flash. If storage initialization
+fails, diagnostics and restart remain available, but saving configuration may fail.
+
+Validate unconfigured Wi-Fi, an unbound device, unreachable NTP, authentication failure, media initialization failure,
+and network reconnection.
+
+In each case query, change, reboot, and verify persistence. Host fault injection does not
+replace serial validation on hardware running the exact image.

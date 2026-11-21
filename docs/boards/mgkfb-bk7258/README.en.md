@@ -212,3 +212,19 @@ Hardware records cover outgoing/incoming calls and AI-to-WeChat handover, with w
 Touch, device-to-device calls, and group intercom are unsupported. OTA, long-duration operation, weak networks, double-talk AEC, volume boundaries and persistence, and dual-display DMA fault recovery need dedicated checks. Complete voice prompts for incoming calls and errors remain unfinished.
 
 Task-exit warnings may appear after calls, periodic status may remain `BOOT`, and SRAM recovery after repeated calls needs longer testing. Physical PCB revision, Flash device ID, PSRAM capacity, reference-path resistor, and amplifier timing remain unconfirmed.
+
+## Serial time-server configuration
+
+`ap_cmd ntp-show` displays the saved primary NTP override (`default` means no override).
+Use `ap_cmd ntp-set time.example.com` or `ap_cmd ntp-set 192.168.1.10` to save it;
+`ap_cmd ntp-reset` restores the default.
+
+Successful set/reset restarts the device
+and interrupts active calls. A save failure does not restart it.
+
+Accepts a DNS hostname or IPv4 address, up to 253 characters; no URL, port, path,
+spaces or IPv6. NTP uses UDP/123. Existing backup servers remain available, so
+this is a primary-server preference, not an exclusive time source.
+
+Factory reset
+clears the override. Confirm synchronization after reboot before testing calls.

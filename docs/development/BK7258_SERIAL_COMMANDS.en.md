@@ -120,8 +120,55 @@ After reboot, the device requests `http://ep-open.tangeopen.com/pre/services`. T
 
 Use `ap_cmd ep-reset` to restore the default.
 
+## Time synchronization server
+
+| Command | Effect |
+| --- | --- |
+| `ap_cmd ntp-show` | Show saved primary override; `default` means no override |
+| `ap_cmd ntp-set time.example.com` | Save a hostname or IPv4 primary server and reboot |
+| `ap_cmd ntp-reset` | Clear the override and reboot |
+
+Input is at most 253 characters, without a URL scheme, port, path or whitespace.
+IPv6 is not supported. Existing fallback servers remain; NTP uses UDP/123.
+Successful changes interrupt active sessions; failed saves do not reboot.
+Factory reset also clears this setting. Verify synchronization after reboot.
+
+The default primary is `pool.ntp.org`, with `ntp.aliyun.com` as fallback.
+`ntp-show` reports saved configuration, not whether synchronization succeeded.
+Replace `time.example.com` with a reachable server. Example using a LAN server:
+
+```text
+ap_cmd ntp-set 192.168.1.10
+# After reboot
+ap_cmd ntp-show
+# Restore defaults and reboot
+ap_cmd ntp-reset
+```
+
 ## Implementation and validation entry points
 
 Command registration, argument validation, and return text are in [`xiaotai_console.c`](../../platforms/beken/runtime/src/xiaotai_console.c); request handling is in [`xiaotai_app.c`](../../platforms/beken/runtime/src/xiaotai_app.c). Both boards link the same implementation.
 
 Refer to each guide for GPIO, serial wiring, and supported features.
+
+## Serial recovery during startup failures
+
+Recovery configuration commands open before media, UI, and networking initialization. They do not depend on
+Wi-Fi connectivity, binding, time synchronization, authentication, or platform availability.
+
+Use `wifi-set`, `wifi-clear`, `tirtc-clear`, `ntp-show/set/reset`, `ep-show/set/reset`, and `restart`
+with the arguments documented for your board. Prefix BK commands with `ap_cmd`; enter ESP32 commands directly.
+
+Until the local runtime is ready, `status` reports recovery mode; calls, media, and voice diagnostics return
+`Local runtime not ready`. Follow the command's restart message after a successful configuration change.
+
+A failed write must not report success or reboot the device.
+
+This entry cannot repair an unavailable serial driver, a system hang, or damaged Flash. If storage initialization
+fails, diagnostics and restart remain available, but saving configuration may fail.
+
+Validate unconfigured Wi-Fi, an unbound device, unreachable NTP, authentication failure, media initialization failure,
+and network reconnection.
+
+In each case query, change, reboot, and verify persistence. Host fault injection does not
+replace serial validation on hardware running the exact image.

@@ -19,8 +19,12 @@ require_text() {
 
 require_text 'ESP_NETIF_SNTP_DEFAULT_CONFIG_MULTIPLE(' "$platform_source" \
     'the product clock must configure both primary and fallback servers'
-require_text 'ESP_SNTP_SERVER_LIST("pool.ntp.org", "ntp.aliyun.com")' \
-    "$platform_source" 'pool.ntp.org must remain primary with Aliyun fallback'
+require_text 'ESP_SNTP_SERVER_LIST(s_ntp_server, "ntp.aliyun.com")' \
+    "$platform_source" 'the persisted primary must retain Aliyun fallback'
+require_text 'runtime_config_load_ntp_server(s_ntp_server' "$platform_source" \
+    'the primary server must load the persistent override'
+require_text 'snprintf(s_ntp_server, sizeof(s_ntp_server), "%s", "pool.ntp.org")' "$platform_source" \
+    'an absent or invalid override must retain the original primary'
 require_text 'CONFIG_LWIP_SNTP_MAX_SERVERS=2' "$project_root/sdkconfig.defaults" \
     'the generated project must retain two SNTP server slots'
 require_text 'esp_netif_sntp_sync_wait' "$platform_source" \

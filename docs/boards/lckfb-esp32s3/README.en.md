@@ -266,3 +266,41 @@ Board configuration and adapter are in `boards/lckfb/esp32s3/`; Hardware IR defi
 ESP32-S3 currently does not support video calls. WeChat VoIP reports uplink/downlink video as `none` with `no_video=true`; audio remains bidirectional A-law / 8 kHz on stream 0. Home quick-call defaults to voice, and contact details offer voice calls only. Device calls are also audio-only.
 
 The camera is used for H5 live view. Host regressions block legacy video requests/states; incoming/outgoing WeChat calls, continuous audio, redial, and H5 handover still require hardware checks.
+
+## Serial time-server configuration
+
+`ntp-show` displays the saved primary NTP override (`default` means no override).
+Use `ntp-set time.example.com` or `ntp-set 192.168.1.10` to save it;
+`ntp-reset` restores the default.
+
+Successful set/reset restarts the device
+and interrupts active calls. A save failure does not restart it.
+
+Accepts a DNS hostname or IPv4 address, up to 253 characters; no URL, port, path,
+spaces or IPv6. NTP uses UDP/123. Existing backup servers remain available, so
+this is a primary-server preference, not an exclusive time source.
+
+Factory reset
+clears the override. Confirm synchronization after reboot before testing calls.
+
+## Serial recovery during startup failures
+
+Recovery configuration commands open before media, UI, and networking initialization. They do not depend on
+Wi-Fi connectivity, binding, time synchronization, authentication, or platform availability.
+
+Use `wifi-set`, `wifi-clear`, `tirtc-clear`, `ntp-show/set/reset`, `ep-show/set/reset`, and `restart`
+with the arguments documented for your board. Prefix BK commands with `ap_cmd`; enter ESP32 commands directly.
+
+Until the local runtime is ready, `status` reports recovery mode; calls, media, and voice diagnostics return
+`Local runtime not ready`. Follow the command's restart message after a successful configuration change.
+
+A failed write must not report success or reboot the device.
+
+This entry cannot repair an unavailable serial driver, a system hang, or damaged Flash. If storage initialization
+fails, diagnostics and restart remain available, but saving configuration may fail.
+
+Validate unconfigured Wi-Fi, an unbound device, unreachable NTP, authentication failure, media initialization failure,
+and network reconnection.
+
+In each case query, change, reboot, and verify persistence. Host fault injection does not
+replace serial validation on hardware running the exact image.

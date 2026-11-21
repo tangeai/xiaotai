@@ -17,6 +17,10 @@
 int main(void)
 {
     bk_init();
+    if (xiaotai_console_start() != 0) {
+        BK_LOGW(TAG, "XiaoTai console command registration failed\n");
+    }
+
     BK_LOGI(TAG, "AP boot reached application entry\n");
     bk_printf_raw(BK_LOG_NONE, NULL,
             "XIAOTAI_BOOT project=lckfb-bk7258-xiaotai version=%s build=%s sdk=bk_avdk_smp/release/v3.1.1.10 reset=%u\n",
@@ -36,13 +40,11 @@ int main(void)
     if (xiaotai_metrics_start() != 0) {
         BK_LOGW(TAG, "resource metrics task unavailable\n");
     }
-    if (xiaotai_console_start() != 0) {
-        BK_LOGW(TAG, "XiaoTai console command registration failed\n");
-    }
 
     int rc = xiaotai_app_start();
     if (rc != 0) {
         BK_LOGE(TAG, "application start failed rc=%d\n", rc);
     }
+    if (rc == 0) xiaotai_console_set_runtime_ready(true);
     return rc;
 }

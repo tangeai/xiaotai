@@ -11,6 +11,7 @@
  */
 
 #include "esp_err.h"
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,6 +19,8 @@ extern "C" {
 
 /** 注册命令并启动 ESP-IDF REPL。重复调用安全。 */
 esp_err_t starter_console_start(void);
+/** Enable business commands only after local runtime initialization succeeds. */
+void starter_console_set_runtime_ready(bool ready);
 
 #ifdef __cplusplus
 }

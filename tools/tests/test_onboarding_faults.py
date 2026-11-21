@@ -12,6 +12,11 @@ class OnboardingFaults(unittest.TestCase):
 #include <assert.h>
 #include <stdbool.h>
 #include <time.h>
+#include <stdio.h>
+#include <string.h>
+static char s_ntp_server[254];
+static unsigned loads;
+static int runtime_config_load_ntp_server(char *out,size_t n){loads++;snprintf(out,n,"%s","time.lan");return 0;}
 typedef int esp_err_t;
 typedef int esp_sntp_config_t;
 #define ESP_OK 0
@@ -32,6 +37,7 @@ static int esp_netif_sntp_sync_wait(unsigned ms){assert(ms==2000);waits++;return
 ''' + function(PLATFORM.read_text(), 'sync_clock') + r'''
 int main(void){
  assert(sync_clock()==ESP_ERR_TIMEOUT && inits==1 && waits==5);
+ assert(loads==1 && !strcmp(s_ntp_server,"time.lan"));
  now=1791528424;assert(sync_clock()==ESP_OK && inits==1);
  assert(sync_clock()==ESP_OK && inits==1);
  s_sntp_initialized=false;inits=0;init_error=7;

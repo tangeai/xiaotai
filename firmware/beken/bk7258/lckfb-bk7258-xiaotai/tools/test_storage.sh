@@ -8,6 +8,7 @@ cc -std=c11 -Wall -Wextra -Werror \
   -I"$root_dir/tools/fakes" -I"$root_dir/tools/fakes/common" \
   -I"$common_repo_dir/platforms/beken/runtime/include" \
   "$root_dir/tools/test_storage.c" \
+  -I"$common_repo_dir/platforms/common/include" \
   "$common_repo_dir/platforms/beken/runtime/src/xiaotai_storage.c" \
   -o "$out_file"
 "$out_file"

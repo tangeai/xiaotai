@@ -13,6 +13,7 @@ class UnbindFlashStack(unittest.TestCase):
         end = runtime.index('    if (strcmp(signal, "callers_update")', start)
         unbind = runtime[start:end]
         run_c(r'''
+#include "xiaotai_ntp_config.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -96,6 +97,6 @@ int main(void){
  sem_fail=false;commit_result=ESP_OK;internal_stack=true;
  assert(runtime_config_clear_tirtc()==ESP_OK && workers==3);
 }
-''')
+''', [ROOT/'platforms/common/include'])
 
 if __name__ == '__main__': unittest.main()

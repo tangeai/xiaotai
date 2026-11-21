@@ -5,6 +5,8 @@
 #include <os/mem.h>
 #include <os/os.h>
 #include <stdbool.h>
+#include <stdatomic.h>
+#include "xiaotai_console_policy.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -158,6 +160,46 @@ static void command_tirtc_clear(char *output, int capacity,
              "device credentials cleared; restarting into binding\r\n" :
              argc == 1 ? "device credentials clear failed\r\n" :
              "usage: tirtc-clear\r\n");
+}
+
+static void command_ntp_show(char *output, int capacity, int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) {
+        response(output, capacity, "usage: ntp-show\r\n");
+        return;
+    }
+    char url[XIAOTAI_NTP_SERVER_MAX] = {0};
+    if (xiaotai_storage_load_ntp_server(url, sizeof(url)) != BK_OK) {
+        response(output, capacity, "Primary NTP server: default\r\n");
+    } else if (output != NULL && capacity > 0) {
+        snprintf(output, (size_t)capacity, "Primary NTP server: %s\r\n", url);
+    }
+}
+
+static void command_ntp_set(char *output, int capacity, int argc, char **argv)
+{
+    if (argc != 2) {
+        response(output, capacity, "usage: ntp-set <hostname-or-IPv4>\r\n");
+        return;
+    }
+    int rc = xiaotai_storage_save_ntp_server(argv[1]);
+    if (rc == BK_OK) rc = schedule_reboot();
+    response(output, capacity, rc == BK_OK ?
+             "Primary NTP server saved; restarting\r\n" : "NTP rejected or save failed\r\n");
+}
+
+static void command_ntp_reset(char *output, int capacity, int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) {
+        response(output, capacity, "usage: ntp-reset\r\n");
+        return;
+    }
+    int rc = xiaotai_storage_clear_ntp_server();
+    if (rc == BK_OK) rc = schedule_reboot();
+    response(output, capacity, rc == BK_OK ?
+             "Primary NTP server restored to default; restarting\r\n" : "NTP reset failed\r\n");
 }
 
 static void command_ep_show(char *output, int capacity, int argc, char **argv)
@@ -447,6 +489,9 @@ static const struct cli_command s_commands[] = {
     {"wificlear", "Compatibility alias for wifi-clear", command_wifi_clear},
     {"wifi-change", "Open provisioning and retain credentials", command_wifi_change},
     {"tirtc-clear", "Clear binding and restart", command_tirtc_clear},
+    {"ntp-show", "NTP show", command_ntp_show},
+    {"ntp-set", "NTP set <hostname-or-IPv4>", command_ntp_set},
+    {"ntp-reset", "NTP reset", command_ntp_reset},
     {"ep-show", "Show platform discovery base", command_ep_show},
     {"ep-set", "ep-set <http(s)://host[:port][/path]>", command_ep_set},
     {"ep-reset", "Clear platform discovery override", command_ep_reset},
@@ -467,8 +512,41 @@ static const struct cli_command s_commands[] = {
     {"restart", "Restart the device", command_restart},
 };
 
+static atomic_bool s_runtime_ready;
+static bool s_registered;
+static struct cli_command s_dispatch_commands[sizeof(s_commands)/sizeof(s_commands[0])];
+
+void xiaotai_console_set_runtime_ready(bool ready)
+{
+    atomic_store_explicit(&s_runtime_ready, ready, memory_order_release);
+}
+
+static void dispatch_command(char *output, int capacity, int argc, char **argv)
+{
+    if (argc < 1 || argv == NULL || argv[0] == NULL) return;
+    if (!atomic_load_explicit(&s_runtime_ready, memory_order_acquire) &&
+        !xiaotai_console_recovery_command(argv[0])) {
+        response(output, capacity,
+                 "Local runtime not ready; recovery configuration commands remain available.\r\n");
+        return;
+    }
+    for (size_t i = 0; i < sizeof(s_commands)/sizeof(s_commands[0]); ++i) {
+        if (strcmp(argv[0], s_commands[i].name) == 0) {
+            s_commands[i].function(output, capacity, argc, argv);
+            return;
+        }
+    }
+}
+
 int xiaotai_console_start(void)
 {
-    return cli_register_commands(s_commands,
+    if (s_registered) return BK_OK;
+    for (size_t i = 0; i < sizeof(s_commands)/sizeof(s_commands[0]); ++i) {
+        s_dispatch_commands[i] = s_commands[i];
+        s_dispatch_commands[i].function = dispatch_command;
+    }
+    int rc = cli_register_commands(s_dispatch_commands,
         (int)(sizeof(s_commands) / sizeof(s_commands[0])));
+    if (rc == BK_OK) s_registered = true;
+    return rc;
 }

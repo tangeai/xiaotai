@@ -24,6 +24,12 @@ typedef struct {
     char client_id[65];      /**< 可选客户端 ID，空值由组合根生成。 */
 } runtime_tirtc_config_t;
 
+#define RUNTIME_NTP_SERVER_MAX 254
+/* Saved primary NTP server; applied on reboot. Existing fallbacks are retained. */
+esp_err_t runtime_config_load_ntp_server(char *output, size_t capacity);
+esp_err_t runtime_config_save_ntp_server(const char *server);
+esp_err_t runtime_config_clear_ntp_server(void);
+
 #define RUNTIME_TIRTC_ENDPOINT_MAX 256
 
 /** Optional platform discovery base. NOT_FOUND means use compiled discovery URL. */

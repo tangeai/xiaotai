@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdatomic.h>
 #include <string.h>
+#include "xiaotai_ntp_config.h"
 
 #include "xiaotai_audio_policy.h"
 
@@ -14,6 +15,7 @@
 #define XIAOTAI_DEVICE_KEY "xiaotai_device_v1"
 #define XIAOTAI_SETTINGS_KEY "xiaotai_settings_v1"
 #define XIAOTAI_ENDPOINT_KEY "xiaotai_ep_v1"
+#define XIAOTAI_NTP_SERVER_KEY "xiaotai_ntp_v1"
 
 static bool endpoint_valid(const char *url)
 {
@@ -99,7 +101,7 @@ int xiaotai_storage_reset_user_data(void)
         return BK_FAIL;
     }
     const char *keys[] = {XIAOTAI_DEVICE_KEY, XIAOTAI_WIFI_KEY, XIAOTAI_SETTINGS_KEY,
-                          XIAOTAI_ENDPOINT_KEY};
+                          XIAOTAI_ENDPOINT_KEY, XIAOTAI_NTP_SERVER_KEY};
     int result = BK_OK;
     for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i) {
         EfErrCode rc = ef_del_env(keys[i]);
@@ -339,4 +341,31 @@ int xiaotai_storage_save_settings(const xiaotai_product_settings_t *value)
     record.payload = *value;
     make_header(&record.header, &record.payload, sizeof(record.payload));
     return storage_write_blob(XIAOTAI_SETTINGS_KEY, &record, sizeof(record));
+}
+
+
+int xiaotai_storage_load_ntp_server(char *output, size_t capacity)
+{
+    if (output == NULL || capacity < XIAOTAI_NTP_SERVER_MAX) return BK_ERR_PARAM;
+    output[0] = '\0';
+    size_t saved = 0;
+    size_t read = ef_get_env_blob(XIAOTAI_NTP_SERVER_KEY, output,
+                                  XIAOTAI_NTP_SERVER_MAX, &saved);
+    if (read == 0 || saved != read || read > XIAOTAI_NTP_SERVER_MAX ||
+        output[read - 1] != '\0' || !xiaotai_ntp_server_valid(output)) {
+        output[0] = '\0';
+        return BK_FAIL;
+    }
+    return BK_OK;
+}
+
+int xiaotai_storage_save_ntp_server(const char *url)
+{
+    if (!xiaotai_ntp_server_valid(url)) return BK_ERR_PARAM;
+    return storage_write_blob(XIAOTAI_NTP_SERVER_KEY, url, strlen(url) + 1U);
+}
+
+int xiaotai_storage_clear_ntp_server(void)
+{
+    return storage_delete(XIAOTAI_NTP_SERVER_KEY);
 }

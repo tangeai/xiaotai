@@ -189,7 +189,7 @@ class BootIdentityTest(unittest.TestCase):
                 self.assertLess(entry.index('XIAOTAI_BOOT'),
                                 entry.index('ESP_ERROR_CHECK(app_init())')
                                 if path == P4 / 'main/app_main.c' else
-                                entry.index('ESP_ERROR_CHECK(starter_media_init())'))
+                                entry.index('starter_media_init()'))
         p4_app = (P4 / 'main/application/app.c').read_text()
         self.assertNotIn('"firmware version: %s project=%s built=%s %s"', p4_app)
 

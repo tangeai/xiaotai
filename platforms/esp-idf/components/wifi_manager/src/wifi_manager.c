@@ -20,6 +20,7 @@
 #include "esp_netif.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
+#include "esp_wifi_default.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs.h"
@@ -482,8 +483,13 @@ static void start_provisioning(void)
     ap.ap.max_connection = 4;
     ap.ap.authmode = WIFI_AUTH_OPEN;
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap));
+    esp_err_t setup_err = esp_wifi_set_mode(WIFI_MODE_APSTA);
+    if (setup_err == ESP_OK) setup_err = esp_wifi_set_config(WIFI_IF_AP, &ap);
+    if (setup_err != ESP_OK) {
+        ESP_LOGE(TAG, "provisioning setup failed: %s; use serial recovery",
+                 esp_err_to_name(setup_err));
+        return;
+    }
     s_provisioning = true;
     esp_err_t portal_err = start_http_server();
     if (portal_err == ESP_OK) {
@@ -552,20 +558,50 @@ static void wifi_event(void *argument,
     }
 }
 
+/* The SDK's default constructors abort on allocation/attach errors. Keep
+ * those failures recoverable through the already-running serial console. */
+static esp_err_t create_wifi_netif(bool access_point, esp_netif_t **result)
+{
+    *result = NULL;
+    esp_netif_config_t config = ESP_NETIF_DEFAULT_WIFI_STA();
+    if (access_point) {
+        esp_netif_config_t ap_config = ESP_NETIF_DEFAULT_WIFI_AP();
+        config = ap_config;
+    }
+    esp_netif_t *netif = esp_netif_new(&config);
+    if (netif == NULL) return ESP_ERR_NO_MEM;
+    esp_err_t err = access_point ? esp_netif_attach_wifi_ap(netif)
+                                 : esp_netif_attach_wifi_station(netif);
+    if (err == ESP_OK) {
+        err = access_point ? esp_wifi_set_default_wifi_ap_handlers()
+                           : esp_wifi_set_default_wifi_sta_handlers();
+    }
+    if (err != ESP_OK) {
+        esp_netif_destroy_default_wifi(netif);
+        return err;
+    }
+    *result = netif;
+    return ESP_OK;
+}
+
 esp_err_t wifi_manager_start(void)
 {
     if (s_started) {
         return ESP_OK;
     }
-    ESP_ERROR_CHECK(esp_netif_init());
-    esp_err_t err = esp_event_loop_create_default();
+    esp_err_t err = esp_netif_init();
+    if (err != ESP_OK) return err;
+    err = esp_event_loop_create_default();
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
         return err;
     }
-    (void)esp_netif_create_default_wifi_sta();
-    s_ap_netif = esp_netif_create_default_wifi_ap();
-    if (s_ap_netif == NULL) {
-        return ESP_ERR_NO_MEM;
+    esp_netif_t *station_netif = NULL;
+    err = create_wifi_netif(false, &station_netif);
+    if (err != ESP_OK) return err;
+    err = create_wifi_netif(true, &s_ap_netif);
+    if (err != ESP_OK) {
+        esp_netif_destroy_default_wifi(station_netif);
+        return err;
     }
     /* 产品配网页明确约定 192.168.6.1，不能依赖 IDF 的 192.168.4.1 默认值。 */
     esp_netif_ip_info_t ap_ip = {0};
@@ -609,8 +645,10 @@ esp_err_t wifi_manager_start(void)
     if (err != ESP_OK) {
         return err;
     }
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event, NULL));
+    err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event, NULL);
+    if (err != ESP_OK) return err;
+    err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event, NULL);
+    if (err != ESP_OK) return err;
 
     /* 启动前先决定 STA 还是 APSTA；STA_START 事件负责真正 connect。 */
     wifi_manager_credentials_t credentials;
@@ -622,12 +660,15 @@ esp_err_t wifi_manager_start(void)
         station.sta.threshold.authmode = credentials.password[0] == '\0'
                                              ? WIFI_AUTH_OPEN
                                              : WIFI_AUTH_WPA2_PSK;
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &station));
+        err = esp_wifi_set_mode(WIFI_MODE_STA);
+        if (err != ESP_OK) return err;
+        err = esp_wifi_set_config(WIFI_IF_STA, &station);
+        if (err != ESP_OK) return err;
         ESP_LOGI(TAG, "connecting to configured SSID=%s", credentials.ssid);
     } else {
         s_has_saved_credentials = false;
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+        err = esp_wifi_set_mode(WIFI_MODE_APSTA);
+        if (err != ESP_OK) return err;
     }
     if (xTaskCreate(signal_task, "wifi_signal", 3072, NULL, 1, &s_signal_task) != pdPASS)
         return ESP_ERR_NO_MEM;

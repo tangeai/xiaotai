@@ -9,8 +9,14 @@
 #include "starter_pipeline_diag.h"
 #include "starter_audio_trace.h"
 #include "sdkconfig.h"
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+#include "driver/usb_serial_jtag.h"
+#include "driver/usb_serial_jtag_vfs.h"
+#endif
 
 #include <stdio.h>
+#include <stdatomic.h>
+#include "xiaotai_console_policy.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -677,6 +683,62 @@ static int command_tirtc_clear(int argc, char **argv)
     return 0;
 }
 
+static int command_ntp_show(int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) {
+        printf("usage: ntp-show\n");
+        return 1;
+    }
+    char url[RUNTIME_NTP_SERVER_MAX] = {0};
+    esp_err_t err = runtime_config_load_ntp_server(url, sizeof(url));
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        printf("Primary NTP server: default\n");
+        return 0;
+    }
+    if (err != ESP_OK) {
+        printf("NTP read failed: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("Primary NTP server: %s\n", url);
+    return 0;
+}
+
+static int command_ntp_set(int argc, char **argv)
+{
+    if (argc != 2) {
+        printf("usage: ntp-set <hostname-or-IPv4>\n");
+        return 1;
+    }
+    esp_err_t err = runtime_config_save_ntp_server(argv[1]);
+    if (err != ESP_OK) {
+        printf("NTP rejected or save failed: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("Primary NTP server saved: %s; restarting...\n", argv[1]);
+    vTaskDelay(pdMS_TO_TICKS(300));
+    esp_restart();
+    return 0;
+}
+
+static int command_ntp_reset(int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) {
+        printf("usage: ntp-reset\n");
+        return 1;
+    }
+    esp_err_t err = runtime_config_clear_ntp_server();
+    if (err != ESP_OK) {
+        printf("NTP reset failed: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("Primary NTP server restored to default; restarting...\n");
+    vTaskDelay(pdMS_TO_TICKS(300));
+    esp_restart();
+    return 0;
+}
+
 static int command_ep_show(int argc, char **argv)
 {
     (void)argv;
@@ -781,26 +843,64 @@ static int command_face_animation(int argc, char **argv)
     return 0;
 }
 
+typedef struct {
+    const char *name;
+    esp_console_cmd_func_t function;
+} console_entry_t;
+static console_entry_t s_command_entries[40];
+static size_t s_command_count;
+static atomic_bool s_runtime_ready;
+static bool s_repl_started;
+
+void starter_console_set_runtime_ready(bool ready)
+{
+    atomic_store_explicit(&s_runtime_ready, ready, memory_order_release);
+}
+
+static int dispatch_command(int argc, char **argv)
+{
+    if (argc < 1 || argv == NULL || argv[0] == NULL) return 1;
+    if (!atomic_load_explicit(&s_runtime_ready, memory_order_acquire) &&
+        !xiaotai_console_recovery_command(argv[0])) {
+        printf("Local runtime not ready; recovery configuration commands remain available.\n");
+        return strcmp(argv[0], "status") == 0 ? 0 : 1;
+    }
+    for (size_t i = 0; i < s_command_count; ++i)
+        if (strcmp(argv[0], s_command_entries[i].name) == 0)
+            return s_command_entries[i].function(argc, argv);
+    return 1;
+}
+
+static esp_err_t start_repl(void)
+{
+    esp_err_t err = esp_console_start_repl(s_repl);
+    /* The SDK task waits for the start notification. Its delete API does not
+     * release that waiting task, so retain the object for a later retry. */
+    if (err == ESP_OK) s_repl_started = true;
+    return err;
+}
+
 static esp_err_t register_command(const char *name,
                                   const char *help,
                                   esp_console_cmd_func_t function)
 {
+    for (size_t i = 0; i < s_command_count; ++i)
+        if (strcmp(name, s_command_entries[i].name) == 0) return ESP_OK;
+    if (s_command_count >= sizeof(s_command_entries)/sizeof(s_command_entries[0]))
+        return ESP_ERR_NO_MEM;
     const esp_console_cmd_t command = {
         .command = name,
         .help = help,
-        .func = function,
+        .func = dispatch_command,
     };
-    return esp_console_cmd_register(&command);
+    esp_err_t err = esp_console_cmd_register(&command);
+    if (err == ESP_OK)
+        s_command_entries[s_command_count++] = (console_entry_t){name, function};
+    return err;
 }
 
-esp_err_t starter_console_start(void)
+static esp_err_t register_console_commands(void)
 {
-    if (s_repl != NULL) {
-        return ESP_OK;
-    }
-    ESP_RETURN_ON_ERROR(esp_console_register_help_command(),
-                        "starter_console",
-                        "register help");
     ESP_RETURN_ON_ERROR(register_command("version", "Show firmware identity", command_version),
                         "starter_console", "register version");
     ESP_RETURN_ON_ERROR(register_command("video-submit", "Development probe: pause|resume|show encoded video submission", command_video_submit),
@@ -842,6 +942,12 @@ esp_err_t starter_console_start(void)
                         "starter_console", "register tirtc-set");
     ESP_RETURN_ON_ERROR(register_command("tirtc-clear", "Clear device credentials", command_tirtc_clear),
                         "starter_console", "register tirtc-clear");
+    ESP_RETURN_ON_ERROR(register_command("ntp-show", "NTP show", command_ntp_show),
+                        "starter_console", "register ntp-show");
+    ESP_RETURN_ON_ERROR(register_command("ntp-set", "NTP set <hostname-or-IPv4>", command_ntp_set),
+                        "starter_console", "register ntp-set");
+    ESP_RETURN_ON_ERROR(register_command("ntp-reset", "NTP reset", command_ntp_reset),
+                        "starter_console", "register ntp-reset");
     ESP_RETURN_ON_ERROR(register_command("ep-show", "Show platform discovery base", command_ep_show),
                         "starter_console", "register ep-show");
     ESP_RETURN_ON_ERROR(register_command("ep-set", "ep-set <http(s)://host[:port][/path]", command_ep_set),
@@ -851,21 +957,52 @@ esp_err_t starter_console_start(void)
     ESP_RETURN_ON_ERROR(register_command("restart", "Restart the device", command_restart),
                         "starter_console", "register restart");
 
+    return ESP_OK;
+}
+
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+static esp_err_t create_usb_repl(const esp_console_repl_config_t *repl)
+{
+    /* IDF 5.5 leaves the USB driver installed if REPL allocation fails after
+     * driver installation. Only unwind a driver acquired by this attempt. */
+    bool driver_existed = usb_serial_jtag_is_driver_installed();
+    esp_console_dev_usb_serial_jtag_config_t device =
+        ESP_CONSOLE_DEV_USB_SERIAL_JTAG_CONFIG_DEFAULT();
+    esp_err_t err = esp_console_new_repl_usb_serial_jtag(&device, repl, &s_repl);
+    if (err != ESP_OK && !driver_existed && usb_serial_jtag_is_driver_installed()) {
+        usb_serial_jtag_vfs_use_nonblocking();
+        (void)usb_serial_jtag_driver_uninstall();
+    }
+    return err;
+}
+#endif
+
+esp_err_t starter_console_start(void)
+{
+    if (s_repl != NULL) return s_repl_started ? ESP_OK : start_repl();
+    /* Register before creating the SDK's waiting REPL task: registration
+     * failure can then be retried without leaking a task or its stack.
+     * The constructor registers help itself. */
+    ESP_RETURN_ON_ERROR(register_console_commands(), "starter_console", "register commands");
+    esp_err_t err;
     /* sdkconfig.defaults 默认走 USB Serial/JTAG，UART 分支便于其他板型复用。 */
     esp_console_repl_config_t repl = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
     repl.prompt = "starter> ";
     repl.max_cmdline_length = 512;
 #if defined(CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
-    esp_console_dev_usb_serial_jtag_config_t device =
-        ESP_CONSOLE_DEV_USB_SERIAL_JTAG_CONFIG_DEFAULT();
-    ESP_RETURN_ON_ERROR(esp_console_new_repl_usb_serial_jtag(&device, &repl, &s_repl),
-                        "starter_console", "create USB Serial/JTAG REPL");
+    err = create_usb_repl(&repl);
 #elif defined(CONFIG_ESP_CONSOLE_UART_DEFAULT) || defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
     esp_console_dev_uart_config_t device = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
-    ESP_RETURN_ON_ERROR(esp_console_new_repl_uart(&device, &repl, &s_repl),
-                        "starter_console", "create UART REPL");
+    err = esp_console_new_repl_uart(&device, &repl, &s_repl);
 #else
 #error Unsupported console transport
 #endif
-    return esp_console_start_repl(s_repl);
+    if (err != ESP_OK) {
+        /* Constructors may already have cleared the command registry. */
+        (void)esp_console_deinit();
+        s_repl = NULL;
+        s_command_count = 0;
+        return err;
+    }
+    return start_repl();
 }

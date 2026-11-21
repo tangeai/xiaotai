@@ -134,9 +134,45 @@ ap_cmd ep-set http://ep-open.tangeopen.com/pre
 TiRTC 连接地址取自服务发现响应的 `tirtc-srv` 字段，`ep-set` 设置的是服务发现入口。
 恢复默认地址时执行 `ap_cmd ep-reset`。
 
+## 时间同步服务器
+
+| 命令 | 作用 |
+| --- | --- |
+| `ap_cmd ntp-show` | 查看主服务器覆盖项；`default` 表示没有覆盖项 |
+| `ap_cmd ntp-set time.example.com` | 保存主服务器域名或 IPv4 地址并重启 |
+| `ap_cmd ntp-reset` | 清除覆盖项并重启 |
+
+输入最长 253 字符，不带协议前缀、端口、路径或空格，不支持 IPv6。保留固件原有
+备用服务器，NTP 使用 UDP/123。成功修改会中断当前会话；保存失败不重启。
+恢复出厂设置也会清除该项。重启后须确认校时成功。
+
+默认主服务器为 `pool.ntp.org`，备用为 `ntp.aliyun.com`。`ntp-show` 只查询保存的
+配置，不表示校时已经成功。请将 `time.example.com` 替换为可达服务器。局域网示例：
+
+```text
+ap_cmd ntp-set 192.168.1.10
+# 等待重启后查询
+ap_cmd ntp-show
+# 恢复默认并重启
+ap_cmd ntp-reset
+```
+
 ## 实现与验证入口
 
 命令注册、参数检查和返回文本见
 [`xiaotai_console.c`](../../platforms/beken/runtime/src/xiaotai_console.c)；
 请求处理见 [`xiaotai_app.c`](../../platforms/beken/runtime/src/xiaotai_app.c)。
 两块板链接同一份命令实现，GPIO、串口接线及支持的产品功能以各板指南为准。
+
+## 启动异常时使用串口
+
+恢复配置命令在媒体、界面和联网之前开放，不依赖 Wi-Fi 连接、设备绑定、校时、鉴权或平台上线成功。
+可使用 `wifi-set`、`wifi-clear`、`tirtc-clear`、`ntp-show/set/reset`、`ep-show/set/reset` 和 `restart`；
+具体参数仍按本板命令说明输入。BK 命令须加 `ap_cmd` 前缀，ESP32 直接输入命令。
+
+本地业务未就绪时，`status` 只提示恢复模式，通话、媒体、语音诊断等业务命令返回 `Local runtime not ready`。
+修改配置成功后按命令提示重启；写入失败不会报告保存成功或重启。
+此入口不能修复串口驱动不可用、系统死机或 Flash 损坏；存储初始化失败时可以查看提示并重启，但保存配置可能失败。
+
+验收应覆盖未配网、未绑定、NTP 不可达、鉴权失败、媒体初始化失败和断网重连；
+每种情况下执行查询、修改、重启，并确认配置保留。主机故障注入不能替代当前镜像的实板串口验证。
