@@ -4,6 +4,7 @@
  * 版本化 blob 保存整组身份；兼容读取旧的分键格式，读取失败时清空输出。这里使用普通 NVS，量产工程应由组合根启用 NVS 加密或安全芯片。
  */
 #include "runtime_config.h"
+#include "config_store.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -97,22 +98,26 @@ esp_err_t runtime_config_load_endpoint(char *output, size_t capacity)
 esp_err_t runtime_config_save_endpoint(const char *url)
 {
     if (!runtime_config_endpoint_valid(url)) return ESP_ERR_INVALID_ARG;
+    if (!config_store_write_begin()) return ESP_ERR_INVALID_STATE;
     nvs_handle_t nvs = 0;
     esp_err_t err = nvs_open(TIRTC_ENDPOINT_NVS_NAMESPACE, NVS_READWRITE, &nvs);
     if (err == ESP_OK) err = nvs_set_str(nvs, TIRTC_ENDPOINT_NVS_KEY, url);
     if (err == ESP_OK) err = nvs_commit(nvs);
     if (nvs != 0) nvs_close(nvs);
+    config_store_write_end();
     return err;
 }
 
 esp_err_t runtime_config_clear_endpoint(void)
 {
+    if (!config_store_write_begin()) return ESP_ERR_INVALID_STATE;
     nvs_handle_t nvs = 0;
     esp_err_t err = nvs_open(TIRTC_ENDPOINT_NVS_NAMESPACE, NVS_READWRITE, &nvs);
     if (err == ESP_OK) err = nvs_erase_key(nvs, TIRTC_ENDPOINT_NVS_KEY);
     if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
     if (err == ESP_OK) err = nvs_commit(nvs);
     if (nvs != 0) nvs_close(nvs);
+    config_store_write_end();
     return err;
 }
 
@@ -311,46 +316,56 @@ esp_err_t runtime_config_load_ntp_server(char *output, size_t capacity)
 esp_err_t runtime_config_save_ntp_server(const char *url)
 {
     if (!xiaotai_ntp_server_valid(url)) return ESP_ERR_INVALID_ARG;
+    if (!config_store_write_begin()) return ESP_ERR_INVALID_STATE;
     nvs_handle_t nvs = 0;
     esp_err_t err = nvs_open(NTP_NVS_NAMESPACE, NVS_READWRITE, &nvs);
     if (err == ESP_OK) err = nvs_set_str(nvs, NTP_NVS_KEY, url);
     if (err == ESP_OK) err = nvs_commit(nvs);
     if (nvs != 0) nvs_close(nvs);
+    config_store_write_end();
     return err;
 }
 
 esp_err_t runtime_config_clear_ntp_server(void)
 {
+    if (!config_store_write_begin()) return ESP_ERR_INVALID_STATE;
     nvs_handle_t nvs = 0;
     esp_err_t err = nvs_open(NTP_NVS_NAMESPACE, NVS_READWRITE, &nvs);
     if (err == ESP_OK) err = nvs_erase_key(nvs, NTP_NVS_KEY);
     if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
     if (err == ESP_OK) err = nvs_commit(nvs);
     if (nvs != 0) nvs_close(nvs);
+    config_store_write_end();
     return err;
 }
 
 esp_err_t runtime_config_save_tirtc(const runtime_tirtc_config_t *value)
 {
-    if (!xiaotai_identity_write_begin(&s_identity_gate)) return ESP_ERR_INVALID_STATE;
+    if (!config_store_write_begin()) return ESP_ERR_INVALID_STATE;
+    if (!xiaotai_identity_write_begin(&s_identity_gate)) { config_store_write_end(); return ESP_ERR_INVALID_STATE; }
     esp_err_t result = save_tirtc_unlocked(value);
     xiaotai_identity_write_end(&s_identity_gate);
+    config_store_write_end();
     return result;
 }
 
 esp_err_t runtime_config_clear_tirtc(void)
 {
-    if (!xiaotai_identity_write_begin(&s_identity_gate)) return ESP_ERR_INVALID_STATE;
+    if (!config_store_write_begin()) return ESP_ERR_INVALID_STATE;
+    if (!xiaotai_identity_write_begin(&s_identity_gate)) { config_store_write_end(); return ESP_ERR_INVALID_STATE; }
     esp_err_t result = clear_tirtc_unlocked();
     xiaotai_identity_write_end(&s_identity_gate);
+    config_store_write_end();
     return result;
 }
 
 esp_err_t runtime_config_recover_tirtc(const runtime_tirtc_config_t *value)
 {
+    if (!config_store_write_begin()) return ESP_ERR_INVALID_STATE;
     int previous = xiaotai_identity_recovery_begin(&s_identity_gate);
-    if (previous < 0) return ESP_ERR_INVALID_STATE;
+    if (previous < 0) { config_store_write_end(); return ESP_ERR_INVALID_STATE; }
     esp_err_t result = value != NULL ? save_tirtc_unlocked(value) : clear_tirtc_unlocked();
     xiaotai_identity_recovery_end(&s_identity_gate, previous, result == ESP_OK);
+    config_store_write_end();
     return result;
 }

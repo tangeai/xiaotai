@@ -64,6 +64,8 @@ typedef struct {uint8_t contact_count;starter_product_contact_t contacts[8];} st
 static starter_runtime_product_snapshot_t snapshot;
 static starter_runtime_product_snapshot_t starter_runtime_product_snapshot(void){return snapshot;}
 static uint8_t s_contacts_page;
+static starter_product_contact_t s_displayed_contacts[8];
+static uint8_t s_displayed_contact_count;
 ''' + render + r'''
 static void check_page(unsigned count,unsigned requested){
     used=0;snapshot.contact_count=count;s_contacts_page=requested;

@@ -14,6 +14,7 @@ class BkProductGaps(unittest.TestCase):
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #define UI_PAGE_EXPRESSIONS 1
 #define UI_PAGE_EXPRESSION_PREVIEW 2
 #define UI_PAGE_HOME 3
@@ -68,13 +69,15 @@ int main(void){
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #define UI_PAGE_CONTACTS 1
 #define UI_PAGE_CONTACT_DETAIL 2
 #define XIAOTAI_CONTACT_VOIP 1
 static int s_ui_page=UI_PAGE_CONTACTS;
 static size_t s_contact_display_count=7,s_contact_page,s_contact_selected;
 static size_t s_contact_display_indices[8]={0,1,2,3,4,5,6,7};
-typedef struct {bool online;int type;} xiaotai_contact_t;
+typedef struct {bool online;int type;char id[65],app_id[65],model_id[65];} xiaotai_contact_t;
+static xiaotai_contact_t s_contact_target;
 static struct {unsigned count;xiaotai_contact_t entries[8];} s_contacts={.count=7};
 static void render_contacts(void){}
 static void render_contact_detail(void){}
@@ -100,6 +103,7 @@ int main(void){
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <stddef.h>
 typedef enum { UI_PAGE_HOME,UI_PAGE_AI_CHAT,UI_PAGE_CONTACTS,UI_PAGE_ROOM,UI_PAGE_EXPRESSIONS,UI_PAGE_SETTINGS,UI_PAGE_DIAGNOSTICS } ui_page_t;
 static ui_page_t s_ui_page;
@@ -168,6 +172,7 @@ int main(void){
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <stdio.h>
 #include <string.h>
 typedef int frame_buffer_t;

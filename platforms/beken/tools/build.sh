@@ -40,8 +40,10 @@ sdk_patches=(
     "$support_dir/tools/patches/bk-avdk-heartbeat-debug-level.patch"
     "$support_dir/tools/patches/bk-avdk-speaker-close-debug-level.patch"
     "$support_dir/tools/patches/bk-avdk-speaker-abort-write.patch"
+    "$support_dir/tools/patches/bk-avdk-mic-abort-read.patch"
     "$support_dir/tools/patches/bk-avdk-ipc-worker-sram.patch"
     "$support_dir/tools/patches/bk-avdk-rtos-assert-caller-diagnostics.patch"
+    "$support_dir/tools/patches/bk-avdk-audio-lifecycle.patch"
 )
 
 export XIAOTAI_TOOLCHAIN_DIR="$toolchain_bin"
@@ -141,7 +143,7 @@ fi
 
 # Normalize overlapping follow-up diagnostics before validating the base patches.
 # This keeps a second build as reproducible as the first patched SDK build.
-for followup in bk-avdk-speaker-close-debug-level.patch bk-avdk-heartbeat-debug-level.patch; do
+for followup in bk-avdk-audio-lifecycle.patch bk-avdk-speaker-close-debug-level.patch bk-avdk-heartbeat-debug-level.patch; do
     patch_path="$support_dir/tools/patches/$followup"
     if git -C "$sdk_dir" apply --reverse --check --ignore-whitespace "$patch_path" 2>/dev/null; then
         git -C "$sdk_dir" apply --reverse --ignore-whitespace "$patch_path"

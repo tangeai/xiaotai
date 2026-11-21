@@ -1314,7 +1314,7 @@ esp_err_t platform_client_provision(const platform_provision_config_t *config,
     return err;
 }
 
-esp_err_t platform_client_start(const platform_client_config_t *config)
+esp_err_t platform_client_check_identity(const platform_client_config_t *config)
 {
     /* 正常在线入口只完成发现、鉴权和 MQTT；HTTP worker 延迟到 TiRTC 之后。 */
     if (s_ready) {
@@ -1355,6 +1355,14 @@ esp_err_t platform_client_start(const platform_client_config_t *config)
     if (err != ESP_OK) {
         return err;
     }
+    return ESP_OK;
+}
+
+esp_err_t platform_client_start(const platform_client_config_t *config)
+{
+    if (s_ready) return ESP_OK;
+    esp_err_t err = platform_client_check_identity(config);
+    if (err != ESP_OK) return err;
     err = start_mqtt();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "MQTT start failed: %s", esp_err_to_name(err));

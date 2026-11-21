@@ -30,6 +30,18 @@ typedef uintptr_t beken_thread_arg_t;
 static bool s_running,s_prompt_sync_ready,s_speaker_muted;
 static atomic_bool s_prompt_active,s_prompt_run;
 static int s_prompt_stopped;
+static int s_prompt_device_mutex;
+static bool prompt_locked;
+static int rtos_init_mutex(int *m){return 0;}
+static int rtos_deinit_mutex(int *m){return 0;}
+static int rtos_lock_mutex(int *m){assert(!prompt_locked);prompt_locked=true;return 0;}
+static int rtos_trylock_mutex(int *m){if(prompt_locked)return -1;prompt_locked=true;return 0;}
+static int rtos_unlock_mutex(int *m){assert(prompt_locked);prompt_locked=false;return 0;}
+static unsigned aborts;
+static int close_failures;
+static bool cancel_while_open;
+static int xiaotai_board_prompt_audio_request_stop(void){assert(prompt_locked);aborts++;return 0;}
+
 static void *s_prompt_thread;
 static unsigned s_prompt_repeats;
 static atomic_int s_prompt_result;
@@ -55,12 +67,12 @@ static int rtos_create_psram_thread(void **t,int pr,const char*n,void(*f)(beken_
 }
 static void rtos_delay_milliseconds(unsigned n){if(complete_after_join)s_prompt_active=false;}
 static void rtos_delete_thread(void *t){}
-static int xiaotai_board_prompt_audio_start(void){opened++;return board_fail?-1:0;}
+static int xiaotai_board_prompt_audio_start(void){opened++;if(cancel_while_open)xiaotai_audio_cancel_prompt();return board_fail?-1:0;}
 static int xiaotai_board_prompt_audio_write(const int16_t *p,size_t n){
  writes++;if(writes==cancel_at)xiaotai_audio_cancel_prompt();
  return writes==write_fail_at?-1:(int)(n*sizeof(*p));
 }
-static void xiaotai_board_prompt_audio_stop(void){stopped++;}
+static int xiaotai_board_prompt_audio_stop(void){assert(prompt_locked);stopped++;if(close_failures){assert(s_prompt_active && s_prompt_pcm && allocations==1);close_failures--;return BK_FAIL;}return 0;}
 ''' + function(source,'audio_control_enter') + function(source,'audio_control_leave') + function(source,'play_prompt_pcm') + function(source,'prompt_task') +
               function(source,'xiaotai_audio_prompt_result') + function(source,'cancel_prompt_locked') + function(source,'xiaotai_audio_cancel_prompt') + function(source,'start_prompt_locked') + function(source,'start_prompt') + function(source,'xiaotai_audio_announce_verification_pcm') + preview + r'''
 int main(void){
@@ -127,7 +139,9 @@ int main(void){
    assert(s_prompt_active && allocations==1 && freed==before);
    assert(xiaotai_audio_preview_acknowledgement(true)==BK_ERR_BUSY);
   }
+  unsigned previous_aborts=aborts;
   worker(0);
+  if(chunk>0)assert(aborts==previous_aborts+1);
   assert(writes==chunk && stopped==stops+1 && freed==before+1);
   assert(!s_prompt_active && !s_prompt_run && !s_prompt_pcm && allocations==0);
   xiaotai_audio_cancel_prompt();assert(freed==before+1);
@@ -135,6 +149,20 @@ int main(void){
   assert(xiaotai_audio_preview_acknowledgement(true)==0);worker(0);
   assert(writes==15 && allocations==0);
  }
+''')
+
+    def test_cancel_during_open_does_not_touch_half_open_device(self):
+        self.replay(r'''
+ cancel_while_open=true;
+ assert(xiaotai_audio_preview_acknowledgement(false)==0);
+ worker(0);assert(aborts==0 && writes==0 && allocations==0);
+''')
+
+    def test_close_failure_keeps_prompt_owned_until_retry(self):
+        self.replay(r'''
+ close_failures=2;
+ assert(xiaotai_audio_preview_acknowledgement(false)==0);
+ worker(0);assert(stopped==3 && allocations==0 && !s_prompt_active);
 ''')
 
     def test_semaphore_failure_returns_buffer_and_retry_succeeds(self):

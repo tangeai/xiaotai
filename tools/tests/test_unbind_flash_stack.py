@@ -1,3 +1,4 @@
+from config_store_fixture import config_store_fixture
 """Replay the real credential erase API with the IDF cache-disabled stack guard."""
 import re
 import unittest
@@ -12,7 +13,7 @@ class UnbindFlashStack(unittest.TestCase):
         start = runtime.index('    if (strcmp(signal, "unbind") == 0) {')
         end = runtime.index('    if (strcmp(signal, "callers_update")', start)
         unbind = runtime[start:end]
-        run_c(r'''
+        run_c(config_store_fixture() + r'''
 #include "xiaotai_ntp_config.h"
 #include "xiaotai_identity_gate.h"
 #include <assert.h>

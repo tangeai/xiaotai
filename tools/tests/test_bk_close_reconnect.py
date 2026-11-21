@@ -32,6 +32,7 @@ class BKCloseReconnect(unittest.TestCase):
 #include <stdlib.h>
 #include <setjmp.h>
 #define BK_OK 0
+static void rtos_delay_milliseconds(unsigned ms);
 #define BK_FAIL -1
 #define TIRTC_E_BUSY -2
 #define TIRTC_E_LACK_OF_RESOURCE -3
@@ -62,6 +63,7 @@ static xiaotai_tirtc_handlers_t s_handlers;
 static char s_active_call_room[128];
 static unsigned head, tail, notifications, stopped, accepted, disconnected;
 static bool fail_push, check_cleanup_busy, in_callback;
+static unsigned stop_failures, retry_delays;
 static jmp_buf idle;
 bool xiaotai_tirtc_busy(void);
 static void on_conn_accepted(tirtc_conn_t);
@@ -83,7 +85,9 @@ static int send_h264(const uint8_t *p, size_t n, void *ctx) { return 0; }
 static int xiaotai_audio_start(int codec, int (*send)(const uint8_t *, size_t, void *), void *ctx) { return 0; }
 static void xiaotai_audio_set_uplink_enabled(bool enabled) { (void)enabled; }
 static bool xiaotai_audio_running(void) { return true; }
+static void rtos_delay_milliseconds(unsigned ms){assert(ms==20 && xiaotai_tirtc_busy() && !notifications);retry_delays++;}
 static int xiaotai_audio_stop(void) {
+    if(stop_failures){stop_failures--;assert(xiaotai_tirtc_busy() && !notifications);return BK_FAIL;}
     if (check_cleanup_busy) {
         assert(xiaotai_tirtc_busy() && "new sessions must wait for audio stop");
         on_conn_accepted((void *)0x2222);
@@ -139,7 +143,9 @@ int main(void) {
             assert(xiaotai_tirtc_busy());
             xiaotai_tirtc_service_close_wakeup();
             xiaotai_tirtc_service_close_wakeup();
+            stop_failures=2;retry_delays=0;
             check_cleanup_busy = true; run_worker(); check_cleanup_busy = false;
+            assert(retry_delays==2);
             assert(notifications == 1 && stopped == 1 && disconnected == 2);
             assert(!xiaotai_tirtc_busy());
             on_conn_accepted((void *)0x3333); run_worker();

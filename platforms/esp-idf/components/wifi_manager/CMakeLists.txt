@@ -6,6 +6,7 @@ idf_component_register(
         "${xiaotai_wifi_manager_dir}/src/captive_dns.c"
     INCLUDE_DIRS "${xiaotai_wifi_manager_dir}/include"
     PRIV_INCLUDE_DIRS "${xiaotai_wifi_manager_dir}/src"
-    REQUIRES esp_wifi esp_netif esp_event nvs_flash
+                      "${xiaotai_wifi_manager_dir}/../../../common/include"
+    REQUIRES esp_wifi esp_netif esp_event nvs_flash runtime_config
     PRIV_REQUIRES esp_http_server json esp_system lwip
 )

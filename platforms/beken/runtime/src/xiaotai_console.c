@@ -134,7 +134,7 @@ static void command_wifi_set(char *output, int capacity, int argc, char **argv)
     }
     snprintf(value.ssid, sizeof(value.ssid), "%s", argv[1]);
     snprintf(value.password, sizeof(value.password), "%s", argv[2]);
-    int rc = xiaotai_storage_save_wifi(&value);
+    int rc = xiaotai_storage_recover_wifi(&value);
     complete_configuration_change(output, capacity, rc,
              "Wi-Fi config saved; restarting\r\n",
              "Wi-Fi config save failed\r\n");
@@ -144,7 +144,7 @@ static void command_wifi_clear(char *output, int capacity,
                                int argc, char **argv)
 {
     (void)argv;
-    int rc = argc == 1 ? xiaotai_storage_clear_wifi() : BK_ERR_PARAM;
+    int rc = argc == 1 ? xiaotai_storage_recover_wifi(NULL) : BK_ERR_PARAM;
     complete_configuration_change(output, capacity, rc,
              "Wi-Fi config cleared; restarting into SoftAP\r\n",
              argc == 1 ? "Wi-Fi config clear failed\r\n" :
@@ -519,7 +519,7 @@ static const struct cli_command s_commands[] = {
     {"restart", "Restart the device", command_restart},
 };
 
-static atomic_bool s_runtime_ready;
+static atomic_bool s_runtime_ready __attribute__((section(".sram_spinlock_section"), aligned(4)));
 static bool s_registered;
 static struct cli_command s_dispatch_commands[sizeof(s_commands)/sizeof(s_commands[0])];
 

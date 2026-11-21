@@ -1,10 +1,11 @@
+from config_store_fixture import config_store_fixture
 """Replay serial NTP configuration through production persistence and commands."""
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
 from test_serial_ep_override import P4_CONFIG, BK_STORAGE, P4_CONSOLE, BK_CONSOLE
 
 COMMON = ROOT / 'platforms/common/include'
-PRELUDE = r'''
+PRELUDE = config_store_fixture() + r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -56,6 +57,7 @@ static char stored[254]; static int writes,fail;
 #define ESP_OK 0
 #define ESP_ERR_NVS_NOT_FOUND -1
 #define ESP_ERR_INVALID_ARG -2
+#define ESP_ERR_INVALID_STATE -9
 #define RUNTIME_NTP_SERVER_MAX 254
 #define NTP_NVS_NAMESPACE "ntp_cfg"
 #define NTP_NVS_KEY "server"

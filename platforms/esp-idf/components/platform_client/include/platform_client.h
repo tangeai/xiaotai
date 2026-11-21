@@ -89,6 +89,8 @@ typedef void (*platform_online_callback_t)(void *user_data);
  * 本函数不创建另一份大栈；TiRTC 启动成功后由调用者进入请求循环。
  * 函数执行网络 I/O，必须在 app_main 之外的工作任务调用；重复调用安全。
  */
+/* Bounded discovery/login only: no persistent MQTT or request worker. */
+esp_err_t platform_client_check_identity(const platform_client_config_t *config);
 esp_err_t platform_client_start(const platform_client_config_t *config);
 
 /**

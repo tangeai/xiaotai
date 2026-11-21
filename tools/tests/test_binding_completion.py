@@ -63,13 +63,23 @@ static unsigned s_prompt_repeats=3;
 static atomic_int s_prompt_result;
 #define BK_FAIL -1
 static int s_prompt_stopped;
+static int s_prompt_device_mutex;
+static bool prompt_locked;
+static int rtos_init_mutex(int *m){return 0;}
+static int rtos_deinit_mutex(int *m){return 0;}
+static int rtos_lock_mutex(int *m){assert(!prompt_locked);prompt_locked=true;return 0;}
+static int rtos_trylock_mutex(int *m){if(prompt_locked)return -1;prompt_locked=true;return 0;}
+static int rtos_unlock_mutex(int *m){assert(prompt_locked);prompt_locked=false;return 0;}
+static unsigned aborts;
+static int xiaotai_board_prompt_audio_request_stop(void){assert(prompt_locked);aborts++;return 0;}
+
 static void *s_prompt_thread=(void*)1;
 static int16_t pcm[320], *s_prompt_pcm=pcm;
 static size_t s_prompt_samples=320;
 static unsigned writes,delays,stops,frees,signals;
 static int xiaotai_board_prompt_audio_start(void){return 0;}
 static int xiaotai_board_prompt_audio_write(const int16_t*p,size_t n){writes++;return 0;}
-static void xiaotai_board_prompt_audio_stop(void){stops++;}
+static int xiaotai_board_prompt_audio_stop(void){stops++;return 0;}
 static void psram_free(void*p){assert(p==pcm);frees++;}
 static void rtos_delay_milliseconds(unsigned n){delays+=n;atomic_store(&s_prompt_run,false);}
 static void rtos_set_semaphore(int*p){signals++;}

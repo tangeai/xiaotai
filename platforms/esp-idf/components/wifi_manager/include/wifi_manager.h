@@ -59,6 +59,8 @@ esp_err_t wifi_manager_save_credentials(const char *ssid, const char *password);
 
 /** 删除 Wi-Fi NVS 配置；调用后不会自动重启。 */
 esp_err_t wifi_manager_forget_credentials(void);
+/* Manual recovery excludes delayed portal writes until reboot; NULL/NULL clears. */
+esp_err_t wifi_manager_recover_credentials(const char *ssid, const char *password);
 
 /** 按 ESP32 字节长度规则校验 SSID 和密码；error 可为 NULL。 */
 bool wifi_manager_credentials_valid(const char *ssid,

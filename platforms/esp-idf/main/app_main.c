@@ -1,3 +1,4 @@
+#include "esp_timer.h"
 /*
  * 工程组合根：只负责初始化基础设施、组装模块和持有启动任务。
  *
@@ -42,6 +43,7 @@
 /* 联调阶段先使用已验证的 HTTP 平台服务发现；HTTPS 留到功能验收后启用。 */
 #define DISCOVERY_URL CONFIG_XIAOTAI_DISCOVERY_URL
 #define START_RETRY_DELAY_MS 5000U
+#define TIRTC_START_TIMEOUT_MS 30000U
 #define STARTER_TASK_STACK_BYTES 13312U
 #define PLATFORM_REQUEST_TASK_STACK_BYTES 13312U
 #define VERIFICATION_PROMPT_REPEAT_COUNT 3U
@@ -311,6 +313,7 @@ static void starter_start_task(void *argument)
      * 本地凭证对应的设备已解绑，保持在验证码页并持续尝试签名重绑。
      */
     bool tirtc_submitted = false;
+    int64_t tirtc_start_deadline = 0;
     bool controls_started = false;
     bool wake_submitted = false;
     for (;;) {
@@ -324,6 +327,20 @@ static void starter_start_task(void *argument)
          * fragment the remaining internal heap.
          */
         if (!tirtc_submitted) {
+            /* Check revocation before SDK startup without starting MQTT/tasks.
+             * Keep the internal bootstrap reserve held during this HTTP work. */
+            esp_err_t identity_err = platform_client_check_identity(&platform);
+            if (identity_err == ESP_ERR_NOT_FOUND) {
+                identity_err = provision_and_save(mac_address, true);
+                if (identity_err == ESP_OK) {
+                    vTaskDelay(pdMS_TO_TICKS(1000));
+                    esp_restart();
+                }
+            }
+            if (identity_err != ESP_OK) {
+                vTaskDelay(pdMS_TO_TICKS(START_RETRY_DELAY_MS));
+                continue;
+            }
             esp_err_t endpoint_err = platform_client_discover_tirtc_endpoint(
                 s_discovery_url, s_tirtc_endpoint, sizeof(s_tirtc_endpoint));
             if (endpoint_err != ESP_OK) {
@@ -353,6 +370,7 @@ static void starter_start_task(void *argument)
             int rc = starter_tirtc_start(&tirtc);
             if (rc == 0) {
                 tirtc_submitted = true;
+                tirtc_start_deadline = esp_timer_get_time() / 1000 + TIRTC_START_TIMEOUT_MS;
                 ESP_LOGI(TAG,
                          "TiRTC send buffer configured=%u bytes",
                          (unsigned)tirtc.max_send_buffer_bytes);
@@ -369,7 +387,15 @@ static void starter_start_task(void *argument)
             continue;
         }
         if (!starter_tirtc_started()) {
-            /* TiRtcStart is asynchronous; avoid overlapping MQTT/TLS startup. */
+            /* Stop/Uninit are asynchronous too. Without a completed stop callback
+             * it is unsafe to initialize another SDK instance. Keep recovery
+             * commands available and require an explicit restart after timeout. */
+            if (esp_timer_get_time() / 1000 >= tirtc_start_deadline) {
+                ESP_LOGE(TAG, "TiRTC startup timed out; recovery console available; run restart");
+                starter_console_set_runtime_ready(false);
+                vTaskDelete(NULL);
+                return;
+            }
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }

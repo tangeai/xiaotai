@@ -1,3 +1,4 @@
+from config_store_fixture import config_store_fixture
 """Check the serial EP override at its public command and storage seams."""
 
 import re
@@ -57,7 +58,7 @@ int main(void) {{
         functions = "\n".join(function(source, name) for name in (
             "runtime_config_endpoint_valid", "runtime_config_load_endpoint",
             "runtime_config_save_endpoint", "runtime_config_clear_endpoint"))
-        run_c(r'''
+        run_c(config_store_fixture() + r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -71,6 +72,7 @@ int main(void) {{
 #define ESP_OK 0
 #define ESP_ERR_NVS_NOT_FOUND 1
 #define ESP_ERR_INVALID_ARG 2
+#define ESP_ERR_INVALID_STATE 9
 typedef int esp_err_t;
 typedef int nvs_handle_t;
 static char stored[256];
@@ -113,7 +115,7 @@ int main(void) {
         functions = "\n".join(function(source, name) for name in (
             "endpoint_valid", "xiaotai_storage_load_endpoint",
             "xiaotai_storage_save_endpoint", "xiaotai_storage_clear_endpoint"))
-        run_c(r'''
+        run_c(config_store_fixture() + r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>

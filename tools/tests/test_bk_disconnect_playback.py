@@ -20,6 +20,10 @@ class BKDisconnectPlayback(unittest.TestCase):
 #include <stdint.h>
 #include <stddef.h>
 #include <stdatomic.h>
+#define BK_OK 0
+static bool retry_cleanup;
+static atomic_uintptr_t s_outgoing_cleanup_connection;
+static atomic_uint s_active_generation;
 #define BK_LOGI(...) ((void)0)
 #define BK_LOGD(...) ((void)0)
 #define CONNECTION_STREAM 1
@@ -57,7 +61,7 @@ static int TiRtcDisconnect(tirtc_conn_t c){
 }
 ''' + constants + '\n' + cancel + function(source, 'drain_ai_playback_after_transport_close') +
               '\nstatic void dispatch(media_event_t event){\n' + branch.replace('continue;', 'return;') +
-              '}\nstatic void closed_event(media_event_t event){\n' + closed +
+              '}\nstatic void closed_event(media_event_t event){\n' + closed.replace('continue;', 'return;') +
               '}}\nint main(void){\n' + scenario + '\n}\n')
 
     def test_remote_close_plays_received_tail_before_stop(self):
@@ -81,7 +85,8 @@ static int TiRtcDisconnect(tirtc_conn_t c){
     def test_remote_closed_callback_without_end_session_drains(self):
         self.replay(r'''
     written=242;pending=7;
-    closed_event((media_event_t){.type=MEDIA_EVENT_CLOSED,.mode=2,.error=0});
+    s_pending_close_event=(media_event_t){.connection=current};
+    closed_event((media_event_t){.type=MEDIA_EVENT_CLOSED,.mode=2,.error=0,.connection=current});
     assert(written==249 && "normal transport close must finish received audio");
     assert(stops==1 && clock_ms==140 && !running && !uplink);
 ''')
@@ -124,7 +129,7 @@ int main(void){
 
     def test_user_cancel_overrides_remote_tail_drain(self):
         self.replay(r'''
-    pending=46;
+    pending=46;s_active_generation=7;
     xiaotai_tirtc_ai_cancel_tail(7);
     dispatch((media_event_t){.type=1,.mode=2,.error=-40008,.generation=7,.connection=current});
     assert(clock_ms==0 && written==0 && stops==1);
@@ -134,12 +139,21 @@ int main(void){
     assert(clock_ms==30 && written==1 && stops==2);
     /* Connection callback may have already cleared the handle. */
     running=true;pending=46;clock_ms=0;written=0;
-    closed_event((media_event_t){.type=MEDIA_EVENT_CLOSED,.mode=2,.generation=7});
+    s_pending_close_event=(media_event_t){.connection=current,.generation=7};
+    closed_event((media_event_t){.type=MEDIA_EVENT_CLOSED,.mode=2,.generation=7,.connection=current});
     assert(clock_ms==0 && written==0 && stops==3);
     /* Old cancellation must not truncate the next generation's normal tail. */
     running=true;pending=2;
-    closed_event((media_event_t){.type=MEDIA_EVENT_CLOSED,.mode=2,.generation=8});
+    s_pending_close_event.generation=8;
+    closed_event((media_event_t){.type=MEDIA_EVENT_CLOSED,.mode=2,.generation=8,.connection=current});
     assert(clock_ms==40 && written==2);
+''')
+
+    def test_reused_handle_with_old_generation_cannot_stop_new_media(self):
+        self.replay(r'''
+    s_active_generation=8;pending=46;
+    dispatch((media_event_t){.type=1,.mode=2,.generation=7,.connection=current});
+    assert(running && pending==46 && stops==0 && disconnects==0);
 ''')
 
     def test_stale_cleanup_preserves_current_audio(self):

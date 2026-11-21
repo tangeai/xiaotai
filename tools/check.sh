@@ -187,4 +187,17 @@ python3 "$repo_dir/tools/product_coverage.py"
 python3 "$repo_dir/tools/build.py" --validate
 git -C "$repo_dir" diff --check
 
+
+python3 "$repo_dir/tools/tests/test_bk_contact_identity.py"
+python3 "$repo_dir/tools/tests/test_esp_contact_identity.py"
+python3 "$repo_dir/tools/tests/test_esp_startup_recovery.py"
+
+python3 "$repo_dir/tools/tests/test_configuration_transactions.py"
+python3 "$repo_dir/tools/tests/test_bk_mic_abort.py"
+
+python3 "$repo_dir/tools/tests/test_bk_wifi_recovery.py"
+python3 "$repo_dir/tools/tests/test_esp_wifi_recovery.py"
+python3 "$repo_dir/tools/tests/test_wifi_portal_restart.py"
+python3 "$repo_dir/tools/tests/test_bk_sdk_audio_lifecycle.py"
+
 echo "XiaoTai repository checks passed"

@@ -142,6 +142,7 @@ static unsigned s_diagnostics_tab;
 static uint32_t s_diagnostics_due_ms;
 static size_t s_contact_page;
 static size_t s_contact_selected;
+static xiaotai_contact_t s_contact_target;
 static size_t s_contact_display_indices[XIAOTAI_CONTACTS_MAX];
 static size_t s_contact_display_count;
 static unsigned s_launcher_selected = 6U;
@@ -175,7 +176,7 @@ static bool s_room_touch_talking;
 static uint32_t s_room_touch_generation;
 /* Touch producer publishes terminal edges independently of the bounded
  * control queue. Only the control task changes room/PTT business state. */
-static atomic_uint s_touch_release_generation;
+static atomic_uint s_touch_release_generation __attribute__((section(".sram_spinlock_section"), aligned(4)));
 static bool s_touch_wake_consumed;
 static bool s_touch_action_consumed;
 static control_event_t s_after_room_event;
@@ -641,6 +642,7 @@ static void render_contact_detail(void)
         return;
     }
     const xiaotai_contact_t *contact = &s_contacts.entries[s_contact_selected];
+    s_contact_target = *contact;
     xiaotai_ui_show_contact_detail(contact->name, contact->online,
                                    contact->type == XIAOTAI_CONTACT_VOIP);
 }
@@ -1617,13 +1619,19 @@ static void handle_touch(const control_event_t *event)
     }
     if (s_ui_page == UI_PAGE_CONTACT_DETAIL) {
         if (event->x >= 72U && event->x < 248U &&
-            event->y >= 204U && event->y < 233U &&
-            s_contact_selected < s_contacts.count) {
-            const xiaotai_contact_t *contact =
-                &s_contacts.entries[s_contact_selected];
-            if (contact->online || contact->type == XIAOTAI_CONTACT_VOIP) {
-                dial_contact(contact);
+            event->y >= 204U && event->y < 233U) {
+            for (size_t i = 0; i < s_contacts.count; ++i) {
+                const xiaotai_contact_t *contact = &s_contacts.entries[i];
+                if (contact->type != s_contact_target.type ||
+                    strcmp(contact->id, s_contact_target.id) != 0 ||
+                    strcmp(contact->app_id, s_contact_target.app_id) != 0 ||
+                    strcmp(contact->model_id, s_contact_target.model_id) != 0) continue;
+                if (contact->online || contact->type == XIAOTAI_CONTACT_VOIP)
+                    dial_contact(contact);
+                return;
             }
+            s_ui_page = UI_PAGE_CONTACTS;
+            render_contacts();
         }
         return;
     }

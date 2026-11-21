@@ -1483,6 +1483,28 @@ static bool begin_call_common(const starter_product_contact_t *contact)
     return true;
 }
 
+static void dial_selected_contact(const starter_product_contact_t *selected, bool video)
+{
+    if (s_product_mutex == NULL ||
+        xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
+    uint8_t index = STARTER_PRODUCT_CONTACTS_MAX;
+    for (uint8_t i = 0; i < s_product_snapshot.contact_count; ++i) {
+        const starter_product_contact_t *current = &s_product_snapshot.contacts[i];
+        if (current->source == selected->source &&
+            strcmp(current->id, selected->id) == 0 &&
+            strcmp(current->wx_app_id, selected->wx_app_id) == 0 &&
+            strcmp(current->wx_model_id, selected->wx_model_id) == 0) {
+            index = i;
+            break;
+        }
+    }
+    xSemaphoreGive(s_product_mutex);
+    /* The runtime task owns contact replacement, so this index remains valid
+     * for the following synchronous dial; it never crosses an event queue. */
+    if (index < STARTER_PRODUCT_CONTACTS_MAX) dial_contact(index, video);
+    else product_set_call_result("联系人已更新，请返回重试");
+}
+
 static void dial_contact(uint8_t index, bool video)
 {
     starter_product_contact_t contact = {0};
@@ -4079,7 +4101,8 @@ static void runtime_task(void *argument)
                 handle_contacts_result(&event);
                 break;
             case EVENT_CALL_DIAL:
-                dial_contact((uint8_t)event.command, event.flag);
+                if (event.text != NULL && event.length == sizeof(starter_product_contact_t))
+                    dial_selected_contact((const starter_product_contact_t *)event.text, event.flag);
                 break;
             case EVENT_CALL_ACCEPT:
                 accept_call();
@@ -4386,23 +4409,38 @@ esp_err_t starter_runtime_room_ptt(bool pressed)
     return queued ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
-esp_err_t starter_runtime_call_contact(uint8_t index)
+esp_err_t starter_runtime_call_target(const starter_product_contact_t *contact, bool video)
 {
-    if (index >= STARTER_PRODUCT_CONTACTS_MAX) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    const runtime_event_t event = {
-        .type = EVENT_CALL_DIAL,
-        .command = index,
-    };
-    return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
+    if (contact == NULL || contact->id[0] == '\0') return ESP_ERR_INVALID_ARG;
+    runtime_event_t event = {.type = EVENT_CALL_DIAL, .flag = video,
+                             .length = sizeof(*contact)};
+    event.text = malloc(sizeof(*contact));
+    if (event.text == NULL) return ESP_ERR_NO_MEM;
+    memcpy(event.text, contact, sizeof(*contact));
+    if (queue_event(&event)) return ESP_OK;
+    free(event.text);
+    return ESP_ERR_TIMEOUT;
+}
+
+static esp_err_t enqueue_contact_index(uint8_t index, bool video)
+{
+    starter_product_contact_t contact;
+    if (s_product_mutex == NULL ||
+        xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(100)) != pdTRUE) return ESP_ERR_TIMEOUT;
+    bool valid = index < s_product_snapshot.contact_count;
+    if (valid) contact = s_product_snapshot.contacts[index];
+    xSemaphoreGive(s_product_mutex);
+    return valid ? starter_runtime_call_target(&contact, video) : ESP_ERR_INVALID_ARG;
 }
 
 esp_err_t starter_runtime_call_contact_video(uint8_t index)
 {
-    if (index >= STARTER_PRODUCT_CONTACTS_MAX) return ESP_ERR_INVALID_ARG;
-    const runtime_event_t event = {.type = EVENT_CALL_DIAL, .command = index, .flag = true};
-    return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
+    return enqueue_contact_index(index, true);
+}
+
+esp_err_t starter_runtime_call_contact(uint8_t index)
+{
+    return enqueue_contact_index(index, false);
 }
 
 #if CONFIG_IDF_TARGET_ESP32P4

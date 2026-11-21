@@ -157,6 +157,8 @@ esp_err_t starter_runtime_main_key(bool double_click);
 /** 联系人同步与呼叫控制，均只把意图投递给统一状态任务。 */
 esp_err_t starter_runtime_contacts_refresh(void);
 esp_err_t starter_runtime_wechat_quick_call(void);
+/* Explicit UI selections retain the identity that was actually displayed. */
+esp_err_t starter_runtime_call_target(const starter_product_contact_t *contact, bool video);
 esp_err_t starter_runtime_call_contact(uint8_t index);
 esp_err_t starter_runtime_call_contact_video(uint8_t index);
 #if CONFIG_IDF_TARGET_ESP32P4

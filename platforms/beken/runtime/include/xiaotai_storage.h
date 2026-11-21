@@ -38,6 +38,8 @@ int xiaotai_storage_load_wifi(xiaotai_wifi_credentials_t *out);
 int xiaotai_storage_save_wifi(const xiaotai_wifi_credentials_t *value);
 /** Delete only the saved station credentials; binding/settings are retained. */
 int xiaotai_storage_clear_wifi(void);
+/* Manual recovery blocks late portal saves until reboot; NULL clears. */
+int xiaotai_storage_recover_wifi(const xiaotai_wifi_credentials_t *value);
 int xiaotai_storage_load_device(xiaotai_device_credentials_t *out);
 int xiaotai_storage_save_device(const xiaotai_device_credentials_t *value);
 int xiaotai_storage_clear_device(void);

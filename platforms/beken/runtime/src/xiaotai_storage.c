@@ -67,8 +67,8 @@ bool xiaotai_storage_format_discovery_url(const char *base, char *output, size_t
 
 /* EasyFlash already serializes ordinary writes. Only an explicit reset gates
  * new writers; an in-flight save makes reset fail for a safe user retry. */
-static atomic_bool s_storage_reset_pending;
-static atomic_uint s_storage_writers;
+static atomic_bool s_storage_reset_pending __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_storage_writers __attribute__((section(".sram_spinlock_section"), aligned(4)));
 
 static bool storage_write_begin(void)
 {
@@ -214,7 +214,10 @@ int xiaotai_storage_load_wifi(xiaotai_wifi_credentials_t *out)
     return BK_OK;
 }
 
-int xiaotai_storage_save_wifi(const xiaotai_wifi_credentials_t *value)
+static xiaotai_identity_gate_t s_wifi_gate
+    __attribute__((used, section(".sram_spinlock_section"), aligned(4)));
+
+static int save_wifi_unlocked(const xiaotai_wifi_credentials_t *value)
 {
     if (!xiaotai_wifi_credentials_valid(value)) return BK_ERR_PARAM;
     xiaotai_wifi_record_t record = {0};
@@ -223,9 +226,34 @@ int xiaotai_storage_save_wifi(const xiaotai_wifi_credentials_t *value)
     return storage_write_blob(XIAOTAI_WIFI_KEY, &record, sizeof(record));
 }
 
-int xiaotai_storage_clear_wifi(void)
+static int clear_wifi_unlocked(void)
 {
     return storage_delete(XIAOTAI_WIFI_KEY);
+}
+
+int xiaotai_storage_save_wifi(const xiaotai_wifi_credentials_t *value)
+{
+    if (!xiaotai_identity_write_begin(&s_wifi_gate)) return BK_ERR_BUSY;
+    int result = save_wifi_unlocked(value);
+    xiaotai_identity_write_end(&s_wifi_gate);
+    return result;
+}
+
+int xiaotai_storage_clear_wifi(void)
+{
+    if (!xiaotai_identity_write_begin(&s_wifi_gate)) return BK_ERR_BUSY;
+    int result = clear_wifi_unlocked();
+    xiaotai_identity_write_end(&s_wifi_gate);
+    return result;
+}
+
+int xiaotai_storage_recover_wifi(const xiaotai_wifi_credentials_t *value)
+{
+    int previous = xiaotai_identity_recovery_begin(&s_wifi_gate);
+    if (previous < 0) return BK_ERR_BUSY;
+    int result = value == NULL ? clear_wifi_unlocked() : save_wifi_unlocked(value);
+    xiaotai_identity_recovery_end(&s_wifi_gate, previous, result == BK_OK);
+    return result;
 }
 
 int xiaotai_storage_load_device(xiaotai_device_credentials_t *out)

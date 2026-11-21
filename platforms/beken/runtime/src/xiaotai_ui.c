@@ -28,7 +28,7 @@
 #define AI_MOUTH_W 66U
 #define AI_MOUTH_H 36U
 
-static atomic_bool s_verification_voice_error;
+static atomic_bool s_verification_voice_error __attribute__((section(".sram_spinlock_section"), aligned(4)));
 static unsigned s_verification_displayed_seconds = ~0U;
 static uint8_t *s_ai_mouth_pixels;
 static frame_buffer_t *s_ai_mouth_frame;

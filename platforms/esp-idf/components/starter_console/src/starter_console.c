@@ -612,7 +612,7 @@ static int command_wifi_set(int argc, char **argv)
         printf("invalid Wi-Fi config: %s\n", error);
         return 1;
     }
-    esp_err_t err = wifi_manager_save_credentials(argv[1], argv[2]);
+    esp_err_t err = wifi_manager_recover_credentials(argv[1], argv[2]);
     if (err != ESP_OK) {
         printf("save failed: %s\n", esp_err_to_name(err));
         return 1;
@@ -627,7 +627,7 @@ static int command_wifi_clear(int argc, char **argv)
 {
     (void)argc;
     (void)argv;
-    esp_err_t err = wifi_manager_forget_credentials();
+    esp_err_t err = wifi_manager_recover_credentials(NULL, NULL);
     if (err != ESP_OK) {
         printf("clear failed: %s\n", esp_err_to_name(err));
         return 1;
