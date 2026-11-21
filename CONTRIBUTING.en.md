@@ -10,6 +10,69 @@ ESP32-S3 and ESP32-P4 projects use **ESP-IDF v5.5.5**, commit `b774170ff46c393ee
 
 Historical third-party SDK compiler versions are recorded in their manifests.
 
+## Branch, PR, and release workflow
+
+Start daily development on a short-lived branch from the latest `main` and open a
+pull request (PR) targeting `main`. Do not create or use `develop` for development
+or integration. Keep each PR focused on one feature, fix, or complete business slice.
+
+Use `feat/<topic>` for features, `fix/<topic>` for fixes, `docs/<topic>` for documentation,
+and `chore/<topic>` for maintenance. Inspect uncommitted changes, remote branches,
+and open PRs before starting, and preserve existing work. Contributors with repository
+write access can start from a clean working tree with:
+
+```bash
+git fetch origin
+git switch -c feat/your-topic origin/main
+```
+
+External contributors first fork the repository, configure this repository as
+`upstream`, create a short-lived branch from the latest `upstream/main`, push to
+their fork, and open a PR targeting this repository's `main`.
+
+1. Develop and test locally: follow [Testing requirements](#testing-requirements)
+   for red-green regression coverage and run `bash tools/check.sh`. Complete firmware
+   builds and hardware validation for the affected scope. For documentation changes,
+   describe coverage from existing checks.
+2. Open a PR: fill in the template with scope, test evidence, compatibility, and pending
+   validation. Push to your branch, not directly to `main`.
+3. Review and CI: resolve review discussions and ensure required checks pass on the
+   latest PR commit before Squash merging. Delete the short-lived remote branch after
+   merging and start the next task from the latest `main`.
+4. Validate after merging: record the actual merged commit on `main` and rerun the full
+   checks on it. For firmware changes, validate the corresponding builds and hardware
+   images. PR branch results do not replace validation of the merged commit.
+5. Release: after validation, select board versions following
+   [Firmware versions and releases](#firmware-versions-and-releases), create version
+   tags and GitHub Releases at the validated commit, and retain artifacts, hashes, and
+   bilingual notes. Documentation changes alone do not bump firmware versions.
+   Keep images pending release until their hardware validation is complete.
+
+When an older stable version needs maintenance, use `release/<version>` and backport
+fixes through PRs; this is not the daily integration branch. If a historical `develop`
+exists, inspect its unique commits and dependencies first. If integration is needed,
+create a branch from `main`, test, and open a PR. Handle archival or deletion separately;
+adopting this workflow does not automatically delete history.
+
+### GitHub settings and acceptance
+
+Documentation does not change GitHub settings. Administrators must configure and verify
+these settings in this repository:
+
+- Default branch `main`, Squash merging only, and automatic deletion of short-lived branches after merging.
+- Require PRs, resolved discussions, linear history, and an up-to-date branch for `main`;
+  prohibit force pushes and deletion.
+- Require the actual `test` job from this repository's `Host tests` workflow, with GitHub
+  Actions as its source. It runs `bash tools/check.sh`. Apply actual checks to `release/*`
+  when used; do not copy job names from other repositories.
+- Default Actions permissions to read-only and disable permission to create and approve
+  PRs. Grant write permissions individually to release jobs as needed.
+- Protect all board tag patterns in the [naming table](#versions-and-names) against
+  updates and deletion; matching only `v*` is insufficient.
+- Use a small PR to verify that failing checks block merging, passing checks permit
+  Squash merging, and the branch is deleted afterward. Verify merged-commit validation
+  and the production release entry point. Mark incomplete acceptance checks as pending.
+
 ## Prepare the environment
 
 1. Read [Architecture and development](ARCHITECTURE.en.md) for directory boundaries and media lifecycles.
