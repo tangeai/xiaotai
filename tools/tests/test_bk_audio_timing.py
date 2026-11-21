@@ -4,7 +4,7 @@ from test_s3_product_regressions import ROOT, function, run_c
 AUDIO=ROOT/'platforms/beken/runtime/src/xiaotai_audio.c'
 
 def diagnostic_block(source):
-    return source.split('/* AI audio timing begin */',1)[1].split('/* AI audio timing end */',1)[0]
+    return '#include "xiaotai_opus_plc.h"\n' + source.split('/* AI audio timing begin */',1)[1].split('/* AI audio timing end */',1)[0]
 
 class AudioTiming(unittest.TestCase):
     def test_packet_timestamps_follow_the_actual_queue(self):
@@ -55,13 +55,13 @@ static int packet_samples=320;
 static int opus_packet_get_nb_samples(const uint8_t *p,opus_int32 n,int rate) {
     (void)p;(void)n;assert(rate==16000);return packet_samples;
 }
-static uint16_t s_opus_samples[64];
 static uint32_t s_opus_queued_samples;
 static xiaotai_audio_buffer_t s_ai_buffer={.target_ms=100};
 /* Legacy ownership/timing cases release immediately; adaptive cases override. */
 static bool s_ai_buffer_ended=true;
-''' + diagnostic_block(s) + function(s,'xiaotai_audio_play_opus') + function(s,'opus_ring_take') + r'''
+''' + diagnostic_block(s) + function(s,'xiaotai_audio_play_opus_stream') + function(s,'xiaotai_audio_play_opus') + function(s,'opus_ring_take') + r'''
 int main(void){
+ (void)s_plc_rendered_ms;
  ai_playback_timing_t quiet={0}; ai_uplink_timing_t quiet_up={0};
  ai_audio_written(&quiet,100,102,103,123,true);
  assert(strstr(logs,"AI_AUDIO event=first_write") && strstr(logs,"rx_to_write_ms=123"));
@@ -75,7 +75,7 @@ int main(void){
  uint8_t p=42,out;lock_delay=3;
  assert(xiaotai_audio_play_opus(&p,1,0)==1);
  now=1040;assert(opus_ring_take(&out,1)==1 && out==42);
- assert(s_ai_packet.seq==1 && s_ai_packet.rx_ms==1000 && s_ai_packet.enqueue_ms==1003);
+ assert(s_ai_packet.seq==1 && s_ai_packet.opus.rx_ms==1000 && s_ai_packet.enqueue_ms==1003);
  ai_playback_timing_t stats={0};
  ai_audio_written(&stats,1040,1042,1043,1063,true);
  assert(strstr(logs,"rx_ms=1000") && strstr(logs,"admit_ms=3 queue_ms=37 decode_ms=2 prepare_ms=1 write_ms=20 rx_to_write_ms=63"));
@@ -86,7 +86,7 @@ int main(void){
  /* Overflow preserves accepted packets and their diagnostic stamps. */
  for(unsigned i=0;i<80;i++){now=3000+i;p=i;assert(xiaotai_audio_play_opus(&p,1,0)==(i<64?1:BK_ERR_BUSY));}
  now=4000;assert(opus_ring_take(&out,1)==1 && out==0);
- assert(s_ai_packet.rx_ms==3000 && s_ai_packet.seq==3);
+ assert(s_ai_packet.opus.rx_ms==3000 && s_ai_packet.seq==3);
  ai_audio_written(&stats,4000,4001,4001,4021,true);
  assert(strstr(logs,"queue_max_ms=1000"));
  ai_audio_idle(&stats,4221);assert(strstr(logs,"event=idle"));

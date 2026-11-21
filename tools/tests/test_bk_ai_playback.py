@@ -110,18 +110,37 @@ static int packet_samples=320;
 static int opus_packet_get_nb_samples(const uint8_t *p,opus_int32 n,int rate) {
     (void)p;(void)n;assert(rate==16000);return packet_samples;
 }
-static uint16_t s_opus_samples[64];
 static uint32_t s_opus_queued_samples;
 static xiaotai_audio_buffer_t s_ai_buffer={.target_ms=100};
 /* Legacy ownership/timing cases release immediately; adaptive cases override. */
 static bool s_ai_buffer_ended=true;
-''' + diagnostic_block(source) + function(source, 'xiaotai_audio_play_opus') + function(source, 'opus_ring_take')
+''' + diagnostic_block(source) + function(source, 'xiaotai_audio_play_opus_stream') + function(source, 'xiaotai_audio_play_opus') + function(source, 'opus_ring_take')
               + function(source, 'ring_reset') + function(source, 'xiaotai_audio_playback_boundary') + function(source, 'xiaotai_audio_log_playback_status') + r'''
 int main(void){
     (void)s_opus_received_frames;(void)s_opus_queue_peak;(void)s_admission_busy;
 ''' + scenario + r'''
 }
 ''', [ROOT / 'platforms/beken/runtime/include', ROOT / 'platforms/common/include'])
+
+    def test_duplicate_boundaries_preserve_packet_epochs(self):
+        self.replay(r'''
+    uint8_t packet=42, output=0;
+    xiaotai_audio_playback_boundary(false);
+    uint32_t first=s_plc_epoch;
+    assert(xiaotai_audio_play_opus(&packet,1,0)==1);
+    xiaotai_audio_playback_boundary(false);
+    assert(s_plc_epoch==first && "duplicate start must not reset recovery");
+    xiaotai_audio_playback_boundary(true);
+    uint32_t ended=s_plc_epoch;
+    assert(ended==first && "end must retain timeline for late old packets");
+    xiaotai_audio_playback_boundary(true);
+    assert(s_plc_epoch==ended && "duplicate end must not reset recovery");
+    assert(opus_ring_take(&output,1)==1 && s_ai_packet.opus.epoch==first);
+    assert(xiaotai_audio_play_opus(&packet,1,20)==1);
+    assert(opus_ring_take(&output,1)==1 && s_ai_packet.opus.epoch==ended);
+    xiaotai_audio_playback_boundary(false);
+    assert(s_plc_epoch!=ended);
+''')
 
     def test_tts_burst_preserves_every_packet_in_order(self):
         self.replay(r'''
@@ -186,7 +205,7 @@ int main(void){
     now=1399;xiaotai_audio_playback_boundary(false); /* duplicate start */
     assert(opus_ring_take(&output,1)==0);
     now=1400;assert(opus_ring_take(&output,1)==1 && output==42);
-    assert(s_ai_packet.media_ms==1234 && s_opus_queued_samples==0);
+    assert(s_ai_packet.opus.media_ms==1234 && s_opus_queued_samples==0);
     s_playback_in_progress=false;
     xiaotai_audio_buffer_begin_round(&s_ai_buffer);
     now=2000;assert(xiaotai_audio_play_opus(&packet,1,1254)==1);

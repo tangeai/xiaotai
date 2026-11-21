@@ -53,6 +53,7 @@ set(srcs
     src/xiaotai_console.c
     src/xiaotai_time.c
     "${XIAOTAI_COMMON_ROOT}/src/starter_audio_resampler.c"
+    src/xiaotai_opus_plc.c
     src/xiaotai_audio.c
     src/xiaotai_audio_agc.c
     src/xiaotai_audio_ns.c

@@ -268,12 +268,22 @@ static bool s_play_run;
 static xiaotai_audio_codec_t s_codec;
 static size_t s_frame_samples;
 static void *s_opus_decoder,*s_play_thread;
-static int s_play_stopped,writes,refs,packet;
+static int s_play_stopped,writes,refs,packet,sink_result,decodes;
+static bool concealment_only;
+static size_t sink_bytes,reference_samples;
 typedef int opus_int32;
 typedef int beken_thread_arg_t;
 static unsigned rtos_get_time(void){return 200;}
 static size_t opus_ring_take(void *p,size_t n){if(packet){memset(p,0,n);return 5;}return 0;}
-static int opus_decode(void *d,void *p,int n,int16_t *pcm,int max,int fec){memset(pcm,0,320*2);return 320;}
+#include "xiaotai_opus_plc.h"
+int xiaotai_opus_plc_decode(xiaotai_opus_plc_t *s,struct OpusDecoder *d,
+ const xiaotai_opus_stamp_t *stamp,const uint8_t *p,int n,int16_t *pcm,int max){
+ int samples=packet==2?(concealment_only?640:960):320;assert(max>=samples);
+ decodes++;s->output_concealed_samples=packet==2?640:0;
+ s->output_packet_decoded=!concealment_only;
+ for(int i=0;i<samples;i++)pcm[i]=packet==2?2048:0;
+ return samples;
+}
 static size_t ring_take(void *p,size_t n){if(packet){memset(p,0,n);return n;}return 0;}
 static int16_t alaw2linear(unsigned char c){return 0;}
 static void rtos_delay_milliseconds(unsigned n){assert(n==5);s_play_run=false;}
@@ -283,10 +293,12 @@ static unsigned playback_columns_pack(void *p,size_t n){return 0;}
 static int s_ring_mutex;
 static void rtos_lock_mutex(int *m){}
 static void rtos_unlock_mutex(int *m){}
-static void aec_reference_push(const int16_t *pcm,size_t n){refs++;}
+static void aec_reference_push(const int16_t *pcm,size_t n){refs++;reference_samples+=n;}
 static int write_pcm(void *c,const int16_t *pcm,size_t n,size_t *bytes){
  bool audible=false;for(size_t i=0;i<n;i++)audible|=pcm[i]!=0;
- assert(audible==!s_speaker_muted);*bytes=n*2;writes++;s_play_run=false;return 0;
+ assert(audible==!s_speaker_muted);
+ if(packet==2){assert(n==(concealment_only?640:960) && pcm[0]==1024 && pcm[n-1]==1024);}
+ *bytes=sink_bytes==SIZE_MAX?0:(sink_bytes?sink_bytes:n*2);writes++;s_play_run=false;return sink_result;
 }
 static struct {void *context;int (*write_pcm)(void *,const int16_t *,size_t,size_t *);} board={0,write_pcm},*s_board_audio=&board;
 ''' + (AUDIO.parent / 'xiaotai_audio_policy.c').read_text() + '\nstatic xiaotai_audio_buffer_t s_ai_buffer;\n' + diagnostic_block(source) + function(source,'call_ringtone_pcm') + function(source,'mix_call_ringtone') +
@@ -295,14 +307,44 @@ int main(void){
  for(int codec=0;codec<2;codec++)for(int mute=0;mute<2;mute++)for(packet=0;packet<2;packet++){
   s_codec=codec;s_frame_samples=codec?320:160;s_speaker_muted=mute;
   s_play_run=true;s_downlink_frames=0;s_playback_pcm_ms=0;writes=refs=0;
-  (void)s_ai_packet_stamps;(void)s_ai_rx_seq;(void)s_ai_rx_previous_ms;
+  (void)s_ai_packet_stamps;(void)s_ai_rx_seq;(void)s_ai_rx_previous_ms;(void)s_plc_epoch;
   playback_task(0);assert(writes==1 && refs==1);
   assert(s_downlink_frames==(unsigned)packet && s_playback_pcm_ms==(packet?20U:0U));
  }
  s_call_ring_kind=XIAOTAI_CALL_RING_NONE;packet=0;s_play_run=true;writes=0;
  playback_task(0);assert(writes==0);
+ s_codec=XIAOTAI_AUDIO_CODEC_OPUS_16K;s_speaker_muted=false;s_volume=5;
+ s_ai_packet.opus.samples=320;packet=2;s_play_run=true;s_playback_pcm_ms=0;refs=0;
+ playback_task(0);assert(writes==1 && refs==1 && s_plc_rendered_ms==40 && s_playback_pcm_ms==60);
+ /* A partial sink write has consumed PCM: keep its AEC reference and tail,
+  * but do not mark the full network frame written or re-decode the packet. */
+ sink_bytes=800;reference_samples=0;refs=writes=0;s_play_run=true;
+ s_downlink_frames=0;s_playback_pcm_ms=0;s_playback_tail_ms=0;
+ playback_task(0);
+ assert(writes==1 && refs==1 && reference_samples==400);
+ assert(s_downlink_frames==0 && s_playback_pcm_ms==25 && s_playback_tail_ms==225);
+ assert(s_plc_rendered_ms==25);
+ /* Accepted prefix remains real even when the adapter also returns error. */
+ sink_result=-1;sink_bytes=320;reference_samples=0;refs=writes=0;s_play_run=true;
+ s_playback_pcm_ms=0;s_playback_tail_ms=0;
+ playback_task(0);
+ assert(writes==1 && refs==1 && reference_samples==160);
+ assert(s_downlink_frames==0 && s_playback_pcm_ms==10 && s_plc_rendered_ms==10);
+ /* No PCM accepted: neither tail nor AEC may advance, and no retry. */
+ sink_bytes=SIZE_MAX;reference_samples=0;refs=writes=decodes=0;s_play_run=true;
+ s_playback_pcm_ms=0;s_playback_tail_ms=0;
+ playback_task(0);
+ assert(writes==1 && decodes==1 && refs==0 && reference_samples==0);
+ assert(s_downlink_frames==0 && s_playback_pcm_ms==0 && s_playback_tail_ms==0);
+ /* A decoded concealment prefix is not a successfully decoded real packet. */
+ concealment_only=true;sink_result=0;sink_bytes=0;refs=writes=decodes=0;s_play_run=true;
+ playback_task(0);
+ assert(writes==1 && decodes==1 && refs==1 && s_downlink_frames==0);
+
+
 }
-''',[ROOT/'platforms/beken/runtime/include',ROOT/'platforms/beken/runtime/assets'])
+''',[ROOT/'platforms/beken/runtime/include',ROOT/'platforms/beken/runtime/assets',
+     ROOT/'platforms/common/include'])
 
 
 if __name__ == '__main__':
