@@ -22,7 +22,8 @@ def run_room_case(checks):
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-typedef struct node {char text[128];bool visible,disabled;struct node *child;} lv_obj_t;
+typedef struct node {char text[128];int x,y,w,h,mode;bool visible,disabled;struct node *child;} lv_obj_t;
+typedef int lv_coord_t;
 typedef struct {int code;} lv_event_t;
 typedef int lv_event_code_t;
 #define LV_EVENT_PRESSED 1
@@ -36,6 +37,8 @@ static unsigned nodes;
 static char s_voice_feedback[64];
 static uint8_t s_room_members_page;
 lv_obj_t *s_room_code_label,*s_room_status_label,*s_room_member_labels[3],*s_room_page_label;
+lv_obj_t *s_room_member_status_labels[3];
+char s_room_member_text[3][65];
 lv_obj_t *s_room_ptt_button,*s_room_connecting_label,*s_room_previous_button,*s_room_next_button,*s_room_members_caption;
 #define LV_STATE_DISABLED 1
 static void lv_obj_add_state(lv_obj_t *o,int s){if(o)o->disabled=true;}
@@ -54,6 +57,7 @@ static void lv_obj_clear_state(lv_obj_t *o,int s){if(o)o->disabled=false;}
 #define ACTION_ROOM_PREVIOUS 6
 #define ACTION_ROOM_NEXT 7
 #define LV_EVENT_ALL 0
+#define LV_LABEL_LONG_DOT 1
 #define lv_color_hex(x) (x)
 static int s_page=PAGE_ROOM,s_previous_room_phase;
 static bool s_previous_room_ptt;
@@ -68,9 +72,12 @@ static void note_interaction(void) {}
 static int starter_runtime_room_ptt(bool active) {snapshot.room_ptt=active;return 0;}
 
 static lv_obj_t *make_label(lv_obj_t *s,const char *t,int x,int y,int w,unsigned c) {
- (void)s;(void)x;(void)y;(void)w;(void)c;
- assert(nodes<256);lv_obj_t *obj=&pool[nodes++];snprintf(obj->text,128,"%s",t);obj->visible=true;return obj;
+ (void)s;(void)c;
+ assert(nodes<256);lv_obj_t *obj=&pool[nodes++];snprintf(obj->text,128,"%s",t);
+ obj->x=x;obj->y=y;obj->w=w;obj->visible=true;return obj;
 }
+static void lv_obj_set_height(lv_obj_t *obj,int height) {obj->h=height;}
+static void lv_label_set_long_mode(lv_obj_t *obj,int mode) {obj->mode=mode;}
 static lv_obj_t *make_button(lv_obj_t *s,const char *t,int x,int y,int w,int h,int a) {
  (void)h;(void)a;lv_obj_t *obj=make_label(s,"",x,y,w,0);obj->child=make_label(obj,t,0,0,0,0);return obj;
 }
@@ -131,12 +138,29 @@ class RoomRefreshRegressions(unittest.TestCase):
         run_room_case(r'''
  strcpy(snapshot.room_members[0].id,"carol");snapshot.room_members[0].speaking=true;
  snapshot.room_ptt=true;product=snapshot;refresh_tick();
- assert(shown("carol  正在说话") && !shown("alice"));
+ assert(shown("carol") && shown("正在说话") && !shown("alice"));
  assert(nodes==initial_nodes);
  snapshot.room_members[0].speaking=false;product=snapshot;refresh_tick();
- assert(shown("carol") && !shown("carol  正在说话"));
+ assert(shown("carol") && !shown("正在说话"));
  snapshot.room_member_count=1;product=snapshot;refresh_tick();assert(!shown("bob"));
  assert(shown("在线 100 人") && nodes==initial_nodes);
+''')
+
+    def test_long_member_id_leaves_one_row_and_keeps_speaking_status_visible(self):
+        run_room_case(r'''
+ const char *id="WWWWWWWWWWWWWWWWWW";
+ strcpy(snapshot.room_members[0].id,id);snapshot.room_members[0].speaking=true;
+ product=snapshot;refresh_tick();
+ lv_obj_t *name=NULL,*status=NULL,*next=NULL;
+ for(unsigned i=0;i<nodes;i++) {
+   if(!pool[i].visible) continue;
+   if(strcmp(pool[i].text,id)==0) name=&pool[i];
+   if(strcmp(pool[i].text,"正在说话")==0) status=&pool[i];
+   if(strcmp(pool[i].text,"bob")==0) next=&pool[i];
+ }
+ assert(name && status && next && nodes==initial_nodes);
+ assert(name->mode==LV_LABEL_LONG_DOT && name->h==22 && name->y==status->y);
+ assert(name->x+name->w<=status->x && status->w>=64 && name->y+name->h<=next->y);
 ''')
 
 

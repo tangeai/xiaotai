@@ -1,4 +1,5 @@
 """Reject unverified font inputs before invoking the public font generator."""
+import re
 import subprocess
 import sys
 import tempfile
@@ -9,6 +10,20 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class FontProvenance(unittest.TestCase):
+    def test_distributed_character_maps_respect_lvgl_lookup_bounds(self):
+        paths = list((ROOT / 'platforms/esp-idf/components/starter_product/src').glob('ui_font_cn_*.c'))
+        paths.append(ROOT / 'firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/main/ui/font/lv_font_cn_14.c')
+        for path in paths:
+            with self.subTest(path=path):
+                source = path.read_text()
+                lengths = re.findall(r'\.range_length = ([^,]+),', source)
+                self.assertTrue(lengths)
+                # These builds pin LVGL 8.3.11, whose upper bound is inclusive.
+                self.assertTrue(all(re.fullmatch(r'XIAOTAI_CMAP_LENGTH\(\d+\)', length)
+                                    for length in lengths))
+                # Sparse Unicode lists make holes unambiguous.
+                self.assertNotIn('LV_FONT_FMT_TXT_CMAP_FORMAT0_FULL', source)
+
     def test_unverified_font_is_rejected_before_converter_runs(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)

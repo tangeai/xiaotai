@@ -4,9 +4,54 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
+
+
+def make_lvgl_character_maps_compatible(source):
+    """Keep missing codepoints missing on the firmware's pinned LVGL."""
+    dense_offsets = re.compile(
+        r'static const uint8_t (glyph_id_ofs_list_\d+)\[\] = \{\s*([\d,\s]+)\};\n'
+    )
+    for match in dense_offsets.finditer(source):
+        name, values = match.groups()
+        entry = re.compile(
+            rf'\.unicode_list = NULL, \.glyph_id_ofs_list = {name}, '
+            r'\.list_length = \d+, \.type = LV_FONT_FMT_TXT_CMAP_FORMAT0_FULL'
+        )
+        if not entry.search(source):
+            continue
+
+        # FORMAT0_FULL encodes holes as zero, which LVGL resolves to the first
+        # glyph in the map. The converter assigns consecutive IDs to its entries.
+        offsets = [int(value) for value in re.findall(r'\d+', values)]
+        codepoints = [0] + [index for index, offset in enumerate(offsets) if offset]
+        if [offsets[index] for index in codepoints] != list(range(len(codepoints))):
+            raise ValueError(f'Unexpected glyph order in {name}')
+        unicode_list = name.replace('glyph_id_ofs_list_', 'unicode_list_')
+        values = ', '.join(hex(codepoint) for codepoint in codepoints)
+        source = source.replace(match[0], f'static const uint16_t {unicode_list}[] = {{\n'
+                                f'    {values}\n}};\n', 1)
+        source = entry.sub(f'.unicode_list = {unicode_list}, .glyph_id_ofs_list = NULL, '
+                           f'.list_length = {len(codepoints)}, .type = LV_FONT_FMT_TXT_CMAP_SPARSE_TINY',
+                           source, count=1)
+
+    if 'LV_FONT_FMT_TXT_CMAP_FORMAT0_FULL' in source:
+        raise ValueError('Unexpected FORMAT0_FULL character map')
+
+    # LVGL 8.3.11 tests the relative codepoint against an inclusive upper
+    # bound. Keep the standard count for LVGL versions with exclusive bounds.
+    source = re.sub(r'\.range_length = (\d+),', r'.range_length = XIAOTAI_CMAP_LENGTH(\1),', source)
+    marker = 'static const lv_font_fmt_txt_cmap_t cmaps[]'
+    return source.replace(marker,
+        '/* LVGL 8.3.11 treats range_length as an inclusive upper bound. */\n'
+        '#if LVGL_VERSION_MAJOR == 8 && LVGL_VERSION_MINOR == 3 && LVGL_VERSION_PATCH == 11\n'
+        '#define XIAOTAI_CMAP_LENGTH(count) ((count) - 1)\n'
+        '#else\n'
+        '#define XIAOTAI_CMAP_LENGTH(count) (count)\n'
+        '#endif\n' + marker, 1)
 
 
 def main():
@@ -59,7 +104,7 @@ def main():
         (temporary / manifest['filename']).write_bytes(args.font.read_bytes())
         (temporary / symbols['filename']).write_bytes(symbols_path.read_bytes())
         subprocess.run(command, check=True, cwd=temporary)
-        generated = (temporary / destination.name).read_text()
+        generated = make_lvgl_character_maps_compatible((temporary / destination.name).read_text())
         header = ('/* SPDX-License-Identifier: OFL-1.1\n'
                   ' * Noto Sans CJK SC; copyright and license:\n'
                   ' * product/assets/fonts/noto-sans-sc/NOTICE.txt and OFL.txt\n'
