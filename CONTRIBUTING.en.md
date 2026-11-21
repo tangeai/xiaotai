@@ -314,7 +314,7 @@ The release owner decides whether behavior or feature changes require a product-
 
 Append `-<variant>` for separately published variants, for example `m5stack-cores3-lite-v1.0.1-build.47-ili9342e`. Specify the variant in the body while keeping the title format above.
 
-Publish only images that have completed hardware validation. Keep historical tags for manual cleanup by maintainers, and retain historical 1.0.0 download names. A release operation does not implicitly authorize `git push`; respect explicit user restrictions.
+Publish stable releases only after hardware validation of the exact image. Beta pre-releases follow the separate rules below. Keep historical tags for manual cleanup by maintainers, and retain historical 1.0.0 download names. A release operation does not implicitly authorize `git push`; respect explicit user restrictions.
 
 ### ESP32 split files and merged images
 
@@ -380,6 +380,30 @@ This preserves the existing ZIP bytes. When adding a merged BIN to an existing R
 
 Uploading still requires user authorization and does not perform an automatic `git push`.
 
+### Beta pre-releases and stable releases
+
+Keep development and integration on `main`; do not create a permanent `release` or `develop`
+branch for each release. Merge changes through PR review and CI, verify the merged commit,
+then build and package each board and variant.
+
+After host checks and native release-profile builds pass, beta images may be published for
+hardware testing. Mark GitHub `pre-release`, do not mark Latest, and leave the stable download
+index unchanged. Use `<stable-tag>-beta.<sequence>-build.<build-number>`, with a variant suffix
+where applicable. Keep the board title format and identify beta/pre-release in both note sections.
+
+Firmware identity and asset names keep the existing product version and `+build.N` format;
+beta identifies the distribution channel. Retain `BUILD_VERIFIED_HIL_PENDING` in beta packages.
+Notes must list pending scenarios, known issues, exact source commit, BIN hashes, and upgrade
+impact. Public testing does not establish hardware acceptance.
+
+Bind hardware acceptance to the exact BIN SHA-256. A fix and rebuild requires a new beta
+sequence and fresh validation. After acceptance, create the stable board tag/Release using
+the same tested BIN and add the validation evidence. Keep historical beta tags and assets.
+
+No new compilation is needed for promotion. If rebuilding changes the BIN bytes, verify and
+accept the new image instead of transferring old results. Use a maintenance branch only when
+supporting an older stable series under the existing maintenance policy.
+
 ### Release notes template
 
 Use the [bilingual release notes template](.github/release_notes_template.md) for every release, Chinese first and English second. Keep this order: Overview, Added, Changed, Fixed, Known issues, Validation, Downloads and upgrade.
@@ -414,14 +438,14 @@ Old versions in screenshots are examples; update screenshots when UI or actions 
 
 1. Before upload, list board ID, product version, tag, title, asset names, and source commit; compare each against the table and actual artifacts. Read online metadata before replacing an existing Release.
 2. Check BIN/ELF, manifest, and actual flashed-file identities and SHA-256. State original paths, versions, and full hashes; label exported packages as copies.
-3. Describe additions, changes, and this image's hardware results. Old board bring-up cannot replace acceptance of the exact artifact. Keep untested packages as `BUILD_VERIFIED_HIL_PENDING` and do not publish them.
+3. Describe additions, changes, and this image's hardware results. Old board bring-up cannot replace acceptance of the exact artifact. Keep untested packages as `BUILD_VERIFIED_HIL_PENDING`; publish them only under the beta pre-release rules.
 4. After publishing, read back GitHub titles, tags, and asset names, check remote hashes, and verify public downloads. Report publication complete only when all match; fix naming mismatches before handoff.
 
 `tools/release_firmware.py` verifies package file sizes and SHA-256 and derives a base tag, title, and asset names. Check names against its output before uploading. Add required same-version build or variant suffixes from the table to avoid reusing published tags.
 
 The tool reads local artifacts only and does not operate GitHub.
 
-CI covers naming for all five boards and rejection of invalid artifacts. The tool permits inspecting HIL-pending packages, so a generated plan or passing `tools/check.sh` does not authorize publication. The HIL requirements and remote checks above still apply.
+CI covers naming for all five boards and rejection of invalid artifacts. The tool permits inspecting HIL-pending packages, so a generated plan or passing `tools/check.sh` does not complete release acceptance. The selected channel’s build, HIL or beta-label requirements and remote checks still apply.
 
 ## Before committing
 

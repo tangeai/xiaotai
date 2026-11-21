@@ -83,5 +83,5 @@ python3 -m unittest discover -s tools/tests -v
 发布配置构建、打包与实板验收。发布单块板不要求编译所有板卡；共用实现变更须覆盖所有受影响板。
 
 构建成功只证明编译组合成立。未完成本次镜像实板验收时，保留
-`BUILD_VERIFIED_HIL_PENDING`，不得借用旧版本结论公开发布。
+`BUILD_VERIFIED_HIL_PENDING`，只可按贡献指南的 beta 预发布规则供测试；不得借用旧版本结论发布正式版。
 测试报告应区分“主机检查通过”“原生构建通过”和“实板验证通过”，并列出剩余验证项。

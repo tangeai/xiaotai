@@ -75,4 +75,4 @@ For audio defects, record direction, stream ID, codec, sample rate, first-frame 
 
 Follow [Firmware versions and releases](../CONTRIBUTING.en.md#firmware-versions-and-releases) for target checks, release builds, packaging, and hardware acceptance. Releasing one board does not require building every board; shared implementation changes must cover all affected boards.
 
-A successful build proves only that the build combination works. If the exact image has not completed hardware acceptance, retain `BUILD_VERIFIED_HIL_PENDING` and do not publish using old validation results. Reports must distinguish host checks, native builds, and hardware validation, and list outstanding checks.
+A successful build proves only that the build combination works. If the exact image has not completed hardware acceptance, retain `BUILD_VERIFIED_HIL_PENDING` and follow the beta pre-release rules for testing. Do not use old validation results to publish a stable release. Reports must distinguish host checks, native builds, and hardware validation, and list outstanding checks.
