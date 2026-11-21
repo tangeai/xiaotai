@@ -120,12 +120,6 @@ After reboot, the device requests `http://ep-open.tangeopen.com/pre/services`. T
 
 Use `ap_cmd ep-reset` to restore the default.
 
-## Implementation and validation entry points
-
-Command registration, argument validation, and return text are in [`xiaotai_console.c`](../../platforms/beken/runtime/src/xiaotai_console.c); request handling is in [`xiaotai_app.c`](../../platforms/beken/runtime/src/xiaotai_app.c). Both boards link the same implementation.
-
-Refer to each guide for GPIO, serial wiring, and supported features.
-
 ## Time synchronization server
 
 | Command | Effect |
@@ -138,3 +132,21 @@ Input is at most 253 characters, without a URL scheme, port, path or whitespace.
 IPv6 is not supported. Existing fallback servers remain; NTP uses UDP/123.
 Successful changes interrupt active sessions; failed saves do not reboot.
 Factory reset also clears this setting. Verify synchronization after reboot.
+
+The default primary is `pool.ntp.org`, with `ntp.aliyun.com` as fallback.
+`ntp-show` reports saved configuration, not whether synchronization succeeded.
+Replace `time.example.com` with a reachable server. Example using a LAN server:
+
+```text
+ap_cmd ntp-set 192.168.1.10
+# After reboot
+ap_cmd ntp-show
+# Restore defaults and reboot
+ap_cmd ntp-reset
+```
+
+## Implementation and validation entry points
+
+Command registration, argument validation, and return text are in [`xiaotai_console.c`](../../platforms/beken/runtime/src/xiaotai_console.c); request handling is in [`xiaotai_app.c`](../../platforms/beken/runtime/src/xiaotai_app.c). Both boards link the same implementation.
+
+Refer to each guide for GPIO, serial wiring, and supported features.

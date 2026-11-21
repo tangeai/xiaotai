@@ -134,13 +134,6 @@ ap_cmd ep-set http://ep-open.tangeopen.com/pre
 TiRTC 连接地址取自服务发现响应的 `tirtc-srv` 字段，`ep-set` 设置的是服务发现入口。
 恢复默认地址时执行 `ap_cmd ep-reset`。
 
-## 实现与验证入口
-
-命令注册、参数检查和返回文本见
-[`xiaotai_console.c`](../../platforms/beken/runtime/src/xiaotai_console.c)；
-请求处理见 [`xiaotai_app.c`](../../platforms/beken/runtime/src/xiaotai_app.c)。
-两块板链接同一份命令实现，GPIO、串口接线及支持的产品功能以各板指南为准。
-
 ## 时间同步服务器
 
 | 命令 | 作用 |
@@ -152,3 +145,21 @@ TiRTC 连接地址取自服务发现响应的 `tirtc-srv` 字段，`ep-set` 设�
 输入最长 253 字符，不带协议前缀、端口、路径或空格，不支持 IPv6。保留固件原有
 备用服务器，NTP 使用 UDP/123。成功修改会中断当前会话；保存失败不重启。
 恢复出厂设置也会清除该项。重启后须确认校时成功。
+
+默认主服务器为 `pool.ntp.org`，备用为 `ntp.aliyun.com`。`ntp-show` 只查询保存的
+配置，不表示校时已经成功。请将 `time.example.com` 替换为可达服务器。局域网示例：
+
+```text
+ap_cmd ntp-set 192.168.1.10
+# 等待重启后查询
+ap_cmd ntp-show
+# 恢复默认并重启
+ap_cmd ntp-reset
+```
+
+## 实现与验证入口
+
+命令注册、参数检查和返回文本见
+[`xiaotai_console.c`](../../platforms/beken/runtime/src/xiaotai_console.c)；
+请求处理见 [`xiaotai_app.c`](../../platforms/beken/runtime/src/xiaotai_app.c)。
+两块板链接同一份命令实现，GPIO、串口接线及支持的产品功能以各板指南为准。
