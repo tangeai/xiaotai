@@ -18,6 +18,8 @@ code=r'''
 #define STARTER_PRODUCT_CONTACTS_MAX 10
 #define PAGE_CONTACT_DETAIL 4
 static uint8_t s_selected_contact;
+static unsigned s_displayed_contact_count=10;
+static int s_displayed_contacts[10],s_selected_target;
 static int page, dials;
 static int enter_page(int p) {page=p; return 1;}
 int starter_runtime_call_contact(int i) {(void)i; ++dials; return 0;}
@@ -26,9 +28,11 @@ static void action_test(int action) {
 }
 int main(void) {
     for(int i=0;i<10;i++) {
-        page=0; action_test(100+i); assert(page==4 && s_selected_contact==i && !dials);
-        page=0; action_test(120+i); assert(page==4 && s_selected_contact==i && !dials);
+        s_displayed_contacts[i]=i+42;
+        page=0; action_test(100+i); assert(page==4 && s_selected_contact==i && s_selected_target==i+42 && !dials);
+        page=0; action_test(120+i); assert(page==4 && s_selected_contact==i && s_selected_target==i+42 && !dials);
     }
+    s_displayed_contact_count=0;page=0;action_test(100);assert(page==0 && !dials);
 }
 '''
 with tempfile.TemporaryDirectory(prefix="contact-entry-") as tmp:

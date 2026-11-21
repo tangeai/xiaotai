@@ -74,12 +74,16 @@ fi
 
 if [[ "$media_compact" != *'heap_caps_calloc(AUDIO_RX_QUEUE_DEPTH,sizeof(*s_audio_rx_pool),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
       "$media_compact" != *'#defineOPUS_WORKER_TASK_STACK_BYTES(40U*1024U)'* ||
-      "$media_compact" != *'xTaskCreateWithCaps(audio_uplink_task,"rtc_audio_tx",OPUS_WORKER_TASK_STACK_BYTES,NULL,7,NULL,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
+      "$media_compact" != *'s_media_workers[1].function=audio_uplink_task;'* ||
+      "$media_compact" != *'xTaskCreateWithCaps(starter_media_worker_entry,"rtc_audio_tx",OPUS_WORKER_TASK_STACK_BYTES,&s_media_workers[1],7,&s_media_workers[1].handle,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
       "$media_compact" != *'heap_caps_malloc(JPEG_BUFFER_BYTES,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
       "$media_compact" != *'xQueueCreate(AUDIO_RX_QUEUE_DEPTH,sizeof(uint8_t))'* ||
-      "$media_compact" != *'xTaskCreateWithCaps(audio_sink_task,"board_audio_rx",OPUS_WORKER_TASK_STACK_BYTES,NULL,8,NULL,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
-      "$media_compact" != *'xTaskCreatePinnedToCoreWithCaps(audio_capture_task,"board_audio_tx",6144,NULL,7,NULL,MEDIA_REALTIME_CORE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
-      "$media_compact" != *'xTaskCreatePinnedToCoreWithCaps(camera_task,"board_mjpeg",8192,NULL,5,NULL,MEDIA_REALTIME_CORE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
+      "$media_compact" != *'s_media_workers[0].function=audio_sink_task;'* ||
+      "$media_compact" != *'xTaskCreateWithCaps(starter_media_worker_entry,"board_audio_rx",OPUS_WORKER_TASK_STACK_BYTES,&s_media_workers[0],8,&s_media_workers[0].handle,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
+      "$media_compact" != *'s_media_workers[2].function=audio_capture_task;'* ||
+      "$media_compact" != *'xTaskCreatePinnedToCoreWithCaps(starter_media_worker_entry,"board_audio_tx",6144,&s_media_workers[2],7,&s_media_workers[2].handle,MEDIA_REALTIME_CORE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
+      "$media_compact" != *'s_media_workers[3].function=camera_task;'* ||
+      "$media_compact" != *'xTaskCreatePinnedToCoreWithCaps(starter_media_worker_entry,"board_mjpeg",8192,&s_media_workers[3],5,&s_media_workers[3].handle,MEDIA_REALTIME_CORE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
       "$media_compact" != *'frame2jpg_cb('* ]]; then
     echo "FAIL: media must use PSRAM audio/JPEG pools, stacks, and byte-index queues" >&2
     exit 1

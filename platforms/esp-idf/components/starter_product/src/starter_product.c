@@ -40,6 +40,7 @@
 #include "nvs.h"
 #include "platform_client.h"
 #include "runtime_config.h"
+#include "config_store.h"
 #include "starter_media.h"
 #include "starter_runtime.h"
 #include "starter_recognition.h"
@@ -330,6 +331,9 @@ static lv_obj_t *s_binding_countdown_label;
 static unsigned s_binding_displayed_seconds;
 static char s_voice_feedback[65];
 static uint8_t s_selected_contact;
+static starter_product_contact_t s_displayed_contacts[STARTER_PRODUCT_CONTACTS_MAX];
+static uint8_t s_displayed_contact_count;
+static starter_product_contact_t s_selected_target;
 static uint8_t s_contacts_page;
 static uint8_t s_preview_emoji;
 static product_page_t s_network_back_page = PAGE_MENU;
@@ -461,30 +465,75 @@ static bool s_preferences_dirty;
 static product_preferences_t s_preferences_saving;
 /* PREFERENCE_SAVE_STATE_END */
 
+#define PRODUCT_PREFERENCES_KEY "settings_v1"
+typedef struct { uint8_t version; uint8_t values[7]; } preferences_record_t;
+static const char *const s_preference_keys[] = {
+    "volume", "spk_mute", "mic_mute", "mic_sens", "ack_voice", "sleep", "emoji"
+};
+
+static bool preferences_record_valid(const preferences_record_t *record)
+{
+    return record->version == 1 && record->values[0] <= 10 &&
+        record->values[1] <= 1 && record->values[2] <= 1 &&
+        record->values[3] >= 1 && record->values[3] <= 5 &&
+        record->values[4] <= 1 && record->values[5] < 5 &&
+        record->values[6] < sizeof(s_emoji_names) / sizeof(s_emoji_names[0]);
+}
+
+static esp_err_t preferences_read_record(nvs_handle_t nvs, preferences_record_t *record)
+{
+    *record = (preferences_record_t){.version = 1, .values = {7,0,0,4,0,1,0}};
+    size_t size = sizeof(*record);
+    esp_err_t err = nvs_get_blob(nvs, PRODUCT_PREFERENCES_KEY, record, &size);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        /* Older firmware persisted independent fields. Missing keys retain
+         * defaults; unknown read errors must never authorize migration. */
+        for (size_t i = 0; i < sizeof(record->values); ++i) {
+            uint8_t value;
+            err = nvs_get_u8(nvs, s_preference_keys[i], &value);
+            if (err == ESP_OK) record->values[i] = value;
+            else if (err != ESP_ERR_NVS_NOT_FOUND) return err;
+        }
+        size = sizeof(*record);
+        err = ESP_OK;
+    }
+    if (err == ESP_OK && (size != sizeof(*record) || !preferences_record_valid(record)))
+        err = ESP_ERR_INVALID_ARG;
+    return err;
+}
+
+static esp_err_t preferences_write_record(nvs_handle_t nvs, const product_preferences_t *value)
+{
+    preferences_record_t record;
+    esp_err_t err = preferences_read_record(nvs, &record);
+    if (err == ESP_OK) err = nvs_set_blob(nvs, PRODUCT_PREFERENCES_KEY, &record, sizeof(record));
+    else if (err == ESP_ERR_INVALID_ARG) err = ESP_OK; /* Explicit repair of corrupt settings. */
+    for (size_t i = 0; err == ESP_OK && i < sizeof(record.values); ++i) {
+        err = nvs_erase_key(nvs, s_preference_keys[i]);
+        if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+    }
+    record = (preferences_record_t){.version = 1, .values = {
+        value->volume, value->speaker_muted, value->microphone_muted,
+        value->microphone_sensitivity, value->acknowledgement_male,
+        value->sleep_index, value->emoji_index}};
+    if (err == ESP_OK) err = nvs_set_blob(nvs, PRODUCT_PREFERENCES_KEY, &record, sizeof(record));
+    return err;
+}
+
 static void preferences_save_task(void *argument)
 {
     (void)argument;
     esp_err_t err = ESP_ERR_INVALID_STATE;
     nvs_handle_t nvs = 0;
-    if (!atomic_load(&s_factory_reset_requested)) {
+    if (!atomic_load(&s_factory_reset_requested) && config_store_write_begin()) {
         err = nvs_open(PRODUCT_NVS, NVS_READWRITE, &nvs);
-        const char *keys[] = {"volume", "spk_mute", "mic_mute", "mic_sens",
-                              "ack_voice", "sleep", "emoji"};
-        const uint8_t values[] = {
-            s_preferences_saving.volume, s_preferences_saving.speaker_muted,
-            s_preferences_saving.microphone_muted,
-            s_preferences_saving.microphone_sensitivity,
-            s_preferences_saving.acknowledgement_male,
-            s_preferences_saving.sleep_index, s_preferences_saving.emoji_index,
-        };
-        for (size_t i = 0; err == ESP_OK && i < sizeof(values); ++i) {
-            err = nvs_set_u8(nvs, keys[i], values[i]);
-        }
+        if (err == ESP_OK) err = preferences_write_record(nvs, &s_preferences_saving);
         if (err == ESP_OK) {
             err = atomic_load(&s_factory_reset_requested)
                 ? ESP_ERR_INVALID_STATE : nvs_commit(nvs);
         }
         if (nvs != 0) nvs_close(nvs);
+        config_store_write_end();
     }
     if (err != ESP_OK) ESP_LOGE(TAG, "settings save failed rc=%d", err);
     /* Publish only after the last storage access; reset uses this boundary. */
@@ -525,30 +574,14 @@ static void preferences_load(void)
 {
     nvs_handle_t nvs = 0;
     if (nvs_open(PRODUCT_NVS, NVS_READONLY, &nvs) == ESP_OK) {
-        uint8_t value = 0;
-        if (nvs_get_u8(nvs, "volume", &value) == ESP_OK && value <= 10U) {
-            s_preferences.volume = value;
-        }
-        if (nvs_get_u8(nvs, "spk_mute", &value) == ESP_OK) {
-            s_preferences.speaker_muted = value != 0U;
-        }
-        if (nvs_get_u8(nvs, "mic_mute", &value) == ESP_OK) {
-            s_preferences.microphone_muted = value != 0U;
-        }
-        if (nvs_get_u8(nvs, "mic_sens", &value) == ESP_OK &&
-            value >= 1U && value <= 5U) {
-            s_preferences.microphone_sensitivity = value;
-        }
-        if (nvs_get_u8(nvs, "ack_voice", &value) == ESP_OK) {
-            s_preferences.acknowledgement_male = value != 0U;
-        }
-        if (nvs_get_u8(nvs, "sleep", &value) == ESP_OK &&
-            value < sizeof(s_sleep_minutes) / sizeof(s_sleep_minutes[0])) {
-            s_preferences.sleep_index = value;
-        }
-        if (nvs_get_u8(nvs, "emoji", &value) == ESP_OK &&
-            value < sizeof(s_emoji_names) / sizeof(s_emoji_names[0])) {
-            s_preferences.emoji_index = value;
+        preferences_record_t record;
+        if (preferences_read_record(nvs, &record) == ESP_OK) {
+            s_preferences = (product_preferences_t){
+                .volume = record.values[0], .speaker_muted = record.values[1] != 0,
+                .microphone_muted = record.values[2] != 0,
+                .microphone_sensitivity = record.values[3],
+                .acknowledgement_male = record.values[4] != 0,
+                .sleep_index = record.values[5], .emoji_index = record.values[6]};
         }
         nvs_close(nvs);
     }
@@ -1064,16 +1097,22 @@ static void factory_reset_task(void *argument)
         vTaskDelete(NULL);
         return;
     }
-    esp_err_t config_err = runtime_config_clear_tirtc();
+    if (!config_store_reset_begin()) {
+        atomic_store(&s_factory_reset_status, FACTORY_RESET_FAILED);
+        vTaskDelete(NULL);
+        return;
+    }
+    esp_err_t config_err = runtime_config_recover_tirtc(NULL);
     esp_err_t endpoint_err = runtime_config_clear_endpoint();
     esp_err_t ntp_err = runtime_config_clear_ntp_server();
-    esp_err_t wifi_err = wifi_manager_forget_credentials();
+    esp_err_t wifi_err = wifi_manager_recover_credentials(NULL, NULL);
     /* Product preferences are cleared last so an already-queued async save
      * cannot repopulate them while the identity stores are being erased. */
     esp_err_t product_err = clear_product_preferences();
 
     if (product_err != ESP_OK || config_err != ESP_OK ||
         endpoint_err != ESP_OK || ntp_err != ESP_OK || wifi_err != ESP_OK) {
+        config_store_reset_end(false);
         ESP_LOGE(TAG,
                  "device reset failed: product=%s config=%s endpoint=%s ntp=%s wifi=%s",
                  esp_err_to_name(product_err),
@@ -1086,6 +1125,7 @@ static void factory_reset_task(void *argument)
         return;
     }
 
+    config_store_reset_end(true);
     ESP_LOGW(TAG, "device user configuration cleared; restarting");
     vTaskDelay(pdMS_TO_TICKS(300));
     esp_restart();
@@ -1342,16 +1382,20 @@ static void on_action(lv_event_t *event)
         if ((s_room_members_page + 1U) * 3U < room.room_member_count)
             ++s_room_members_page;
     } else if (action == ACTION_VOICE_CALL) {
-        (void)starter_runtime_call_contact(s_selected_contact);
+        (void)starter_runtime_call_target(&s_selected_target, false);
     } else if (action == ACTION_VIDEO_CALL) {
-        (void)starter_runtime_call_contact_video(s_selected_contact);
+        (void)starter_runtime_call_target(&s_selected_target, true);
     } else if (action >= ACTION_CONTACT_CALL_BASE &&
                action < ACTION_CONTACT_CALL_BASE + STARTER_PRODUCT_CONTACTS_MAX) {
         s_selected_contact = (uint8_t)(action - ACTION_CONTACT_CALL_BASE);
+        if (s_selected_contact >= s_displayed_contact_count) return;
+        s_selected_target = s_displayed_contacts[s_selected_contact];
         (void)enter_page(PAGE_CONTACT_DETAIL);
     } else if (action >= ACTION_CONTACT_BASE &&
                action < ACTION_CONTACT_BASE + STARTER_PRODUCT_CONTACTS_MAX) {
         s_selected_contact = (uint8_t)(action - ACTION_CONTACT_BASE);
+        if (s_selected_contact >= s_displayed_contact_count) return;
+        s_selected_target = s_displayed_contacts[s_selected_contact];
         (void)enter_page(PAGE_CONTACT_DETAIL);
     } else if (action >= ACTION_EMOJI_BASE &&
                action < ACTION_EMOJI_BASE +
@@ -2310,6 +2354,8 @@ static void render_contacts(lv_obj_t *screen)
 {
     starter_runtime_product_snapshot_t product =
         starter_runtime_product_snapshot();
+    memcpy(s_displayed_contacts, product.contacts, sizeof(s_displayed_contacts));
+    s_displayed_contact_count = product.contact_count;
     (void)make_header_back_button(screen, ACTION_MENU);
     render_header(screen, "联系人 | 仅语音");
     uint8_t page_count = product.contact_count == 0U ? 1U :
@@ -2401,17 +2447,25 @@ static void render_contacts(lv_obj_t *screen)
 
 static void render_contact_detail(lv_obj_t *screen)
 {
-    starter_runtime_product_snapshot_t product =
-        starter_runtime_product_snapshot();
     (void)make_header_back_button(screen, ACTION_CONTACTS_BACK);
     render_header(screen, "联系人详情");
-    if (s_selected_contact >= product.contact_count) {
+    const starter_product_contact_t *contact = &s_selected_target;
+    starter_runtime_product_snapshot_t product = starter_runtime_product_snapshot();
+    bool available = false;
+    for (uint8_t i = 0; i < product.contact_count; ++i) {
+        const starter_product_contact_t *current = &product.contacts[i];
+        if (current->source == contact->source && strcmp(current->id, contact->id) == 0 &&
+            strcmp(current->wx_app_id, contact->wx_app_id) == 0 &&
+            strcmp(current->wx_model_id, contact->wx_model_id) == 0) {
+            available = true;
+            break;
+        }
+    }
+    if (!available) {
         (void)make_label(screen, "联系人已更新，请返回重试", 48, 88, 224,
                          lv_color_hex(0xABC0C9));
         return;
     }
-    const starter_product_contact_t *contact =
-        &product.contacts[s_selected_contact];
     lv_obj_t *name = make_label(screen, contact->name, 35, 55, 250,
                                 lv_color_hex(0xFFFFFF));
     lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_CENTER, 0);

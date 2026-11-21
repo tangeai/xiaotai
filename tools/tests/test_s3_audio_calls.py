@@ -63,6 +63,7 @@ int main(void){
         source = (BASE / 'starter_media_s3/starter_media.c').read_text()
         run_c(defines('starter_media', self.board) + r'''
 #include <assert.h>
+#include <string.h>
 #include <stdbool.h>
 #include <stdatomic.h>
 #define STARTER_TIRTC_H5 1
@@ -117,6 +118,7 @@ int main(void){
         source=(BASE / 'starter_product/src/starter_product.c').read_text()
         run_c(defines('starter_product', self.board) + r'''
 #include <assert.h>
+#include <string.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -127,10 +129,11 @@ int main(void){
 #define ACTION_VOICE_CALL 2
 #define ACTION_VIDEO_CALL 3
 typedef int lv_obj_t;
-typedef struct {int source;char name[32];} starter_product_contact_t;
+typedef struct {int source;char name[32],id[65],wx_app_id[65],wx_model_id[65];} starter_product_contact_t;
 typedef struct {unsigned contact_count;starter_product_contact_t contacts[1];} starter_runtime_product_snapshot_t;
 static starter_runtime_product_snapshot_t snapshot={.contact_count=1};
-static unsigned s_selected_contact,voice;
+static unsigned voice;
+static starter_product_contact_t s_selected_target;
 static starter_runtime_product_snapshot_t starter_runtime_product_snapshot(void){return snapshot;}
 static void make_header_back_button(lv_obj_t*s,int a){}
 static void render_header(lv_obj_t*s,const char*t){}
@@ -142,9 +145,9 @@ static void make_button(lv_obj_t*s,const char*t,int x,int y,int w,int h,int a){
 }
 ''' + function(source,'render_contact_detail') + r'''
 int main(void){
- snapshot.contacts[0].source=STARTER_CONTACT_WECHAT;render_contact_detail(NULL);
- snapshot.contacts[0].source=0;render_contact_detail(NULL);assert(voice==2);
- s_selected_contact=1;render_contact_detail(NULL);assert(voice==2);
+ s_selected_target.source=STARTER_CONTACT_WECHAT;snapshot.contacts[0]=s_selected_target;render_contact_detail(NULL);
+ s_selected_target.source=0;snapshot.contacts[0]=s_selected_target;render_contact_detail(NULL);assert(voice==2);
+ snapshot.contact_count=0;render_contact_detail(NULL);assert(voice==2); /* Removed target is visibly unavailable and cannot be dialled. */
 }
 ''')
 

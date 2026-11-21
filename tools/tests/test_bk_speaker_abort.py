@@ -57,7 +57,9 @@ static int onboard_speaker_mute(void){assert(0);return 0;}
 static int onboard_speaker_unmute(void){assert(0);return 0;}
 static int onboard_speaker_set_volume(int v){assert(0);return 0;}
 static int xiaotai_board_amplifier_set_playing(bool playing){assert(!playing);return 0;}
-static int audio_record_close(int *p){assert(p==&mic);mic_closes++;return 0;}
+static int audio_record_close(int *p){assert(0);return 0;}
+#define AUDIO_RECORD_ABORT_READ 99
+static int audio_record_control(int *p,int ctl){assert(p==&mic && ctl==99);mic_closes++;return 0;}
 ''' + (fixtures/'bk7258_speaker_abort.c').read_text() + source.read_text() + r'''
 static int audio_play_control(audio_play_t *play,audio_play_ctl_t command){return onboard_speaker_play_control(play,command);}
 ''' + function(board,'audio_adapter_request_stop') + r'''

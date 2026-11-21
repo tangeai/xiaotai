@@ -93,6 +93,7 @@ static const char *requests[]={
  "GET /hotspot-detect.html HTTP/1.1\r\nHost: captive.apple.com\r\n\r\n",
  "GET / HTTP/1.1\r\n\r\n",
  "POST /api/wifi HTTP/1.1\r\nAuthorization: SECRET_HEADER\r\n\r\nSECRET_PASSWORD",
+ "POST /api/wifi HTTP/1.1\r\n\r\nSTORAGE_FAILURE",
  "GET /private-SECRET_PATH?token=SECRET_QUERY HTTP/1.1\r\n\r\n",
  NULL};
 static void capture_log(const char *tag,const char *fmt,...){
@@ -117,7 +118,7 @@ static bool receive_request(int fd,char*b,size_t cap,size_t*n){(void)fd;
 static int start_portal_scan(void){return 0;}
 static char *scan_json(void){return NULL;}
 static void psram_free(void*p){(void)p;}
-static bool save_request_wifi(char*p){(void)p;return false;}
+static int save_request_wifi(char*p){(void)p;return index_request==2?-1:-2;}
 static void rtos_delay_milliseconds(int n){(void)n;}
 static void bk_reboot(void){}
 static void rtos_delete_thread(void*p){(void)p;}
@@ -137,6 +138,7 @@ int main(void){
  assert(strstr(logs,"status=302 sent=1"));
  assert(strstr(logs,"status=200 OK sent=1"));
  assert(strstr(logs,"status=400 Bad Request sent=1"));
+ assert(strstr(logs,"status=503 Service Unavailable sent=1"));
  assert(!strstr(logs,"SECRET_"));
  assert(strstr(wire,"Location: http://192.168.6.1/\r\n"));
  assert(strstr(wire,"SETUP PAGE"));

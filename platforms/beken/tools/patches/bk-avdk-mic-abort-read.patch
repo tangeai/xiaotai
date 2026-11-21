@@ -1,0 +1,24 @@
+--- a/ap/components/audio_record/include/audio_record.h
++++ b/ap/components/audio_record/include/audio_record.h
+@@ -49,6 +49,7 @@
+     AUDIO_RECORD_PAUSE,
+     AUDIO_RECORD_RESUME,
+     AUDIO_RECORD_SET_ADC_GAIN,
++    AUDIO_RECORD_ABORT_READ, /* Cancel pending reads; close only after callers exit. */
+ } audio_record_ctl_t;
+ 
+ typedef struct
+--- a/ap/components/audio_record/src/onboard_mic_record.c
++++ b/ap/components/audio_record/src/onboard_mic_record.c
+@@ -828,6 +828,11 @@
+     onboard_mic_record_priv_t *priv = (onboard_mic_record_priv_t *)record->record_ctx;
+     ONBOARD_MIC_RECORD_CHECK_NULL(priv);
+ 
++    if (ctl == AUDIO_RECORD_ABORT_READ)
++    {
++        return rb_abort(priv->rb);
++    }
++
+     if (ctl == AUDIO_RECORD_PAUSE)
+     {
+         if (onboard_mic_state_get(priv) == AUDIO_RECORD_STA_PAUSED)

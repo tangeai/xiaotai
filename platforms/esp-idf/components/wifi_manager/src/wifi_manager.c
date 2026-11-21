@@ -1,3 +1,9 @@
+#include <stdbool.h>
+#include "config_store.h"
+#include "xiaotai_identity_gate.h"
+static xiaotai_identity_gate_t s_wifi_gate;
+/* HTTP handlers run serially on the server task. */
+static bool s_restart_scheduled;
 /*
  * Wi-Fi STA 与 SoftAP 配网 adapter。
  *
@@ -132,7 +138,7 @@ static const char s_setup_page[] =
     "async function save(){connect.disabled=true;connect.textContent='正在保存…';try{let r=await fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},"
     "body:JSON.stringify({ssid:selected,password:p.value})}),m=await r.text();if(!r.ok)throw Error(m);"
     "document.querySelector('main').innerHTML='<section style=\"text-align:center;padding:34px 4px\"><h1>配置已保存</h1><p class=hint>设备正在重启并连接 '+esc(selected)+'，手机可以关闭此页面。</p></section>';footer.hidden=true}"
-    "catch(e){connect.disabled=false;connect.textContent='连接此 Wi-Fi';alert('保存失败：'+e.message)}}scan()</script></body></html>";
+    "catch(e){connect.disabled=false;connect.textContent='连接此 Wi-Fi';alert('操作未完成：'+e.message)}}scan()</script></body></html>";
 
 static void set_error(char *error, size_t error_size, const char *message)
 {
@@ -165,6 +171,12 @@ bool wifi_manager_credentials_valid(const char *ssid,
     return true;
 }
 
+#define WIFI_RECORD_KEY "credentials_v1"
+typedef struct {
+    uint32_t version;
+    wifi_manager_credentials_t credentials;
+} wifi_record_t;
+
 esp_err_t wifi_manager_load_credentials(wifi_manager_credentials_t *credentials)
 {
     if (credentials == NULL) {
@@ -176,13 +188,25 @@ esp_err_t wifi_manager_load_credentials(wifi_manager_credentials_t *credentials)
     if (err != ESP_OK) {
         return err;
     }
-    /* SSID/password 必须成组读取；任一失败都清空输出。 */
-    size_t ssid_size = sizeof(credentials->ssid);
-    size_t password_size = sizeof(credentials->password);
-    err = nvs_get_str(nvs, WIFI_NVS_SSID, credentials->ssid, &ssid_size);
+    wifi_record_t record = {0};
+    size_t record_size = sizeof(record);
+    err = nvs_get_blob(nvs, WIFI_RECORD_KEY, &record, &record_size);
     if (err == ESP_OK) {
-        err = nvs_get_str(nvs, WIFI_NVS_PASSWORD, credentials->password, &password_size);
+        if (record_size != sizeof(record) || record.version != 1)
+            err = ESP_ERR_INVALID_ARG;
+        else *credentials = record.credentials;
+    } else if (err == ESP_ERR_NVS_NOT_FOUND) {
+        size_t ssid_size = sizeof(credentials->ssid);
+        size_t password_size = sizeof(credentials->password);
+        err = nvs_get_str(nvs, WIFI_NVS_SSID, credentials->ssid, &ssid_size);
+        if (err == ESP_OK)
+            err = nvs_get_str(nvs, WIFI_NVS_PASSWORD, credentials->password, &password_size);
     }
+    if (err == ESP_OK &&
+        (memchr(credentials->ssid, 0, sizeof(credentials->ssid)) == NULL ||
+         memchr(credentials->password, 0, sizeof(credentials->password)) == NULL ||
+         !wifi_manager_credentials_valid(credentials->ssid, credentials->password, NULL, 0)))
+        err = ESP_ERR_INVALID_ARG;
     nvs_close(nvs);
     if (err != ESP_OK) {
         memset(credentials, 0, sizeof(*credentials));
@@ -190,7 +214,7 @@ esp_err_t wifi_manager_load_credentials(wifi_manager_credentials_t *credentials)
     return err;
 }
 
-esp_err_t wifi_manager_save_credentials(const char *ssid, const char *password)
+static esp_err_t save_credentials_unlocked(const char *ssid, const char *password)
 {
     char validation_error[80];
     if (!wifi_manager_credentials_valid(ssid,
@@ -201,26 +225,40 @@ esp_err_t wifi_manager_save_credentials(const char *ssid, const char *password)
         return ESP_ERR_INVALID_ARG;
     }
 
+    if (!config_store_write_begin()) return ESP_ERR_INVALID_STATE;
+    wifi_record_t record = {.version = 1};
+    esp_err_t previous = wifi_manager_load_credentials(&record.credentials);
+    if (previous != ESP_OK && previous != ESP_ERR_NVS_NOT_FOUND &&
+        previous != ESP_ERR_INVALID_ARG) {
+        config_store_write_end();
+        return previous;
+    }
     nvs_handle_t nvs = 0;
     esp_err_t err = nvs_open(WIFI_NVS_NAMESPACE, NVS_READWRITE, &nvs);
-    if (err == ESP_OK) {
-        err = nvs_set_str(nvs, WIFI_NVS_SSID, ssid);
+    /* Preserve a complete legacy record before removing legacy keys. NVS writes
+     * are immediate; commit is not a multi-key transaction. */
+    if (err == ESP_OK && previous == ESP_OK)
+        err = nvs_set_blob(nvs, WIFI_RECORD_KEY, &record, sizeof(record));
+    const char *keys[] = {WIFI_NVS_SSID, WIFI_NVS_PASSWORD};
+    for (size_t i = 0; err == ESP_OK && i < 2; ++i) {
+        err = nvs_erase_key(nvs, keys[i]);
+        if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
     }
     if (err == ESP_OK) {
-        err = nvs_set_str(nvs, WIFI_NVS_PASSWORD, password);
+        memset(&record.credentials, 0, sizeof(record.credentials));
+        (void)snprintf(record.credentials.ssid, sizeof(record.credentials.ssid), "%s", ssid);
+        (void)snprintf(record.credentials.password, sizeof(record.credentials.password), "%s", password);
+        err = nvs_set_blob(nvs, WIFI_RECORD_KEY, &record, sizeof(record));
     }
-    /* commit 成功后新配置才对下一次启动可见。 */
-    if (err == ESP_OK) {
-        err = nvs_commit(nvs);
-    }
-    if (nvs != 0) {
-        nvs_close(nvs);
-    }
+    if (err == ESP_OK) err = nvs_commit(nvs);
+    if (nvs != 0) nvs_close(nvs);
+    config_store_write_end();
     return err;
 }
 
-esp_err_t wifi_manager_forget_credentials(void)
+static esp_err_t forget_credentials_unlocked(void)
 {
+    if (!config_store_write_begin()) return ESP_ERR_INVALID_STATE;
     nvs_handle_t nvs = 0;
     esp_err_t err = nvs_open(WIFI_NVS_NAMESPACE, NVS_READWRITE, &nvs);
     if (err == ESP_OK) {
@@ -232,7 +270,34 @@ esp_err_t wifi_manager_forget_credentials(void)
     if (nvs != 0) {
         nvs_close(nvs);
     }
+    config_store_write_end();
     return err;
+}
+
+esp_err_t wifi_manager_save_credentials(const char *ssid, const char *password)
+{
+    if (!xiaotai_identity_write_begin(&s_wifi_gate)) return ESP_ERR_INVALID_STATE;
+    esp_err_t result = save_credentials_unlocked(ssid, password);
+    xiaotai_identity_write_end(&s_wifi_gate);
+    return result;
+}
+
+esp_err_t wifi_manager_forget_credentials(void)
+{
+    if (!xiaotai_identity_write_begin(&s_wifi_gate)) return ESP_ERR_INVALID_STATE;
+    esp_err_t result = forget_credentials_unlocked();
+    xiaotai_identity_write_end(&s_wifi_gate);
+    return result;
+}
+
+esp_err_t wifi_manager_recover_credentials(const char *ssid, const char *password)
+{
+    int previous = xiaotai_identity_recovery_begin(&s_wifi_gate);
+    if (previous < 0) return ESP_ERR_INVALID_STATE;
+    esp_err_t result = ssid == NULL && password == NULL ? forget_credentials_unlocked() :
+                       save_credentials_unlocked(ssid, password);
+    xiaotai_identity_recovery_end(&s_wifi_gate, previous, result == ESP_OK);
+    return result;
 }
 
 static void restart_task(void *argument)
@@ -383,18 +448,24 @@ static esp_err_t wifi_config_post(httpd_req_t *request)
         cJSON_Delete(root);
         return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, validation_error);
     }
+    if (s_restart_scheduled) {
+        cJSON_Delete(root);
+        httpd_resp_set_status(request, "503 Service Unavailable");
+        return httpd_resp_sendstr(request, "restart pending; wait for the device");
+    }
     esp_err_t err = wifi_manager_save_credentials(ssid->valuestring, password->valuestring);
     cJSON_Delete(root);
     if (err != ESP_OK) {
         return httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS save failed");
     }
 
-    httpd_resp_set_type(request, "text/plain; charset=utf-8");
-    esp_err_t response = httpd_resp_sendstr(request, "保存成功，设备将在 1 秒后重启。");
-    if (response == ESP_OK) {
-        (void)xTaskCreate(restart_task, "wifi_restart", 2048, NULL, 3, NULL);
+    if (xTaskCreate(restart_task, "wifi_restart", 2048, NULL, 3, NULL) != pdPASS) {
+        return httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR,
+            "Configuration saved; restart scheduling failed; use serial restart or power cycle");
     }
-    return response;
+    s_restart_scheduled = true;
+    httpd_resp_set_type(request, "text/plain; charset=utf-8");
+    return httpd_resp_sendstr(request, "保存成功，设备将在 1 秒后重启。");
 }
 
 static esp_err_t start_http_server(void)

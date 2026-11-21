@@ -36,6 +36,10 @@ python3 "$repo_dir/tools/tests/test_bk_captive_dns.py"
 python3 "$repo_dir/tools/tests/test_bk_portal_diagnostics.py"
 python3 "$repo_dir/tools/tests/test_bk_call_ringtone.py"
 python3 "$repo_dir/tools/tests/test_bk_audio_stop_retry.py"
+python3 "$repo_dir/tools/tests/test_esp_media_init_failure.py"
+python3 "$repo_dir/tools/tests/test_esp_media_startup_gate.py"
+python3 "$repo_dir/tools/tests/test_esp_board_audio_retry.py"
+python3 "$repo_dir/tools/tests/test_p4_video_init_retry.py"
 python3 "$repo_dir/tools/tests/test_bk_speaker_abort.py"
 python3 "$repo_dir/tools/tests/test_bk_settings_status.py"
 python3 "$repo_dir/tools/tests/test_bk_product_gaps.py"
@@ -186,5 +190,18 @@ python3 "$repo_dir/tools/run_c_sanitizers.py"
 python3 "$repo_dir/tools/product_coverage.py"
 python3 "$repo_dir/tools/build.py" --validate
 git -C "$repo_dir" diff --check
+
+
+python3 "$repo_dir/tools/tests/test_bk_contact_identity.py"
+python3 "$repo_dir/tools/tests/test_esp_contact_identity.py"
+python3 "$repo_dir/tools/tests/test_esp_startup_recovery.py"
+
+python3 "$repo_dir/tools/tests/test_configuration_transactions.py"
+python3 "$repo_dir/tools/tests/test_bk_mic_abort.py"
+
+python3 "$repo_dir/tools/tests/test_bk_wifi_recovery.py"
+python3 "$repo_dir/tools/tests/test_esp_wifi_recovery.py"
+python3 "$repo_dir/tools/tests/test_wifi_portal_restart.py"
+python3 "$repo_dir/tools/tests/test_bk_sdk_audio_lifecycle.py"
 
 echo "XiaoTai repository checks passed"

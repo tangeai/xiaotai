@@ -24,12 +24,12 @@
 static beken_queue_t s_frame_queue;
 static beken_thread_t s_sender_thread;
 static beken_semaphore_t s_sender_stopped;
-static atomic_bool s_sender_run;
-static atomic_bool s_running;
+static atomic_bool s_sender_run __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_running __attribute__((section(".sram_spinlock_section"), aligned(4)));
 static xiaotai_video_uplink_fn s_uplink;
 static void *s_uplink_context;
-static atomic_uint_fast32_t s_sent_frames;
-static atomic_uint_fast32_t s_dropped_frames;
+static atomic_uint_fast32_t s_sent_frames __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_dropped_frames __attribute__((section(".sram_spinlock_section"), aligned(4)));
 
 static frame_buffer_t *frame_malloc(image_format_t format, uint32_t size)
 {

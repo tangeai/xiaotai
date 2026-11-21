@@ -60,25 +60,25 @@ static bool s_capture_joined;
 static bool s_play_joined;
 static beken_mutex_t s_ring_mutex;
 static bool s_ring_mutex_ready;
-static atomic_bool s_capture_run;
-static atomic_bool s_play_run;
-static atomic_bool s_running;
-static atomic_bool s_playback_in_progress;
-static atomic_uint s_last_downlink_ms;
-static atomic_uint s_playback_tail_ms;
-static atomic_uint s_opus_received_frames;
-static atomic_uint s_admission_busy;
-static atomic_uint s_playback_pcm_ms;
-static atomic_uint s_playback_columns;
-static atomic_uint s_playback_columns_at_ms;
-static atomic_uint s_last_opus_rx_ms;
-static atomic_bool s_prompt_run;
-static atomic_bool s_prompt_active;
-static atomic_uint s_volume = 7U;
-static atomic_bool s_speaker_muted;
-static atomic_bool s_microphone_muted;
-static atomic_bool s_uplink_enabled = true;
-static atomic_uint s_uplink_epoch;
+static atomic_bool s_capture_run __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_play_run __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_running __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_playback_in_progress __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_last_downlink_ms __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_playback_tail_ms __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_opus_received_frames __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_admission_busy __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_playback_pcm_ms __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_playback_columns __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_playback_columns_at_ms __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_last_opus_rx_ms __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_prompt_run __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_prompt_active __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_volume __attribute__((section(".sram_spinlock_section"), aligned(4))) = 7U;
+static atomic_bool s_speaker_muted __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_microphone_muted __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_uplink_enabled __attribute__((section(".sram_spinlock_section"), aligned(4))) = true;
+static atomic_uint s_uplink_epoch __attribute__((section(".sram_spinlock_section"), aligned(4)));
 
 /* Seven short-time amplitude slices drive the compact dot mouth. This is a
  * display hint only; the audio worker never waits for the UI. */
@@ -140,18 +140,20 @@ static uint32_t s_echo_diag_last_overruns;
 static beken_thread_t s_prompt_thread;
 static beken_semaphore_t s_prompt_stopped;
 static bool s_prompt_sync_ready;
+/* Guard prompt handle creation/destruction versus cancellation, never PCM writes. */
+static beken_mutex_t s_prompt_device_mutex;
 static int16_t *s_prompt_pcm;
 static size_t s_prompt_samples;
 static unsigned s_prompt_repeats;
-static atomic_int s_prompt_result;
-static atomic_uint s_prompt_generation;
-static atomic_int s_call_ring_kind;
-static atomic_uint s_call_ring_started_ms;
+static atomic_int s_prompt_result __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_prompt_generation __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_int s_call_ring_kind __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_call_ring_started_ms __attribute__((section(".sram_spinlock_section"), aligned(4)));
 static unsigned s_ring_prompt_generation;
 static unsigned s_ring_prompt_volume;
 /* Serialize prompt creation and media device transitions on SMP. Workers never
  * take this lock, so cancellation can wait for their completion safely. */
-static atomic_flag s_audio_control_lock = ATOMIC_FLAG_INIT;
+static atomic_flag s_audio_control_lock __attribute__((section(".sram_spinlock_section"), aligned(4))) = ATOMIC_FLAG_INIT;
 
 static bool audio_control_enter(bool wait)
 {
@@ -199,7 +201,7 @@ static uint32_t s_uplink_agc_failures;
 static uint32_t s_uplink_ns_speech_frames;
 static uint32_t s_uplink_ns_noise_frames;
 static uint32_t s_uplink_ns_failures;
-static atomic_uint s_downlink_frames;
+static atomic_uint s_downlink_frames __attribute__((section(".sram_spinlock_section"), aligned(4)));
 
 static bool play_prompt_pcm(void)
 {
@@ -221,7 +223,9 @@ static bool play_prompt_pcm(void)
 static void prompt_task(beken_thread_arg_t argument)
 {
     (void)argument;
+    rtos_lock_mutex(&s_prompt_device_mutex);
     int result = xiaotai_board_prompt_audio_start();
+    rtos_unlock_mutex(&s_prompt_device_mutex);
     bool ready = result == BK_OK;
     if (!ready) BK_LOGE(TAG, "cannot open speaker for audio prompt\n");
 
@@ -237,7 +241,14 @@ static void prompt_task(beken_thread_arg_t argument)
             }
         }
     }
-    xiaotai_board_prompt_audio_stop();
+    for (;;) {
+        rtos_lock_mutex(&s_prompt_device_mutex);
+        int stopped = xiaotai_board_prompt_audio_stop();
+        rtos_unlock_mutex(&s_prompt_device_mutex);
+        if (stopped == BK_OK) break;
+        /* Keep prompt ownership while a vendor worker still owns its buffers. */
+        rtos_delay_milliseconds(20);
+    }
     if (s_prompt_pcm != NULL) {
         memset(s_prompt_pcm, 0, s_prompt_samples * sizeof(int16_t));
         psram_free(s_prompt_pcm);
@@ -265,6 +276,12 @@ static void cancel_prompt_locked(void)
     if (!atomic_load_explicit(&s_prompt_active, memory_order_acquire)) return;
     atomic_store_explicit(&s_prompt_run, false, memory_order_release);
     if (s_prompt_sync_ready) {
+        /* A busy guard means open/close is running, not a blocked PCM write.
+         * The cleared run flag prevents a newly opened prompt from writing. */
+        if (rtos_trylock_mutex(&s_prompt_device_mutex) == BK_OK) {
+            (void)xiaotai_board_prompt_audio_request_stop();
+            rtos_unlock_mutex(&s_prompt_device_mutex);
+        }
         int rc = rtos_get_semaphore(&s_prompt_stopped,
                                      AUDIO_TASK_STOP_TIMEOUT_MS);
         /* The worker signals before publishing inactive. On SMP, waking from
@@ -295,8 +312,13 @@ static int start_prompt_locked(int16_t *pcm, size_t sample_count, unsigned repea
         return BK_ERR_BUSY;
     }
     if (!s_prompt_sync_ready) {
-        int rc = rtos_init_semaphore(&s_prompt_stopped, 1);
+        int rc = rtos_init_mutex(&s_prompt_device_mutex);
         if (rc != BK_OK) return rc;
+        rc = rtos_init_semaphore(&s_prompt_stopped, 1);
+        if (rc != BK_OK) {
+            rtos_deinit_mutex(&s_prompt_device_mutex);
+            return rc;
+        }
         s_prompt_sync_ready = true;
     } else {
         (void)rtos_get_semaphore(&s_prompt_stopped, 0);
@@ -435,7 +457,7 @@ typedef struct {
 } ai_packet_timing_t;
 static ai_packet_timing_t s_ai_packet_stamps[OPUS_PACKET_SLOTS], s_ai_packet;
 static uint32_t s_ai_rx_seq, s_ai_rx_previous_ms, s_plc_epoch;
-static atomic_uint s_plc_rendered_ms;
+static atomic_uint s_plc_rendered_ms __attribute__((section(".sram_spinlock_section"), aligned(4)));
 typedef struct {
     uint32_t frames, failed, queue_max, decode_max, write_max, gap_max;
     uint32_t last_report_ms, last_write_ms;
@@ -1152,11 +1174,12 @@ static void playback_task(beken_thread_arg_t argument)
     rtos_delete_thread(NULL);
 }
 
-static void destroy_devices(void)
+static int destroy_devices(void)
 {
     if (s_board_audio != NULL && s_board_audio->stop != NULL) {
-        (void)s_board_audio->stop(s_board_audio->context);
+        return s_board_audio->stop(s_board_audio->context);
     }
+    return BK_OK;
 }
 
 int xiaotai_audio_start(xiaotai_audio_codec_t codec,
@@ -1164,6 +1187,8 @@ int xiaotai_audio_start(xiaotai_audio_codec_t codec,
 {
     return xiaotai_audio_start_duplex(codec, codec, uplink, context);
 }
+
+static int audio_stop_locked(void);
 
 static int audio_start_duplex_locked(xiaotai_audio_codec_t uplink_codec,
                                xiaotai_audio_codec_t codec,
@@ -1353,8 +1378,8 @@ static int audio_start_duplex_locked(xiaotai_audio_codec_t uplink_codec,
     s_echo_diag_last_overruns = 0U;
     s_uplink = uplink;
     s_uplink_context = context;
-    s_capture_joined = false;
-    s_play_joined = false;
+    s_capture_joined = true;
+    s_play_joined = true;
     s_play_run = true;
     uint32_t playback_stack = codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ?
                               OPUS_PLAYBACK_TASK_STACK : AUDIO_TASK_STACK;
@@ -1365,12 +1390,14 @@ static int audio_start_duplex_locked(xiaotai_audio_codec_t uplink_codec,
                                   "xiaotai_spk", playback_task,
                                   playback_stack, NULL);
     if (rc != BK_OK) goto fail_started;
+    s_play_joined = false;
 
     s_capture_run = true;
     rc = rtos_create_psram_thread(&s_capture_thread, AUDIO_TASK_PRIORITY,
                                   "xiaotai_mic", capture_task,
                                   capture_stack, NULL);
     if (rc != BK_OK) goto fail_started;
+    s_capture_joined = false;
 
     s_running = true;
     BK_LOGI(TAG, "full-duplex board audio started uplink=%s/%u downlink=%s/%u DSP=%u\n",
@@ -1382,38 +1409,17 @@ static int audio_start_duplex_locked(xiaotai_audio_codec_t uplink_codec,
     return BK_OK;
 
 fail_started:
-    s_capture_run = false;
-    s_play_run = false;
-    if (s_board_audio != NULL && s_board_audio->request_stop != NULL) {
-        (void)s_board_audio->request_stop(s_board_audio->context);
-    }
-    if (s_capture_thread != NULL) {
-        rtos_get_semaphore(&s_capture_stopped, AUDIO_TASK_STOP_TIMEOUT_MS);
-    }
-    if (s_play_thread != NULL) {
-        rtos_get_semaphore(&s_play_stopped, AUDIO_TASK_STOP_TIMEOUT_MS);
-    }
+    /* Own even a partially started instance until every created worker exits.
+     * A timed-out rollback is retried through the ordinary stop interface. */
+    s_running = true;
+    (void)audio_stop_locked();
+    return rc;
+
 fail:
-    s_uplink = NULL;
-    s_uplink_context = NULL;
-    xiaotai_audio_agc_stop(&s_uplink_agc);
-    xiaotai_audio_ns_stop(&s_uplink_ns);
-    destroy_devices();
-    if (s_opus_encoder != NULL) {
-        opus_encoder_destroy(s_opus_encoder);
-        s_opus_encoder = NULL;
-    }
-    if (s_opus_decoder != NULL) {
-        opus_decoder_destroy(s_opus_decoder);
-        s_opus_decoder = NULL;
-    }
-    if (s_opus_ring != NULL) {
-        psram_free(s_opus_ring);
-        s_opus_ring = NULL;
-    }
-    aec_destroy();
-    rtos_deinit_semaphore(&s_capture_stopped);
-    rtos_deinit_semaphore(&s_play_stopped);
+    s_capture_joined = true;
+    s_play_joined = true;
+    s_running = true;
+    (void)audio_stop_locked();
     return rc;
 }
 
@@ -1586,7 +1592,10 @@ static int audio_stop_locked(void)
         return BK_FAIL;
     }
 
-    destroy_devices();
+    if (destroy_devices() != BK_OK) {
+        s_running = true;
+        return BK_FAIL;
+    }
     if (s_opus_encoder != NULL) {
         opus_encoder_destroy(s_opus_encoder);
         s_opus_encoder = NULL;

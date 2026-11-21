@@ -433,10 +433,11 @@ static bool receive_request(int fd, char *buffer, size_t capacity,
     return false;
 }
 
-static bool save_request_wifi(char *request)
+/* 0: saved, -1: invalid input, -2: storage busy or unavailable. */
+static int save_request_wifi(char *request)
 {
     char *body = strstr(request, "\r\n\r\n");
-    if (body == NULL) return false;
+    if (body == NULL) return -1;
     body += 4;
     cJSON *root = cJSON_Parse(body);
     const cJSON *ssid = root == NULL ? NULL :
@@ -444,6 +445,7 @@ static bool save_request_wifi(char *request)
     const cJSON *password = root == NULL ? NULL :
         cJSON_GetObjectItemCaseSensitive(root, "password");
     xiaotai_wifi_credentials_t credentials = {0};
+    int result = -1;
     bool valid = cJSON_IsString(ssid) && cJSON_IsString(password);
     if (valid) {
         size_t ssid_length = strlen(ssid->valuestring);
@@ -454,12 +456,12 @@ static bool save_request_wifi(char *request)
             memcpy(credentials.ssid, ssid->valuestring, ssid_length + 1U);
             memcpy(credentials.password, password->valuestring,
                    password_length + 1U);
-            valid = xiaotai_wifi_credentials_valid(&credentials) &&
-                    xiaotai_storage_save_wifi(&credentials) == BK_OK;
+            if (xiaotai_wifi_credentials_valid(&credentials))
+                result = xiaotai_storage_save_wifi(&credentials) == BK_OK ? 0 : -2;
         }
     }
     cJSON_Delete(root);
-    return valid;
+    return result;
 }
 
 static void portal_task(beken_thread_arg_t argument)
@@ -526,12 +528,16 @@ static void portal_task(beken_thread_arg_t argument)
                               "application/json", "{\"state\":\"error\"}");
             }
         } else if (strncmp(request, "POST /api/wifi ", 15) == 0) {
-            if (save_request_wifi(request)) {
+            int saved = save_request_wifi(request);
+            if (saved == 0) {
                 send_response(client, "200 OK", "text/plain; charset=utf-8",
                               "保存成功，设备即将重启。");
                 close(client);
                 rtos_delay_milliseconds(1000);
                 bk_reboot();
+            } else if (saved == -2) {
+                send_response(client, "503 Service Unavailable", "text/plain; charset=utf-8",
+                              "配置暂时无法保存；若已用串口修改，请先重启，否则稍后重试。");
             } else {
                 send_response(client, "400 Bad Request", "text/plain; charset=utf-8",
                               "Wi-Fi 名称或密码格式不正确，请返回检查。");

@@ -38,8 +38,10 @@ if rg -q 'esp_task_wdt_(delete|deinit)|CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU[0
 fi
 
 if [[ "$media_compact" != *'#defineMEDIA_REALTIME_CORE1'* ||
-      "$media_compact" != *'xTaskCreatePinnedToCoreWithCaps(audio_capture_task,"board_audio_tx",6144,NULL,7,NULL,MEDIA_REALTIME_CORE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
-      "$media_compact" != *'xTaskCreatePinnedToCoreWithCaps(camera_task,"board_mjpeg",8192,NULL,5,NULL,MEDIA_REALTIME_CORE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ]]; then
+      "$media_compact" != *'s_media_workers[2].function=audio_capture_task;'* ||
+      "$media_compact" != *'xTaskCreatePinnedToCoreWithCaps(starter_media_worker_entry,"board_audio_tx",6144,&s_media_workers[2],7,&s_media_workers[2].handle,MEDIA_REALTIME_CORE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ||
+      "$media_compact" != *'s_media_workers[3].function=camera_task;'* ||
+      "$media_compact" != *'xTaskCreatePinnedToCoreWithCaps(starter_media_worker_entry,"board_mjpeg",8192,&s_media_workers[3],5,&s_media_workers[3].handle,MEDIA_REALTIME_CORE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)'* ]]; then
     echo "FAIL: AEC and software JPEG tasks must be deterministically pinned away from CPU0 Wi-Fi work" >&2
     failures=$((failures + 1))
 fi

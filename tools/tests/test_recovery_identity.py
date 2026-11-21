@@ -1,3 +1,4 @@
+from config_store_fixture import config_store_fixture
 """Replay manual recovery versus delayed background credential persistence."""
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
@@ -17,7 +18,7 @@ class RecoveryIdentity(unittest.TestCase):
                 typ='xiaotai_device_credentials_t' if bk else 'runtime_tirtc_config_t'
                 rawsave='save_device_unlocked' if bk else 'save_tirtc_unlocked'
                 rawclear='clear_device_unlocked' if bk else 'clear_tirtc_unlocked'
-                run_c(r'''
+                run_c(config_store_fixture() + r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <string.h>
@@ -61,7 +62,7 @@ int main(void){{
         storage=(ROOT/'platforms/beken/runtime/src/xiaotai_storage.c').read_text()
         console=(ROOT/'platforms/beken/runtime/src/xiaotai_console.c').read_text()
         helper=function(console,'complete_configuration_change') if 'static void complete_configuration_change' in console else ''
-        run_c(r'''
+        run_c(config_store_fixture() + r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>

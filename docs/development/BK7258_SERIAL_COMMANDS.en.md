@@ -178,3 +178,6 @@ NTP replies must match the requested peer and request, and report a synchronized
 
 After `tirtc-clear` succeeds, late background binding results cannot restore credentials before reboot.
 If identity storage is busy, retry the command. If restart scheduling fails, use `ap_cmd restart`; a manual clear can also be retried.
+
+After `wifi-set` / `wifi-clear` succeeds, background provisioning cannot overwrite the recovery before restart.
+The portal asks you to restart before saving again. Storage failures ask for a retry instead of reporting an invalid password.

@@ -79,7 +79,12 @@ class P4ReleaseContractTest(unittest.TestCase):
         self.assertIn(
             "#define OPUS_WORKER_TASK_STACK_BYTES (40U * 1024U)", media
         )
-        task_setup = media[media.index("xTaskCreateWithCaps(audio_sink_task"):]
+        self.assertIn("s_media_workers[0].function = audio_sink_task;", media)
+        self.assertIn("s_media_workers[1].function = audio_uplink_task;", media)
+        task_setup = media[media.index("xTaskCreateWithCaps(starter_media_worker_entry"):]
+        for name in ("board_audio_rx", "rtc_audio_tx"):
+            self.assertRegex(task_setup,
+                             rf'"{name}",\s*OPUS_WORKER_TASK_STACK_BYTES,')
         self.assertGreaterEqual(
             task_setup.count("OPUS_WORKER_TASK_STACK_BYTES"), 2
         )
@@ -238,8 +243,8 @@ class P4ReleaseContractTest(unittest.TestCase):
         self.assertIn('"重置设备"', settings)
         self.assertIn("PAGE_RESET_CONFIRM", product)
         self.assertIn("ACTION_FACTORY_RESET_CONFIRM", product)
-        self.assertIn("wifi_manager_forget_credentials()", reset_task)
-        self.assertIn("runtime_config_clear_tirtc()", reset_task)
+        self.assertIn("wifi_manager_recover_credentials(NULL, NULL)", reset_task)
+        self.assertIn("runtime_config_recover_tirtc(NULL)", reset_task)
         self.assertIn("nvs_erase_all(nvs)", reset_task)
         self.assertIn("esp_restart()", reset_task)
         self.assertNotIn("nvs_flash_erase", reset_task)

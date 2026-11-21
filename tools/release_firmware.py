@@ -23,6 +23,30 @@ BOARDS = {
 }
 
 
+RELEASE_NOTE_SECTIONS = {
+    '中文': ('版本概览', '新增', '调整', '修复', '已知问题与遗留事项', '验证情况', '下载与升级'),
+    'English': ('Overview', 'Added', 'Changed', 'Fixed',
+                'Known issues and outstanding work', 'Validation', 'Downloads and upgrade'),
+}
+
+
+def validate_release_notes(body: str) -> None:
+    """Validate structure, not the factual equivalence of translations."""
+    if re.search(r'\{\{.*?\}\}', body, flags=re.S):
+        raise ValueError('release notes contain an unfilled placeholder')
+    body = re.sub(r'<!--.*?-->', '', body, flags=re.S)
+    languages = re.split(r'^## (.+?)\s*$', body, flags=re.M)
+    if languages[1::2] != list(RELEASE_NOTE_SECTIONS):
+        raise ValueError('release notes require Chinese followed by English')
+    for language, content in zip(languages[1::2], languages[2::2]):
+        sections = re.split(r'^### (.+?)\s*$', content, flags=re.M)
+        if sections[1::2] != list(RELEASE_NOTE_SECTIONS[language]):
+            raise ValueError(f'release notes have missing or misordered {language} sections')
+        for title, text in zip(sections[1::2], sections[2::2]):
+            if not re.sub(r'[\s*#>|`_-]', '', text):
+                raise ValueError(f'release notes section is empty: {title}')
+
+
 def release_plan(package: Path, merged: Path | None = None) -> dict:
     with zipfile.ZipFile(package) as archive:
         if len(archive.namelist()) != len(set(archive.namelist())):
@@ -70,9 +94,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--package', required=True, type=Path)
     parser.add_argument('--merged', type=Path, help='verify a sibling ESP merged BIN against the ZIP')
+    parser.add_argument('--notes-file', type=Path, help='validate bilingual release notes; required before publication')
     args = parser.parse_args()
     try:
-        print(json.dumps(release_plan(args.package, args.merged), ensure_ascii=False, indent=2))
+        if args.notes_file is not None:
+            validate_release_notes(args.notes_file.read_text(encoding='utf-8'))
+        plan = release_plan(args.package, args.merged)
+        plan['notes_validated'] = args.notes_file is not None
+        print(json.dumps(plan, ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError, KeyError, zipfile.BadZipFile) as exc:
         print(f'release validation failed: {exc}', file=sys.stderr)

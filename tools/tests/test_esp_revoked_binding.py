@@ -52,7 +52,7 @@ static bool json_copy_string(const cJSON*r,const char*k,char*out,size_t n){
  if(!cJSON_IsString(v)||!v->valuestring||strlen(v->valuestring)>=n)return false;
  snprintf(out,n,"%s",v->valuestring);return true;
 }
-'''+function(source,'obtain_mqtt_token')+function(source,'platform_client_start')+r'''
+'''+function(source,'obtain_mqtt_token')+function(source,'platform_client_check_identity')+function(source,'platform_client_start')+r'''
 int main(void){
  platform_client_config_t config={"old-id","old-key","00:00:00:00:00:01","test"};
  assert(platform_client_start(&config)==ESP_ERR_NOT_FOUND);

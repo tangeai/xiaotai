@@ -291,3 +291,19 @@ Upgrading does not require rebinding.
 
 After changing credentials, clear binding in the current firmware before downgrading to firmware without the new record format.
 Rebind after downgrading to avoid loading stale legacy credentials.
+
+Wi-Fi SSID and password are saved as one record, with legacy reads supported.
+A failed save cannot combine a new SSID with an old password. A save attempt may migrate the format even if the final update fails;
+downgrading to firmware without this format requires Wi-Fi setup again.
+
+Volume, speaker/microphone mute, and other preferences also use one record with legacy reads supported.
+After migration, older firmware uses its defaults; check sound and mute settings again.
+
+After `wifi-set` / `wifi-clear` succeeds, background provisioning cannot overwrite that recovery before restart.
+If the portal saves configuration but cannot schedule a restart, it asks for a manual restart.
+Run `restart` or power-cycle the device.
+
+Factory reset blocks background configuration writes. Retry later if storage is busy or clearing fails.
+
+If asynchronous TiRTC startup exceeds 30 seconds, recovery commands remain available while business commands are disabled.
+Inspect or update configuration, then run `restart`. The firmware does not repeatedly initialize an SDK whose lifecycle state is unknown.

@@ -401,24 +401,41 @@ static esp_err_t send_video(const uint8_t *data, size_t len, uint16_t w, uint16_
 
 int p4_board_probe_register(void);
 
+static bool s_initialized;
+
 esp_err_t p4_video_init(void)
 {
+    if (s_initialized) return ESP_OK;
+    esp_err_t ret = ESP_ERR_NO_MEM;
     int probe_rc = p4_board_probe_register();
     if (probe_rc != ESP_OK) ESP_LOGW("p4_video", "board-probe registration failed rc=%d", probe_rc);
     s_free = xQueueCreate(VIDEO_INGRESS_SLOTS, sizeof(uint8_t));
     s_pending = xQueueCreate(VIDEO_INGRESS_SLOTS, sizeof(uint8_t));
-    if (!s_free || !s_pending) return ESP_ERR_NO_MEM;
+    if (!s_free || !s_pending) goto fail;
     for (uint8_t i = 0; i < VIDEO_INGRESS_SLOTS; ++i) {
         s_ingress[i].data = heap_caps_malloc(VIDEO_INGRESS_BYTES, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (!s_ingress[i].data) return ESP_ERR_NO_MEM;
+        if (!s_ingress[i].data) goto fail;
         (void)xQueueSend(s_free, &i, 0);
     }
-    esp_err_t ret = call_video_renderer_prewarm_mjpeg_decoder();
+    ret = call_video_renderer_prewarm_mjpeg_decoder();
     if (ret == ESP_OK) ret = camera_pipeline_prewarm_h264();
     if (ret == ESP_OK) ret = camera_pipeline_prewarm_call_scaler();
     if (ret == ESP_OK) ret = call_video_renderer_prewarm();
     if (ret == ESP_OK) ret = camera_pipeline_set_rtc_video_sink(send_video, NULL);
     if (ret == ESP_OK) ret = p4_video_capture_init();
+    if (ret == ESP_OK) {
+        s_initialized = true;
+        return ESP_OK;
+    }
+fail:
+    /* Prewarm modules own their reusable singleton caches. Ingress belongs
+     * here and has no producer/consumer until media startup commits. */
+    for (unsigned i = 0; i < VIDEO_INGRESS_SLOTS; ++i) {
+        heap_caps_free(s_ingress[i].data);
+        s_ingress[i].data = NULL;
+    }
+    if (s_free) { vQueueDelete(s_free); s_free = NULL; }
+    if (s_pending) { vQueueDelete(s_pending); s_pending = NULL; }
     return ret;
 }
 

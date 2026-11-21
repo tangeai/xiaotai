@@ -51,9 +51,9 @@ void xiaotai_metrics_copy_events(char *out, size_t capacity)
     if (s_event_count == 0U) snprintf(out, capacity, "暂无事件");
     rtos_unlock_mutex(&s_state_mutex);
 }
-static atomic_uint s_sta_connects;
-static atomic_uint s_sta_disconnects;
-static atomic_int s_rssi = ATOMIC_VAR_INIT(-128);
+static atomic_uint s_sta_connects __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_sta_disconnects __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_int s_rssi __attribute__((section(".sram_spinlock_section"), aligned(4))) = ATOMIC_VAR_INIT(-128);
 
 int xiaotai_metrics_cached_rssi(void)
 {

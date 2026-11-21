@@ -1,3 +1,4 @@
+from config_store_fixture import config_store_fixture
 """Exercise ESP persistence using NVS immediate-write semantics, not a fake transaction."""
 import unittest
 from test_s3_product_regressions import ROOT, function, run_c
@@ -5,7 +6,7 @@ from test_s3_product_regressions import ROOT, function, run_c
 class IdentityRecord(unittest.TestCase):
     def test_atomic_record_legacy_read_and_corruption(self):
         s=(ROOT/'platforms/esp-idf/components/runtime_config/src/runtime_config.c').read_text()
-        run_c(r'''
+        run_c(config_store_fixture() + r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>

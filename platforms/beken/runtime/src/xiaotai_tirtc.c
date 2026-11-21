@@ -105,27 +105,27 @@ typedef struct {
 
 static beken_queue_t s_media_queue;
 static beken_thread_t s_media_thread;
-static atomic_uintptr_t s_connection;
-static atomic_uint_fast32_t s_generation_counter;
-static atomic_uint_fast32_t s_active_generation;
-static atomic_int s_connection_error;
-static atomic_int s_connection_mode;
-static atomic_uint s_ai_cancel_tail_generation;
-static atomic_uint_fast32_t s_pending_ai_generation;
-static atomic_uint_fast32_t s_pending_call_generation;
-static atomic_uint_fast32_t s_pending_outbound_call_generation;
-static atomic_bool s_call_is_caller;
-static atomic_bool s_call_accept_seen;
-static atomic_uint_fast32_t s_pending_voip_generation;
-static atomic_uint_fast32_t s_pending_room_generation;
+static atomic_uintptr_t s_connection __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_generation_counter __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_active_generation __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_int s_connection_error __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_int s_connection_mode __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_ai_cancel_tail_generation __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_pending_ai_generation __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_pending_call_generation __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_pending_outbound_call_generation __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_call_is_caller __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_call_accept_seen __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_pending_voip_generation __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_pending_room_generation __attribute__((section(".sram_spinlock_section"), aligned(4)));
 /* Remote hangup and the SDK error callback can arrive in the same transport
  * turn.  Only one owner may ask the SDK to destroy the active connection. */
-static atomic_bool s_active_disconnect_queued;
+static atomic_bool s_active_disconnect_queued __attribute__((section(".sram_spinlock_section"), aligned(4)));
 /* Keep ownership until a failed/stale handle emits on_disconnected(). The
  * SDK can still own DTLS and PeerConnection memory after a connect result. */
-static atomic_bool s_outgoing_connect_inflight;
-static atomic_uintptr_t s_outgoing_cleanup_connection;
-static atomic_bool s_recovery_required;
+static atomic_bool s_outgoing_connect_inflight __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uintptr_t s_outgoing_cleanup_connection __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_recovery_required __attribute__((section(".sram_spinlock_section"), aligned(4)));
 /* The SDK destroy callback may run while its transport holds SMP locks.
  * Publish one completed close to the media worker without entering an RTOS
  * queue from that callback. 0=empty, 1=publishing/cleaning media, 2=ready,
@@ -137,14 +137,14 @@ static atomic_bool s_recovery_required;
 static atomic_int s_pending_close_state
     __attribute__((used, section(".sram_spinlock_section")));
 static media_event_t s_pending_close_event;
-static atomic_bool s_cleanup_probe_active;
-static atomic_uint_fast32_t s_cleanup_probe_started_ms;
-static atomic_uint_fast32_t s_outgoing_heap_baseline;
-static atomic_bool s_voip_accept_seen;
-static atomic_bool s_audio_subscribed;
-static atomic_bool s_video_subscribed;
-static atomic_uint_fast32_t s_rejected_audio_frames;
-static atomic_uint_fast32_t s_received_audio_frames;
+static atomic_bool s_cleanup_probe_active __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_cleanup_probe_started_ms __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_outgoing_heap_baseline __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_voip_accept_seen __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_audio_subscribed __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_bool s_video_subscribed __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_rejected_audio_frames __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint_fast32_t s_received_audio_frames __attribute__((section(".sram_spinlock_section"), aligned(4)));
 static uint32_t s_echo_diag_generation;
 static connection_mode_t s_echo_diag_mode;
 static uint32_t s_echo_diag_packets;
@@ -557,8 +557,13 @@ static void media_worker(beken_thread_arg_t argument)
 {
     (void)argument;
     media_event_t event;
+    bool retry_cleanup = false;
     for (;;) {
-        if (!media_wait_next_event(&event)) {
+        if (retry_cleanup) {
+            /* Retain ownership locally: a full queue cannot lose cleanup. */
+            rtos_delay_milliseconds(20);
+            retry_cleanup = false;
+        } else if (!media_wait_next_event(&event)) {
             continue;
         }
         if (event.type == MEDIA_EVENT_DISCONNECT) {
@@ -568,8 +573,13 @@ static void media_worker(beken_thread_arg_t argument)
                  * TiRtcSendAudioStream while TiRtcDisconnect frees its
                  * channel/KCP state. Stale outgoing cleanup does not own the
                  * active media pipeline and must not stop it. */
-                if (connection_matches(event.connection)) {
-                    (void)xiaotai_video_stop();
+                bool active = connection_matches(event.connection) &&
+                    event.generation == atomic_load(&s_active_generation);
+                if (!active && event.generation != 0 &&
+                    (uintptr_t)event.connection != atomic_load(&s_outgoing_cleanup_connection))
+                    continue; /* Remote close already retired this active handle. */
+                if (active) {
+                    int video_rc = xiaotai_video_stop();
                     /* A remote AI close can race end_session while decoded
                      * speech remains queued. Drain before audio_stop clears
                      * that queue; user hangup still stops immediately. */
@@ -577,7 +587,13 @@ static void media_worker(beken_thread_arg_t argument)
                         xiaotai_audio_set_uplink_enabled(false);
                         drain_ai_playback_after_transport_close(event.generation);
                     }
-                    (void)xiaotai_audio_stop();
+                    int audio_rc = xiaotai_audio_stop();
+                    if (video_rc != BK_OK || audio_rc != BK_OK) {
+                        retry_cleanup = true;
+                        continue;
+                    }
+                    if (!connection_matches(event.connection) ||
+                        event.generation != atomic_load(&s_active_generation)) continue;
                 }
                 BK_LOGI(TAG,
                         "TiRtcDisconnect begin handle=%p mode=%d generation=%u\n",
@@ -774,20 +790,24 @@ static void media_worker(beken_thread_arg_t argument)
             continue;
         }
         if (event.type == MEDIA_EVENT_CLOSED) {
-            /* Temporary close-path probes: remove after the SMP stall has
-             * been reproduced with an identified failing boundary. */
-            BK_LOGD(TAG, "[DEBUG-bk-close] worker-received mode=%d generation=%u\n",
-                    (int)event.mode, (unsigned)event.generation);
-            (void)xiaotai_video_stop();
-            BK_LOGD(TAG, "[DEBUG-bk-close] worker-video-stopped\n");
-            if (event.mode == CONNECTION_AI && xiaotai_audio_running()) {
-                xiaotai_audio_set_uplink_enabled(false);
-                drain_ai_playback_after_transport_close(event.generation);
-            }
-            (void)xiaotai_audio_stop();
-            BK_LOGD(TAG, "[DEBUG-bk-close] worker-audio-stopped\n");
-            if (event.mode == CONNECTION_ROOM || event.mode == CONNECTION_STREAM) {
-                xiaotai_audio_set_uplink_enabled(true);
+            /* A failed connect has no media ownership. In particular it must
+             * not stop an unrelated connection that won admission first. */
+            bool owns_media = event.connection != NULL &&
+                event.connection == s_pending_close_event.connection &&
+                event.generation == s_pending_close_event.generation;
+            if (owns_media) {
+                int video_rc = xiaotai_video_stop();
+                if (event.mode == CONNECTION_AI && xiaotai_audio_running()) {
+                    xiaotai_audio_set_uplink_enabled(false);
+                    drain_ai_playback_after_transport_close(event.generation);
+                }
+                int audio_rc = xiaotai_audio_stop();
+                if (video_rc != BK_OK || audio_rc != BK_OK) {
+                    retry_cleanup = true;
+                    continue;
+                }
+                if (event.mode == CONNECTION_ROOM || event.mode == CONNECTION_STREAM)
+                    xiaotai_audio_set_uplink_enabled(true);
             }
             /* Notifications can immediately schedule an answer or an AI
              * requested call on the control core. Release admission after

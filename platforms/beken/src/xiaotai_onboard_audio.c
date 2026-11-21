@@ -38,19 +38,21 @@ static int audio_adapter_configure(void *context, uint32_t sample_rate_hz,
     return BK_OK;
 }
 
-static void destroy_full_duplex(void)
+static int destroy_full_duplex(void)
 {
     if (s_record != NULL) {
-        audio_record_destroy(s_record);
+        int rc = audio_record_destroy(s_record);
+        if (rc != BK_OK) return rc;
         s_record = NULL;
     }
     if (s_play != NULL) {
-        audio_play_close(s_play);
-        audio_play_destroy(s_play);
+        int rc = audio_play_destroy(s_play);
+        if (rc != BK_OK) return rc;
         s_play = NULL;
     }
     xiaotai_board_amplifier_power_off();
     s_audio_ready = false;
+    return BK_OK;
 }
 
 static int audio_adapter_start(void *context)
@@ -101,16 +103,15 @@ static int audio_adapter_request_stop(void *context)
      * Closing the speaker here would free that ring while the writer uses it. */
     int play_rc = s_play == NULL ? BK_OK :
         audio_play_control(s_play, AUDIO_PLAY_ABORT_WRITE);
-    int capture_rc = s_record == NULL ? BK_OK : audio_record_close(s_record);
+    int capture_rc = s_record == NULL ? BK_OK :
+        audio_record_control(s_record, AUDIO_RECORD_ABORT_READ);
     return play_rc != BK_OK ? play_rc : capture_rc;
 }
 
 static int audio_adapter_stop(void *context)
 {
     (void)context;
-    if (s_record != NULL) (void)audio_record_close(s_record);
-    destroy_full_duplex();
-    return BK_OK;
+    return destroy_full_duplex();
 }
 
 static bool audio_adapter_ready(void *context)
@@ -237,13 +238,20 @@ int xiaotai_board_prompt_audio_write(const int16_t *samples, size_t frames)
                                  (uint32_t)(frames * sizeof(*samples)));
 }
 
-void xiaotai_board_prompt_audio_stop(void)
+int xiaotai_board_prompt_audio_request_stop(void)
+{
+    return s_prompt_play == NULL ? BK_OK :
+        audio_play_control(s_prompt_play, AUDIO_PLAY_ABORT_WRITE);
+}
+
+int xiaotai_board_prompt_audio_stop(void)
 {
     (void)xiaotai_board_amplifier_set_playing(false);
     if (s_prompt_play != NULL) {
-        audio_play_close(s_prompt_play);
-        audio_play_destroy(s_prompt_play);
+        int rc = audio_play_destroy(s_prompt_play);
+        if (rc != BK_OK) return rc;
         s_prompt_play = NULL;
     }
     xiaotai_board_amplifier_power_off();
+    return BK_OK;
 }
