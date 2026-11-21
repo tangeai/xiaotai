@@ -1,0 +1,11 @@
+Noto Sans CJK SC Regular 2.004
+© 2014-2021 Adobe (http://www.adobe.com/).
+
+Licensed under the SIL Open Font License, Version 1.1 (see OFL.txt).
+The copyright statement above is retained from the original font name table.
+XiaoTai LVGL bitmap subsets are generated derivatives under the same license.
+Source revision, download URL and SHA-256 are recorded in source.json.
+
+Noto Sans Math Regular 2.001 (U+2252 only)
+Copyright 2018 Google LLC. All Rights Reserved.
+Licensed under the SIL Open Font License, Version 1.1 (see OFL.txt).

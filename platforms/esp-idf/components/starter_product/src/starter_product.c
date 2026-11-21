@@ -1856,7 +1856,7 @@ static void render_header(lv_obj_t *screen, const char *title)
     s_header_title = make_label(screen, title, title_x, 8, title_width,
                                 lv_color_hex(0xBFE9F3));
     lv_label_set_long_mode(s_header_title, LV_LABEL_LONG_DOT);
-    lv_obj_set_height(s_header_title, 20);
+    lv_obj_set_height(s_header_title, 22);
 
     render_header_status(screen);
 }
@@ -2013,19 +2013,19 @@ static void render_home(lv_obj_t *screen)
     s_state = make_label(screen, "小钛在这儿", 45, 150, 230,
                          lv_color_hex(0xBFE9F3));
     lv_obj_set_style_text_align(s_state, LV_TEXT_ALIGN_CENTER, 0);
-    s_recognition_label = make_label(screen, "", 16, 169, 236, lv_color_hex(0xEDFAFF));
-    lv_obj_set_height(s_recognition_label, 17);
+    s_recognition_label = make_label(screen, "", 16, 173, 236, lv_color_hex(0xEDFAFF));
+    lv_obj_set_height(s_recognition_label, 22);
     lv_obj_set_style_text_align(s_recognition_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_t *result_viewport = lv_obj_create(screen);
-    lv_obj_set_pos(result_viewport, 16, 187);
-    lv_obj_set_size(result_viewport, 236, 19);
+    lv_obj_set_pos(result_viewport, 16, 196);
+    lv_obj_set_size(result_viewport, 236, 22);
     lv_obj_clear_flag(result_viewport, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_bg_opa(result_viewport, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(result_viewport, 0, 0);
     lv_obj_set_style_pad_all(result_viewport, 0, 0);
     s_recognition_result = make_label(result_viewport, "", 0, 0, 236,
                                       lv_color_hex(0xEDFAFF));
-    lv_obj_set_height(s_recognition_result, 19);
+    lv_obj_set_height(s_recognition_result, 22);
     lv_label_set_long_mode(s_recognition_result, LV_LABEL_LONG_CLIP);
     lv_obj_add_flag(s_recognition_result, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_long_mode(s_recognition_label, LV_LABEL_LONG_CLIP);
@@ -2048,7 +2048,7 @@ static void render_home(lv_obj_t *screen)
 
     s_hint = make_label(screen, "说“你好小钛”或点击 AI 聊天", 38, 145, 244,
                         lv_color_hex(0xDFF7FF));
-    lv_obj_set_height(s_hint, 30);
+    lv_obj_set_height(s_hint, 34);
     lv_obj_set_style_text_align(s_hint, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_bg_color(s_hint, lv_color_hex(0x0A1F28), 0);
     lv_obj_set_style_bg_opa(s_hint, LV_OPA_COVER, 0);
@@ -2062,10 +2062,10 @@ static void render_home(lv_obj_t *screen)
     s_activity = make_label(screen, "", 62, 34, 196, lv_color_hex(0x72DEF8));
     lv_obj_set_style_text_align(s_activity, LV_TEXT_ALIGN_CENTER, 0);
     (void)make_label(screen, s_page == PAGE_HOME_FACE ? "●  ○" : "○  ●",
-                     135, 219, 55, lv_color_hex(0x8A809F));
+                     135, 218, 55, lv_color_hex(0x8A809F));
     lv_obj_t *indicator = lv_obj_create(screen);
-    lv_obj_set_pos(indicator, 128, 208);
-    lv_obj_set_size(indicator, 66, 30);
+    lv_obj_set_pos(indicator, 128, 218);
+    lv_obj_set_size(indicator, 66, 22);
     lv_obj_set_style_bg_opa(indicator, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(indicator, 0, 0);
     lv_obj_add_event_cb(indicator, on_page_indicator, LV_EVENT_CLICKED, NULL);
@@ -2098,7 +2098,7 @@ static void render_ai_chat(lv_obj_t *screen)
                              ? "正在连接 AI" : phase_text(product.ai_phase),
                          52, 10, 154, lv_color_hex(0x72DEF8));
     lv_label_set_long_mode(s_state, LV_LABEL_LONG_DOT);
-    lv_obj_set_height(s_state, 20);
+    lv_obj_set_height(s_state, 22);
     render_header_status(screen);
     s_ai_history_panel = lv_obj_create(screen);
     lv_obj_set_pos(s_ai_history_panel, 10, 40);
@@ -2417,7 +2417,7 @@ static void render_contacts(lv_obj_t *screen)
         lv_obj_set_style_text_color(name, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_pos(name, 42, 7);
         lv_obj_set_width(name, 190);
-        lv_obj_set_height(name, 18);
+        lv_obj_set_height(name, 22);
         lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
         if (contact->source != STARTER_CONTACT_WECHAT) {
             lv_obj_t *status = lv_obj_create(row);

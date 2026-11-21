@@ -1,0 +1,22 @@
+{
+  "family": "Noto Sans CJK SC",
+  "version": "2.004",
+  "filename": "NotoSansCJKsc-Regular.otf",
+  "source_commit": "f8d157532fbfaeda587e826d4cd5b21a49186f7c",
+  "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf",
+  "sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+  "license": "OFL-1.1",
+  "converter_version": "1.5.3",
+  "symbols": {
+    "family": "Noto Sans Math",
+    "version": "2.001",
+    "filename": "NotoSansMath-Regular.ttf",
+    "source_commit": "ffebf8c1ee449e544955a7e813c54f9b73848eac",
+    "url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansMath/NotoSansMath-Regular.ttf",
+    "sha256": "80b61fd613d3519197e64fff6f7e71fdc7f3e6526440ea4115b554ef7fd59af7",
+    "license": "OFL-1.1",
+    "codepoints": [
+      "U+2252"
+    ]
+  }
+}

@@ -550,7 +550,8 @@ class RepositoryLayoutTests(unittest.TestCase):
             "product/assets/audio/",
         ):
             self.assertIn(expected, checklist)
-        self.assertNotIn("ui_font_cn_16.c", checklist)
+        self.assertIn("ui_font_cn_16.c", checklist)
+        self.assertIn("ui_font_cn_24.c", checklist)
         self.assertNotIn("TiRTC SDK 2.3.0", checklist)
 
     def test_hardware_ir_project_sources_are_repository_relative_and_exist(self):

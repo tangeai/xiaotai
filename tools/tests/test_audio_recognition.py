@@ -68,8 +68,13 @@ int main(void) {
         self.assertIsNotNone(layout)
         result=tuple(map(int,layout.groups()))
         self.assertGreaterEqual(status[1],168)
-        self.assertGreaterEqual(result[1]-status[1],18)
-        self.assertLessEqual(result[1]+18,208)  # page indicator begins at y=208
+        status_height=int(re.search(r'lv_obj_set_height\(s_recognition_label, (\d+)\)',source).group(1))
+        self.assertGreaterEqual(result[1]-status[1],status_height)
+        indicator=re.search(r'lv_obj_set_pos\(indicator, 128, (\d+)\);\s*lv_obj_set_size\(indicator, 66, (\d+)\);',source)
+        self.assertIsNotNone(indicator)
+        indicator_y,indicator_h=map(int,indicator.groups())
+        self.assertLessEqual(result[1]+result[3],indicator_y)
+        self.assertLessEqual(indicator_y+indicator_h,240)
         self.assertLessEqual(result[0]+result[2],252)  # clear of call shortcut
 
     def test_result_scrolls_twice_then_hides(self):
