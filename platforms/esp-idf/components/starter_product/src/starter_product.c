@@ -235,6 +235,8 @@ static lv_obj_t *s_room_code_label;
 static lv_obj_t *s_room_status_label;
 static lv_obj_t *s_room_members_caption;
 static lv_obj_t *s_room_member_labels[3];
+static lv_obj_t *s_room_member_status_labels[3];
+static char s_room_member_text[3][sizeof(((starter_room_member_t *)0)->id)];
 static lv_obj_t *s_room_page_label;
 static lv_obj_t *s_room_previous_button;
 static lv_obj_t *s_room_next_button;
@@ -2199,17 +2201,21 @@ static void refresh_room_controls(const starter_runtime_product_snapshot_t *room
     for (unsigned row = 0; row < per_page; ++row) {
         unsigned index = first + row;
         bool present = index < room->room_member_count;
+        const char *name = row == 0U ? "等待成员同步" : "";
         if (present) {
-            (void)snprintf(line, sizeof(line), "%.18s  %s",
-                room->room_members[index].self ? "本机" : room->room_members[index].id,
+            name = room->room_members[index].self ? "本机" : room->room_members[index].id;
+            label_set_text_if_changed(s_room_member_status_labels[row],
                 room->room_members[index].speaking ? "正在说话" : "未发言");
-        } else {
-            (void)snprintf(line, sizeof(line), "%s",
-                row == 0U && room->room_member_count == 0U ? "等待成员同步" : "");
         }
-        label_set_text_if_changed(s_room_member_labels[row], line);
+        // LVGL inserts dots into the label buffer. Compare the original ID
+        // so long names don't trigger a new layout on every room tick.
+        if (strcmp(s_room_member_text[row], name) != 0) {
+            (void)snprintf(s_room_member_text[row], sizeof(s_room_member_text[row]), "%s", name);
+            label_set_text_if_changed(s_room_member_labels[row], name);
+        }
         set_object_visible(s_room_member_labels[row],
             present || (row == 0U && room->room_member_count == 0U));
+        set_object_visible(s_room_member_status_labels[row], present);
     }
     bool partial = room->room_online_count > room->room_member_count;
     if (pages > 1U) {
@@ -2262,20 +2268,26 @@ static void render_room(lv_obj_t *screen)
         (void)make_button(screen, "加入房间", 8, 184, 304, 48, ACTION_ROOM_JOIN);
         return;
     }
-    s_room_code_label = make_label(screen, "", 18, 38, 284, lv_color_hex(0xFFFFFF));
-    s_room_status_label = make_label(screen, "", 18, 59, 284, lv_color_hex(0xBFE9F3));
-    s_room_members_caption = make_label(screen, "房间成员", 18, 80, 284, lv_color_hex(0xBFE9F3));
-    for (unsigned row = 0; row < 3U; ++row)
-        s_room_member_labels[row] = make_label(screen, "", 30, 100 + row * 20, 260,
-                                              lv_color_hex(0x91B0BC));
-    s_room_page_label = make_label(screen, "", 90, 158, 140, lv_color_hex(0x91B0BC));
-    s_room_previous_button = make_button(screen, "<", 12, 154, 64, 26, ACTION_ROOM_PREVIOUS);
-    s_room_next_button = make_button(screen, ">", 244, 154, 64, 26, ACTION_ROOM_NEXT);
-    (void)make_button(screen, "退出房间", 8, 184, 148, 48, ACTION_ROOM_LEAVE);
-    s_room_ptt_button = make_button(screen, "按住说话", 164, 184, 148, 48, ACTION_ROOM);
+    s_room_code_label = make_label(screen, "", 18, 34, 284, lv_color_hex(0xFFFFFF));
+    s_room_status_label = make_label(screen, "", 18, 56, 284, lv_color_hex(0xBFE9F3));
+    s_room_members_caption = make_label(screen, "房间成员", 18, 78, 284, lv_color_hex(0xBFE9F3));
+    memset(s_room_member_text, 0, sizeof(s_room_member_text));
+    for (unsigned row = 0; row < 3U; ++row) {
+        const lv_coord_t y = 100 + row * 22;
+        s_room_member_labels[row] = make_label(screen, "", 30, y, 182, lv_color_hex(0x91B0BC));
+        lv_obj_set_height(s_room_member_labels[row], 22);
+        lv_label_set_long_mode(s_room_member_labels[row], LV_LABEL_LONG_DOT);
+        s_room_member_status_labels[row] = make_label(screen, "", 220, y, 70,
+                                                      lv_color_hex(0x91B0BC));
+    }
+    s_room_page_label = make_label(screen, "", 90, 167, 140, lv_color_hex(0x91B0BC));
+    s_room_previous_button = make_button(screen, "<", 12, 166, 64, 24, ACTION_ROOM_PREVIOUS);
+    s_room_next_button = make_button(screen, ">", 244, 166, 64, 24, ACTION_ROOM_NEXT);
+    (void)make_button(screen, "退出房间", 8, 194, 148, 44, ACTION_ROOM_LEAVE);
+    s_room_ptt_button = make_button(screen, "按住说话", 164, 194, 148, 44, ACTION_ROOM);
     lv_obj_remove_event_cb(s_room_ptt_button, on_action);
     lv_obj_add_event_cb(s_room_ptt_button, on_room_ptt, LV_EVENT_ALL, NULL);
-    s_room_connecting_label = make_label(screen, "正在连接…", 164, 200, 148,
+    s_room_connecting_label = make_label(screen, "正在连接…", 164, 194, 148,
                                         lv_color_hex(0x72DEF8));
     refresh_room_controls(&room);
 }
@@ -2314,9 +2326,11 @@ static void render_room_input(lv_obj_t *screen)
 #if CONFIG_IDF_TARGET_ESP32S3
     const int key_x = 14, key_y = 59, step_x = 98, step_y = 40;
     const int key_w = 92, key_h = 36;
+    const int hint_y = 218;
 #else
     const int key_x = 58, key_y = 61, step_x = 70, step_y = 42;
     const int key_w = 62, key_h = 34;
+    const int hint_y = 223;
 #endif
     for (unsigned i = 1; i <= 9U; ++i) {
         unsigned col = (i - 1U) % 3U, row = (i - 1U) / 3U;
@@ -2330,10 +2344,10 @@ static void render_room_input(lv_obj_t *screen)
     (void)make_button(screen, "确定", key_x + 2 * step_x, key_y + 3 * step_y,
                       key_w, key_h, ACTION_ROOM_INPUT_SUBMIT);
     if (s_voice_feedback[0] != '\0')
-        (void)make_label(screen, s_voice_feedback, 24, 223, 272, lv_color_hex(0xFF9D9D));
+        (void)make_label(screen, s_voice_feedback, 24, hint_y, 272, lv_color_hex(0xFF9D9D));
     else if (!code && !s_room_input_create) {
         lv_obj_t *hint = make_label(screen, XIAOTAI_UI_ROOM_PASSWORD_HINT,
-                                    24, 223, 272, lv_color_hex(0xB8D4E0));
+                                    24, hint_y, 272, lv_color_hex(0xB8D4E0));
         lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
     }
 }
@@ -3039,6 +3053,7 @@ static void render_page(void)
     s_room_status_label = NULL;
     s_room_members_caption = NULL;
     memset(s_room_member_labels, 0, sizeof(s_room_member_labels));
+    memset(s_room_member_status_labels, 0, sizeof(s_room_member_status_labels));
     s_room_page_label = NULL;
     s_room_previous_button = NULL;
     s_room_next_button = NULL;
