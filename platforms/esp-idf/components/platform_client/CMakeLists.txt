@@ -5,5 +5,5 @@ idf_component_register(
     INCLUDE_DIRS "${xiaotai_platform_client_dir}/include"
     PRIV_INCLUDE_DIRS "${xiaotai_platform_client_dir}/../../../../product/include"
     REQUIRES esp_http_client esp_netif mqtt mbedtls json
-    PRIV_REQUIRES esp-tls esp_timer
+    PRIV_REQUIRES esp-tls esp_timer runtime_config
 )

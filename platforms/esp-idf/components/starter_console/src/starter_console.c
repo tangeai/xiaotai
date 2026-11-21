@@ -677,6 +677,62 @@ static int command_tirtc_clear(int argc, char **argv)
     return 0;
 }
 
+static int command_ntp_show(int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) {
+        printf("usage: ntp-show\n");
+        return 1;
+    }
+    char url[RUNTIME_NTP_SERVER_MAX] = {0};
+    esp_err_t err = runtime_config_load_ntp_server(url, sizeof(url));
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        printf("Primary NTP server: default\n");
+        return 0;
+    }
+    if (err != ESP_OK) {
+        printf("NTP read failed: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("Primary NTP server: %s\n", url);
+    return 0;
+}
+
+static int command_ntp_set(int argc, char **argv)
+{
+    if (argc != 2) {
+        printf("usage: ntp-set <hostname-or-IPv4>\n");
+        return 1;
+    }
+    esp_err_t err = runtime_config_save_ntp_server(argv[1]);
+    if (err != ESP_OK) {
+        printf("NTP rejected or save failed: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("Primary NTP server saved: %s; restarting...\n", argv[1]);
+    vTaskDelay(pdMS_TO_TICKS(300));
+    esp_restart();
+    return 0;
+}
+
+static int command_ntp_reset(int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) {
+        printf("usage: ntp-reset\n");
+        return 1;
+    }
+    esp_err_t err = runtime_config_clear_ntp_server();
+    if (err != ESP_OK) {
+        printf("NTP reset failed: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("Primary NTP server restored to default; restarting...\n");
+    vTaskDelay(pdMS_TO_TICKS(300));
+    esp_restart();
+    return 0;
+}
+
 static int command_ep_show(int argc, char **argv)
 {
     (void)argv;
@@ -842,6 +898,12 @@ esp_err_t starter_console_start(void)
                         "starter_console", "register tirtc-set");
     ESP_RETURN_ON_ERROR(register_command("tirtc-clear", "Clear device credentials", command_tirtc_clear),
                         "starter_console", "register tirtc-clear");
+    ESP_RETURN_ON_ERROR(register_command("ntp-show", "NTP show", command_ntp_show),
+                        "starter_console", "register ntp-show");
+    ESP_RETURN_ON_ERROR(register_command("ntp-set", "NTP set <hostname-or-IPv4>", command_ntp_set),
+                        "starter_console", "register ntp-set");
+    ESP_RETURN_ON_ERROR(register_command("ntp-reset", "NTP reset", command_ntp_reset),
+                        "starter_console", "register ntp-reset");
     ESP_RETURN_ON_ERROR(register_command("ep-show", "Show platform discovery base", command_ep_show),
                         "starter_console", "register ep-show");
     ESP_RETURN_ON_ERROR(register_command("ep-set", "ep-set <http(s)://host[:port][/path]", command_ep_set),

@@ -9,6 +9,12 @@
 
 #define XIAOTAI_WIFI_SSID_MAX 32
 #define XIAOTAI_WIFI_PASSWORD_MAX 64
+#define XIAOTAI_NTP_SERVER_MAX 254
+/* Saved primary NTP server; applied on reboot. Existing fallbacks are retained. */
+int xiaotai_storage_load_ntp_server(char *output, size_t capacity);
+int xiaotai_storage_save_ntp_server(const char *server);
+int xiaotai_storage_clear_ntp_server(void);
+
 #define XIAOTAI_ENDPOINT_MAX 256
 
 typedef struct {

@@ -27,6 +27,7 @@
 #include "esp_log.h"
 #include "esp_memory_utils.h"
 #include "esp_netif_sntp.h"
+#include "runtime_config.h"
 #include "esp_random.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -137,6 +138,8 @@ static bool s_services_ready;
 static esp_err_t sync_clock(void);
 /* Startup/provision retries share one SNTP service owned by the startup task. */
 static bool s_sntp_initialized;
+/* lwIP retains server-name pointers for background refresh. */
+static char s_ntp_server[RUNTIME_NTP_SERVER_MAX];
 static char s_verification_code[17];
 static _Atomic uint32_t s_verification_expiry;
 static platform_signal_callback_t s_signal_callback;
@@ -754,11 +757,12 @@ static esp_err_t sync_clock(void)
      */
     time_t current = time(NULL);
     bool time_was_valid = current > 1700000000;
-    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG_MULTIPLE(
-        2,
-        ESP_SNTP_SERVER_LIST("pool.ntp.org", "ntp.aliyun.com"));
     esp_err_t err = ESP_OK;
     if (!s_sntp_initialized) {
+        if (runtime_config_load_ntp_server(s_ntp_server, sizeof(s_ntp_server)) != ESP_OK)
+            snprintf(s_ntp_server, sizeof(s_ntp_server), "%s", "pool.ntp.org");
+        esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG_MULTIPLE(
+            2, ESP_SNTP_SERVER_LIST(s_ntp_server, "ntp.aliyun.com"));
         err = esp_netif_sntp_init(&config);
         if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return err;
         s_sntp_initialized = true;
@@ -766,7 +770,7 @@ static esp_err_t sync_clock(void)
     if (time_was_valid) {
         ESP_LOGI(TAG,
                  "SNTP refresh started asynchronously "
-                 "(primary=pool.ntp.org fallback=ntp.aliyun.com)");
+                 "(primary=%s fallback=ntp.aliyun.com)", s_ntp_server);
         return ESP_OK;
     }
     for (int attempt = 0; attempt < 5; ++attempt) {
@@ -774,7 +778,7 @@ static esp_err_t sync_clock(void)
         if (err == ESP_OK || time(NULL) > 1700000000) {
             ESP_LOGI(TAG,
                      "network clock synchronized "
-                     "(primary=pool.ntp.org fallback=ntp.aliyun.com)");
+                     "(primary=%s fallback=ntp.aliyun.com)", s_ntp_server);
             return ESP_OK;
         }
     }

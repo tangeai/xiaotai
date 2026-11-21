@@ -160,6 +160,46 @@ static void command_tirtc_clear(char *output, int capacity,
              "usage: tirtc-clear\r\n");
 }
 
+static void command_ntp_show(char *output, int capacity, int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) {
+        response(output, capacity, "usage: ntp-show\r\n");
+        return;
+    }
+    char url[XIAOTAI_NTP_SERVER_MAX] = {0};
+    if (xiaotai_storage_load_ntp_server(url, sizeof(url)) != BK_OK) {
+        response(output, capacity, "Primary NTP server: default\r\n");
+    } else if (output != NULL && capacity > 0) {
+        snprintf(output, (size_t)capacity, "Primary NTP server: %s\r\n", url);
+    }
+}
+
+static void command_ntp_set(char *output, int capacity, int argc, char **argv)
+{
+    if (argc != 2) {
+        response(output, capacity, "usage: ntp-set <hostname-or-IPv4>\r\n");
+        return;
+    }
+    int rc = xiaotai_storage_save_ntp_server(argv[1]);
+    if (rc == BK_OK) rc = schedule_reboot();
+    response(output, capacity, rc == BK_OK ?
+             "Primary NTP server saved; restarting\r\n" : "NTP rejected or save failed\r\n");
+}
+
+static void command_ntp_reset(char *output, int capacity, int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) {
+        response(output, capacity, "usage: ntp-reset\r\n");
+        return;
+    }
+    int rc = xiaotai_storage_clear_ntp_server();
+    if (rc == BK_OK) rc = schedule_reboot();
+    response(output, capacity, rc == BK_OK ?
+             "Primary NTP server restored to default; restarting\r\n" : "NTP reset failed\r\n");
+}
+
 static void command_ep_show(char *output, int capacity, int argc, char **argv)
 {
     (void)argv;
@@ -447,6 +487,9 @@ static const struct cli_command s_commands[] = {
     {"wificlear", "Compatibility alias for wifi-clear", command_wifi_clear},
     {"wifi-change", "Open provisioning and retain credentials", command_wifi_change},
     {"tirtc-clear", "Clear binding and restart", command_tirtc_clear},
+    {"ntp-show", "NTP show", command_ntp_show},
+    {"ntp-set", "NTP set <hostname-or-IPv4>", command_ntp_set},
+    {"ntp-reset", "NTP reset", command_ntp_reset},
     {"ep-show", "Show platform discovery base", command_ep_show},
     {"ep-set", "ep-set <http(s)://host[:port][/path]>", command_ep_set},
     {"ep-reset", "Clear platform discovery override", command_ep_reset},

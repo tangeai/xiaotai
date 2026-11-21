@@ -140,3 +140,15 @@ TiRTC 连接地址取自服务发现响应的 `tirtc-srv` 字段，`ep-set` 设�
 [`xiaotai_console.c`](../../platforms/beken/runtime/src/xiaotai_console.c)；
 请求处理见 [`xiaotai_app.c`](../../platforms/beken/runtime/src/xiaotai_app.c)。
 两块板链接同一份命令实现，GPIO、串口接线及支持的产品功能以各板指南为准。
+
+## 时间同步服务器
+
+| 命令 | 作用 |
+| --- | --- |
+| `ap_cmd ntp-show` | 查看主服务器覆盖项；`default` 表示没有覆盖项 |
+| `ap_cmd ntp-set time.example.com` | 保存主服务器域名或 IPv4 地址并重启 |
+| `ap_cmd ntp-reset` | 清除覆盖项并重启 |
+
+输入最长 253 字符，不带协议前缀、端口、路径或空格，不支持 IPv6。保留固件原有
+备用服务器，NTP 使用 UDP/123。成功修改会中断当前会话；保存失败不重启。
+恢复出厂设置也会清除该项。重启后须确认校时成功。

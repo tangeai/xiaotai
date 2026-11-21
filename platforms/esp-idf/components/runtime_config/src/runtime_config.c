@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include "xiaotai_ntp_config.h"
 
 #include "nvs.h"
 #include "esp_memory_utils.h"
@@ -241,4 +242,46 @@ esp_err_t runtime_config_clear_tirtc(void)
     xSemaphoreTake(request.done, portMAX_DELAY);
     vSemaphoreDelete(request.done);
     return request.result;
+}
+
+#define NTP_NVS_NAMESPACE "ntp_cfg"
+#define NTP_NVS_KEY "server"
+
+esp_err_t runtime_config_load_ntp_server(char *output, size_t capacity)
+{
+    if (output == NULL || capacity == 0) return ESP_ERR_INVALID_ARG;
+    output[0] = '\0';
+    nvs_handle_t nvs = 0;
+    esp_err_t err = nvs_open(NTP_NVS_NAMESPACE, NVS_READONLY, &nvs);
+    if (err != ESP_OK) return err;
+    size_t size = capacity;
+    err = nvs_get_str(nvs, NTP_NVS_KEY, output, &size);
+    nvs_close(nvs);
+    if (err != ESP_OK || !xiaotai_ntp_server_valid(output)) {
+        output[0] = '\0';
+        return err == ESP_OK ? ESP_ERR_INVALID_ARG : err;
+    }
+    return ESP_OK;
+}
+
+esp_err_t runtime_config_save_ntp_server(const char *url)
+{
+    if (!xiaotai_ntp_server_valid(url)) return ESP_ERR_INVALID_ARG;
+    nvs_handle_t nvs = 0;
+    esp_err_t err = nvs_open(NTP_NVS_NAMESPACE, NVS_READWRITE, &nvs);
+    if (err == ESP_OK) err = nvs_set_str(nvs, NTP_NVS_KEY, url);
+    if (err == ESP_OK) err = nvs_commit(nvs);
+    if (nvs != 0) nvs_close(nvs);
+    return err;
+}
+
+esp_err_t runtime_config_clear_ntp_server(void)
+{
+    nvs_handle_t nvs = 0;
+    esp_err_t err = nvs_open(NTP_NVS_NAMESPACE, NVS_READWRITE, &nvs);
+    if (err == ESP_OK) err = nvs_erase_key(nvs, NTP_NVS_KEY);
+    if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+    if (err == ESP_OK) err = nvs_commit(nvs);
+    if (nvs != 0) nvs_close(nvs);
+    return err;
 }

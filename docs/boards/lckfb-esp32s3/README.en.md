@@ -266,3 +266,19 @@ Board configuration and adapter are in `boards/lckfb/esp32s3/`; Hardware IR defi
 ESP32-S3 currently does not support video calls. WeChat VoIP reports uplink/downlink video as `none` with `no_video=true`; audio remains bidirectional A-law / 8 kHz on stream 0. Home quick-call defaults to voice, and contact details offer voice calls only. Device calls are also audio-only.
 
 The camera is used for H5 live view. Host regressions block legacy video requests/states; incoming/outgoing WeChat calls, continuous audio, redial, and H5 handover still require hardware checks.
+
+## Serial time-server configuration
+
+`ntp-show` displays the saved primary NTP override (`default` means no override).
+Use `ntp-set time.example.com` or `ntp-set 192.168.1.10` to save it;
+`ntp-reset` restores the default.
+
+Successful set/reset restarts the device
+and interrupts active calls. A save failure does not restart it.
+
+Accepts a DNS hostname or IPv4 address, up to 253 characters; no URL, port, path,
+spaces or IPv6. NTP uses UDP/123. Existing backup servers remain available, so
+this is a primary-server preference, not an exclusive time source.
+
+Factory reset
+clears the override. Confirm synchronization after reboot before testing calls.

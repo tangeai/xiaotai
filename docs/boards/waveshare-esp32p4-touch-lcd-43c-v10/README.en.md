@@ -293,3 +293,19 @@ User call logs show a 10-second uplink window at 7.9 fps with 80 frames sent and
 Older build.87 and build.101/103 H.264 experiments are historical comparisons only. See [Call diagnostics (Chinese)](../../development/MEDIA_PIPELINE_DIAGNOSTICS.md) and [Video performance records (Chinese)](../../product/P4_VIDEO_PERFORMANCE.md) for paired logs, conditions, and limits.
 
 Board configuration is in `boards/waveshare/esp32p4-touch-lcd-43c/`; project `hardware-ir.json` contains hardware facts and evidence grades.
+
+## Serial time-server configuration
+
+`ntp-show` displays the saved primary NTP override (`default` means no override).
+Use `ntp-set time.example.com` or `ntp-set 192.168.1.10` to save it;
+`ntp-reset` restores the default.
+
+Successful set/reset restarts the device
+and interrupts active calls. A save failure does not restart it.
+
+Accepts a DNS hostname or IPv4 address, up to 253 characters; no URL, port, path,
+spaces or IPv6. NTP uses UDP/123. Existing backup servers remain available, so
+this is a primary-server preference, not an exclusive time source.
+
+Factory reset
+clears the override. Confirm synchronization after reboot before testing calls.

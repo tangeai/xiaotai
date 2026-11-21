@@ -244,3 +244,19 @@ Validated release records are **v1.0.1 · build.47 / ILI9342E** and **v1.0.1 · 
 - AEC and UI processing headroom during playback remains tight. Weak networks, repeated switching, and long runs need continued regression. See [Audio performance review (Chinese)](AUDIO_PERFORMANCE_REVIEW.md).
 - Select firmware by display controller; see Downloads for current availability.
 - SD card, IMU, magnetometer, proximity sensor, and RTC are not integrated into XiaoTai features.
+
+## Serial time-server configuration
+
+`ntp-show` displays the saved primary NTP override (`default` means no override).
+Use `ntp-set time.example.com` or `ntp-set 192.168.1.10` to save it;
+`ntp-reset` restores the default.
+
+Successful set/reset restarts the device
+and interrupts active calls. A save failure does not restart it.
+
+Accepts a DNS hostname or IPv4 address, up to 253 characters; no URL, port, path,
+spaces or IPv6. NTP uses UDP/123. Existing backup servers remain available, so
+this is a primary-server preference, not an exclusive time source.
+
+Factory reset
+clears the override. Confirm synchronization after reboot before testing calls.

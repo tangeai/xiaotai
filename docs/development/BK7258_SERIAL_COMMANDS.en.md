@@ -125,3 +125,16 @@ Use `ap_cmd ep-reset` to restore the default.
 Command registration, argument validation, and return text are in [`xiaotai_console.c`](../../platforms/beken/runtime/src/xiaotai_console.c); request handling is in [`xiaotai_app.c`](../../platforms/beken/runtime/src/xiaotai_app.c). Both boards link the same implementation.
 
 Refer to each guide for GPIO, serial wiring, and supported features.
+
+## Time synchronization server
+
+| Command | Effect |
+| --- | --- |
+| `ap_cmd ntp-show` | Show saved primary override; `default` means no override |
+| `ap_cmd ntp-set time.example.com` | Save a hostname or IPv4 primary server and reboot |
+| `ap_cmd ntp-reset` | Clear the override and reboot |
+
+Input is at most 253 characters, without a URL scheme, port, path or whitespace.
+IPv6 is not supported. Existing fallback servers remain; NTP uses UDP/123.
+Successful changes interrupt active sessions; failed saves do not reboot.
+Factory reset also clears this setting. Verify synchronization after reboot.

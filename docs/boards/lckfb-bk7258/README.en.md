@@ -267,3 +267,19 @@ H5 live view/two-way audio, AI, and WeChat have hardware usage records limited t
 TODO: complete per-image acceptance, long-run duration, Flash JEDEC identification, PCB revision, and board photos. OTA, weak-network recovery, double-talk AEC, and long-duration group intercom need dedicated validation.
 
 Do not commit credential-bearing raw logs or dated stability investigations. Record current findings in HIL records tied to firmware SHA-256.
+
+## Serial time-server configuration
+
+`ap_cmd ntp-show` displays the saved primary NTP override (`default` means no override).
+Use `ap_cmd ntp-set time.example.com` or `ap_cmd ntp-set 192.168.1.10` to save it;
+`ap_cmd ntp-reset` restores the default.
+
+Successful set/reset restarts the device
+and interrupts active calls. A save failure does not restart it.
+
+Accepts a DNS hostname or IPv4 address, up to 253 characters; no URL, port, path,
+spaces or IPv6. NTP uses UDP/123. Existing backup servers remain available, so
+this is a primary-server preference, not an exclusive time source.
+
+Factory reset
+clears the override. Confirm synchronization after reboot before testing calls.

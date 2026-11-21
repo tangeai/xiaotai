@@ -1054,7 +1054,10 @@ static int synchronize_clock(void)
      * rejected when the clock differs from the server by more than 300 s. */
     if (s_clock_synchronized) return BK_OK;
     time_t previous = xiaotai_time_now();
-    static const char *servers[] = {"pool.ntp.org", "ntp.aliyun.com"};
+    char primary[XIAOTAI_NTP_SERVER_MAX] = {0};
+    if (xiaotai_storage_load_ntp_server(primary, sizeof(primary)) != BK_OK)
+        snprintf(primary, sizeof(primary), "%s", "pool.ntp.org");
+    const char *servers[] = {primary, "ntp.aliyun.com"};
     for (size_t attempt = 0; attempt < sizeof(servers) / sizeof(servers[0]); ++attempt) {
         struct addrinfo hints = {0};
         hints.ai_family = AF_INET;
