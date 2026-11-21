@@ -5,7 +5,7 @@
 - [ ] 从最新上游 `main` 创建短期分支，PR 目标为 `main`（旧稳定版回补请说明）
 - [ ] 本 PR 聚焦一个功能、修复或完整业务切片
 
-分支、合并后验证和发布按 [贡献指南](../CONTRIBUTING.md#分支pr-与发布流程)执行。
+分支、合并后验证和发布按 [贡献指南](https://github.com/tangeai/xiaotai/blob/main/CONTRIBUTING.md#分支pr-与发布流程)执行。
 
 ## 测试证据
 
