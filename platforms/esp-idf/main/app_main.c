@@ -297,6 +297,8 @@ static void starter_start_task(void *argument)
         return;
     }
 
+    starter_console_set_runtime_ready(true);
+
     const platform_client_config_t platform = {
         .device_id = s_tirtc_config.device_id,
         .device_secret = s_tirtc_config.device_secret,
@@ -409,13 +411,11 @@ static void starter_start_task(void *argument)
         }
         if (platform_client_ready() && tirtc_submitted) {
             if (!controls_started) {
-                esp_err_t console_err = starter_console_start();
                 esp_err_t button_err = starter_button_start();
-                controls_started = console_err == ESP_OK && button_err == ESP_OK;
+                controls_started = button_err == ESP_OK;
                 if (!controls_started) {
                     ESP_LOGW(TAG,
-                             "development controls deferred: console=%s button=%s",
-                             esp_err_to_name(console_err),
+                             "development controls deferred: button=%s",
                              esp_err_to_name(button_err));
                 }
             }
@@ -441,22 +441,32 @@ static void starter_start_task(void *argument)
     vTaskDelete(NULL);
 }
 
-static void init_nvs(void)
+static esp_err_t init_nvs(void)
 {
     /* 仅在 NVS 分区布局升级或空间耗尽时擦除；普通启动保留配网和绑定数据。 */
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_erase();
+        if (err != ESP_OK) return err;
         err = nvs_flash_init();
     }
-    ESP_ERROR_CHECK(err);
+    return err;
 }
 
 void app_main(void)
 {
     /* app_main 保持短小且不等待网络，耗时启动工作交给 starter_start_task。 */
-    ESP_ERROR_CHECK(heap_caps_register_failed_alloc_callback(allocation_failed));
-    init_nvs();
+    (void)heap_caps_register_failed_alloc_callback(allocation_failed);
+    esp_err_t storage_err = init_nvs();
+    esp_err_t console_err = starter_console_start();
+    if (console_err != ESP_OK) {
+        ESP_LOGE(TAG, "recovery console unavailable: %s", esp_err_to_name(console_err));
+    }
+    if (storage_err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS unavailable: %s; repair storage before saving configuration",
+                 esp_err_to_name(storage_err));
+        return;
+    }
     if (setenv("TZ", "CST-8", 1) != 0) {
         ESP_LOGW(TAG, "cannot configure Asia/Shanghai timezone");
     }
@@ -486,12 +496,27 @@ void app_main(void)
     ESP_LOGI(TAG, "TiRTC version: %s", starter_tirtc_version());
     ESP_LOGI(TAG, "TiRTC build: %s", starter_tirtc_build_info());
 
-    ESP_ERROR_CHECK(starter_media_init());
+    esp_err_t starter_media_init_err = starter_media_init();
+    if (starter_media_init_err != ESP_OK) {
+        ESP_LOGE(TAG, "starter_media_init failed: %s; recovery console retained",
+                 esp_err_to_name(starter_media_init_err));
+        return;
+    }
     log_heap_snapshot("post-media");
-    ESP_ERROR_CHECK(starter_product_start());
+    esp_err_t starter_product_start_err = starter_product_start();
+    if (starter_product_start_err != ESP_OK) {
+        ESP_LOGE(TAG, "starter_product_start failed: %s; recovery console retained",
+                 esp_err_to_name(starter_product_start_err));
+        return;
+    }
     log_heap_snapshot("post-product-ui");
     /* 本地语音模型在 TiRTC TLS 建立后加载，避免两个启动峰值竞争内部 SRAM。 */
-    ESP_ERROR_CHECK(wifi_manager_start());
+    esp_err_t wifi_manager_start_err = wifi_manager_start();
+    if (wifi_manager_start_err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_manager_start failed: %s; recovery console retained",
+                 esp_err_to_name(wifi_manager_start_err));
+        return;
+    }
     log_heap_snapshot("post-wifi-start");
     /* NTP_SYNC_BACKGROUND_TASK: SNTP/HMAC waits never block app_main or LVGL. */
     /* This worker reads/writes NVS and loads the model partition. Both paths

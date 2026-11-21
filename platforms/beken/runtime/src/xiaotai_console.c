@@ -5,6 +5,8 @@
 #include <os/mem.h>
 #include <os/os.h>
 #include <stdbool.h>
+#include <stdatomic.h>
+#include "xiaotai_console_policy.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -510,8 +512,41 @@ static const struct cli_command s_commands[] = {
     {"restart", "Restart the device", command_restart},
 };
 
+static atomic_bool s_runtime_ready;
+static bool s_registered;
+static struct cli_command s_dispatch_commands[sizeof(s_commands)/sizeof(s_commands[0])];
+
+void xiaotai_console_set_runtime_ready(bool ready)
+{
+    atomic_store_explicit(&s_runtime_ready, ready, memory_order_release);
+}
+
+static void dispatch_command(char *output, int capacity, int argc, char **argv)
+{
+    if (argc < 1 || argv == NULL || argv[0] == NULL) return;
+    if (!atomic_load_explicit(&s_runtime_ready, memory_order_acquire) &&
+        !xiaotai_console_recovery_command(argv[0])) {
+        response(output, capacity,
+                 "Local runtime not ready; recovery configuration commands remain available.\r\n");
+        return;
+    }
+    for (size_t i = 0; i < sizeof(s_commands)/sizeof(s_commands[0]); ++i) {
+        if (strcmp(argv[0], s_commands[i].name) == 0) {
+            s_commands[i].function(output, capacity, argc, argv);
+            return;
+        }
+    }
+}
+
 int xiaotai_console_start(void)
 {
-    return cli_register_commands(s_commands,
+    if (s_registered) return BK_OK;
+    for (size_t i = 0; i < sizeof(s_commands)/sizeof(s_commands[0]); ++i) {
+        s_dispatch_commands[i] = s_commands[i];
+        s_dispatch_commands[i].function = dispatch_command;
+    }
+    int rc = cli_register_commands(s_dispatch_commands,
         (int)(sizeof(s_commands) / sizeof(s_commands[0])));
+    if (rc == BK_OK) s_registered = true;
+    return rc;
 }

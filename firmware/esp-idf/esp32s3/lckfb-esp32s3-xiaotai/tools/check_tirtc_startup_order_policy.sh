@@ -23,11 +23,18 @@ platform_line=$(rg -n -m1 'platform_client_start\(&platform\)' "$main_source" |
     fail 'TiRTC must reserve its contiguous internal heap before platform MQTT/TLS'
 
 app_main_body=$(sed -n '/^void app_main(void)/,/^}/p' "$main_source")
-if rg -q 'starter_console_start|starter_button_start' <<<"$app_main_body"; then
-    fail 'development controls must not reserve stacks before TiRTC startup'
+if rg -q 'starter_button_start' <<<"$app_main_body"; then
+    fail 'button controls must not reserve stacks before TiRTC startup'
 fi
 
-rg -Fq 'TIRTC_FIRST_CONTIGUOUS_HEAP' "$main_source" ||
+# Recovery commands must remain available when networking or TiRTC fails.
+# Their task is an intentional early internal-stack allocation.
+console_line=$(rg -n -m1 'starter_console_start\(' <<<"$app_main_body" | cut -d: -f1)
+media_line=$(rg -n -m1 'starter_media_init\(' <<<"$app_main_body" | cut -d: -f1)
+[[ -n "$console_line" && -n "$media_line" ]] || fail 'missing early recovery console'
+((console_line < media_line)) || fail 'recovery console must precede media initialization'
+
+rg -Fq 'TIRTC_FIRST_CONTIGUOUS_HEAP'  "$main_source" ||
     fail 'the startup memory invariant must remain documented in source'
 
 rg -Fq 'TIRTC_TGTRP_POLL_TIMEOUT_MS 20' "$tirtc_source" ||

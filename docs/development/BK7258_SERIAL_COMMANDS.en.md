@@ -150,3 +150,25 @@ ap_cmd ntp-reset
 Command registration, argument validation, and return text are in [`xiaotai_console.c`](../../platforms/beken/runtime/src/xiaotai_console.c); request handling is in [`xiaotai_app.c`](../../platforms/beken/runtime/src/xiaotai_app.c). Both boards link the same implementation.
 
 Refer to each guide for GPIO, serial wiring, and supported features.
+
+## Serial recovery during startup failures
+
+Recovery configuration commands open before media, UI, and networking initialization. They do not depend on
+Wi-Fi connectivity, binding, time synchronization, authentication, or platform availability.
+
+Use `wifi-set`, `wifi-clear`, `tirtc-clear`, `ntp-show/set/reset`, `ep-show/set/reset`, and `restart`
+with the arguments documented for your board. Prefix BK commands with `ap_cmd`; enter ESP32 commands directly.
+
+Until the local runtime is ready, `status` reports recovery mode; calls, media, and voice diagnostics return
+`Local runtime not ready`. Follow the command's restart message after a successful configuration change.
+
+A failed write must not report success or reboot the device.
+
+This entry cannot repair an unavailable serial driver, a system hang, or damaged Flash. If storage initialization
+fails, diagnostics and restart remain available, but saving configuration may fail.
+
+Validate unconfigured Wi-Fi, an unbound device, unreachable NTP, authentication failure, media initialization failure,
+and network reconnection.
+
+In each case query, change, reboot, and verify persistence. Host fault injection does not
+replace serial validation on hardware running the exact image.
