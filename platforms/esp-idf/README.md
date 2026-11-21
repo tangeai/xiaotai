@@ -69,7 +69,7 @@ PCM contract; its other peripherals remain behind Beken-specific board adapters.
 The CoreS3-Lite project uses the same product/runtime and the canonical S3 media
 pipeline in `components/starter_media_s3`. LCKFB's previous media source paths
 remain compatibility symlinks. M5 power, audio, camera, display and touch live
-under `boards/m5stack/cores3-lite`; explicit ILI9342C/E variants select panel
+under `boards/m5stack/cores3-lite`; the sole ILI9342C configuration selects panel
 commands. GPIO0 remains I2S MCLK, so this touch board's optional button startup
 succeeds without creating a GPIO polling task. Board identity is injected by
 the selected runtime component instead of inheriting LCKFB's reported name.

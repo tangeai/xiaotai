@@ -4,7 +4,7 @@
     "id": "m5stack-cores3-lite",
     "vendor": "M5Stack",
     "model": "CoreS3-Lite K128-Lite",
-    "hardware_revision": "PCB unconfirmed; schematic v1.0; explicit ILI9342C/E variants",
+    "hardware_revision": "PCB unconfirmed; schematic v1.0; project supports only ILI9342C per maintainer confirmation on 2026-11-21",
     "physical_revision_confirmed": false
   },
   "sources": [
@@ -103,12 +103,6 @@
       "kind": "official-vendor-document-or-source",
       "location": "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/products/core/CoreS3/AW9523B-CN.pdf",
       "revision": "downloaded 2026-10-20; SHA-256 24022acd5860b74eb898b08a93e09287bde1909fae3caab4eb27a8a2a1b12d42"
-    },
-    {
-      "id": "ILI9342E.pdf",
-      "kind": "official-vendor-document-or-source",
-      "location": "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/644/ILI9342E.pdf",
-      "revision": "downloaded 2026-10-20; SHA-256 2bcca2655e73d4b569583e518dc64b514678dea6ccb8b3ed8bfcf081bdc0c188"
     },
     {
       "id": "Panel_ILI9342.hpp",
@@ -444,18 +438,18 @@
     "artifacts": [
       {
         "path": "build/m5stack_cores3_lite_xiaotai.bin",
-        "size_bytes": 4023008,
-        "sha256": "4b7e26fac87d1f28c7fd2591e1f04bdb3f500111f2f6182e14aa62e45ae51ef7"
+        "size_bytes": 4032064,
+        "sha256": "9547bfe6012d0d661005a698b5f76b8345f1b8ec3af2c802b101cac7312f734a"
       },
       {
         "path": "build/m5stack_cores3_lite_xiaotai.elf",
-        "size_bytes": 29095812,
-        "sha256": "d9c32d8a034c1c4e67e82b5240a343be027a25efad9a647d900abd8869c25276"
+        "size_bytes": 29000044,
+        "sha256": "278caf8c34c20ec27b50499b2555fe263c1ba737cccce9950f53e6a9279b8adb"
       },
       {
         "path": "build/bootloader/bootloader.bin",
         "size_bytes": 20848,
-        "sha256": "baec2960de2b8d802c1417e7c399f1cd09c96c03d18ed12eba72bcffdbf650ef"
+        "sha256": "ef0f83c8aa08d30a09ea1dcedeb6f0dca1759b6033a5bb45bce85e8c7fb498b0"
       },
       {
         "path": "build/partition_table/partition-table.bin",
@@ -464,130 +458,12 @@
       }
     ],
     "status": "COMPILE_PASS",
-    "variant": "ili9342e",
-    "version": "1.0.1+build.42",
+    "variant": "ili9342c",
+    "version": "1.1.0+build.92",
     "idf_version": "v5.5.5",
-    "note": "M5 ILI9342E release build using tools/build.py --release on main at dbc262c; only the allocated BUILD_NUMBER differed at compile time. ESP-IDF v5.5.5, Oct 22 2026 16:32:44. Native build, post-link audit and BIN/ELF identity passed. Same firmware behavior as build.41; release-tool naming and documentation changed. User build.41 observations remain historical, not build.42 hardware acceptance. No serial device; exact build.42 requires HIL. Build.41 native images, ELF and delivery files retained in artifacts/1.0.1+build.41."
+    "note": "Default tools/build.py --board m5stack-cores3-lite --release, C-only worktree based on 54481a0. Native build and board regressions passed. No serial device; hardware validation pending. Not a replacement for published build.91."
   },
-  "runtime_evidence": [
-    {
-      "label": "User serial status, 2026-10-21, build.17",
-      "artifact_sha256": "f3e31adeabc3df82aaf5071ceb2a2129dc57ee00dce729edba862d6668f0d7fd",
-      "elf_sha256": "ad24d9071105f21e6c7ceb45f95492941b97d42ae8e22ed2cfaf7af9acf8c732",
-      "verification": "user_reported",
-      "acceptance_levels": [
-        "L2"
-      ],
-      "features": [
-        "ai_talk"
-      ],
-      "source_refs": [
-        "user-build17-status-20261021"
-      ],
-      "notes": "Version, compile time and ELF prefix match retained artifact. AI alaw/8000 input and opus/16000 output accepted. TX 9355, RX/decoded/played 1677, decode/i2s-fail 0; encode avg 144 us. Window 209: 1043 ms wall/1024 ms audio, capture-overflow 0, clipped mic 48. Partial observation only; natural interruption, ASR accuracy and long run not accepted. L2 records observed runtime only; L6 AI acoustic acceptance is not claimed."
-    },
-    {
-      "label": "CoreS3 cache-line B observation, 2026-10-21, build.24",
-      "artifact_sha256": "e0ee432861753a861ff8bed425d136e136a87909820462d53f9273139da1d404",
-      "elf_sha256": "468da465d80efa183f2d971804f8c0dacabdfd9c407640a8841215d944a6308f",
-      "verification": "measured",
-      "acceptance_levels": [
-        "L2"
-      ],
-      "features": [
-        "ai_talk"
-      ],
-      "source_refs": [
-        "tests/.local/cache-line-20261021/cache-B-boot.log",
-        "tests/.local/cache-line-20261021/cache-B-play.log",
-        "tests/.local/cache-line-20261021/cache-B-analysis.json"
-      ],
-      "notes": "Exact flash hashes and boot ELF verified; 8 MB PSRAM memory test, Wi-Fi, MQTT, wake startup observed. 80 AI playback windows in generation 5: mean wall 1111.04 ms per 1024 ms audio, AEC wrapper 32984.14 us. Two capture-overflow events in all sampled windows (one in sustained playback). Final playback drained RX/decoded/written=10855, RX overflow=0. Performance target FAIL; approximate cloud-audio scenario, settings values unconfirmed. A2 rollback to build.23 observed 25 sustained-playback windows: wall 1199.76 ms/1024 ms, AEC 36339.92 us, one capture-overflow event. A2 is below planned 30 samples; acoustic/full-product acceptance remains pending. Device restored to build.23; defaults/build tree retain the unaccepted 64 B candidate."
-    },
-    {
-      "label": "Cache A2 rollback and six AI lifecycle cycles, 2026-10-21, build.23",
-      "artifact_sha256": "0a9882af66047bc9ea558c8c840b7e4b20033e2589d305fbf1bd21c41a4c3fbf",
-      "elf_sha256": "a1acc050242e400abd701bfcc64cab6d475ad02ebf221a944a8754a7c94fe45b",
-      "verification": "measured",
-      "acceptance_levels": [
-        "L2"
-      ],
-      "features": [
-        "ai_talk"
-      ],
-      "source_refs": [
-        "tests/.local/cache-line-20261021/cache-A-boot.log",
-        "tests/.local/cache-line-20261021/cache-A2-active.log",
-        "tests/.local/cache-line-20261021/cycle-snapshots.json",
-        "tests/.local/cache-line-20261021/REPORT.md"
-      ],
-      "notes": "Restored exact build.23 identity, NVS preserved. A2: 25 sustained playback windows, mean wall 1199.76 ms/1024 ms, AEC wrapper 36339.92 us, one observed capture overflow. Below planned 30 windows. Six serial AI start/stop cycles generations 2..7: active then waiting, last-error=0, wake listening restored. Largest internal block 24576 throughout. Transient heap reduction recovered during idle to pre-cycle level. Acoustic double-talk, touch, weak-network and other media modes not certified; no L6 claim."
-    },
-    {
-      "label": "CoreS3 caption PSRAM runtime, 2026-10-21, build.25",
-      "artifact_sha256": "22692abfd31f1c598d68ecb5ef7eb4b00e83cd6ba4700b7df414ea2f7cd80245",
-      "elf_sha256": "95c555add4b155a71cfc451f6d12caaf6b6439603ecfc25d66e9dd4ff671bbd9",
-      "verification": "measured",
-      "acceptance_levels": [
-        "L2"
-      ],
-      "features": [
-        "ai_talk"
-      ],
-      "source_refs": [
-        "cores3-build25-HIL.md",
-        "cores3-build25-flash25.log",
-        "cores3-build25-boot25.log",
-        "cores3-build25-play25-analysis.json",
-        "cores3-build25-lifecycle25.json",
-        "cores3-build25-QUIET_SPEECH.md",
-        "cores3-build25-DOUBLETALK.md"
-      ],
-      "notes": "Native three-image flash verified, boot version/ELF prefix match, PSRAM test and bound Wi-Fi/MQTT startup pass. Six AI cycles generations 2..7 enter active then waiting/wake, last-error=0. Final idle internal-free=53895 and largest=29696 stable at 92/122/152 seconds, PSRAM-free=6587944. 61 sampled sustained-playback windows: mean wall/audio=1086.95/1024 ms, AEC wrapper=31866.11 us, one observed capture overflow; realtime target not met. Initial playback RX/decoded/written=10157, decode/I2S/RX-overflow=0. One reconnect generation recorded media dropped=1, cause unresolved. Visual captions/touch, subjective audio, double-talk, NVS save/unbind and other media modes not certified. No L6 claim. Device left build.25 waiting with wake enabled; serial observer closed. Subsequent user session 8 feedback: interruption difficult and recognition often poor even with playback stopped; acoustic acceptance FAIL (user reported). Read-only status confirmed same firmware and session, no decode/I2S errors; historical counters cannot localize the near-end speech loss. Follow-up controlled tests: quiet complete-sentence recognition 3/3 correct; one complete-sentence barge-in correct. At about 30 cm, formula short-phrase barge-in required two repetitions and only the final part was recognized. Subsequent controlled quiet formula recognized correctly once. Double-talk acceptance remains FAIL; these limited quiet passes do not certify all speech. No tuning applied."
-    },
-    {
-      "label": "User build.36 AI face observation, 2026-10-22",
-      "artifact_sha256": "2bdef58d4f9acee244eb94da4b1478e4015dc7932856ded43e2fc2d3100a43f9",
-      "elf_sha256": "e2bcb5dd18d99ab05e6422b6adaff421d96c6545ed0951a0777465cea444aada",
-      "verification": "user_reported",
-      "acceptance_levels": [],
-      "features": [
-        "ai_talk"
-      ],
-      "source_refs": [
-        "VALIDATION.md"
-      ],
-      "notes": "User status version/time/ELF prefix match retained build.36. Two face snapshots: ai=1 phase=3 tag=1 emotion=happy pcm=1, columns=6775666 then 5555555; mouth reported static. Consistent with explicit TAG priority. No inference whether this TAG belongs to song or introduction; no full hardware acceptance."
-    },
-    {
-      "label": "User build.38 short-phrase observations, 2026-10-22",
-      "artifact_sha256": "d42d19f468356458f4f499a8b5bd7bdb19e433324ea26d9a30c72247746e98d8",
-      "elf_sha256": "b1b3d28387a815706fb7d7f294385681e68da0e40c88891bf3232666dc255163",
-      "verification": "user_reported",
-      "acceptance_levels": [],
-      "features": [
-        "ai_talk"
-      ],
-      "source_refs": [
-        "VALIDATION.md"
-      ],
-      "notes": "Version and ELF prefix match retained artifacts/1.0.1+build.38. User reports short phrases missed at about 30 cm and long phrases better. Several quiet voice windows preserve mic/AEC RMS, continuous SDK submissions, no recorded capture overflow; repeated same-group final ASR events lack transcript/mode. Does not localize onset loss or certify network/cloud receipt."
-    },
-    {
-      "label": "User build.41 music mouth and performance observation, 2026-10-22",
-      "artifact_sha256": "339a547337d437bde25f69f21f62a6e3fb32e2ac1a258b866bb9aa56aa1b5992",
-      "elf_sha256": "4d60e843d6ba761b58a2d0316b5a678f74e449e7643970d231636c56f78f15a5",
-      "verification": "user_reported",
-      "acceptance_levels": [],
-      "features": [
-        "ai_talk"
-      ],
-      "source_refs": [
-        "VALIDATION.md"
-      ],
-      "notes": "User confirms music mouth restored; subsequent status version/time/ELF prefix match build.41. Generation 2 active, RX/decoded/played 1870/1868/1867, pending 3; decode/I2S/RX-overflow/application drops zero. Window 357 wall/audio 1179/1024 ms, AEC average 34385 us, capture overflow and clipping zero. Cumulative AEC misses 485, processed 1387, mic clipped 5356. UI 26 refreshes per 5005 ms, total wall render/transfer 1060 ms, max 165 ms. Real-time headroom remains limited; no full acoustic, long-run, other-board or product acceptance claim."
-    }
-  ],
+  "runtime_evidence": [],
   "features": {
     "requested": [
       "h5_live_audio",

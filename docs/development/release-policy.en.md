@@ -21,7 +21,9 @@ Create annotated tags that state when and why a historical milestone was recorde
 | `v1.2.0-beta.1` | 2026-11-21 | `1e9f0811f251c8d9fdab7b910ba2c74bc7596ec1` | PLC/FEC, SDK, serial recovery and lifecycle fixes; current test distribution |
 | `v1.2.0` | Pending acceptance | Undetermined | Stable distribution; do not create it early as a substitute for beta |
 
-`v1.0.0` and `v1.1.0` are retrospective source tags only. Do not invent unified historical firmware or hardware acceptance. Historical Release pages remain as evidence, but deleting their tags invalidates old asset URLs. The current download page lists only the unified beta.
+`v1.0.0` and `v1.1.0` are retrospective source tags with archives of actual historical complete BINs. Each board retains its original embedded version, build source, and hash; not all images were compiled from the unified tag.
+
+M5 archives contain only ILI9342C; v1.1.0 reuses its older build.48. LCKFB S3 build.68 still has a known issue, so v1.1.0 remains pre-release. Original Release pages remain evidence; old asset URLs expired with their tags, and the download page links to the new archives.
 
 Reproduce historical source using the commit SHA in those notes, not deleted board tags.
 

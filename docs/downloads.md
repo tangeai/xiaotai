@@ -91,6 +91,13 @@ M5Stack CoreS3-Lite / M5Stack CoreS3-Lite
 
 [烧录步骤与开发板指南](boards/mgkfb-bk7258/README.md)
 
+## 历史固件归档
+
+- [v1.0.0：五板历史完整 BIN](https://github.com/tangeai/xiaotai/releases/tag/v1.0.0)。
+- [v1.1.0：五板历史完整 BIN](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0)；归档的立创 S3 镜像存在 AI 已知问题，保留 pre-release。
+
+归档保留实际内嵌版本与哈希，供复现历史使用；当前测试使用上方 v1.2.0-beta.1。
+
 ## 二次开发
 
 先阅读[架构与二次开发](../ARCHITECTURE.md)，工具链、SDK、原生工程、编译与调试步骤见各板指南。

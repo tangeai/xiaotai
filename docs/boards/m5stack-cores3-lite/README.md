@@ -4,24 +4,17 @@
 
 [中文](README.md) · [English](README.en.md)
 
-板卡 ID：`m5stack-cores3-lite`。两种屏幕固件的当前版本见[固件下载](../../downloads.md#m5stack-cores3-lite)。
+板卡 ID：`m5stack-cores3-lite`。当前固件版本见[固件下载](../../downloads.md#m5stack-cores3-lite)。
 短句识别、AI 打断和双讲效果仍需回归；详情见[验证状态与已知限制](#验证状态与已知限制)。
 
 ## 烧录
 
 文件名中的版本为统一发行版本，设备内嵌版本按发布页的对应关系核对。只下载完整 BIN，无需解压；截图中的版本和路径仅作示例。
 
-### 烧录前确认屏幕型号
+### 确认开发板
 
-先核对实物是否为 **CoreS3-Lite K128-Lite**，再向购买渠道或 M5Stack 确认屏幕控制器是
-`ILI9342E` 还是 `ILI9342C`，以明确的器件型号为准。不能仅凭购买日期、产品名或外壳外观推断；
-官方资料说明同系列存在两种面板，[M5GFX 的面板识别实现](https://github.com/m5stack/M5GFX/releases/tag/0.2.30)
-也分别处理 C/E。无法确认时先向销售方索取屏幕型号，再从下表选择对应固件。
-
-| 屏幕控制器 | 完整镜像 |
-|---|---|
-| ILI9342E | [下载对应 merged BIN](../../downloads.md#m5stack-cores3-lite) |
-| ILI9342C | [下载对应 merged BIN](../../downloads.md#m5stack-cores3-lite) |
+本项目仅支持 **CoreS3-Lite K128-Lite / ILI9342C**。下载页只提供这一种完整镜像，
+不需要选择屏幕型号，也不提供其他面板的构建配置。
 
 ### 打开烧录工具
 
@@ -31,11 +24,11 @@
 
 ### 烧录步骤
 
-1. 从上表按屏幕控制器下载对应的完整 `merged.bin`。烧录时只选择这一个 BIN，地址为 **`0x0`**。
+1. 从下载页获取本板完整 `_merged.bin`。烧录时只选择这一个 BIN，地址为 **`0x0`**。
 2. 使用本机 Type-C 接口连接电脑。长按底侧复位键约 3 秒，绿色灯亮后松开，灯熄灭后进入下载模式。识别结果必须是 **ESP32-S3**。
 3. 在网页工具的 **Program** 区域选择 `Baudrate`（可先用 `921600`，不稳定时改为 `115200`），点击 **Connect** 并选择本板串口。桌面串口方式不勾选 `WebUSB (CH340)`。
 4. 点击 **Choose File** 选择下载的完整 BIN，**Flash Address 改为 `0x0`**；Flash Mode、Flash Frequency、Flash Size 均选 `keep`。只添加这一行，点击 **Program**。
-5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `m5stack_cores3_lite_xiaotai`，以及下载包对应屏幕变体和完整版本，再进入“首次使用”。
+5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `m5stack_cores3_lite_xiaotai`，以及发布说明列出的内嵌版本，再进入“首次使用”。
 
 连接位置和烧录参数见下图，图中的端口号与路径只是示例：
 
@@ -47,7 +40,7 @@
 `keep` 仅保留镜像中的 Flash 参数，不表示保留设备配置。若网页连接失败，按第 2 步进入下载模式后重连；
 若写入或校验失败，检查串口、数据线、文件和地址后重试，不按进度条 100% 判定成功。
 
-完整镜像为 `v<发行版本>_m5stack-cores3-lite_<屏幕变体>_merged.bin`，只烧录这一份，地址 `0x0`。
+完整镜像为 `v<发行版本>_m5stack-cores3-lite_ili9342c_merged.bin`，只烧录这一份，地址 `0x0`。
 
 如需校验，使用发布说明中的 BIN SHA-256；Windows 用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`，
 Linux 用 `sha256sum "实际BIN路径"`，macOS 用 `shasum -a 256 "实际BIN路径"`。
@@ -77,12 +70,12 @@ Wi-Fi 和绑定凭证保存在 NVS，源码不带账号或密码。
 
 ```bash
 . tools/activate_esp_idf.sh
-python3 tools/build.py --board m5stack-cores3-lite --variant ili9342e
+python3 tools/build.py --board m5stack-cores3-lite --variant ili9342c
 cd firmware/esp-idf/esp32s3/m5stack-cores3-lite
 idf.py -p <串口> flash monitor
 ```
 
-示例选择 ILI9342E；实物为 ILI9342C 时，将 `--variant` 改为 `ili9342c`。
+默认与显式构建均选择 ILI9342C。
 `<串口>` 换成本机实际端口；`idf.py` 会使用工程烧录清单和正确地址。
 普通升级不执行 `erase-flash`。示例命令截图不代表已在当前硬件执行：
 
@@ -94,7 +87,7 @@ idf.py -p <串口> flash monitor
 |---|---|
 | 芯片 / 当前框架 | ESP32-S3 / **ESP-IDF v5.5.5** |
 | 存储 | 16 MB Flash / 8 MB Quad PSRAM，PSRAM 配置 80 MHz |
-| 屏幕 / 触摸 | 320×240 ILI9342C 或 ILI9342E / FT6336U |
+| 屏幕 / 触摸 | 320×240 ILI9342C / FT6336U |
 | 摄像头 | GC0308，板载 24 MHz 时钟 |
 | 音频 | ES7210 双麦输入及电气回采；AW88298 + 1 W 扬声器 |
 | 电源 | AXP2101 + AW9523B，200 mAh 电池（官方规格，未测容量） |
@@ -207,11 +200,11 @@ M5 工程通过组件私有定义 `XIAOTAI_UI_TEXT_PSRAM=1`，将 AI 字幕历�
 ```bash
 . tools/activate_esp_idf.sh
 idf.py --version
-python3 tools/build.py --board m5stack-cores3-lite --variant ili9342e
-# 若实物为 ILI9342C，将上一条命令的 ili9342e 改为 ili9342c。
+python3 tools/build.py --board m5stack-cores3-lite --variant ili9342c
+
 ```
 
-省略 `--variant` 选择 `ili9342e`。切换会重新配置面板命令表，不会运行时猜测屏幕。
+省略 `--variant` 选择唯一的 `ili9342c`，原生工程也拒绝其他面板配置。
 原生输出在 `firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/`，应用为
 `m5stack_cores3_lite_xiaotai.bin` / `.elf`；烧录地址以同目录 `flasher_args.json` 为准。
 独立 `BUILD_NUMBER` 每次编译递增，失败也消耗编号，不自动改变产品版本。
@@ -262,15 +255,14 @@ bash tools/check.sh
 结果滚动两次并语音播报。通话、实时查看、AI 对话和房间业务占用期间暂停识别。
 MIC3 回放参考不进入识别录音，阈值与实际声学表现仍待 M5 实板验证。
 
-M5 已完成实板验证，已验证的发布记录为 **v1.0.1 · build.47 / ILI9342E** 和
-**v1.0.1 · build.48 / ILI9342C**。
+历史 ILI9342C 发布记录为 **v1.0.1 · build.48**；当前 beta 尚待实板验收，不能沿用历史通过结论。
 功能与修复列表见[发布记录](FREEZE.md)，具体构建身份、验证范围和历史日志见
 [验证记录](../../../boards/m5stack/cores3-lite/VALIDATION.md)。
 
 - 收音、AI 打断和双讲效果仍需持续测试；短句“好的”识别不稳定、可能丢失句首的问题尚未修复。
 - 本版不提供录音导出到 TF 卡的实验功能。诊断使用 `voice-diag`、`status` 和 `face-animation`。
 - 播放期间的 AEC 与 UI 实时处理余量仍偏紧；弱网、反复切换和长时间运行需持续回归。分析见[音频性能排查](AUDIO_PERFORMANCE_REVIEW.md)。
-- 按屏幕控制器选择对应固件，当前版本见下载页。
+- 仅提供本板 ILI9342C 完整固件，当前版本见下载页。
 - SD 卡、IMU、磁力计、接近传感器和 RTC 尚未接入小钛产品功能。
 
 ## 串口配置时间服务器

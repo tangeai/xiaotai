@@ -88,6 +88,13 @@ For the **8 MiB Flash, dual-eye-display** board.
 
 [Flashing and board guide](boards/mgkfb-bk7258/README.en.md)
 
+## Historical firmware archives
+
+- [v1.0.0: five historical complete BINs](https://github.com/tangeai/xiaotai/releases/tag/v1.0.0).
+- [v1.1.0: five historical complete BINs](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0); pre-release because the archived LCKFB S3 image has a known AI issue.
+
+Archives retain actual embedded versions and hashes. They are for historical reproduction; current testing uses v1.2.0-beta.1 above.
+
 ## Development
 
 Start with [Architecture](../ARCHITECTURE.en.md) and the board guides for SDKs, native project paths, build and debugging steps. Use [source setup](../README.en.md#build-from-source) and `tools/build.py --board <board-id>`; select the correct M5 screen variant.

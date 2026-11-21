@@ -204,7 +204,7 @@ LCKFB S3 也使用相同的 32 KB / 32 B 默认配置，但其硬件与负载不
 
 ### build.24 已完成的离线对照
 
-- 默认屏幕：ILI9342E；ESP-IDF v5.5.5；版本 `1.0.1+build.24`。
+- 历史性能对照构建：ESP-IDF v5.5.5，`1.0.1+build.24`；其面板支持记录已撤销，不作为当前硬件验收。
 - 原生应用：`firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/m5stack_cores3_lite_xiaotai.bin`，
   大小 4020912 字节，SHA-256：
   `e0ee432861753a861ff8bed425d136e136a87909820462d53f9273139da1d404`。
