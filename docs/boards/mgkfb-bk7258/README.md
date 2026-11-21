@@ -13,7 +13,7 @@
 
 ## 烧录
 
-文件名中的 `<版本>` 代表下载页列出的完整版本（含 build 编号）。操作时选择实际下载的文件，并核对包内清单；截图中的版本和路径仅作示例。
+文件名中的版本为统一发行版本，设备内嵌版本按发布页的对应关系核对。只下载完整 BIN，无需解压；截图中的版本和路径仅作示例。
 
 当前版本见[固件下载](../../downloads.md#mgkfb-bk7258)，适用于 **8 MiB Flash 的觅感 BK7258 双屏板**。
 
@@ -32,11 +32,11 @@
 
 ### 烧录步骤
 
-1. 下载并解压 [固件包（ZIP）](../../downloads.md#mgkfb-bk7258)。
+1. 下载 [完整镜像（BIN）](../../downloads.md#mgkfb-bk7258)。
 2. 用本板通讯 Type-C 连接电脑，关闭占用串口的日志终端，打开 BKFIL，点击 **Select Port** 选择对应 COM 口。
-3. 选择所下载固件包中的 **`-all-app.bin`**，起始地址为 **`0x00000000`**。
+3. 选择下载的 **`_all-app.bin`**，起始地址为 **`0x00000000`**。
 4. 启动下载，按工具提示复位或重新上电完成下载握手；等待写入及工具校验完成，再重新上电。
-5. 打开 115200 波特率日志，核对板卡 `mgkfb-bk7258` 和所下载包的完整版本，再进行配网与绑定。
+5. 打开 115200 波特率日志，核对板卡 `mgkfb-bk7258` 和发布说明列出的内嵌版本，再进行配网与绑定。
 
 下面是 [BKFIL v4 官方操作指南](https://docs.bekencorp.com/arminodoc/bk_app/bkfil_v4/zh_CN/latest/quick_start/quick_start_guide/quick_start_guide.html#id3)中的界面截图，红框标出了操作位置。
 
@@ -46,8 +46,8 @@
 
 ![BKFIL 选择串口和波特率，红框标出设置位置](../../images/flashing/bkfil-select-port.png)
 
-**选择固件。** 点击 **Select BIN**，选择解压后的
-`mgkfb-bk7258-<版本>-all-app.bin`。
+**选择固件。** 点击 **Select BIN**，选择下载的
+`v<发行版本>_mgkfb-bk7258_all-app.bin`。
 
 ![BKFIL 选择固件，红框标出 Select BIN 按钮](../../images/flashing/bkfil-select-bin.png)
 
@@ -59,12 +59,9 @@
 
 | 文件 | 用途 |
 |---|---|
-| `mgkfb-bk7258-<版本>-all-app.bin` | **直接用于串口烧录**，起始地址 **`0x0`** |
-| `mgkfb-bk7258-<版本>-app_pack.rbl` | **不能用于串口烧录**；OTA（无线升级）尚未验证，暂不使用 |
-| `MANIFEST.json` | 文件信息与校验清单，不用于烧录 |
-| `symbols/`、`partitions/`、`build_identity.json` | 开发排查资料，不用于烧录 |
+| `v<发行版本>_mgkfb-bk7258_all-app.bin` | **直接用于串口烧录**，起始地址 **`0x0`** |
 
-如需核验文件，使用固件包内 `MANIFEST.json` 中的 SHA-256 校验值。
+如需核验文件，使用发布说明中的 BIN SHA-256 校验值。
 
 烧录接口使用 UART0（TX GPIO11、RX GPIO10）。
 首次烧录前请备份原厂固件和射频校准资料。日常更新使用 **Download** 写入固件，保留数据分区。

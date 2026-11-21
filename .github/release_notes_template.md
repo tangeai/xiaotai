@@ -22,9 +22,9 @@ This file is a project convention, not an automatically applied GitHub feature.
 | 版本 / 类型 | {{统一发行版本}} · {{正式发布 / pre-release}} |
 | 比较基线 | {{同板同变体的上一版本或明确的源码提交；缺失时如实说明}} |
 
-| 开发板（中文） | Board (English) | 硬件 / 屏幕变体 | BIN 下载链接 | 内嵌固件身份 |
+| 开发板（中文） | Board (English) | 开发板实物图 | BIN 下载链接 | 内嵌固件身份 |
 | --- | --- | --- | --- | --- |
-| {{中文型号}} | {{English model}} | {{变体}} | {{实际 BIN 链接}} | {{实际产品版本与 build}} |
+| {{中文型号}} | {{English model}} | {{主页对应开发板图片}} | {{实际 BIN 链接}} | {{实际产品版本与 build}} |
 
 ### 新增
 
@@ -66,9 +66,9 @@ This file is a project convention, not an automatically applied GitHub feature.
 | Version / channel | {{Unified distribution version}} · {{Stable / pre-release}} |
 | Comparison baseline | {{Previous version for the same board/variant or explicit source commit; disclose if unavailable}} |
 
-| 开发板（中文） | Board (English) | Hardware / display variant | BIN download link | Embedded firmware identity |
+| 开发板（中文） | Board (English) | Board photo | BIN download link | Embedded firmware identity |
 | --- | --- | --- | --- | --- |
-| {{Chinese model}} | {{English model}} | {{Variant}} | {{Actual BIN link}} | {{Actual product version and build}} |
+| {{Chinese model}} | {{English model}} | {{Matching board image from the homepage}} | {{Actual BIN link}} | {{Actual product version and build}} |
 
 ### Added
 

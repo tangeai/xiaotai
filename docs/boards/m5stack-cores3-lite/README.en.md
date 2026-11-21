@@ -8,7 +8,7 @@ Board ID: `m5stack-cores3-lite`. See [Downloads](../../downloads.en.md#m5stack-c
 
 ## Flashing
 
-`<version>` in filenames means the full download-page version, including build number. Use actual downloaded files and verify the manifest; screenshot versions and paths are examples.
+The filename uses the distribution version; compare embedded firmware identity with the release notes. Download one complete BIN without extraction. Screenshot versions and paths are examples.
 
 ### Identify the screen first
 
@@ -16,10 +16,10 @@ Confirm the device is **CoreS3-Lite K128-Lite**, then ask the seller or M5Stack 
 
 Official materials describe both panels, and [M5GFX panel detection](https://github.com/m5stack/M5GFX/releases/tag/0.2.30) handles C/E separately. If uncertain, obtain the controller model from the seller before choosing firmware.
 
-| Controller | Merged image for first flashing | Split package for retaining settings |
-|---|---|---|
-| ILI9342E | Check [Downloads](../../downloads.en.md#m5stack-cores3-lite) for availability | Check [Downloads](../../downloads.en.md#m5stack-cores3-lite) for availability |
-| ILI9342C | [Merged BIN](../../downloads.en.md#m5stack-cores3-lite) | [Firmware ZIP](../../downloads.en.md#m5stack-cores3-lite) |
+| Controller | Complete image |
+|---|---|
+| ILI9342E | [Download matching merged BIN](../../downloads.en.md#m5stack-cores3-lite) |
+| ILI9342C | [Download matching merged BIN](../../downloads.en.md#m5stack-cores3-lite) |
 
 ### Open the flashing tool
 
@@ -43,20 +43,13 @@ Connection and programming controls are shown below; port numbers and paths are 
 
 Repeat step 2 for connection failures; check the port, cable, file, and address for write/verification failures. A 100% progress bar alone does not prove success.
 
-| Download or package file | Purpose |
-|---|---|
-| Correct variant's `-merged.bin` | **Flash directly**, this file only, at `0x0` |
-| Correct variant's `-validation.zip` | Extract and flash individual files at the addresses below |
-| `m5stack_cores3_lite_xiaotai.bin` | Application at `0x10000`; not a complete image for `0x0` |
-| `MANIFEST.json`, `flasher_args.json`, `flash_args`, ELF | Manifests/diagnostics; do not flash directly |
+The complete image is `v<release-version>_m5stack-cores3-lite_<display-variant>_merged.bin`. Flash only this file at `0x0`.
 
-The corresponding Release's `SHA256SUMS` contains the complete BIN checksum.
-
-Windows: `Get-FileHash -Algorithm SHA256 "path-to-BIN"`; Linux: `sha256sum "path-to-BIN"`; macOS: `shasum -a 256 "path-to-BIN"`. Individual hashes are in `MANIFEST.json`; release-asset hashes are in `SHA256SUMS` on the corresponding Release.
+Compare its SHA-256 with the release notes. Use `Get-FileHash -Algorithm SHA256 "BIN-path"` on Windows, `sha256sum "BIN-path"` on Linux, or `shasum -a 256 "BIN-path"` on macOS.
 
 ## First use
 
-Confirm the merged image was flashed at `0x0` and the device rebooted. For split files, confirm all 3 BINs were written at their listed addresses. Use either method, then configure Wi-Fi and bind.
+Confirm the complete `_merged.bin` was flashed at `0x0` and the device rebooted, then configure Wi-Fi and bind.
 
 1. **Wi-Fi:** without saved credentials, the screen prompts for setup. Connect a phone/computer to the open hotspot beginning `XiaoTai-`; “no internet” is normal. Select 2.4 GHz Wi-Fi in the setup page, enter the password, and submit. If no page opens, visit `http://192.168.6.1`. A reappearing hotspot indicates failure; check password and signal.
 2. **Binding:** after connection, the display shows a six-digit code. Restore the phone/computer's internet connection, open the [XiaoTai device page](https://xiaotai.chat/devices), sign up or sign in, and enter the code under Add device. Use a refreshed code if expired. The home screen and an entry in the device list indicate success.
@@ -65,20 +58,6 @@ Confirm the merged image was flashed at `0x0` and the device rebooted. For split
 Wi-Fi and binding credentials are stored in NVS; source code contains no account or password.
 
 ## Other flashing methods
-
-### Split-file flashing
-
-Download and extract the ZIP for the correct display controller. Verify this board/version's **3 BINs** against `MANIFEST.json` and `flasher_args.json`:
-
-| File | Address | Purpose |
-|---|---|---|
-| `bootloader/bootloader.bin` | `0x0` | Bootloader |
-| `partition_table/partition-table.bin` | `0x8000` | Partition table |
-| `m5stack_cores3_lite_xiaotai.bin` | `0x10000` | Application; never write at 0x0 |
-
-Use **Add File** for each BIN and enter its address, then **Program**. Do not also add the merged image. Bootloader addresses vary by board. To retain settings, first check partition compatibility and avoid full-chip erase.
-
-![CoreS3-Lite split files and addresses](../../images/flashing/web-split-m5stack-cores3-lite.png)
 
 ### Build and flash from source
 

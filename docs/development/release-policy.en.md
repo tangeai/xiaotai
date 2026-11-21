@@ -10,7 +10,9 @@ The Release title must exactly match its tag, for example `v1.2.0-beta.1`. Put b
 
 ## Timeline and versions
 
-These unified milestones follow source history without rewriting board version history. Retain existing tags without moving or deleting them. Create annotated tags that state when and why a historical milestone was recorded; never backdate their creation to imply an original release date.
+These unified milestones follow source history without rewriting board version history. This maintainer-authorized migration removes legacy non-version tags after backing up tag objects, commit mappings, and a recovery bundle. Only the first three version tags below remain afterward.
+
+Create annotated tags that state when and why a historical milestone was recorded; never backdate their creation to imply an original release date.
 
 | Tag | Source date | Commit | Meaning |
 |---|---|---|---|
@@ -19,7 +21,11 @@ These unified milestones follow source history without rewriting board version h
 | `v1.2.0-beta.1` | 2026-11-21 | `1e9f0811f251c8d9fdab7b910ba2c74bc7596ec1` | PLC/FEC, SDK, serial recovery and lifecycle fixes; current test distribution |
 | `v1.2.0` | Pending acceptance | Undetermined | Stable distribution; do not create it early as a substitute for beta |
 
-`v1.0.0` and `v1.1.0` are retrospective source tags only. Do not invent unified historical firmware or hardware acceptance. Historical BINs, notes, and evidence remain in their original board Releases.
+`v1.0.0` and `v1.1.0` are retrospective source tags only. Do not invent unified historical firmware or hardware acceptance. Historical Release pages remain as evidence, but deleting their tags invalidates old asset URLs. The current download page lists only the unified beta.
+
+Reproduce historical source using the commit SHA in those notes, not deleted board tags.
+
+Keep version tags immutable; this one-time cleanup does not authorize routine tag deletion.
 
 Use `1.2.1` for compatible fixes, `1.3.0` for compatible features, and `2.0.0` for breaking changes; build counts do not determine minor versions.
 
@@ -33,7 +39,6 @@ Use `1.2.1` for compatible fixes, `1.3.0` for compatible features, and `2.0.0` f
 | MGKFB BK7258 | `1.0.3+build.49` |
 | LCKFB ESP32-S3 | `1.1.0+build.82` |
 | Waveshare ESP32-P4 | `1.1.0+build.48` |
-| M5 ILI9342E | `1.1.0+build.90` |
 | M5 ILI9342C | `1.1.0+build.91` |
 
 Record distribution version, channel, board ID, variant, embedded version, build number, original build commit, integrated commit, and download BIN SHA-256 in release notes. When build and release commits differ, retain source-equivalence evidence and distinguish the identities.
@@ -42,17 +47,18 @@ Align base firmware versions to `1.2.0` during subsequent firmware changes; this
 
 ## Downloads
 
-Use `v<distribution-version>_<board-id>[_<variant>].bin`, omitting the suffix for a sole default variant. The release overview and download page must map each BIN link to the board’s Chinese and English names and hardware/display variant.
+Use `v<distribution-version>_<board-id>[_<variant>]_<image-type>.bin`, optionally omitting the suffix for a sole default variant. The release overview and download page must map each BIN link to the board’s Chinese and English names and the matching homepage photograph, without a separate display column.
 
-The current five boards have six variants. Retain both version and hardware identity to prevent confusion after download.
+The image type must be included: `merged` for ESP or `all-app` for BK.
+
+The current five boards have five complete images. Retain both version and hardware identity to prevent confusion after download.
 
 ```text
-v1.2.0-beta.1_lckfb-bk7258.bin
-v1.2.0-beta.1_mgkfb-bk7258.bin
-v1.2.0-beta.1_lckfb-esp32s3.bin
-v1.2.0-beta.1_waveshare-esp32p4-touch-lcd-43c-v10.bin
-v1.2.0-beta.1_m5stack-cores3-lite_ili9342e.bin
-v1.2.0-beta.1_m5stack-cores3-lite_ili9342c.bin
+v1.2.0-beta.1_lckfb-bk7258_all-app.bin
+v1.2.0-beta.1_mgkfb-bk7258_all-app.bin
+v1.2.0-beta.1_lckfb-esp32s3_merged.bin
+v1.2.0-beta.1_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin
+v1.2.0-beta.1_m5stack-cores3-lite_ili9342c_merged.bin
 ```
 
 ESP downloads are complete raw BINs merged using actual native `flasher_args.json` addresses, with base `0x0`. Verify every segment, address, total length, and `0xFF` padding. Include P4 OTA initialization data.
@@ -71,13 +77,13 @@ Then copy to public names and compare bytes without increasing build counters. C
 
 Branch from current `main`, use PR review, CI and Squash merge, and verify the integrated commit before release. Do not use `develop` or a permanent release integration branch. Protect both `refs/tags/v*` and historical `refs/tags/*-v*` against updates and deletion.
 
-Verify actual GitHub settings; documentation alone does not enable protection.
+For one-time migration deletion, temporarily exclude only the exact old refs, then restore and verify protection. Verify actual GitHub settings; documentation alone does not enable protection.
 
 Use the [bilingual template](../../.github/release_notes_template.md) and verify board-specific changes against an explicit baseline. Each section may list boards separately. Chinese and English versions must agree on identities, hashes, known issues, and validation scope.
 
 Host checks and native builds with pending hardware testing permit only pre-release, never Latest; retain `BUILD_VERIFIED_HIL_PENDING`. Never substitute stale firmware for a failed variant; explain omissions.
 
-After publication, check tag targets, pre-release state, asset set and names, and download every BIN to verify SHA-256. Update beta navigation only after remote verification, leaving stable links unchanged. Do not overwrite historical releases or assets.
+After publication, check tag targets, pre-release state, asset set and names, and download every BIN to verify SHA-256. Update beta navigation only after remote verification, never labeling the beta as stable; there is currently no unified stable download. Do not overwrite historical releases or assets.
 
 Hardware acceptance applies to exact BIN bytes. An accepted BIN may be promoted to stable by external renaming without changing its hash. Changing embedded versions or recompiling requires new validation. Include only accepted boards/variants in stable releases; never borrow another variant's results.
 

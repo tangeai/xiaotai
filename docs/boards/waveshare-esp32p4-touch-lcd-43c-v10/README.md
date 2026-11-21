@@ -9,7 +9,7 @@
 
 ## 烧录
 
-文件名中的 `<版本>` 代表下载页列出的完整版本（含 build 编号）。操作时选择实际下载的文件，并核对包内清单；截图中的版本和路径仅作示例。
+文件名中的版本为统一发行版本，设备内嵌版本按发布页的对应关系核对。只下载完整 BIN，无需解压；截图中的版本和路径仅作示例。
 
 ### 打开烧录工具
 
@@ -23,7 +23,7 @@
 2. 使用板上的 **USB TO UART** Type-C 接口连接电脑，不要连接 USB OTG 或 C6 烧录焊盘。连接失败时按住 BOOT，按一下 RESET，再松开 BOOT。识别结果必须是 **ESP32-P4**；若显示 ESP32-C6，检查接口。
 3. 在网页工具的 **Program** 区域选择 `Baudrate`（可先用 `921600`，不稳定时改为 `115200`），点击 **Connect** 并选择本板串口。桌面串口方式不勾选 `WebUSB (CH340)`。
 4. 点击 **Choose File** 选择下载的完整 BIN，**Flash Address 改为 `0x0`**；Flash Mode、Flash Frequency、Flash Size 均选 `keep`。只添加这一行，点击 **Program**。
-5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `xiaotai_esp32p4` 和所下载包的完整版本，再进入“首次使用”。
+5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `xiaotai_esp32p4` 和发布说明列出的内嵌版本，再进入“首次使用”。
 
 连接位置和烧录参数见下图，图中的端口号与路径只是示例：
 
@@ -35,23 +35,14 @@
 `keep` 仅保留镜像中的 Flash 参数，不表示保留设备配置。若网页连接失败，按第 2 步进入下载模式后重连；
 若写入或校验失败，检查串口、数据线、文件和地址后重试，不按进度条 100% 判定成功。
 
-| 下载或包内文件 | 用途 |
-|---|---|
-| `waveshare-esp32p4-touch-lcd-43c-v10-<版本>-merged.bin` | **直接烧录**，只此一个文件，地址 `0x0` |
-| `waveshare-esp32p4-touch-lcd-43c-v10-<版本>-validation.zip` | 分文件烧录包，先解压，按下表各地址写入 |
-| `xiaotai_esp32p4.bin` | 应用 BIN，仅在分文件方式中写入 `0x10000`，不可当完整镜像写入 `0x0` |
-| `MANIFEST.json`、`flasher_args.json`、`flash_args`、ELF | 清单或排查资料，不直接烧录 |
+完整镜像为 `v<发行版本>_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin`，只烧录这一份，地址 `0x0`。
 
-如需核验完整 BIN，使用下载页对应 Release 的 `SHA256SUMS`。
-
-Windows 可用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 用 `sha256sum "实际BIN路径"`；
-macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIFEST.json`，
-发布附件的完整哈希见[固件下载与发布说明](../../downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)中的 `SHA256SUMS`。
+如需校验，使用发布说明中的 BIN SHA-256；Windows 用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`，
+Linux 用 `sha256sum "实际BIN路径"`，macOS 用 `shasum -a 256 "实际BIN路径"`。
 
 ## 首次使用
 
-使用完整镜像时，只需确认单个 `-merged.bin` 已从 `0x0` 写入并正常重启；使用分文件包时，
-确认清单中的 4 个 BIN 都已按各自地址写入。两种方式任选一种，然后配网和绑定。
+确认完整 `_merged.bin` 已从 `0x0` 烧录且设备正常重启，然后配网和绑定。
 
 ### 1. 配置 Wi-Fi
 
@@ -77,24 +68,6 @@ macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIF
 绑定。不要擦除整片 Flash。
 
 ## 其他烧录方式
-
-### 分文件烧录
-
-下载并解压 [固件包（ZIP）](../../downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)。
-此方式需按包内 `MANIFEST.json` 和 `flasher_args.json` 核对本板、本版的 **4 个 BIN**：
-
-| 文件 | 烧录地址 | 用途 |
-|---|---|---|
-| `bootloader/bootloader.bin` | `0x2000` | 启动引导程序 |
-| `partition_table/partition-table.bin` | `0x8000` | 分区表 |
-| `ota_data_initial.bin` | `0xd000` | OTA 初始化数据，不可遗漏 |
-| `xiaotai_esp32p4.bin` | `0x10000` | 应用程序，不可写入 0x0 |
-
-在网页工具用 **Add File** 添加上述每个 BIN，各填对应地址，然后点击 **Program**。
-不要同时添加完整镜像；不同板卡的 bootloader 地址也可能不同。分文件方式可用于保留配置的升级，
-但必须先确认分区布局兼容，不执行全片擦除。操作位置见下图：
-
-![微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 分文件烧录的文件与地址](../../images/flashing/web-split-waveshare-esp32p4-touch-lcd-43c-v10.png)
 
 ### 从源码编译后烧录
 

@@ -8,9 +8,13 @@ Board ID: `lckfb-bk7258`. Touchscreen and buttons control browser-based (H5) liv
 
 ## Flashing
 
-`<version>` in filenames means the full download-page version, including build number. Select actual downloaded files and check the manifest; screenshot versions and paths are examples.
+The filename uses the distribution version; compare embedded firmware identity with the release notes. Download one complete BIN without extraction. Screenshot versions and paths are examples.
 
-See [Downloads](../../downloads.en.md#lckfb-bk7258) for firmware for **LCKFB BK7258**. Current features have on-board usage validation; build identities, scope, and outstanding checks are in [Validation (Chinese)](VALIDATION.md) and [release notes](../../downloads.en.md#lckfb-bk7258).
+See [Downloads](../../downloads.en.md#lckfb-bk7258) for firmware for **LCKFB BK7258**.
+
+The current beta awaits hardware acceptance; historical results do not validate this image.
+
+Build identities, scope, and outstanding checks are in [Validation (Chinese)](VALIDATION.md) and [release notes](../../downloads.en.md#lckfb-bk7258).
 
 ### Install the flashing tool
 
@@ -28,11 +32,11 @@ The [BKFIL v4 manual (Chinese)](https://docs.bekencorp.com/arminodoc/bk_app/bkfi
 
 ### Flashing steps
 
-1. Download and extract the [firmware ZIP](../../downloads.en.md#lckfb-bk7258).
+1. Download the [complete BIN](../../downloads.en.md#lckfb-bk7258).
 2. Connect as described in the LCKFB tutorial and close serial log terminals. Open BKFIL and use **Select Port** to select this board.
-3. Click **Select BIN**, choose **`lckfb-bk7258-<version>-all-app.bin`**, set **Start Address** to **`0x00000000`**, and check the file row.
+3. Click **Select BIN**, choose **`v<release-version>_lckfb-bk7258_all-app.bin`**, set **Start Address** to **`0x00000000`**, and check the file row.
 4. Click **Download**, reset or power-cycle as prompted, and wait for writing and verification. Power-cycle afterward.
-5. Open 115200-baud logs and verify board `lckfb-bk7258` and the downloaded full version before setup and binding.
+5. Open 115200-baud logs and verify board `lckfb-bk7258` and the embedded version listed in the release notes before setup and binding.
 
 The official BKFIL screenshots mark controls in red. Ports, paths, and baud rates are examples; select your detected device and the LCKFB BIN above. `Baud` is the flashing rate; `AppResetBaud` is the application-reset communication rate.
 
@@ -40,7 +44,7 @@ The official BKFIL screenshots mark controls in red. Ports, paths, and baud rate
 
 ![BKFIL port and baud settings](../../images/flashing/bkfil-select-port.png)
 
-**Select firmware.** Click **Select BIN** and select `lckfb-bk7258-<version>-all-app.bin`.
+**Select firmware.** Click **Select BIN** and select `v<release-version>_lckfb-bk7258_all-app.bin`.
 
 ![BKFIL Select BIN](../../images/flashing/bkfil-select-bin.png)
 
@@ -50,12 +54,9 @@ The official BKFIL screenshots mark controls in red. Ports, paths, and baud rate
 
 | File | Purpose |
 |---|---|
-| `lckfb-bk7258-<version>-all-app.bin` | **Serial flashing** at **`0x0`** |
-| `lckfb-bk7258-<version>-app_pack.rbl` | **Not for serial flashing**; OTA updates only, not initial flashing |
-| `MANIFEST.json` | File metadata and checksums; not a flash image |
-| `symbols/`, `partitions/`, `build_identity.json` | Diagnostics; not flash images |
+| `v<release-version>_lckfb-bk7258_all-app.bin` | **Serial flashing** at **`0x0`** |
 
-Use the package's `MANIFEST.json` SHA-256 values to verify files. Back up factory firmware and RF calibration before initial flashing. Preserve calibration, factory-data, and credential partitions during ordinary updates; do not erase the whole chip.
+Use the BIN SHA-256 in the release notes to verify the download. Back up factory firmware and RF calibration before initial flashing. Preserve calibration, factory-data, and credential partitions during ordinary updates; do not erase the whole chip.
 
 For source builds, flash the `package/all-app.bin` under Building, also at `0x0`.
 

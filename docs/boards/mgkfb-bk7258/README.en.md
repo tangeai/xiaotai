@@ -12,7 +12,7 @@ Operation uses physical buttons; touch, device-to-device calls, and group interc
 
 ## Flashing
 
-`<version>` in filenames means the full download-page version, including build number. Select actual downloaded files and check the manifest; screenshot versions and paths are examples.
+The filename uses the distribution version; compare embedded firmware identity with the release notes. Download one complete BIN without extraction. Screenshot versions and paths are examples.
 
 See [Downloads](../../downloads.en.md#mgkfb-bk7258) for firmware for the **MGKFB BK7258 dual-display board with 8 MiB Flash**.
 
@@ -30,11 +30,11 @@ Choose the appropriate installer from the directory. See the [BKFIL v4 manual (C
 
 ### Flashing steps
 
-1. Download and extract the [firmware ZIP](../../downloads.en.md#mgkfb-bk7258).
+1. Download the [complete BIN](../../downloads.en.md#mgkfb-bk7258).
 2. Connect the board's communication Type-C port, close serial log terminals, open BKFIL, and use **Select Port** to choose the corresponding COM port.
 3. Select the package's **`-all-app.bin`** at **`0x00000000`**.
 4. Start downloading and reset or power-cycle as prompted to complete the handshake. Wait for writing and verification, then power-cycle.
-5. Open 115200-baud logs and verify board `mgkfb-bk7258` and the downloaded full version before setup and binding.
+5. Open 115200-baud logs and verify board `mgkfb-bk7258` and the embedded version listed in the release notes before setup and binding.
 
 The following screenshots come from the [official BKFIL v4 guide (Chinese)](https://docs.bekencorp.com/arminodoc/bk_app/bkfil_v4/zh_CN/latest/quick_start/quick_start_guide/quick_start_guide.html#id3), with controls marked in red.
 
@@ -42,7 +42,7 @@ The following screenshots come from the [official BKFIL v4 guide (Chinese)](http
 
 ![BKFIL port and baud-rate settings highlighted in red](../../images/flashing/bkfil-select-port.png)
 
-**Select firmware.** Click **Select BIN** and choose the extracted `mgkfb-bk7258-<version>-all-app.bin`.
+**Select firmware.** Click **Select BIN** and choose the extracted `v<release-version>_mgkfb-bk7258_all-app.bin`.
 
 ![BKFIL Select BIN control](../../images/flashing/bkfil-select-bin.png)
 
@@ -52,12 +52,9 @@ The following screenshots come from the [official BKFIL v4 guide (Chinese)](http
 
 | File | Purpose |
 |---|---|
-| `mgkfb-bk7258-<version>-all-app.bin` | **Serial flashing**, starting at **`0x0`** |
-| `mgkfb-bk7258-<version>-app_pack.rbl` | **Not for serial flashing**; over-the-air (OTA) updates are unvalidated, so do not use yet |
-| `MANIFEST.json` | File metadata and checksums, not a flash image |
-| `symbols/`, `partitions/`, `build_identity.json` | Development diagnostics, not flash images |
+| `v<release-version>_mgkfb-bk7258_all-app.bin` | **Serial flashing**, starting at **`0x0`** |
 
-Verify files using SHA-256 values in the package's `MANIFEST.json`.
+Verify the BIN using its SHA-256 in the release notes.
 
 Flashing uses UART0 (TX GPIO11, RX GPIO10). Back up factory firmware and RF calibration before first flashing. Use **Download** for ordinary updates, retaining data partitions.
 
