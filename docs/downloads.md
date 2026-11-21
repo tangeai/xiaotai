@@ -2,7 +2,7 @@
 
 [中文](downloads.md) · [English](downloads.en.md)
 
-当前统一发行：**v1.2.0-beta.1 — 测试版，待实板验收**。本页暂不提供统一正式版下载。
+当前统一发行：**v1.2.0-beta.1 — 测试版，待实板验收**。下方另列 `v1.0.0` 历史正式归档和 `v1.1.0` 历史预发布归档。
 旧板卡 tag 及其失效下载链接已清理。
 
 [发布说明、SHA-256 与已知问题](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1) · [发布规范](development/release-policy.md)

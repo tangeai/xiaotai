@@ -85,7 +85,9 @@ Use the [bilingual template](../../.github/release_notes_template.md) and verify
 
 Host checks and native builds with pending hardware testing permit only pre-release, never Latest; retain `BUILD_VERIFIED_HIL_PENDING`. Never substitute stale firmware for a failed variant; explain omissions.
 
-After publication, check tag targets, pre-release state, asset set and names, and download every BIN to verify SHA-256. Update beta navigation only after remote verification, never labeling the beta as stable; there is currently no unified stable download. Do not overwrite historical releases or assets.
+After publication, check tag targets, pre-release state, asset set and names, and download every BIN to verify SHA-256. Update beta navigation only after remote verification, never labeling the beta as stable. Do not overwrite historical releases or assets.
+
+`v1.0.0` is a historical stable archive, while `v1.1.0` remains a pre-release due to known issues and the current `v1.2.0-beta.1` candidate remains a beta.
 
 Hardware acceptance applies to exact BIN bytes. An accepted BIN may be promoted to stable by external renaming without changing its hash. Changing embedded versions or recompiling requires new validation. Include only accepted boards/variants in stable releases; never borrow another variant's results.
 

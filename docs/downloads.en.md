@@ -2,7 +2,7 @@
 
 [中文](downloads.md) · [English](downloads.en.md)
 
-Current distribution: **v1.2.0-beta.1 — pre-release, pending hardware acceptance**. There is currently no unified stable download on this page. Legacy board tags and their invalid download links have been removed.
+Current distribution: **v1.2.0-beta.1 — pre-release, pending hardware acceptance**. Historical archives below include stable `v1.0.0` and pre-release `v1.1.0`. Legacy board tags and their invalid download links have been removed.
 
 [Release notes, SHA-256 and known issues](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1) · [Release policy](development/release-policy.en.md)
 
