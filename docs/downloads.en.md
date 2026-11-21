@@ -20,6 +20,8 @@ Verify downloads with the release's `SHA256SUMS`. Package files, versions, and f
 
 ## Beta testing: v1.2.0-beta.1
 
+These are complete flash images: merged BINs for ESP32 and native all-app BINs for BK7258. Only filenames are standardized; no split-image flashing packages are provided.
+
 These six images for five boards form a unified test distribution. Download BINs directly; no extraction is needed. Hardware acceptance is pending, and this beta does not replace the stable releases below. Prepare to configure Wi-Fi and binding again after full flashing; select the correct M5 display variant.
 
 The distribution version is `1.2.0-beta.1`. These reused builds retain the embedded versions listed below. See the [unified pre-release notes](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1) for checksums, known issues, and flashing parameters.

@@ -6,6 +6,8 @@ Starting with this migration, one distribution version has one GitHub Release an
 
 GitHub-generated Source code archives are not firmware and are outside this asset rule.
 
+The Release title must exactly match its tag, for example `v1.2.0-beta.1`. Put board counts, models, and bilingual descriptions in the body.
+
 ## Timeline and versions
 
 These unified milestones follow source history without rewriting board version history. Retain existing tags without moving or deleting them. Create annotated tags that state when and why a historical milestone was recorded; never backdate their creation to imply an original release date.
