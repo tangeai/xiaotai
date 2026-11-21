@@ -450,8 +450,8 @@ static esp_err_t wifi_config_post(httpd_req_t *request)
     }
     if (s_restart_scheduled) {
         cJSON_Delete(root);
-        return httpd_resp_send_err(request, HTTPD_503_SERVICE_UNAVAILABLE,
-                                   "restart pending; wait for the device");
+        httpd_resp_set_status(request, "503 Service Unavailable");
+        return httpd_resp_sendstr(request, "restart pending; wait for the device");
     }
     esp_err_t err = wifi_manager_save_credentials(ssid->valuestring, password->valuestring);
     cJSON_Delete(root);

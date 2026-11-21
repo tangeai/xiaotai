@@ -18,7 +18,8 @@ class PortalRestart(unittest.TestCase):
         typedef struct {const char *valuestring;} cJSON;
         #define ESP_OK 0
         #define pdPASS 1
-        #define HTTPD_503_SERVICE_UNAVAILABLE 503
+        static int response_status;
+        static void httpd_resp_set_status(httpd_req_t*r,const char*s){response_status=503;}
         static bool s_restart_scheduled;
         static int task_result;
         #define HTTPD_400_BAD_REQUEST 400
@@ -43,7 +44,7 @@ class PortalRestart(unittest.TestCase):
         int main(void){httpd_req_t request={2};int rc=wifi_config_post(&request);
          assert(rc==500 && saves==1 && restart_attempts==1 && response[0]==0);
          task_result=1;assert(wifi_config_post(&request)==0 && saves==2 && restart_attempts==2);
-         assert(wifi_config_post(&request)==503 && saves==2 && restart_attempts==2);
+         assert(wifi_config_post(&request)==0 && response_status==503 && saves==2 && restart_attempts==2);
         }
         ''')
 

@@ -46,7 +46,8 @@ their fork, and open a PR targeting this repository's `main`.
    [Firmware versions and releases](#firmware-versions-and-releases), create version
    tags and GitHub Releases at the validated commit, and retain artifacts, hashes, and
    bilingual notes. Documentation changes alone do not bump firmware versions.
-   Keep images pending release until their hardware validation is complete.
+   Keep images pending stable release until hardware validation is complete;
+   beta pre-releases for testing may follow the conditions below.
 
 When an older stable version needs maintenance, use `release/<version>` and backport
 fixes through PRs; this is not the daily integration branch. If a historical `develop`
