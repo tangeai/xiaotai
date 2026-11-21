@@ -23,6 +23,7 @@ class OpusPLC(unittest.TestCase):
             rpath = [f'-Wl,-rpath,{Path(library).parent}'] if Path(library).is_absolute() else []
             subprocess.run(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2',
                             '-I', tmp, '-I', str(RUNTIME / 'include'),
+                            '-I', str(ROOT / 'platforms/common/include'),
                             str(ROOT / 'tests/audio/bk_opus_plc_replay.c'),
                             str(RUNTIME / 'src/xiaotai_opus_plc.c'),
                             library, *rpath, '-lm', '-o', str(exe)], check=True)

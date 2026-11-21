@@ -1084,28 +1084,37 @@ static void playback_task(beken_thread_arg_t argument)
                                           samples,
                                           &bytes_written);
         uint32_t written_ms = rtos_get_time();
-        if (rc != BK_OK || bytes_written != samples * sizeof(*pcm)) {
-            BK_LOGW(TAG, "speaker write failed rc=%d\n", rc);
-        } else if (media_frame) {
+        bool complete_write = rc == BK_OK && bytes_written == samples * sizeof(*pcm);
+        /* The decoder has already consumed this packet. A sink failure must
+         * never cause compressed input to be decoded again. Keep only the
+         * explicitly accepted PCM prefix for AEC and the hardware tail. */
+        size_t accepted_samples = bytes_written <= samples * sizeof(*pcm) &&
+                                  bytes_written % sizeof(*pcm) == 0U
+                                ? bytes_written / sizeof(*pcm) : 0U;
+        if (!complete_write) {
+            BK_LOGW(TAG, "speaker write failed rc=%d accepted=%u requested=%u\n",
+                    rc, (unsigned)bytes_written, (unsigned)(samples * sizeof(*pcm)));
+        }
+        if (media_frame && accepted_samples != 0U) {
             if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
-                if (samples > s_ai_packet.opus.samples)
-                    atomic_fetch_add_explicit(&s_plc_rendered_ms,
-                        (samples - s_ai_packet.opus.samples) / 16U, memory_order_relaxed);
+                size_t concealed = plc.output_concealed_samples;
+                if (concealed > accepted_samples) concealed = accepted_samples;
+                atomic_fetch_add_explicit(&s_plc_rendered_ms,
+                    concealed / 16U, memory_order_relaxed);
                 atomic_store_explicit(&s_playback_columns,
-                    playback_columns_pack(pcm, samples), memory_order_relaxed);
+                    playback_columns_pack(pcm, accepted_samples), memory_order_relaxed);
                 atomic_store_explicit(&s_playback_columns_at_ms,
                     rtos_get_time(), memory_order_release);
             }
-            /* write_pcm may enqueue into the board DMA path.  Measure the
-             * quiet tail from the last successful write, not only from
-             * network receipt, so teardown cannot clip that final frame. */
+            /* write_pcm may enqueue a prefix into the board DMA path even
+             * when the rest fails. Preserve the accepted prefix's quiet tail. */
             atomic_store_explicit(&s_last_downlink_ms, rtos_get_time(),
                                   memory_order_release);
             uint32_t now_ms = rtos_get_time();
             uint32_t sample_rate_hz =
                 s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? 16000U : 8000U;
             uint32_t frame_duration_ms =
-                (uint32_t)((samples * 1000U) / sample_rate_hz);
+                (uint32_t)((accepted_samples * 1000U) / sample_rate_hz);
             atomic_fetch_add_explicit(&s_playback_pcm_ms, frame_duration_ms,
                                       memory_order_relaxed);
             uint32_t tail_ms = atomic_load_explicit(
@@ -1120,20 +1129,22 @@ static void playback_task(beken_thread_arg_t argument)
                 xiaotai_audio_buffer_written(&s_ai_buffer, frame_duration_ms);
                 rtos_unlock_mutex(&s_ring_mutex);
             }
-            aec_reference_push(pcm, samples);
-            ++s_downlink_frames;
-            if (s_downlink_frames == 1U) {
+            aec_reference_push(pcm, accepted_samples);
+            bool complete_packet = complete_write &&
+                (s_codec != XIAOTAI_AUDIO_CODEC_OPUS_16K || plc.output_packet_decoded);
+            if (complete_packet) ++s_downlink_frames;
+            if (complete_packet && s_downlink_frames == 1U) {
                 BK_LOGI(TAG, "first downlink frame played bytes=%u\n",
                         (unsigned)(samples * sizeof(*pcm)));
             }
         }
-        if (!media_frame && rc == BK_OK && bytes_written == samples * sizeof(*pcm))
-            aec_reference_push(pcm, samples);
+        if (!media_frame && accepted_samples != 0U)
+            aec_reference_push(pcm, accepted_samples);
         atomic_store_explicit(&s_playback_in_progress, false,
                               memory_order_release);
         if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K && media_frame) {
             ai_audio_written(&timing, take_ms, decoded_ms, write_ms, written_ms,
-                             rc == BK_OK && bytes_written == samples * sizeof(*pcm));
+                             complete_write && plc.output_packet_decoded);
         }
     }
     s_play_thread = NULL;
@@ -1632,7 +1643,11 @@ void xiaotai_audio_playback_boundary(bool ended)
              * or interrupt audio already playing. */
             s_ai_buffer.recovering = false;
         }
-        ++s_plc_epoch;
+        /* Only the next start after an end opens a new media segment.
+         * End retains the current timeline so late tail packets cannot replay
+         * audio already decoded/concealed. No packet means no tail synthesis.
+         * Preserve queued stamps; the decoder worker alone applies resets. */
+        if (s_ai_buffer_ended && !ended) ++s_plc_epoch;
         s_ai_buffer_ended = ended;
     }
     rtos_unlock_mutex(&s_ring_mutex);

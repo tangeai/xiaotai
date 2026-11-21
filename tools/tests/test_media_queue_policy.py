@@ -32,6 +32,44 @@ class MediaQueuePolicy(unittest.TestCase):
     self.assertIn('xiaotai_media_overflow(',text)
     self.assertIn('xiaotai_media_expired(',text)
 
+ def test_recovery_capability_replays_for_every_audio_board(self):
+  from test_s3_product_regressions import run_c
+  for board in load_boards(ROOT):
+   if 'audio' not in board.data['capabilities']: continue
+   capable = board.data['platform'] == 'beken'
+   with self.subTest(board=board.id):
+    run_c('#define RECOVERY_CAPABLE '+str(int(capable))+r'''
+#include "xiaotai_audio_recovery.h"
+#include <assert.h>
+int main(void){
+ xiaotai_audio_recovery_t state={0};
+ xiaotai_audio_recovery_stamp_t stamp={.samples=320,.epoch=1,.stream=14};
+ for(unsigned i=0;i<3;i++){
+  stamp.media_ms=i*20;stamp.rx_ms=i;
+  xiaotai_audio_recovery_plan_t p=xiaotai_audio_recovery_plan(&state,&stamp,RECOVERY_CAPABLE,true);
+  assert(!p.discard && p.missing_frames==0);
+  if(p.reset)xiaotai_audio_recovery_begin(&state,&stamp);
+  xiaotai_audio_recovery_commit_packet(&state,&stamp,p,true);
+ }
+ stamp.media_ms=100;stamp.rx_ms=3;
+ xiaotai_audio_recovery_plan_t p=xiaotai_audio_recovery_plan(&state,&stamp,RECOVERY_CAPABLE,true);
+ assert(p.missing_frames==(RECOVERY_CAPABLE?2:0));
+ for(unsigned i=0;i<p.missing_frames;i++)xiaotai_audio_recovery_commit_missing(&state);
+ xiaotai_audio_recovery_commit_packet(&state,&stamp,p,true);
+ stamp.media_ms=60;stamp.rx_ms=1000;
+ assert(xiaotai_audio_recovery_plan(&state,&stamp,RECOVERY_CAPABLE,true).discard);
+ stamp.media_ms=140;stamp.epoch=2;
+ p=xiaotai_audio_recovery_plan(&state,&stamp,RECOVERY_CAPABLE,true);
+ assert(p.reset && !p.discard && !p.missing_frames);
+}
+''', [ROOT/'platforms/common/include'])
+    # ESP keeps its existing decode path until its native capability is verified.
+    if not capable:
+     project=ROOT/board.project_dir
+     cmake=(project/'components/starter_media/CMakeLists.txt').read_text()
+     adapter=MEDIA if 'starter_media_s3/starter_media.c' in cmake else P4
+     self.assertNotIn('xiaotai_opus_plc_decode(',adapter.read_text())
+
  def test_business_decision_is_independent_of_board_budgets(self):
   from test_s3_product_regressions import run_c
   for age,capacity in ((80,8),(160,64),(240,128)):

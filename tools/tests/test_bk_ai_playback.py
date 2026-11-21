@@ -122,6 +122,26 @@ int main(void){
 }
 ''', [ROOT / 'platforms/beken/runtime/include', ROOT / 'platforms/common/include'])
 
+    def test_duplicate_boundaries_preserve_packet_epochs(self):
+        self.replay(r'''
+    uint8_t packet=42, output=0;
+    xiaotai_audio_playback_boundary(false);
+    uint32_t first=s_plc_epoch;
+    assert(xiaotai_audio_play_opus(&packet,1,0)==1);
+    xiaotai_audio_playback_boundary(false);
+    assert(s_plc_epoch==first && "duplicate start must not reset recovery");
+    xiaotai_audio_playback_boundary(true);
+    uint32_t ended=s_plc_epoch;
+    assert(ended==first && "end must retain timeline for late old packets");
+    xiaotai_audio_playback_boundary(true);
+    assert(s_plc_epoch==ended && "duplicate end must not reset recovery");
+    assert(opus_ring_take(&output,1)==1 && s_ai_packet.opus.epoch==first);
+    assert(xiaotai_audio_play_opus(&packet,1,20)==1);
+    assert(opus_ring_take(&output,1)==1 && s_ai_packet.opus.epoch==ended);
+    xiaotai_audio_playback_boundary(false);
+    assert(s_plc_epoch!=ended);
+''')
+
     def test_tts_burst_preserves_every_packet_in_order(self):
         self.replay(r'''
     for(unsigned i=0;i<56;i++){uint8_t packet=i;assert(xiaotai_audio_play_opus(&packet,1,0)==1);}

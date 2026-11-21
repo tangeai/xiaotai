@@ -12,6 +12,48 @@ static short input[FRAME], reference[CAPACITY], repaired[CAPACITY], skipped[CAPA
 static unsigned char packets[256][512];
 static int lengths[256];
 
+static void check_interleaved_streams(void)
+{
+    int err;
+    OpusDecoder *dec = opus_decoder_create(16000, 1, &err);
+    assert(dec && err == OPUS_OK);
+    xiaotai_opus_plc_t state = {0};
+    xiaotai_opus_stamp_t stamp = {.epoch=1, .stream=1, .samples=FRAME};
+    assert(xiaotai_opus_plc_decode(&state, dec, &stamp,
+        packets[4], lengths[4], repaired, CAPACITY) == FRAME);
+    stamp.stream = 2;
+    assert(xiaotai_opus_plc_decode(&state, dec, &stamp,
+        packets[4], lengths[4], repaired, CAPACITY) == 0);
+    stamp.stream = 1;
+    assert(xiaotai_opus_plc_decode(&state, dec, &stamp,
+        packets[4], lengths[4], repaired, CAPACITY) == 0);
+    stamp.epoch = 2;
+    stamp.stream = 2;
+    assert(xiaotai_opus_plc_decode(&state, dec, &stamp,
+        packets[4], lengths[4], repaired, CAPACITY) == FRAME);
+    opus_decoder_destroy(dec);
+}
+
+static void check_repeated_gaps(void)
+{
+    const unsigned timestamps[] = {0, 20, 40, 80, 120, 60, 80, 100, 120};
+    const int expected[] = {FRAME, FRAME, FRAME, 2*FRAME, 2*FRAME, 0, 0, 0, 0};
+    int err;
+    OpusDecoder *dec = opus_decoder_create(16000, 1, &err);
+    assert(dec && err == OPUS_OK);
+    xiaotai_opus_plc_t state = {0};
+    for (unsigned i = 0; i < sizeof(timestamps)/sizeof(timestamps[0]); ++i) {
+        xiaotai_opus_stamp_t stamp = {.media_ms=timestamps[i],
+            .rx_ms=100+i+(i >= 5 ? 500 : 0), .epoch=1, .stream=14, .samples=FRAME};
+        int actual = xiaotai_opus_plc_decode(&state, dec, &stamp,
+            packets[4], lengths[4], repaired, CAPACITY);
+        if (actual != expected[i]) fprintf(stderr,
+            "timestamp %u: expected %d, got %d\n", timestamps[i], expected[i], actual);
+        assert(actual == expected[i]);
+    }
+    opus_decoder_destroy(dec);
+}
+
 /* Exercise the same decoder entry as the firmware with clock discontinuities.
  * Use an actual encoded packet so errors and capacity limits come from Opus. */
 static void check_timeline(void)
@@ -31,12 +73,12 @@ static void check_timeline(void)
         {160, 401, 1, 14, FRAME}, {180, 402, 1, 14, FRAME},
         {220, 403, 2, 14, FRAME},  /* new round */
         {240, 404, 2, 14, FRAME}, {260, 405, 2, 14, FRAME},
-        {300, 406, 2, 13, FRAME},  /* new stream */
-        {320, 406, 2, 13, FRAME}, {340, 406, 2, 13, FRAME},
-        {420, 406, 2, 13, FRAME},  /* three missing frames exceed budget */
-        {440, 406, 2, 13, FRAME}, {460, 406, 2, 13, FRAME},
-        {501, 406, 2, 13, FRAME},  /* timestamp jitter */
-        {501, 406, 2, 13, FRAME}, {497, 406, 2, 13, FRAME},
+        {300, 406, 3, 13, FRAME},  /* new round may select a new stream */
+        {320, 406, 3, 13, FRAME}, {340, 406, 3, 13, FRAME},
+        {420, 406, 3, 13, FRAME},  /* three missing frames exceed budget */
+        {440, 406, 3, 13, FRAME}, {460, 406, 3, 13, FRAME},
+        {501, 406, 3, 13, FRAME},  /* timestamp jitter */
+        {501, 406, 3, 13, 0}, {497, 406, 3, 13, 0},
     };
     int err;
     OpusDecoder *dec = opus_decoder_create(16000, 1, &err);
@@ -132,6 +174,8 @@ int main(void)
     }
     opus_encoder_destroy(encoder);
     assert(count > 10);
+    check_interleaved_streams();
+    check_repeated_gaps();
     check_timeline();
     check_thirty_percent(count, 0);
     check_thirty_percent(count, 1);
