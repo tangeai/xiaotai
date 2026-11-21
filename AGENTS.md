@@ -1,5 +1,12 @@
 # Agent guidance
 
+Before starting a development task, read the
+[branch, PR, and release workflow](CONTRIBUTING.md#分支pr-与发布流程).
+Start a short-lived branch from the latest upstream `main`, preserve existing
+uncommitted work, and submit a focused PR to `main`. Do not create or use
+`develop` as a development or integration branch. Verify the merged commit
+before tagging or releasing; retain the board-specific build and HIL gates.
+
 When the user asks for “检查” or a general project check without a scope, follow
 [the unified check workflow](CONTRIBUTING.md#统一检查约定) and cover every category
 in the rule index. For a scoped request, check that scope and affected dependencies.
