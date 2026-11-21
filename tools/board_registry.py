@@ -296,7 +296,8 @@ def build_command(root: Path, board: Board, variant: str) -> tuple[list[str], Pa
         raise ManifestError(f"{board.id}: unknown variant {variant}")
     project_dir = board.project_path(root)
     if board.data["platform"] == "esp-idf":
-        if len(board.data["variants"]) > 1:
+        if len(board.data["variants"]) > 1 or variant != "default":
+            # Forward named singleton variants to override stale native caches.
             return ["idf.py", f"-DXIAOTAI_BOARD_VARIANT={variant}", "build"], project_dir
         return ["idf.py", "build"], project_dir
     if board.data["platform"] == "beken":

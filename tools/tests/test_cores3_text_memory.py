@@ -18,7 +18,7 @@ PROJECTS = {
 }
 
 
-def board_defines(directory, board, variant="ili9342e"):
+def board_defines(directory, board, variant="ili9342c"):
     wrapper = ROOT / "firmware/esp-idf" / PROJECTS[board] / "components/starter_product/CMakeLists.txt"
     (directory / "stub.c").write_text("int unused;\n")
     (directory / "CMakeLists.txt").write_text('''
@@ -40,7 +40,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/defines.txt" "${defines}")
 
 
 class CaptionMemory(unittest.TestCase):
-    def compile_case(self, directory, board, variant="ili9342e", external_bss=True):
+    def compile_case(self, directory, board, variant="ili9342c", external_bss=True):
         defines = board_defines(directory, board, variant)
         source = SOURCE.read_text()
         # Keep production preprocessor guards, declarations and their capacities.
@@ -84,7 +84,7 @@ int main(void) {
         return result
 
     def test_selected_boards_place_only_m5_text_in_external_bss(self):
-        for board, variant in (("m5", "ili9342c"), ("m5", "ili9342e"),
+        for board, variant in (("m5", "ili9342c"),
                                ("lckfb", "default"), ("p4", "default")):
             with self.subTest(board=board, variant=variant), tempfile.TemporaryDirectory() as tmp:
                 path = Path(tmp)

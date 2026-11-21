@@ -25,10 +25,10 @@ See [Firmware downloads](docs/downloads.en.md) for current versions, exact filen
 | <img src="docs/images/boards/lckfb-bk7258.webp" alt="LCKFB ShiZhanPai BK7258 board" width="180"> | LCKFB ShiZhanPai BK7258<br>`lckfb-bk7258` | [Firmware and release notes](docs/downloads.en.md#lckfb-bk7258) | [Flashing guide](docs/boards/lckfb-bk7258/README.en.md#flashing) |
 | <img src="docs/images/boards/lckfb-esp32s3.webp" alt="LCKFB ShiZhanPai ESP32-S3 board" width="180"> | LCKFB ShiZhanPai ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | [Firmware and release notes](docs/downloads.en.md#lckfb-esp32s3) | [Flashing guide](docs/boards/lckfb-esp32s3/README.en.md#flashing) |
 | <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10.webp" alt="Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 board" width="180"> | Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | [Firmware and release notes](docs/downloads.en.md#waveshare-esp32p4-touch-lcd-43c-v10) | [Flashing guide](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.en.md#flashing) |
-| <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite board" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342E / ILI9342C display<br>`m5stack-cores3-lite` | [Firmware and release notes](docs/downloads.en.md#m5stack-cores3-lite) | [Flashing guide](docs/boards/m5stack-cores3-lite/README.en.md#flashing) |
+| <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite board" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342C display<br>`m5stack-cores3-lite` | [Firmware and release notes](docs/downloads.en.md#m5stack-cores3-lite) | [Flashing guide](docs/boards/m5stack-cores3-lite/README.en.md#flashing) |
 | <img src="docs/images/boards/mgkfb-bk7258.webp" alt="MGKFB BK7258 AI toy board with dual-eye displays" width="180"> | MGKFB BK7258 AI toy board<br>Dual-eye displays · 8 MiB Flash<br>`mgkfb-bk7258` | [Firmware and release notes](docs/downloads.en.md#mgkfb-bk7258) | [Flashing guide](docs/boards/mgkfb-bk7258/README.en.md#flashing) |
 
-For M5, choose the variant matching the ILI9342E or ILI9342C display controller. MGKFB BK7258 firmware is for the board with 8 MiB Flash and dual-eye displays.
+M5 supports only the ILI9342C display controller. MGKFB BK7258 firmware is for the board with 8 MiB Flash and dual-eye displays.
 
 See the [complete board catalog](docs/boards/README.en.md) for specifications, features, and dependencies, and [GitHub Releases](https://github.com/tangeai/xiaotai/releases) for previous versions.
 

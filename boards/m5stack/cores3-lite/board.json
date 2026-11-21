@@ -28,14 +28,8 @@
   },
   "variants": [
     {
-      "name": "ili9342e",
-      "default": true,
-      "interaction_profile": "touch-full",
-      "layout_profile": "compact"
-    },
-    {
       "name": "ili9342c",
-      "default": false,
+      "default": true,
       "interaction_profile": "touch-full",
       "layout_profile": "compact"
     }

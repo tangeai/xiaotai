@@ -24,12 +24,11 @@
 | `AW88298.pdf` | [下载](https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/datasheet/core/K128%20CoreS3/AW88298.PDF) | `d9060b2d8a19f4bcb85c5e116458dfd53973d9ddfd26b334ff8b149be064a9bf` |
 | `GC0308.pdf` | [下载](https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/datasheet/core/K128%20CoreS3/GC0308.PDF) | `b8a73e544473cd14e04760db5c0c906129036ef0d2f5f86d87f451d3df5f4dcd` |
 | `AW9523B.pdf` | [下载](https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/products/core/CoreS3/AW9523B-CN.pdf) | `24022acd5860b74eb898b08a93e09287bde1909fae3caab4eb27a8a2a1b12d42` |
-| `ILI9342E.pdf` | [下载](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/644/ILI9342E.pdf) | `2bcca2655e73d4b569583e518dc64b514678dea6ccb8b3ed8bfcf081bdc0c188` |
 | `Panel_ILI9342.hpp` | [下载](https://raw.githubusercontent.com/m5stack/M5GFX/master/src/lgfx/v1/panel/Panel_ILI9342.hpp) | `675e3837c13306b72826c9d3a8e69b3d7dd680e334e50784cbbea2c616b79a16` |
 | `M5GFX.cpp` | [下载](https://raw.githubusercontent.com/m5stack/M5GFX/master/src/M5GFX.cpp) | `314251ee69846afa754e11738bb44eaf00509c2b8b5b9de679f34e10411af6bc` |
 
 用户原有 `icoss1060691881e8496f5b7b0a85cb.pdf` 是 2026-03-02 的产品文档快照，
-用于比对旧屏说明；其内容没有包含 2026-08-07 的 ILI9342E 变更。原有
+用于核对本项目支持的 ILI9342C。原有
 `Sch_M5_CoreS3_v1.0.pdf` 与当前官方链接对应。对外说明以官方页面和明确板型为准。
 
 ## 关键结论与证据等级
@@ -45,8 +44,8 @@
   GPIO0 是音频 MCLK，不能作为立创 BOOT 业务按键。电源键和 RST 保留硬件用途，业务使用触摸。
 - **来源交叉确认，待实测**：ES7210 TDM 模式输出 MIC1/MIC3/MIC2/MIC4，MIC3 接
   扬声器差分回采。适配器保留四槽读取，再压紧前两槽到公共 AEC 的 MR 输入。
-- **明确变体，待实测**：ILI9342C 与 ILI9342E 使用不同扩展命令及伽马表；320×240
-  原生横屏、触摸不交换坐标。`ili9342e` 为默认，旧屏选择 `ili9342c`，不依赖日期猜实物。
+- **维护者确认的支持范围**：仅 ILI9342C；320×240 原生横屏、触摸不交换坐标。
+  构建仅保留 `ili9342c`。厂商支持其他面板不代表本项目具有对应实物和验证证据。
   官方 `bsp_display.c` 和旧 SE 工程均将面板及 LVGL 的 swap/mirror 设为 false；
   共享 UI 注册必须采用本板方向，不能沿用立创原生 240×320 屏的交换 XY / 水平镜像配置。
   2026-10-20 用户指定摄像头在顶部使用：在原生横屏基础上同时镜像 X/Y，实现
@@ -65,7 +64,7 @@
 | `sdkconfig.defaults` | `SPIRAM_MODE_QUAD`、80 MHz PSRAM 配置 | Quad 与 Lite 原理图 U7 四线接法一致；修正从立创带入的 Octal 配置，不能继承 SE 的实板验证结果 |
 | `components/starter_media/src/starter_media.c` | ES7210/AW88298 codec 配置，共享 I2S 64fs 的 AW88298 寄存器读回 | 两个音频器件相同；4×16-bit RX 与 2×32-bit TX 共享 BCLK，不能照搬 ES8311 |
 | `docs/音频与资源.md` | MIC1/MIC3/MIC2/MIC4 槽序与回采归属 | 与 ES7210 数据手册、原理图交叉核验；本次仍需实板验证槽位和 AEC |
-| `components/starter_product/src/starter_product.c` | ILI9342C 面板运输层、FT6336 原生横屏坐标 | 只移植硬件初始化；ILI9342E 表另取当前官方 M5GFX |
+| `components/starter_product/src/starter_product.c` | ILI9342C 面板运输层、FT6336 原生横屏坐标 | 只移植 ILI9342C 硬件初始化 |
 
 没有移植旧工程的业务状态机、页面、抖动缓冲、AGC、额外 ISR 采集队列或旧依赖版本。
 原因是本仓库的产品运行时、公共 AEC、20 ms 音频链路、UI 和测试才是当前探鸽小钛基线。

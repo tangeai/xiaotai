@@ -16,7 +16,7 @@ BOARD = ROOT / "boards/m5stack/cores3-lite"
 class CoreS3BoardTest(unittest.TestCase):
     def test_registered_build_selects_one_panel_and_own_version(self):
         board = find_board(load_boards(ROOT), "m5stack-cores3-lite")
-        for variant in ("ili9342c", "ili9342e"):
+        for variant in ("ili9342c",):
             command, project = build_command(ROOT, board, variant)
             self.assertIn(f"-DXIAOTAI_BOARD_VARIANT={variant}", command)
             self.assertEqual(project.name, "m5stack-cores3-lite")
@@ -27,6 +27,17 @@ class CoreS3BoardTest(unittest.TestCase):
             capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("touch-full", result.stdout)
+
+    def test_default_build_selects_supported_panel_and_rejects_removed_panel(self):
+        base = [sys.executable, str(ROOT / "tools/build.py"),
+                "--board", "m5stack-cores3-lite", "--dry-run"]
+        default = subprocess.run(base, capture_output=True, text=True)
+        self.assertEqual(default.returncode, 0, default.stderr)
+        self.assertIn("-DXIAOTAI_BOARD_VARIANT=ili9342c", default.stdout)
+        rejected = subprocess.run(base + ["--variant", "ili9342e"],
+                                  capture_output=True, text=True)
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertIn("variant", rejected.stderr.lower())
 
     def test_capture_normalizes_mic1_and_electrical_reference(self):
         run_c(r'''
@@ -155,26 +166,29 @@ int main(void) {
 }
 ''')
 
-    def test_panel_revision_uses_its_own_extended_commands(self):
+    def test_panel_uses_supported_commands_without_selection_macro(self):
         source = (BOARD / "board_display.c").read_text()
-        tables = source[source.index("#if defined(XIAOTAI_PANEL_ILI9342C)"):
-                        source.index("esp_err_t szpi_board_display_init")]
-        for define, unlock, gamma in (("#define XIAOTAI_PANEL_ILI9342C 1", 0xc8, 0xe0),
-                                       ("", 0xdd, 0xe4)):
-            run_c(r'''
+        legacy_guard = "#if defined(XIAOTAI_PANEL_ILI9342C)"
+        start = source.index(legacy_guard if legacy_guard in source else
+                             "static const ili9341_lcd_init_cmd_t s_panel_init")
+        tables = source[start:source.index("esp_err_t szpi_board_display_init")]
+        run_c(r'''
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 typedef struct {int cmd; const void *data; size_t data_bytes; unsigned delay_ms;}
     ili9341_lcd_init_cmd_t;
-''' + define + "\n" + tables + f'''
-int main(void) {{
-    assert(s_panel_init[0].cmd == {unlock});
-    unsigned found=0;
+''' + tables + r'''
+int main(void) {
+    assert(s_panel_init[0].cmd == 0xc8);
+    assert(s_panel_init[0].data_bytes == 3);
+    const uint8_t *unlock = s_panel_init[0].data;
+    assert(unlock[0] == 0xff && unlock[1] == 0x93 && unlock[2] == 0x42);
+    unsigned gamma=0;
     for(unsigned i=0; i<sizeof(s_panel_init)/sizeof(s_panel_init[0]); ++i)
-        found += s_panel_init[i].cmd == {gamma};
-    assert(found==1);
-}}
+        gamma += s_panel_init[i].cmd == 0xe0;
+    assert(gamma==1);
+}
 ''')
 
     def test_no_application_key_claims_the_audio_master_clock(self):

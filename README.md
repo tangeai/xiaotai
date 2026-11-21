@@ -25,10 +25,10 @@
 | <img src="docs/images/boards/lckfb-bk7258.webp" alt="立创·实战派 BK7258 开发板" width="180"> | 立创·实战派 BK7258<br>`lckfb-bk7258` | [下载固件与发布说明](docs/downloads.md#lckfb-bk7258) | [烧录指南](docs/boards/lckfb-bk7258/README.md#烧录) |
 | <img src="docs/images/boards/lckfb-esp32s3.webp" alt="立创·实战派 ESP32-S3 开发板" width="180"> | 立创·实战派 ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | [下载固件与发布说明](docs/downloads.md#lckfb-esp32s3) | [烧录指南](docs/boards/lckfb-esp32s3/README.md#烧录) |
 | <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10.webp" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="180"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | [下载固件与发布说明](docs/downloads.md#waveshare-esp32p4-touch-lcd-43c-v10) | [烧录指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录) |
-| <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite 开发板" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342E / ILI9342C 屏幕<br>`m5stack-cores3-lite` | [下载固件与发布说明](docs/downloads.md#m5stack-cores3-lite) | [烧录指南](docs/boards/m5stack-cores3-lite/README.md#烧录) |
+| <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite 开发板" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342C 屏幕<br>`m5stack-cores3-lite` | [下载固件与发布说明](docs/downloads.md#m5stack-cores3-lite) | [烧录指南](docs/boards/m5stack-cores3-lite/README.md#烧录) |
 | <img src="docs/images/boards/mgkfb-bk7258.webp" alt="觅感 AI 玩具开发板 BK7258 双屏眼睛" width="180"> | 觅感 AI 玩具开发板 BK7258<br>双屏眼睛 · 8 MiB Flash<br>`mgkfb-bk7258` | [下载固件与发布说明](docs/downloads.md#mgkfb-bk7258) | [烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录) |
 
-M5 必须按 ILI9342E/ILI9342C 屏幕控制器选择对应变体；觅感 BK7258 固件适用于 8 MiB Flash、
+M5 仅支持 ILI9342C 屏幕；觅感 BK7258 固件适用于 8 MiB Flash、
 双屏眼睛开发板。各板规格、功能与依赖见[完整开发板目录](docs/boards/README.md)，历史版本见
 [GitHub Releases](https://github.com/tangeai/xiaotai/releases)。
 

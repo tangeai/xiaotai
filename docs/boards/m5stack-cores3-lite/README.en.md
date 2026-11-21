@@ -4,22 +4,15 @@
 
 [中文](README.md) · [English](README.en.md)
 
-Board ID: `m5stack-cores3-lite`. See [Downloads](../../downloads.en.md#m5stack-cores3-lite) for both screen variants. Short-phrase recognition, AI interruption, and double-talk still need regression testing; see [Validation status and limitations](#validation-status-and-limitations).
+Board ID: `m5stack-cores3-lite`. See [Downloads](../../downloads.en.md#m5stack-cores3-lite) for the supported ILI9342C firmware. Short-phrase recognition, AI interruption, and double-talk still need regression testing; see [Validation status and limitations](#validation-status-and-limitations).
 
 ## Flashing
 
 The filename uses the distribution version; compare embedded firmware identity with the release notes. Download one complete BIN without extraction. Screenshot versions and paths are examples.
 
-### Identify the screen first
+### Confirm the board
 
-Confirm the device is **CoreS3-Lite K128-Lite**, then ask the seller or M5Stack whether its controller is `ILI9342E` or `ILI9342C`. Use an explicit part identification, not purchase date, product name, or enclosure appearance.
-
-Official materials describe both panels, and [M5GFX panel detection](https://github.com/m5stack/M5GFX/releases/tag/0.2.30) handles C/E separately. If uncertain, obtain the controller model from the seller before choosing firmware.
-
-| Controller | Complete image |
-|---|---|
-| ILI9342E | [Download matching merged BIN](../../downloads.en.md#m5stack-cores3-lite) |
-| ILI9342C | [Download matching merged BIN](../../downloads.en.md#m5stack-cores3-lite) |
+This project supports **CoreS3-Lite K128-Lite / ILI9342C** only. The download page provides one complete image; there is no display choice or build configuration for other panels.
 
 ### Open the flashing tool
 
@@ -27,11 +20,11 @@ Open [Espressif ESP Web Tool](https://espressif.github.io/esptool-js/) in deskto
 
 ### Flashing steps
 
-1. Download the complete `merged.bin` for the correct controller from the table. Select only this BIN at **`0x0`**.
+1. Download this board’s complete `_merged.bin` from Downloads. Select only this BIN at **`0x0`**.
 2. Connect Type-C to the computer. Hold the bottom reset button for about 3 seconds, release when the green LED lights, and wait until it goes out to enter download mode. Detection must show **ESP32-S3**.
 3. In **Program**, set `Baudrate` to `921600`, or `115200` if unstable. Click **Connect** and select the board. Leave `WebUSB (CH340)` unchecked for desktop serial mode.
 4. Click **Choose File**, select the merged BIN, and set **Flash Address to `0x0`**. Set Flash Mode, Flash Frequency, and Flash Size to `keep`. Add only one row and click **Program**.
-5. Wait for `Hash of data verified.` and a final `Leaving...` with no `Error:`. Click **Disconnect**, reset, and check 115200-baud logs for `m5stack_cores3_lite_xiaotai`, the selected screen variant, and the full version before first use.
+5. Wait for `Hash of data verified.` and a final `Leaving...` with no `Error:`. Click **Disconnect**, reset, and check 115200-baud logs for `m5stack_cores3_lite_xiaotai`, the embedded version listed in the release notes before first use.
 
 Connection and programming controls are shown below; port numbers and paths are examples:
 
@@ -43,7 +36,7 @@ Connection and programming controls are shown below; port numbers and paths are 
 
 Repeat step 2 for connection failures; check the port, cable, file, and address for write/verification failures. A 100% progress bar alone does not prove success.
 
-The complete image is `v<release-version>_m5stack-cores3-lite_<display-variant>_merged.bin`. Flash only this file at `0x0`.
+The complete image is `v<release-version>_m5stack-cores3-lite_ili9342c_merged.bin`. Flash only this file at `0x0`.
 
 Compare its SHA-256 with the release notes. Use `Get-FileHash -Algorithm SHA256 "BIN-path"` on Windows, `sha256sum "BIN-path"` on Linux, or `shasum -a 256 "BIN-path"` on macOS.
 
@@ -65,12 +58,12 @@ Follow [Building from source](../../../README.en.md#build-from-source) to obtain
 
 ```bash
 . tools/activate_esp_idf.sh
-python3 tools/build.py --board m5stack-cores3-lite --variant ili9342e
+python3 tools/build.py --board m5stack-cores3-lite --variant ili9342c
 cd firmware/esp-idf/esp32s3/m5stack-cores3-lite
 idf.py -p <serial-port> flash monitor
 ```
 
-This selects ILI9342E; for ILI9342C, change `--variant` to `ili9342c`. Replace `<serial-port>` with the actual port; `idf.py` uses the project manifest and addresses. Ordinary upgrades do not use `erase-flash`. The screenshot is an example, not proof these commands ran on the current board:
+Default and explicit builds both select ILI9342C. Replace `<serial-port>` with the actual port; `idf.py` uses the project manifest and addresses. Ordinary upgrades do not use `erase-flash`. The screenshot is an example, not proof these commands ran on the current board:
 
 ![CoreS3-Lite build and flash commands](../../images/flashing/project-m5stack-cores3-lite.png)
 
@@ -80,7 +73,7 @@ This selects ILI9342E; for ILI9342C, change `--variant` to `ili9342c`. Replace `
 |---|---|
 | Chip / framework | ESP32-S3 / **ESP-IDF v5.5.5** |
 | Storage | 16 MB Flash / 8 MB Quad PSRAM, configured at 80 MHz |
-| Display / touch | 320×240 ILI9342C or ILI9342E / FT6336U |
+| Display / touch | 320×240 ILI9342C / FT6336U |
 | Camera | GC0308 with onboard 24 MHz clock |
 | Audio | ES7210 dual-microphone input and electrical playback reference; AW88298 + 1 W speaker |
 | Power | AXP2101 + AW9523B, 200 mAh battery (official rating, capacity unmeasured) |
@@ -171,11 +164,11 @@ From the root, select one screen only:
 ```bash
 . tools/activate_esp_idf.sh
 idf.py --version
-python3 tools/build.py --board m5stack-cores3-lite --variant ili9342e
-# For ILI9342C hardware, replace ili9342e above with ili9342c.
+python3 tools/build.py --board m5stack-cores3-lite --variant ili9342c
+
 ```
 
-Omitting `--variant` selects `ili9342e`. Switching reconfigures panel commands, without runtime guessing. Native output is `firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/`; the application is `m5stack_cores3_lite_xiaotai.bin` / `.elf`. Use that directory's `flasher_args.json` for addresses.
+Omitting `--variant` selects the sole `ili9342c` option. The native project also rejects other panel configurations. Native output is `firmware/esp-idf/esp32s3/m5stack-cores3-lite/build/`; the application is `m5stack_cores3_lite_xiaotai.bin` / `.elf`. Use that directory's `flasher_args.json` for addresses.
 
 Independent `BUILD_NUMBER` increments on every build, including failures, without changing product version.
 
@@ -216,12 +209,14 @@ The 1.1.0 test firmware adds AI audio analysis: triggered raw MIC1 16 kHz PCM re
 
 Recognition pauses during calls, live view, AI conversations, and room activity. MIC3 playback reference is excluded; thresholds and acoustics still require M5 hardware validation.
 
-Validated release records are **v1.0.1 · build.47 / ILI9342E** and **v1.0.1 · build.48 / ILI9342C**. See [Release records (Chinese)](FREEZE.md) for features/fixes and [Validation (Chinese)](../../../boards/m5stack/cores3-lite/VALIDATION.md) for build identity, scope, and historical logs.
+The historical ILI9342C release is **v1.0.1 · build.48**. The current beta still needs hardware acceptance; historical results do not validate it.
+
+See [Release records (Chinese)](FREEZE.md) for features/fixes and [Validation (Chinese)](../../../boards/m5stack/cores3-lite/VALIDATION.md) for build identity, scope, and historical logs.
 
 - Capture, AI interruption, and double-talk need ongoing testing. Unstable recognition of the short Chinese phrase “好的” and possible loss of initial speech remain unresolved.
 - This version does not offer experimental recording export to TF cards. Diagnose with `voice-diag`, `status`, and `face-animation`.
 - AEC and UI processing headroom during playback remains tight. Weak networks, repeated switching, and long runs need continued regression. See [Audio performance review (Chinese)](AUDIO_PERFORMANCE_REVIEW.md).
-- Select firmware by display controller; see Downloads for current availability.
+- Only the ILI9342C complete image is provided; see Downloads for availability.
 - SD card, IMU, magnetometer, proximity sensor, and RTC are not integrated into XiaoTai features.
 
 ## Serial time-server configuration

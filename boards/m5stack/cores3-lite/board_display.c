@@ -13,7 +13,6 @@ esp_err_t szpi_board_display_set_awake(bool awake)
 {
     return cores3_board_backlight(awake);
 }
-#if defined(XIAOTAI_PANEL_ILI9342C)
 static const ili9341_lcd_init_cmd_t s_panel_init[] = {
     {0xc8, (const uint8_t[]){0xff,0x93,0x42}, 3, 0},
     {0xc0, (const uint8_t[]){0x12,0x12}, 2, 0},
@@ -26,18 +25,7 @@ static const ili9341_lcd_init_cmd_t s_panel_init[] = {
     {0xb6, (const uint8_t[]){0x08,0x82,0x1d,0x04}, 4, 0},
     {0x38, NULL, 0, 0}, {0x11, NULL, 0, 120},
 };
-#else
-static const ili9341_lcd_init_cmd_t s_panel_init[] = {
-    {0xdd,(const uint8_t[]){1},1,0}, {0xd5,(const uint8_t[]){0},1,0},
-    {0xb1,(const uint8_t[]){0x22},1,0}, {0xc8,(const uint8_t[]){0x38},1,0},
-    {0xcb,(const uint8_t[]){0x1c},1,0}, {0xc9,(const uint8_t[]){0x1a},1,0},
-    {0xca,(const uint8_t[]){0x1a},1,0},
-    {0xb7,(const uint8_t[]){0x5a,0x41,0x11,0x19},4,0},
-    {0xe4,(const uint8_t[]){4,8,0x11,6,0x12,7,0x3a,0x76,0x47,7,0x0f,0x0a,0x11,0x19,5},15,0},
-    {0xe5,(const uint8_t[]){2,3,7,6,0x12,7,0x36,0x5f,0x48,6,0x10,0x0c,0x16,0x14,9},15,0},
-    {0x38,NULL,0,0}, {0x11,NULL,0,120},
-};
-#endif
+
 
 
 esp_err_t szpi_board_display_init(szpi_board_display_t *display)
@@ -68,7 +56,7 @@ esp_err_t szpi_board_display_init(szpi_board_display_t *display)
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_spi(
                             (esp_lcd_spi_bus_handle_t)LCD_HOST, &io, &display->io),
                         TAG, "LCD panel IO");
-    /* Use only the selected ILI9342C/E power and gamma command table. */
+    /* Use only the ILI9342C power and gamma command table. */
     ili9341_vendor_config_t vendor = {
         .init_cmds = s_panel_init, .init_cmds_size = sizeof(s_panel_init)/sizeof(s_panel_init[0]),
     };
@@ -109,11 +97,8 @@ esp_err_t szpi_board_display_init(szpi_board_display_t *display)
     };
     ESP_RETURN_ON_ERROR(esp_lcd_touch_new_i2c_ft5x06(touch_io, &touch, &display->touch),
                         TAG, "FT6336 touch");
-#if defined(XIAOTAI_PANEL_ILI9342C)
     const char *panel_model = "ILI9342C";
-#else
-    const char *panel_model = "ILI9342E";
-#endif
+
     ESP_LOGI(TAG, "LCD %s native=%dx%d UI=%dx%d swap_xy=%d mirror=%d/%d",
              panel_model, LCD_NATIVE_H_RES, LCD_NATIVE_V_RES,
              LCD_H_RES, LCD_V_RES, LCD_SWAP_XY, LCD_MIRROR_X, LCD_MIRROR_Y);
