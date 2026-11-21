@@ -66,6 +66,7 @@ int main(void) {
 
     def test_export_keeps_raw_packets_and_reports_pcm_comparison(self):
         import tempfile
+        import wave
         from pathlib import Path
         spec=importlib.util.spec_from_file_location('audio_export', ROOT/'tools/decode_ai_audio_capture.py')
         exporter=importlib.util.module_from_spec(spec);spec.loader.exec_module(exporter)
@@ -78,6 +79,9 @@ int main(void) {
             report=exporter.export_capture([record],out,'opus')
             self.assertEqual((out/'raw-packets/000000.bin').read_bytes(),packet)
             self.assertTrue(report['pcm_identical'])
+            with wave.open(str(out/'host-opus.wav'), 'rb') as decoded:
+                self.assertEqual(decoded.getparams()[:4], (1, 2, 16000, 320))
+                self.assertEqual(decoded.readframes(320), bytes(640))
             self.assertTrue((out/'comparison.json').is_file())
             with self.assertRaises(FileExistsError):exporter.export_capture([record],out,'opus')
 
