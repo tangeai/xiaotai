@@ -49,6 +49,8 @@ esp_err_t runtime_config_save_tirtc(const runtime_tirtc_config_t *config);
 /** 清空整个 TiRTC 凭证命名空间。同步等待擦除/提交完成并返回 NVS 错误；
  * 可从内部 RAM 或 PSRAM 栈调用，Flash 操作始终在内部 RAM 栈执行。 */
 esp_err_t runtime_config_clear_tirtc(void);
+/* Manual recovery: NULL clears; success blocks background identity writes until reboot. */
+esp_err_t runtime_config_recover_tirtc(const runtime_tirtc_config_t *value);
 
 /** 只校验字段长度；error 可为 NULL。 */
 bool runtime_config_tirtc_valid(const runtime_tirtc_config_t *config,

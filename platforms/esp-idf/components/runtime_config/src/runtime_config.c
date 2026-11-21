@@ -1,15 +1,16 @@
 /*
  * TiRTC 设备凭证的 NVS adapter。
  *
- * 三个字段作为一组提交；读取任一必需字段失败时清空整个输出，避免调用者误用
- * 半组配置。这里使用普通 NVS，量产工程应由组合根启用 NVS 加密或安全芯片。
+ * 版本化 blob 保存整组身份；兼容读取旧的分键格式，读取失败时清空输出。这里使用普通 NVS，量产工程应由组合根启用 NVS 加密或安全芯片。
  */
 #include "runtime_config.h"
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include "xiaotai_ntp_config.h"
+#include "xiaotai_identity_gate.h"
 
 #include "nvs.h"
 #include "esp_memory_utils.h"
@@ -17,7 +18,15 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
+/* Identity writes are serialized without holding a Flash/RTOS critical section. */
+static xiaotai_identity_gate_t s_identity_gate;
+
 #define TIRTC_NVS_NAMESPACE "tirtc_cfg"
+#define TIRTC_IDENTITY_KEY "identity_v1"
+typedef struct {
+    uint32_t version;
+    runtime_tirtc_config_t config;
+} runtime_identity_record_t;
 #define TIRTC_ENDPOINT_NVS_NAMESPACE "tirtc_ep"
 #define TIRTC_ENDPOINT_NVS_KEY "url"
 #ifndef RUNTIME_TIRTC_ENDPOINT_MAX
@@ -122,6 +131,12 @@ bool runtime_config_tirtc_valid(const runtime_tirtc_config_t *config,
         set_error(error, error_size, "config is null");
         return false;
     }
+    if (memchr(config->device_id, '\0', sizeof(config->device_id)) == NULL ||
+        memchr(config->device_secret, '\0', sizeof(config->device_secret)) == NULL ||
+        memchr(config->client_id, '\0', sizeof(config->client_id)) == NULL) {
+        set_error(error, error_size, "unterminated credential field");
+        return false;
+    }
     size_t device_id_length = strlen(config->device_id);
     size_t secret_length = strlen(config->device_secret);
     if (device_id_length == 0 || device_id_length >= sizeof(config->device_id)) {
@@ -147,6 +162,19 @@ esp_err_t runtime_config_load_tirtc(runtime_tirtc_config_t *config)
     if (err != ESP_OK) {
         return err;
     }
+    runtime_identity_record_t record = {0};
+    size_t record_size = sizeof(record);
+    err = nvs_get_blob(nvs, TIRTC_IDENTITY_KEY, &record, &record_size);
+    if (err != ESP_ERR_NVS_NOT_FOUND) {
+        nvs_close(nvs);
+        if (err != ESP_OK) return err;
+        if (record_size != sizeof(record) || record.version != 1 ||
+            !runtime_config_tirtc_valid(&record.config, NULL, 0)) return ESP_ERR_INVALID_ARG;
+        *config = record.config;
+        return ESP_OK;
+    }
+    /* Legacy credentials are read only when no versioned record exists.
+     * Never revive an old identity after detecting a damaged new record. */
     /* client_id 是向后兼容的可选字段；ID 和 secret 必须同时存在。 */
     size_t size = sizeof(config->device_id);
     err = nvs_get_str(nvs, "device_id", config->device_id, &size);
@@ -163,29 +191,45 @@ esp_err_t runtime_config_load_tirtc(runtime_tirtc_config_t *config)
         }
     }
     nvs_close(nvs);
+    if (err == ESP_OK && !runtime_config_tirtc_valid(config, NULL, 0)) err = ESP_ERR_INVALID_ARG;
     if (err != ESP_OK) {
         memset(config, 0, sizeof(*config));
     }
     return err;
 }
 
-esp_err_t runtime_config_save_tirtc(const runtime_tirtc_config_t *config)
+static esp_err_t save_tirtc_unlocked(const runtime_tirtc_config_t *config)
 {
     if (!runtime_config_tirtc_valid(config, NULL, 0)) {
         return ESP_ERR_INVALID_ARG;
     }
     nvs_handle_t nvs = 0;
     esp_err_t err = nvs_open(TIRTC_NVS_NAMESPACE, NVS_READWRITE, &nvs);
-    if (err == ESP_OK) err = nvs_set_str(nvs, "device_id", config->device_id);
-    if (err == ESP_OK) err = nvs_set_str(nvs, "secret", config->device_secret);
-    if (err == ESP_OK) err = nvs_set_str(nvs, "client_id", config->client_id);
+    /* First preserve the currently readable identity as a complete blob.
+     * Only then retire legacy keys, before publishing a different identity.
+     * If NVS later discards a damaged blob, no stale legacy identity can revive.
+     * Migration retires legacy fields only after preserving a readable old
+     * identity; it never updates individual credential fields. */
+    runtime_identity_record_t record = {.version = 1};
     if (err == ESP_OK) {
-        esp_err_t erase_err = nvs_erase_key(nvs, "endpoint");
-        if (erase_err != ESP_OK && erase_err != ESP_ERR_NVS_NOT_FOUND) {
-            err = erase_err;
+        esp_err_t load_err = runtime_config_load_tirtc(&record.config);
+        if (load_err == ESP_OK) {
+            err = nvs_set_blob(nvs, TIRTC_IDENTITY_KEY, &record, sizeof(record));
+            if (err == ESP_OK) err = nvs_commit(nvs);
+        } else if (load_err != ESP_ERR_NVS_NOT_FOUND && load_err != ESP_ERR_INVALID_ARG) {
+            err = load_err;
         }
     }
-    /* nvs_commit 是整组配置对后续启动可见的提交点。 */
+    static const char *const legacy_keys[] = {"device_id", "secret", "client_id", "endpoint"};
+    for (size_t i = 0; err == ESP_OK && i < sizeof(legacy_keys)/sizeof(legacy_keys[0]); ++i) {
+        esp_err_t erase_err = nvs_erase_key(nvs, legacy_keys[i]);
+        if (erase_err != ESP_OK && erase_err != ESP_ERR_NVS_NOT_FOUND) err = erase_err;
+    }
+    if (err == ESP_OK) err = nvs_commit(nvs);
+    /* NVS set_str writes immediately; commit is not a multi-key transaction.
+     * Publish the new ID, secret and client ID with one blob update. */
+    record.config = *config;
+    if (err == ESP_OK) err = nvs_set_blob(nvs, TIRTC_IDENTITY_KEY, &record, sizeof(record));
     if (err == ESP_OK) err = nvs_commit(nvs);
     if (nvs != 0) nvs_close(nvs);
     return err;
@@ -222,7 +266,7 @@ static void clear_tirtc_task(void *argument)
     vTaskDelete(NULL);
 }
 
-esp_err_t runtime_config_clear_tirtc(void)
+static esp_err_t clear_tirtc_unlocked(void)
 {
     unsigned stack_probe = 0;
     if (esp_ptr_internal(&stack_probe)) {
@@ -284,4 +328,29 @@ esp_err_t runtime_config_clear_ntp_server(void)
     if (err == ESP_OK) err = nvs_commit(nvs);
     if (nvs != 0) nvs_close(nvs);
     return err;
+}
+
+esp_err_t runtime_config_save_tirtc(const runtime_tirtc_config_t *value)
+{
+    if (!xiaotai_identity_write_begin(&s_identity_gate)) return ESP_ERR_INVALID_STATE;
+    esp_err_t result = save_tirtc_unlocked(value);
+    xiaotai_identity_write_end(&s_identity_gate);
+    return result;
+}
+
+esp_err_t runtime_config_clear_tirtc(void)
+{
+    if (!xiaotai_identity_write_begin(&s_identity_gate)) return ESP_ERR_INVALID_STATE;
+    esp_err_t result = clear_tirtc_unlocked();
+    xiaotai_identity_write_end(&s_identity_gate);
+    return result;
+}
+
+esp_err_t runtime_config_recover_tirtc(const runtime_tirtc_config_t *value)
+{
+    int previous = xiaotai_identity_recovery_begin(&s_identity_gate);
+    if (previous < 0) return ESP_ERR_INVALID_STATE;
+    esp_err_t result = value != NULL ? save_tirtc_unlocked(value) : clear_tirtc_unlocked();
+    xiaotai_identity_recovery_end(&s_identity_gate, previous, result == ESP_OK);
+    return result;
 }

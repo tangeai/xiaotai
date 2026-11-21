@@ -657,9 +657,10 @@ static int command_tirtc_set(int argc, char **argv)
     if (argc == 4) {
         (void)snprintf(config.client_id, sizeof(config.client_id), "%s", argv[3]);
     }
-    esp_err_t err = runtime_config_save_tirtc(&config);
+    esp_err_t err = runtime_config_recover_tirtc(&config);
     if (err != ESP_OK) {
-        printf("save failed: %s\n", esp_err_to_name(err));
+        printf("save failed: %s\n", err == ESP_ERR_INVALID_STATE ?
+               "identity storage busy; retry the command" : esp_err_to_name(err));
         return 1;
     }
     printf("device credentials saved (secret is not displayed); restarting...\n");
@@ -672,9 +673,10 @@ static int command_tirtc_clear(int argc, char **argv)
 {
     (void)argc;
     (void)argv;
-    esp_err_t err = runtime_config_clear_tirtc();
+    esp_err_t err = runtime_config_recover_tirtc(NULL);
     if (err != ESP_OK) {
-        printf("clear failed: %s\n", esp_err_to_name(err));
+        printf("clear failed: %s\n", err == ESP_ERR_INVALID_STATE ?
+               "identity storage busy; retry the command" : esp_err_to_name(err));
         return 1;
     }
     printf("device credentials cleared; restarting into binding flow...\n");

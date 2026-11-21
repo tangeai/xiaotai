@@ -29,7 +29,13 @@ static inline bool xiaotai_ntp_server_valid(const char *server)
         unsigned octet = 0, parts = 1;
         for (size_t i = 0; i < length; ++i) {
             if (server[i] == '.') { ++parts; octet = 0; }
-            else { octet = octet * 10U + (unsigned)(server[i] - '0'); }
+            else {
+                /* lwIP treats leading-zero IPv4 octets as octal. Accept only
+                 * canonical decimal literals so saved and resolved values agree. */
+                if ((i == 0 || server[i - 1] == '.') && server[i] == '0' &&
+                    i + 1 < length && server[i + 1] != '.') return false;
+                octet = octet * 10U + (unsigned)(server[i] - '0');
+            }
             if (octet > 255 || parts > 4) return false;
         }
         if (parts != 4) return false;
