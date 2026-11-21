@@ -15,16 +15,21 @@ def font_glyphs(source):
                 re.findall(r'\.(\w+) = (-?\d+)', item)}
                for item in re.findall(r'\{([^{}]+)\}', descriptors)]
     glyphs = {}
+    def array(name):
+        data = re.search(r'\b' + name + r'\[\] = \{(.*?)\};', source, re.S).group(1)
+        return [int(value, 0) for value in re.findall(r'0x[0-9a-fA-F]+|\d+', data)]
+
     pattern = (r'\.range_start = (\d+), \.range_length = (\d+), '
-               r'\.glyph_id_start = (\d+),\s*\.unicode_list = (\w+)')
-    for start, length, first, offsets in re.findall(pattern, source):
+               r'\.glyph_id_start = (\d+),\s*\.unicode_list = (\w+), '
+               r'\.glyph_id_ofs_list = (\w+)')
+    for start, length, first, offsets, ids in re.findall(pattern, source):
         if offsets == 'NULL':
             values = range(int(length))
         else:
-            data = re.search(r'\b' + offsets + r'\[\] = \{(.*?)\};', source, re.S).group(1)
-            values = [int(value, 0) for value in re.findall(r'0x[0-9a-fA-F]+|\d+', data)]
+            values = array(offsets)
+        glyph_offsets = array(ids) if ids != 'NULL' else range(len(values))
         for index, offset in enumerate(values):
-            glyphs[int(start) + offset] = entries[int(first) + index]
+            glyphs[int(start) + offset] = entries[int(first) + glyph_offsets[index]]
     return glyphs
 
 
@@ -47,7 +52,7 @@ class TemperatureFontSymbols(unittest.TestCase):
     def test_esp_caption_and_control_fonts_have_visible_symbols(self):
         for size in (16, 24):
             source = (ROOT / f'platforms/esp-idf/components/starter_product/src/ui_font_cn_{size}.c').read_text()
-            for character in '°℃':
+            for character in '°℃≒':
                 with self.subTest(size=size, character=character):
                     metrics = glyph_metrics(source, character)
                     self.assertIsNotNone(metrics, f'{size}px lacks {character}')

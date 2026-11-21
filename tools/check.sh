@@ -100,6 +100,7 @@ python3 "$repo_dir/tools/tests/test_s3_product_regressions.py"
 python3 "$repo_dir/tools/tests/test_ai_global_mute_feedback.py"
 python3 "$repo_dir/tools/tests/test_call_camera_feedback.py"
 python3 "$repo_dir/tools/tests/test_temperature_font_symbols.py"
+python3 "$repo_dir/tools/tests/test_font_provenance.py"
 python3 "$repo_dir/tools/tests/test_s3_room_refresh.py"
 python3 "$repo_dir/tools/tests/test_s3_async_regressions.py"
 # Includes mute/PTT/session/transport changes during S3 encoding (A-law and Opus).
