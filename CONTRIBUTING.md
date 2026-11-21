@@ -249,7 +249,7 @@ bash tools/check.sh
 使用；细节通过板卡指南和开发文档展开，避免重复堆叠参数、内部诊断和历史过程。
 
 英文翻译按以下清单维护，不对整个仓库逐文件翻译。根目录 `README.md` 已有
-`README.en.md`；另有下列 15 份中文源文档纳入翻译范围。列入范围不代表英文版已经完成。
+`README.en.md`；另有下列 16 份中文源文档纳入翻译范围。列入范围不代表英文版已经完成。
 
 | 类别 | 中文源文档 |
 |---|---|
@@ -266,6 +266,7 @@ bash tools/check.sh
 | M5Stack CoreS3-Lite | `docs/boards/m5stack-cores3-lite/README.md` |
 | 觅感 BK7258 | `docs/boards/mgkfb-bk7258/README.md` |
 | BK7258 串口命令 | `docs/development/BK7258_SERIAL_COMMANDS.md` |
+| BK7258 Opus 丢包补偿实践 | `docs/development/bk-opus-plc.md` |
 | 开发注意事项 | `docs/development/pitfalls.md` |
 | 测试指南 | `tests/README.md` |
 

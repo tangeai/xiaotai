@@ -691,8 +691,8 @@ require("#include <modules/aec.h>" in audio_source and
         "s_aec = psram_malloc(s_aec_context_bytes)" in audio_source and
         "s_aec_reference_ring = psram_malloc(" in audio_source and
         "frame_samples != sample_rate_hz / 50U" in audio_source and
-        "aec_reference_push(pcm, samples);" in audio_source and
-        audio_source.find("aec_reference_push(pcm, samples);") >
+        "aec_reference_push(pcm, accepted_samples);" in audio_source and
+        audio_source.find("aec_reference_push(pcm, accepted_samples);") >
         audio_source.find("s_board_audio->write_pcm(") and
         "aec_process_capture(pcm, s_frame_samples);" in
         audio_source and

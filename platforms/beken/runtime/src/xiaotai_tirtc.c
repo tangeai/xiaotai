@@ -1130,7 +1130,7 @@ static void on_audio(tirtc_conn_t connection,
     }
     echo_diag_audio_rx(mode, frame);
     int rc = is_ai_opus ?
-        xiaotai_audio_play_opus((const uint8_t *)data, frame->length, frame->ts) :
+        xiaotai_audio_play_opus_stream(data, frame->length, frame->ts, frame->stream_id) :
         xiaotai_audio_play_alaw((const uint8_t *)data, frame->length);
     uint32_t received = (uint32_t)atomic_fetch_add_explicit(
                             &s_received_audio_frames, 1,
