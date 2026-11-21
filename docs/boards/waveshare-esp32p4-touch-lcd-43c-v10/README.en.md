@@ -331,3 +331,12 @@ and network reconnection.
 
 In each case query, change, reboot, and verify persistence. Host fault injection does not
 replace serial validation on hardware running the exact image.
+
+Use decimal NTP IPv4 addresses without leading zeroes, such as `10.0.0.1`; `010.0.0.1` is rejected.
+
+Successful `tirtc-set` / `tirtc-clear` blocks background binding writes until reboot; retry if storage is busy.
+Credentials use a versioned record, with legacy reads supported. Old keys are retired before publishing a new identity.
+Upgrading does not require rebinding.
+
+After changing credentials, clear binding in the current firmware before downgrading to firmware without the new record format.
+Rebind after downgrading to avoid loading stale legacy credentials.

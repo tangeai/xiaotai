@@ -6,8 +6,12 @@
 #include <stdatomic.h>
 #include <string.h>
 #include "xiaotai_ntp_config.h"
+#include "xiaotai_identity_gate.h"
 
 #include "xiaotai_audio_policy.h"
+
+/* BK exclusive atomics must reside in the SDK spinlock SRAM region. */
+static xiaotai_identity_gate_t s_identity_gate __attribute__((section(".sram_spinlock_section")));
 
 #define XIAOTAI_RECORD_MAGIC 0x5849414FU
 #define XIAOTAI_RECORD_VERSION 1U
@@ -243,7 +247,7 @@ int xiaotai_storage_load_device(xiaotai_device_credentials_t *out)
     return BK_OK;
 }
 
-int xiaotai_storage_save_device(const xiaotai_device_credentials_t *value)
+static int save_device_unlocked(const xiaotai_device_credentials_t *value)
 {
     if (!device_credentials_valid(value)) return BK_ERR_PARAM;
     xiaotai_device_record_t record = {0};
@@ -252,7 +256,7 @@ int xiaotai_storage_save_device(const xiaotai_device_credentials_t *value)
     return storage_write_blob(XIAOTAI_DEVICE_KEY, &record, sizeof(record));
 }
 
-int xiaotai_storage_clear_device(void)
+static int clear_device_unlocked(void)
 {
     return storage_delete(XIAOTAI_DEVICE_KEY);
 }
@@ -368,4 +372,29 @@ int xiaotai_storage_save_ntp_server(const char *url)
 int xiaotai_storage_clear_ntp_server(void)
 {
     return storage_delete(XIAOTAI_NTP_SERVER_KEY);
+}
+
+int xiaotai_storage_save_device(const xiaotai_device_credentials_t *value)
+{
+    if (!xiaotai_identity_write_begin(&s_identity_gate)) return BK_ERR_BUSY;
+    int result = save_device_unlocked(value);
+    xiaotai_identity_write_end(&s_identity_gate);
+    return result;
+}
+
+int xiaotai_storage_clear_device(void)
+{
+    if (!xiaotai_identity_write_begin(&s_identity_gate)) return BK_ERR_BUSY;
+    int result = clear_device_unlocked();
+    xiaotai_identity_write_end(&s_identity_gate);
+    return result;
+}
+
+int xiaotai_storage_recover_device(const xiaotai_device_credentials_t *value)
+{
+    int previous = xiaotai_identity_recovery_begin(&s_identity_gate);
+    if (previous < 0) return BK_ERR_BUSY;
+    int result = value != NULL ? save_device_unlocked(value) : clear_device_unlocked();
+    xiaotai_identity_recovery_end(&s_identity_gate, previous, result == BK_OK);
+    return result;
 }

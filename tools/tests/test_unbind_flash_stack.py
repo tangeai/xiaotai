@@ -14,6 +14,7 @@ class UnbindFlashStack(unittest.TestCase):
         unbind = runtime[start:end]
         run_c(r'''
 #include "xiaotai_ntp_config.h"
+#include "xiaotai_identity_gate.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -23,6 +24,7 @@ class UnbindFlashStack(unittest.TestCase):
 #define ESP_OK 0
 #define ESP_FAIL -1
 #define ESP_ERR_INVALID_ARG 2
+#define ESP_ERR_INVALID_STATE 5
 #define ESP_ERR_NO_MEM 3
 #define ESP_ERR_NVS_NOT_FOUND 4
 #define NVS_READONLY 1
@@ -50,6 +52,8 @@ static esp_err_t nvs_open(const char *name,int mode,nvs_handle_t *handle){
  assert(esp_task_stack_is_sane_cache_disabled() && "spi_flash_disable_interrupts_caches_and_other_cpu cache_utils.c:127");
  assert(!strcmp(name,"tirtc_cfg"));opens++;*handle=1;return ESP_OK;
 }
+static int nvs_get_blob(int h,const char*k,void*v,size_t*n){return ESP_ERR_NVS_NOT_FOUND;}
+static int nvs_set_blob(int h,const char*k,const void*v,size_t n){return 0;}
 static int nvs_get_str(int h,const char*k,char*v,size_t*n){return ESP_ERR_NVS_NOT_FOUND;}
 static int nvs_set_str(int h,const char*k,const char*v){return ESP_OK;}
 static int nvs_erase_key(int h,const char*k){return ESP_OK;}

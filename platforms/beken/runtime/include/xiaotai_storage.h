@@ -41,6 +41,8 @@ int xiaotai_storage_clear_wifi(void);
 int xiaotai_storage_load_device(xiaotai_device_credentials_t *out);
 int xiaotai_storage_save_device(const xiaotai_device_credentials_t *value);
 int xiaotai_storage_clear_device(void);
+/* Manual recovery: NULL clears; success blocks background identity writes until reboot. */
+int xiaotai_storage_recover_device(const xiaotai_device_credentials_t *value);
 int xiaotai_storage_load_endpoint(char *output, size_t capacity);
 int xiaotai_storage_save_endpoint(const char *url);
 int xiaotai_storage_clear_endpoint(void);

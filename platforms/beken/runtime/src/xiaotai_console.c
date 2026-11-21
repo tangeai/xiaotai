@@ -44,6 +44,20 @@ static int schedule_reboot(void)
     return rc;
 }
 
+static void complete_configuration_change(char *output, int capacity, int result,
+                                           const char *success, const char *failure)
+{
+    if (result != BK_OK) {
+        response(output, capacity, result == BK_ERR_BUSY ?
+                 "Configuration storage busy; retry the command\r\n" : failure);
+    } else if (schedule_reboot() != BK_OK) {
+        response(output, capacity,
+                 "Configuration updated; restart scheduling failed; run restart or power cycle\r\n");
+    } else {
+        response(output, capacity, success);
+    }
+}
+
 static const char *owner_name(xiaotai_session_owner_t owner)
 {
     switch (owner) {
@@ -121,9 +135,8 @@ static void command_wifi_set(char *output, int capacity, int argc, char **argv)
     snprintf(value.ssid, sizeof(value.ssid), "%s", argv[1]);
     snprintf(value.password, sizeof(value.password), "%s", argv[2]);
     int rc = xiaotai_storage_save_wifi(&value);
-    if (rc == BK_OK) rc = schedule_reboot();
-    response(output, capacity, rc == BK_OK ?
-             "Wi-Fi config saved; restarting\r\n" :
+    complete_configuration_change(output, capacity, rc,
+             "Wi-Fi config saved; restarting\r\n",
              "Wi-Fi config save failed\r\n");
 }
 
@@ -132,9 +145,8 @@ static void command_wifi_clear(char *output, int capacity,
 {
     (void)argv;
     int rc = argc == 1 ? xiaotai_storage_clear_wifi() : BK_ERR_PARAM;
-    if (rc == BK_OK) rc = schedule_reboot();
-    response(output, capacity, rc == BK_OK ?
-             "Wi-Fi config cleared; restarting into SoftAP\r\n" :
+    complete_configuration_change(output, capacity, rc,
+             "Wi-Fi config cleared; restarting into SoftAP\r\n",
              argc == 1 ? "Wi-Fi config clear failed\r\n" :
              "usage: wifi-clear\r\n");
 }
@@ -154,10 +166,9 @@ static void command_tirtc_clear(char *output, int capacity,
                                 int argc, char **argv)
 {
     (void)argv;
-    int rc = argc == 1 ? xiaotai_storage_clear_device() : BK_ERR_PARAM;
-    if (rc == BK_OK) rc = schedule_reboot();
-    response(output, capacity, rc == BK_OK ?
-             "device credentials cleared; restarting into binding\r\n" :
+    int rc = argc == 1 ? xiaotai_storage_recover_device(NULL) : BK_ERR_PARAM;
+    complete_configuration_change(output, capacity, rc,
+             "device credentials cleared; restarting into binding\r\n",
              argc == 1 ? "device credentials clear failed\r\n" :
              "usage: tirtc-clear\r\n");
 }
@@ -171,7 +182,7 @@ static void command_ntp_show(char *output, int capacity, int argc, char **argv)
     }
     char url[XIAOTAI_NTP_SERVER_MAX] = {0};
     if (xiaotai_storage_load_ntp_server(url, sizeof(url)) != BK_OK) {
-        response(output, capacity, "Primary NTP server: default\r\n");
+        response(output, capacity, "Primary NTP server: default (no valid saved override: missing, unreadable or corrupt)\r\n");
     } else if (output != NULL && capacity > 0) {
         snprintf(output, (size_t)capacity, "Primary NTP server: %s\r\n", url);
     }
@@ -184,9 +195,8 @@ static void command_ntp_set(char *output, int capacity, int argc, char **argv)
         return;
     }
     int rc = xiaotai_storage_save_ntp_server(argv[1]);
-    if (rc == BK_OK) rc = schedule_reboot();
-    response(output, capacity, rc == BK_OK ?
-             "Primary NTP server saved; restarting\r\n" : "NTP rejected or save failed\r\n");
+    complete_configuration_change(output, capacity, rc,
+             "Primary NTP server saved; restarting\r\n", "NTP rejected or save failed\r\n");
 }
 
 static void command_ntp_reset(char *output, int capacity, int argc, char **argv)
@@ -197,9 +207,8 @@ static void command_ntp_reset(char *output, int capacity, int argc, char **argv)
         return;
     }
     int rc = xiaotai_storage_clear_ntp_server();
-    if (rc == BK_OK) rc = schedule_reboot();
-    response(output, capacity, rc == BK_OK ?
-             "Primary NTP server restored to default; restarting\r\n" : "NTP reset failed\r\n");
+    complete_configuration_change(output, capacity, rc,
+             "Primary NTP server restored to default; restarting\r\n", "NTP reset failed\r\n");
 }
 
 static void command_ep_show(char *output, int capacity, int argc, char **argv)
@@ -224,9 +233,8 @@ static void command_ep_set(char *output, int capacity, int argc, char **argv)
         return;
     }
     int rc = xiaotai_storage_save_endpoint(argv[1]);
-    if (rc == BK_OK) rc = schedule_reboot();
-    response(output, capacity, rc == BK_OK ?
-             "Platform discovery base saved; restarting\r\n" : "EP rejected or save failed\r\n");
+    complete_configuration_change(output, capacity, rc,
+             "Platform discovery base saved; restarting\r\n", "EP rejected or save failed\r\n");
 }
 
 static void command_ep_reset(char *output, int capacity, int argc, char **argv)
@@ -237,9 +245,8 @@ static void command_ep_reset(char *output, int capacity, int argc, char **argv)
         return;
     }
     int rc = xiaotai_storage_clear_endpoint();
-    if (rc == BK_OK) rc = schedule_reboot();
-    response(output, capacity, rc == BK_OK ?
-             "Platform discovery restored to default; restarting\r\n" : "EP reset failed\r\n");
+    complete_configuration_change(output, capacity, rc,
+             "Platform discovery restored to default; restarting\r\n", "EP reset failed\r\n");
 }
 
 static void command_wechat_call(char *output, int capacity,

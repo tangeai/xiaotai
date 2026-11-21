@@ -1,5 +1,6 @@
 #include <stdatomic.h>
 #include "xiaotai_binding_countdown.h"
+#include "xiaotai_ntp_response.h"
 #include "xiaotai_platform_client.h"
 #include "xiaotai_build_identity.h"
 
@@ -1074,16 +1075,24 @@ static int synchronize_clock(void)
             continue;
         }
         struct timeval timeout = {.tv_sec = 2, .tv_usec = 0};
-        (void)setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+        uint8_t nonce[8];
+        if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) != 0 ||
+            connect(fd, address->ai_addr, address->ai_addrlen) != 0 ||
+            bk_fill_rand(nonce, sizeof(nonce)) != BK_OK) {
+            close(fd);
+            freeaddrinfo(address);
+            continue;
+        }
+        nonce[0] |= 1U; /* A request timestamp must not be all zero. */
         uint8_t packet[48] = {0};
         packet[0] = 0x23U; /* LI=0, NTPv4, client. */
-        int sent = sendto(fd, packet, sizeof(packet), 0, address->ai_addr,
-                          address->ai_addrlen);
+        memcpy(packet + 40, nonce, sizeof(nonce));
+        int sent = send(fd, packet, sizeof(packet), 0);
         int received = sent == (int)sizeof(packet) ?
             recv(fd, packet, sizeof(packet), 0) : -1;
         close(fd);
         freeaddrinfo(address);
-        if (received < (int)sizeof(packet)) continue;
+        if (received < 0 || !xiaotai_ntp_response_valid(packet, (size_t)received, nonce)) continue;
         uint32_t ntp_seconds = ((uint32_t)packet[40] << 24) |
                                ((uint32_t)packet[41] << 16) |
                                ((uint32_t)packet[42] << 8) |

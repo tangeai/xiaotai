@@ -18,7 +18,7 @@ class SerialNtpServer(unittest.TestCase):
         run_c(PRELUDE + r'''
 int main(void) {
  const char *good[]={"pool.ntp.org","time.lan","192.168.1.10","NTP-1.example.com","localhost"};
- const char *bad[]={"","http://ntp.org","ntp.org:123","bad host","-host","host-","a..b",".host","host.","a/b","a\n","256.1.1.1","1.2.3","1.2.3.4.5"};
+ const char *bad[]={"","http://ntp.org","ntp.org:123","bad host","-host","host-","a..b",".host","host.","a/b","a\n","256.1.1.1","1.2.3","1.2.3.4.5","010.0.0.1","08.0.0.1","1.00.0.1"};
  for(unsigned i=0;i<sizeof(good)/sizeof(good[0]);i++)assert(xiaotai_ntp_server_valid(good[i]));
  for(unsigned i=0;i<sizeof(bad)/sizeof(bad[0]);i++)assert(!xiaotai_ntp_server_valid(bad[i]));
  assert(!xiaotai_ntp_server_valid(NULL));
@@ -38,6 +38,7 @@ int main(void) {
                 fake = r'''
 static char stored[254]; static int writes,fail;
 #define BK_OK 0
+#define BK_ERR_BUSY -9
 #define BK_FAIL -1
 #define BK_ERR_PARAM -2
 #define XIAOTAI_NTP_SERVER_MAX 254
@@ -93,10 +94,12 @@ int main(void) {{
             for op in ('show','set','reset'):
                 self.assertIn('"ntp-'+op+'"', source)
             funcs='\n'.join(function(source,'command_ntp_'+op) for op in ('show','set','reset'))
+            if bk: funcs=function(source,'complete_configuration_change')+funcs
             fake=r'''
 #define RUNTIME_NTP_SERVER_MAX 254
 #define XIAOTAI_NTP_SERVER_MAX 254
 #define BK_OK 0
+#define BK_ERR_BUSY -9
 #define ESP_OK 0
 #define ESP_ERR_NVS_NOT_FOUND -1
 typedef int esp_err_t;
@@ -176,6 +179,21 @@ int main(void){
 }
 ''', [COMMON])
 
+    def test_bk_query_does_not_disguise_unreadable_override(self):
+        source=BK_CONSOLE.read_text()
+        run_c(PRELUDE+r'''
+#define BK_OK 0
+#define BK_ERR_BUSY -9
+#define XIAOTAI_NTP_SERVER_MAX 254
+static void response(char*out,int n,const char*s){snprintf(out,n,"%s",s);}
+static int xiaotai_storage_load_ntp_server(char*out,size_t n){return -1;}
+'''+function(source,'command_ntp_show')+r'''
+int main(void){
+ char output[160];char *args[]={"ntp-show"};command_ntp_show(output,sizeof(output),1,args);
+ assert(strstr(output,"no valid saved override") && strstr(output,"unreadable") && strstr(output,"corrupt"));
+}
+''',[COMMON])
+
     def test_bk_attempts_custom_primary_then_original_fallback(self):
         source=(ROOT/'platforms/beken/runtime/src/xiaotai_platform_client.c').read_text()
         run_c('#define _POSIX_C_SOURCE 200112L\n'+PRELUDE+r'''
@@ -184,8 +202,11 @@ int main(void){
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include "xiaotai_ntp_response.h"
+static int bk_fill_rand(void *out,size_t n){memset(out,1,n);return 0;}
 #include <unistd.h>
 #define BK_OK 0
+#define BK_ERR_BUSY -9
 #define BK_FAIL -1
 #define XIAOTAI_NTP_SERVER_MAX 254
 #define NTP_UNIX_EPOCH_DELTA 2208988800UL

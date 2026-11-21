@@ -124,7 +124,7 @@ Use `ap_cmd ep-reset` to restore the default.
 
 | Command | Effect |
 | --- | --- |
-| `ap_cmd ntp-show` | Show saved primary override; `default` means no override |
+| `ap_cmd ntp-show` | Show saved primary override; fallback output indicates a missing, unreadable, or corrupt override |
 | `ap_cmd ntp-set time.example.com` | Save a hostname or IPv4 primary server and reboot |
 | `ap_cmd ntp-reset` | Clear the override and reboot |
 
@@ -172,3 +172,9 @@ and network reconnection.
 
 In each case query, change, reboot, and verify persistence. Host fault injection does not
 replace serial validation on hardware running the exact image.
+
+Use decimal IPv4 without leading zeroes: `10.0.0.1` is accepted; `010.0.0.1` is rejected.
+NTP replies must match the requested peer and request, and report a synchronized server; invalid replies fall back to the next server.
+
+After `tirtc-clear` succeeds, late background binding results cannot restore credentials before reboot.
+If identity storage is busy, retry the command. If restart scheduling fails, use `ap_cmd restart`; a manual clear can also be retried.

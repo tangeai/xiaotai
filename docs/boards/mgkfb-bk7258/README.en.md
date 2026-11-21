@@ -215,7 +215,7 @@ Task-exit warnings may appear after calls, periodic status may remain `BOOT`, an
 
 ## Serial time-server configuration
 
-`ap_cmd ntp-show` displays the saved primary NTP override (`default` means no override).
+`ap_cmd ntp-show` displays the saved primary NTP override (fallback output states that the override may be missing, unreadable, or corrupt).
 Use `ap_cmd ntp-set time.example.com` or `ap_cmd ntp-set 192.168.1.10` to save it;
 `ap_cmd ntp-reset` restores the default.
 
@@ -228,3 +228,5 @@ this is a primary-server preference, not an exclusive time source.
 
 Factory reset
 clears the override. Confirm synchronization after reboot before testing calls.
+
+Use decimal NTP IPv4 addresses without leading zeroes, such as `10.0.0.1`; `010.0.0.1` is rejected.
