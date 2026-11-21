@@ -163,7 +163,7 @@ See [Interaction profiles §1.3 (Chinese)](../../product/PRODUCT_INTERACTION_PRO
 | Host | Linux/WSL2, Git, Python 3 | [Git](https://git-scm.com/downloads), [Python](https://www.python.org/downloads/) | — |
 | ESP-IDF | `v5.5.5`, commit `b774170ff46c393eeb5e495ea37936038d3f4f4f` | [Official repository](https://github.com/espressif/esp-idf/tree/b774170ff46c393eeb5e495ea37936038d3f4f4f) | — |
 | C/C++ compiler | `xtensa-esp-elf-gcc 14.2.0`, build `esp-14.2.0_20260121` | [ESP-IDF tools manifest](https://github.com/espressif/esp-idf/blob/b774170ff46c393eeb5e495ea37936038d3f4f4f/tools/tools.json) | Installer verifies downloads against the manifest |
-| TiRTC | 2.6.0, `libTiRTC.a` | — | `4739ec70b895bde848205c36a114c34b2ed4ab27761f2c6bf37d1b2a982a451d` |
+| TiRTC | 2.6.3, `libTiRTC.a` | — | `87f9fc6eac5d1c5bd1bd4877fc00abdd115101e85181c035e76089343486f850` |
 | ESP-IDF components | ESP-SR 2.4.7, LVGL 8.3.11, `esp_codec_dev` 1.6.2, `esp32-camera` 2.1.7, `esp_jpeg` 1.3.1 | [Dependency lockfile](../../../firmware/esp-idf/esp32s3/lckfb-esp32s3-xiaotai/dependencies.lock) | — |
 | Board components | ES7210, ES8311, touch and display components | — | — |
 
