@@ -36,7 +36,7 @@ git switch -c feat/your-topic origin/main
    合并后删除短期远端分支；下一项任务重新从最新 `main` 开始。
 4. 合并后验证：记录 `main` 上的实际合并提交，在该提交上重新运行完整检查；
    涉及固件时验证对应构建及实板镜像。PR 分支上的结果不能替代合并提交验证。
-5. 发布：验证通过后，按[固件版本与发布](#固件版本与发布)确定板卡版本，
+5. 发布：验证通过后，按[固件版本与发布](#固件版本与发布)确定统一发行版本及各板固件身份，
    在已验证的提交上创建版本 tag 和 GitHub Release，保留产物、哈希及双语说明。
    文档修改不单独升级固件版本；未完成本次镜像实板验证时不得正式发布，
    符合下文 beta 条件时可预发布供测试。
@@ -54,7 +54,7 @@ git switch -c feat/your-topic origin/main
 - 必需检查使用本仓库 `Host tests` 工作流的实际 job `test`，来源为 GitHub Actions；
   该任务运行 `bash tools/check.sh`。存在 `release/*` 时也配置实际检查，不复制其他仓库的 job 名称。
 - Actions 默认使用只读权限，关闭允许创建和批准 PR 的选项；发布任务按需单独申请写权限。
-- tag 保护覆盖[命名表](#版本与名称)中所有板卡标签，禁止更新或删除已发布标签；仅匹配 `v*` 不够。
+- tag 保护同时覆盖统一 `refs/tags/v*` 和历史 `refs/tags/*-v*`，禁止更新或删除已发布标签。
 - 用一个小 PR 验证失败检查阻止合并、通过后可 Squash、合并后分支自动删除，
   并核对合并提交验证和正式发布入口。尚未完成的验收明确记录为待验证。
 
@@ -80,7 +80,7 @@ GitHub 发布统一遵守[固件版本与发布](#固件版本与发布)。
 | 代理操作、何时读取详细规则 | 根目录 `AGENTS.md`；板级 `AGENTS.md` 只补板级要求 | 代理执行；文档与测试入口检查 |
 | 产品、平台、板卡、驱动及固件工程的目录边界 | [架构](ARCHITECTURE.md#目录导览) | `test_repository_layout.py` |
 | 对外型号、永久板卡 ID、工程目录和目标芯片 | `boards/<vendor>/<board>/board.json` | `tools/build.py --validate`、`test_board_registry.py` |
-| 开发流程、版本、发布名称和交付检查 | 本文 | `test_firmware_versions.py`、`test_boot_identity.py`、`test_validation_packaging.py`、`test_esp_merged_firmware.py`；GitHub 标题须发布前后核对 |
+| 开发流程、版本、发布名称和交付检查 | 本文及[统一发行规则](docs/development/release-policy.md) | `test_firmware_versions.py`、`test_boot_identity.py`、`test_validation_packaging.py`、`test_esp_merged_firmware.py`；GitHub 标题须发布前后核对 |
 | SDK、编译器、ABI、原生产物与烧录布局 | 目标板卡指南、原生构建脚本及依赖清单 | 原生构建及板级契约检查 |
 | 产品状态、交互、房间刷新和媒体参数 | [产品需求](docs/product/PRODUCT_REQUIREMENTS.md)、[交互规范](docs/product/PRODUCT_INTERACTION_PROFILES.md)、[媒体合同](docs/product/MEDIA_CONTRACT.md) | 产品公共接口和平台回归测试 |
 | 文档、翻译范围与内部资料保留 | [文档要求](#文档要求)、[翻译与同步检查](#翻译与同步检查) | 文档布局与链接检查；双语人工核对 |
@@ -250,7 +250,7 @@ bash tools/check.sh
 使用；细节通过板卡指南和开发文档展开，避免重复堆叠参数、内部诊断和历史过程。
 
 英文翻译按以下清单维护，不对整个仓库逐文件翻译。根目录 `README.md` 已有
-`README.en.md`；另有下列 16 份中文源文档纳入翻译范围。列入范围不代表英文版已经完成。
+`README.en.md`；另有下列 17 份中文源文档纳入翻译范围。列入范围不代表英文版已经完成。
 
 | 类别 | 中文源文档 |
 |---|---|
@@ -269,6 +269,7 @@ bash tools/check.sh
 | BK7258 串口命令 | `docs/development/BK7258_SERIAL_COMMANDS.md` |
 | BK7258 Opus 丢包补偿实践 | `docs/development/bk-opus-plc.md` |
 | 开发注意事项 | `docs/development/pitfalls.md` |
+| 统一发行规则 | `docs/development/release-policy.md` |
 | 测试指南 | `tests/README.md` |
 
 `pitfalls.md` 只翻译长期有效的开发注意事项，先分离联调过程和旧构建记录。
@@ -305,6 +306,8 @@ bash tools/check.sh
 添加忽略规则不会使已跟踪文件自动退出版本控制。新增对外文档或调整翻译范围时，在本节统一更新清单。
 
 ## 固件版本与发布
+
+公开发行采用[统一发行版本与 BIN 规则](docs/development/release-policy.md)。该规则优先于下文旧版板卡 tag、标题及公开 ZIP 附件约定；下文保留原生构建身份、内部验证包和历史发布的校验方法。当前迁移版不重新编译，发行版本与内嵌版本分别记录。
 
 ### 版本与名称
 

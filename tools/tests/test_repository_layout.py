@@ -129,9 +129,21 @@ class RepositoryLayoutTests(unittest.TestCase):
                 self.assertNotIn(board_id, readme, board_id)
         self.assertIn("[完整开发板目录](docs/boards/README.md)", readme)
         self.assertIn("docs/downloads.md#mgkfb-bk7258", readme)
-        downloads = (ROOT / "docs/downloads.md").read_text(encoding="utf-8")
-        self.assertRegex(downloads, r"releases/tag/mgkfb-bk7258-v[0-9]+\.[0-9]+\.[0-9]+")
-        self.assertRegex(downloads, r"mgkfb-bk7258-[0-9]+\.[0-9]+\.[0-9]+%2Bbuild\.[0-9]+-validation\.zip")
+        for language in ("", ".en"):
+            downloads = (ROOT / f"docs/downloads{language}.md").read_text(encoding="utf-8")
+            links = re.findall(
+                r"https://github.com/tangeai/xiaotai/releases/download/([^/]+)/([^\s)]+)",
+                downloads,
+            )
+            self.assertEqual(len(links), 5)
+            for tag, filename in links:
+                self.assertRegex(tag, r"^v[0-9]+\.[0-9]+\.[0-9]+(?:-beta\.[0-9]+)?$")
+                self.assertTrue(filename.startswith(tag + "_"))
+                self.assertTrue(filename.endswith("_all-app.bin" if "bk7258" in filename else "_merged.bin"))
+            for board in featured:
+                self.assertTrue(any(board in filename for _, filename in links), board)
+            for variant in ("ili9342c",):
+                self.assertTrue(any("m5stack-cores3-lite_" + variant in filename for _, filename in links))
 
     def test_root_documents_keep_reader_focused_section_order(self):
         expected_sections = {

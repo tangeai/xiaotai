@@ -8,7 +8,7 @@ Board ID: `lckfb-esp32s3`. See [Downloads](../../downloads.en.md#lckfb-esp32s3) 
 
 ## Flashing
 
-`<version>` in filenames means the complete version listed on the download page, including its build number. Use the actual downloaded files and check the package manifest. Screenshot versions and paths are examples only.
+The filename uses the distribution version; compare embedded firmware identity with the release notes. Download one complete BIN without extraction. Screenshot versions and paths are examples.
 
 ### Open the flashing tool
 
@@ -22,7 +22,7 @@ See the [official board guide (Chinese)](https://wiki.lckfb.com/zh-hans/szpi-esp
 2. Connect the board's Type-C port to the computer. If connection fails, hold BOOT while cycling power, release BOOT after entering download mode, and select the port again. Detection must show **ESP32-S3**.
 3. In **Program**, select `Baudrate` (start with `921600`, or use `115200` if unstable), click **Connect**, and select this board's port. Leave `WebUSB (CH340)` unchecked for desktop serial mode.
 4. Click **Choose File**, select the merged BIN, and set **Flash Address to `0x0`**. Set Flash Mode, Flash Frequency, and Flash Size to `keep`. Add only this row and click **Program**.
-5. Wait for `Hash of data verified.` for each file and a final `Leaving...` without `Error:`. Click **Disconnect**, reset the board, and use 115200-baud logs to verify project `lckfb_esp32s3_xiaotai` and the downloaded full version before first use.
+5. Wait for `Hash of data verified.` for each file and a final `Leaving...` without `Error:`. Click **Disconnect**, reset the board, and use 115200-baud logs to verify project `lckfb_esp32s3_xiaotai` and the embedded version listed in the release notes before first use.
 
 The screenshots show connection and programming controls; port numbers and paths are examples:
 
@@ -34,20 +34,13 @@ The screenshots show connection and programming controls; port numbers and paths
 
 For write or verification failure, check the port, cable, file, and address before retrying. A 100% progress bar alone does not establish success.
 
-| Download or package file | Purpose |
-|---|---|
-| `lckfb-esp32s3-<version>-merged.bin` | **Flash directly**: this file only, at `0x0` |
-| `lckfb-esp32s3-<version>-validation.zip` | Split-file package; extract and write each file at the addresses below |
-| `lckfb_esp32s3_xiaotai.bin` | Application BIN at `0x10000` for split-file flashing; never write it at `0x0` as a complete image |
-| `MANIFEST.json`, `flasher_args.json`, `flash_args`, ELF | Manifests or diagnostic data; do not flash directly |
+The complete image is `v<release-version>_lckfb-esp32s3_merged.bin`. Flash only this file at `0x0`.
 
-Use the corresponding Release's `SHA256SUMS` to verify the merged BIN.
-
-On Windows use `Get-FileHash -Algorithm SHA256 "path-to-BIN"`; on Linux, `sha256sum "path-to-BIN"`; on macOS, `shasum -a 256 "path-to-BIN"`. Split-file hashes are in `MANIFEST.json`; complete release-asset hashes are in `SHA256SUMS` linked from [Downloads](../../downloads.en.md#lckfb-esp32s3).
+Compare its SHA-256 with the release notes. Use `Get-FileHash -Algorithm SHA256 "BIN-path"` on Windows, `sha256sum "BIN-path"` on Linux, or `shasum -a 256 "BIN-path"` on macOS.
 
 ## First use
 
-For a merged image, confirm the single `-merged.bin` was written at `0x0` and the board rebooted normally. For split files, confirm all 3 BINs were written at their manifest addresses. Use either method, then configure Wi-Fi and bind.
+Confirm the complete `_merged.bin` was flashed at `0x0` and the device rebooted, then configure Wi-Fi and bind.
 
 ### 1. Configure Wi-Fi
 
@@ -80,20 +73,6 @@ Recognition pauses during AI conversations, live view, and device/WeChat calls. 
 Result text scrolls twice before disappearing, and the analysis is spoken. “Audio recognition is disabled or unavailable” means server configuration disallows uploading; check the recognition switch, types, and quota. See [Interaction profiles (Chinese)](../../product/PRODUCT_INTERACTION_PROFILES.md) for full behavior.
 
 ## Other flashing methods
-
-### Split-file flashing
-
-Download and extract the [firmware ZIP](../../downloads.en.md#lckfb-esp32s3). Check the **3 BINs** for this board and release against `MANIFEST.json` and `flasher_args.json`:
-
-| File | Address | Purpose |
-|---|---|---|
-| `bootloader/bootloader.bin` | `0x0` | Bootloader |
-| `partition_table/partition-table.bin` | `0x8000` | Partition table |
-| `lckfb_esp32s3_xiaotai.bin` | `0x10000` | Application; do not write at 0x0 |
-
-Use **Add File** for each BIN, enter its address, then click **Program**. Do not also add the merged image. Bootloader addresses may differ by board. Split files can retain settings during upgrades, but first verify partition compatibility and do not erase the whole chip.
-
-![LCKFB ESP32-S3 split files and addresses](../../images/flashing/web-split-lckfb-esp32s3.png)
 
 ### Build and flash from source
 

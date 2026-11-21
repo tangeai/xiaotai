@@ -9,7 +9,7 @@
 
 ## 烧录
 
-文件名中的 `<版本>` 代表下载页列出的完整版本（含 build 编号）。操作时选择实际下载的文件，并核对包内清单；截图中的版本和路径仅作示例。
+文件名中的版本为统一发行版本，设备内嵌版本按发布页的对应关系核对。只下载完整 BIN，无需解压；截图中的版本和路径仅作示例。
 
 ### 烧录前确认屏幕型号
 
@@ -18,10 +18,10 @@
 官方资料说明同系列存在两种面板，[M5GFX 的面板识别实现](https://github.com/m5stack/M5GFX/releases/tag/0.2.30)
 也分别处理 C/E。无法确认时先向销售方索取屏幕型号，再从下表选择对应固件。
 
-| 屏幕控制器 | 完整镜像（首次烧录） | 分文件包（保留配置升级） |
-|---|---|---|
-| ILI9342E | 当前可用性见[固件下载](../../downloads.md#m5stack-cores3-lite) | 当前可用性见[固件下载](../../downloads.md#m5stack-cores3-lite) |
-| ILI9342C | [完整镜像（BIN）](../../downloads.md#m5stack-cores3-lite) | [固件包（ZIP）](../../downloads.md#m5stack-cores3-lite) |
+| 屏幕控制器 | 完整镜像 |
+|---|---|
+| ILI9342E | [下载对应 merged BIN](../../downloads.md#m5stack-cores3-lite) |
+| ILI9342C | [下载对应 merged BIN](../../downloads.md#m5stack-cores3-lite) |
 
 ### 打开烧录工具
 
@@ -47,23 +47,14 @@
 `keep` 仅保留镜像中的 Flash 参数，不表示保留设备配置。若网页连接失败，按第 2 步进入下载模式后重连；
 若写入或校验失败，检查串口、数据线、文件和地址后重试，不按进度条 100% 判定成功。
 
-| 下载或包内文件 | 用途 |
-|---|---|
-| 上表对应变体的 `-merged.bin` | **直接烧录**，只此一个文件，地址 `0x0` |
-| 上表对应变体的 `-validation.zip` | 分文件烧录包，先解压，按下表各地址写入 |
-| `m5stack_cores3_lite_xiaotai.bin` | 应用 BIN，仅在分文件方式中写入 `0x10000`，不可当完整镜像写入 `0x0` |
-| `MANIFEST.json`、`flasher_args.json`、`flash_args`、ELF | 清单或排查资料，不直接烧录 |
+完整镜像为 `v<发行版本>_m5stack-cores3-lite_<屏幕变体>_merged.bin`，只烧录这一份，地址 `0x0`。
 
-完整 BIN 的 SHA-256 见下载页对应 Release 的 `SHA256SUMS`。
-
-Windows 可用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`；Linux 用 `sha256sum "实际BIN路径"`；
-macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIFEST.json`，
-发布附件的完整哈希见上表对应发布页中的 `SHA256SUMS`。
+如需校验，使用发布说明中的 BIN SHA-256；Windows 用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`，
+Linux 用 `sha256sum "实际BIN路径"`，macOS 用 `shasum -a 256 "实际BIN路径"`。
 
 ## 首次使用
 
-确认完整镜像已从 `0x0` 写入且设备正常重启，再进行配网和绑定。若改用分文件包，
-需确认清单中的 3 个 BIN 都已按各自地址写入；两种方式任选一种。
+确认完整 `_merged.bin` 已从 `0x0` 烧录且设备正常重启，然后配网和绑定。
 
 1. **配置 Wi-Fi**：设备没有 Wi-Fi 凭证时会显示配网提示。用手机或电脑连接 `XiaoTai-`
    开头的开放热点；提示“无互联网”属于正常现象。在弹出页面选择目标 2.4 GHz Wi-Fi，
@@ -78,23 +69,6 @@ macOS 用 `shasum -a 256 "实际BIN路径"`。分文件的哈希见包内 `MANIF
 Wi-Fi 和绑定凭证保存在 NVS，源码不带账号或密码。
 
 ## 其他烧录方式
-
-### 分文件烧录
-
-从上表下载并解压与屏幕控制器对应的 ZIP。
-此方式需按包内 `MANIFEST.json` 和 `flasher_args.json` 核对本板、本版的 **3 个 BIN**：
-
-| 文件 | 烧录地址 | 用途 |
-|---|---|---|
-| `bootloader/bootloader.bin` | `0x0` | 启动引导程序 |
-| `partition_table/partition-table.bin` | `0x8000` | 分区表 |
-| `m5stack_cores3_lite_xiaotai.bin` | `0x10000` | 应用程序，不可写入 0x0 |
-
-在网页工具用 **Add File** 添加上述每个 BIN，各填对应地址，然后点击 **Program**。
-不要同时添加完整镜像；不同板卡的 bootloader 地址也可能不同。分文件方式可用于保留配置的升级，
-但必须先确认分区布局兼容，不执行全片擦除。操作位置见下图：
-
-![M5Stack CoreS3-Lite 分文件烧录的文件与地址](../../images/flashing/web-split-m5stack-cores3-lite.png)
 
 ### 从源码编译后烧录
 

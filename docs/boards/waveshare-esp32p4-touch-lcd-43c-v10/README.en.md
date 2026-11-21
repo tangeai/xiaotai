@@ -8,7 +8,7 @@ Board ID: `waveshare-esp32p4-touch-lcd-43c-v10`. See [Downloads](../../downloads
 
 ## Flashing
 
-`<version>` in filenames means the full download-page version, including build number. Select actual downloaded files and verify the manifest; screenshot versions and paths are examples.
+The filename uses the distribution version; compare embedded firmware identity with the release notes. Download one complete BIN without extraction. Screenshot versions and paths are examples.
 
 ### Open the flashing tool
 
@@ -20,7 +20,7 @@ Open [Espressif ESP Web Tool](https://espressif.github.io/esptool-js/) in deskto
 2. Connect the **USB TO UART** Type-C port, not USB OTG or C6 flashing pads. If connection fails, hold BOOT, press RESET, then release BOOT. Detection must show **ESP32-P4**; if it shows ESP32-C6, check the connector.
 3. In **Program**, select `Baudrate` (`921600` initially, `115200` if unstable), click **Connect**, and choose the board. Leave `WebUSB (CH340)` unchecked for desktop serial mode.
 4. Click **Choose File**, select the merged BIN, and set **Flash Address to `0x0`**. Set Flash Mode, Flash Frequency, and Flash Size to `keep`. Add only one row, then **Program**.
-5. Wait for `Hash of data verified.` and a final `Leaving...` without `Error:`. Click **Disconnect**, reset, and check 115200-baud logs for project `xiaotai_esp32p4` and the downloaded full version before first use.
+5. Wait for `Hash of data verified.` and a final `Leaving...` without `Error:`. Click **Disconnect**, reset, and check 115200-baud logs for project `xiaotai_esp32p4` and the embedded version listed in the release notes before first use.
 
 Connection and programming controls are shown below; port numbers and paths are examples:
 
@@ -32,20 +32,13 @@ Connection and programming controls are shown below; port numbers and paths are 
 
 For write or verification failures, check port, cable, file, and address. A 100% progress bar alone does not prove success.
 
-| Download or package file | Purpose |
-|---|---|
-| `waveshare-esp32p4-touch-lcd-43c-v10-<version>-merged.bin` | **Flash directly**, this file only, at `0x0` |
-| `waveshare-esp32p4-touch-lcd-43c-v10-<version>-validation.zip` | Extract and flash individual files at the addresses below |
-| `xiaotai_esp32p4.bin` | Application at `0x10000`; not a complete image for `0x0` |
-| `MANIFEST.json`, `flasher_args.json`, `flash_args`, ELF | Manifests/diagnostics; do not flash directly |
+The complete image is `v<release-version>_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin`. Flash only this file at `0x0`.
 
-Use the corresponding Release's `SHA256SUMS` to verify the merged BIN.
-
-Windows: `Get-FileHash -Algorithm SHA256 "path-to-BIN"`; Linux: `sha256sum "path-to-BIN"`; macOS: `shasum -a 256 "path-to-BIN"`. Individual hashes are in `MANIFEST.json`; release-asset hashes are in `SHA256SUMS` linked from [Downloads](../../downloads.en.md#waveshare-esp32p4-touch-lcd-43c-v10).
+Compare its SHA-256 with the release notes. Use `Get-FileHash -Algorithm SHA256 "BIN-path"` on Windows, `sha256sum "BIN-path"` on Linux, or `shasum -a 256 "BIN-path"` on macOS.
 
 ## First use
 
-Confirm the single `-merged.bin` was flashed at `0x0` and the board rebooted normally. For split-file flashing, confirm all 4 BINs were written at their manifest addresses. Use either method before setup and binding.
+Confirm the complete `_merged.bin` was flashed at `0x0` and the device rebooted, then configure Wi-Fi and bind.
 
 ### 1. Configure Wi-Fi
 
@@ -66,21 +59,6 @@ Try AI, then browser live view and two-way audio. With contacts available, try d
 If setup will not open, confirm the phone remains on the device hotspot. If no binding code appears, check IP address, system time, and service discovery. To change networks or rebind, open Device settings → Reset device, confirm, then repeat setup and binding. Do not erase the whole Flash.
 
 ## Other flashing methods
-
-### Split-file flashing
-
-Download and extract the [firmware ZIP](../../downloads.en.md#waveshare-esp32p4-touch-lcd-43c-v10). Verify this board/version's **4 BINs** against `MANIFEST.json` and `flasher_args.json`:
-
-| File | Address | Purpose |
-|---|---|---|
-| `bootloader/bootloader.bin` | `0x2000` | Bootloader |
-| `partition_table/partition-table.bin` | `0x8000` | Partition table |
-| `ota_data_initial.bin` | `0xd000` | OTA initialization data; do not omit |
-| `xiaotai_esp32p4.bin` | `0x10000` | Application; never write at 0x0 |
-
-Use **Add File** for each BIN and address, then **Program**. Do not also add the merged image. Bootloader addresses vary by board. Split-file upgrades may retain settings after verifying partition compatibility and avoiding full-chip erase.
-
-![Waveshare P4 split files and addresses](../../images/flashing/web-split-waveshare-esp32p4-touch-lcd-43c-v10.png)
 
 ### Build and flash from source
 
