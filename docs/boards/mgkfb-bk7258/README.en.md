@@ -20,10 +20,10 @@ Plug a USB data cable into the board’s communication Type-C port. Close any se
 
 Before the first flash, back up the factory firmware and RF calibration data. Avoid a full-chip erase.
 
-1. Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Under **芯片平台** (chip platform), select **博通集成 Beken（BK7258）**. Click **连接设备** (connect device) and select the board’s serial port in the browser prompt.
-2. Under **小钛固件** (published firmware), choose **觅感 AI 玩具开发板 · BK7258（双屏眼睛）** under **开发板** (board), then select the release under **固件版本** (version).
+1. Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Under **芯片平台** (chip platform), select **博通集成 Beken（BK7258）**. Click **连接设备** (connect device) and select the board’s UART0 download port. If the automatic reset fails to connect, keep the port connected and press reset or cycle the board’s power.
+2. Under **小钛固件** (published firmware), choose **觅感 AI 玩具开发板 · BK7258（双屏眼睛）** under **开发板** (board), then choose the **固件版本** (version) entry labeled `xiaotai` that matches the release on the downloads page.
    If you already have the BIN, choose **本地 BIN** (local BIN) and open the [release file](../../downloads.en.md#mgkfb-bk7258) named `v<release-version>_mgkfb-bk7258_all-app.bin`.
-3. Confirm the complete image starts at `0x0` and click **开始烧录** (start flashing). If prompted, reset the board or cycle its power. Keep the board connected until **烧录过程** (flash log) reports completion.
+3. Confirm the complete image starts at `0x0` and click **开始烧录** (start flashing). Keep the board connected until **烧录过程** (flash log) reports completion.
 4. After reboot, open **串口日志** (serial log) at 115200 baud. Look for board ID `mgkfb-bk7258` and compare the reported firmware version with the embedded version in the release notes.
 
 ![XiaoTai Web Flasher with mgkfb-bk7258 selected](../../images/flashing/xiaotai-mgkfb-bk7258.png)
@@ -75,7 +75,7 @@ Flashing uses UART0 (TX GPIO11, RX GPIO10). Back up factory firmware and RF cali
 ## First use
 
 1. Without Wi-Fi configuration, the display shows the hotspot name; serial logs also show it after `配网热点=`. Connect a phone and open `http://192.168.6.1`, choose 2.4 GHz Wi-Fi, and enter the password. “No internet” on the device hotspot is expected. Save and wait for connectivity; reconnect to the hotspot and check settings if it fails.
-2. Once online, the display shows and speaks a binding code; logs also expose `串口备用验证码=`. Restore the phone's internet connection, open the [XiaoTai device page](https://xiaotai.chat/devices), sign up or sign in, and enter the code under Add device. Confirm success on the platform; the eye display returns. Use the newly refreshed code if it expires.
+2. When binding is required, the device displays and reads out a binding code; logs also expose `串口备用验证码=`. Restore the phone's internet connection, open the [XiaoTai device page](https://xiaotai.chat/devices), sign up or sign in, and enter the code under Add device. Confirm success on the platform; the eye display returns. Use the newly refreshed code if it expires.
 3. Single-click S2 to start AI, and again to end. Use the table below for volume and WeChat calls.
 4. Open the bound device's live-view entry in the phone browser to see its camera. If no image appears, inspect camera logs as described under Troubleshooting.
 

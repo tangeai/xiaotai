@@ -15,7 +15,7 @@ Connect the board’s Type-C port to the computer with a USB data cable. Close a
 The full image overwrites saved Wi-Fi credentials, device binding and service-discovery settings in NVS. After flashing, configure Wi-Fi and bind the device again.
 
 1. Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Under **芯片平台** (chip platform), select **乐鑫 Espressif（ESP32 系列）**. Click **连接设备** (connect device) and select the board’s serial port in the browser prompt. If the connection fails, hold BOOT while cycling power, release BOOT and select the port again. Check that the tool detects ESP32-S3.
-2. Under **小钛固件** (published firmware), choose **立创实战派开发板 · ESP32-S3** under **开发板** (board), then select the release under **固件版本** (version).
+2. Under **小钛固件** (published firmware), choose **立创实战派开发板 · ESP32-S3** under **开发板** (board), then choose the **固件版本** (version) entry labeled `xiaotai` that matches the release on the downloads page.
    If you already have the BIN, choose **本地 BIN** (local BIN) and open the [release file](../../downloads.en.md#lckfb-esp32s3) named `v<release-version>_lckfb-esp32s3_merged.bin`.
 3. Confirm the complete image starts at `0x0` and click **开始烧录** (start flashing). Keep the board connected until **烧录过程** (flash log) reports completion.
 4. After reboot, open **串口日志** (serial log) at 115200 baud. Look for project name `lckfb_esp32s3_xiaotai` and compare the reported firmware version with the embedded version in the release notes.
@@ -40,7 +40,7 @@ Page behavior and wording follow [Product requirements 4.11 (Chinese)](../../pro
 
 ### 2. Bind the device
 
-Once online, the screen displays and speaks a 6-digit verification code. Restore the phone's internet connection, sign in to the [XiaoTai device page](https://xiaotai.chat/devices), and enter the code under Add device. Use a new code if it expires.
+When binding is required, the device displays and reads out a 6-digit verification code. Restore the phone's internet connection, sign in to the [XiaoTai device page](https://xiaotai.chat/devices), and enter the code under Add device. Use a new code if it expires.
 
 Successful binding opens the home screen; serial `status` should show the platform, MQTT messaging channel, and TiRTC real-time media SDK ready.
 

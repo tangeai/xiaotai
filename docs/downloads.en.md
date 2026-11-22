@@ -2,11 +2,11 @@
 
 [中文](downloads.md) · [English](downloads.en.md)
 
-Current distribution: **v1.2.0-beta.1 — pre-release, pending hardware acceptance**. Historical archives below include stable `v1.0.0` and pre-release `v1.1.0`. Legacy board tags and their invalid download links have been removed.
+Current distribution: **v1.2.0-beta.1 — pre-release, pending hardware acceptance**. See the historical archives below for `v1.0.0` and `v1.1.0`. Legacy board tags and their invalid download links have been removed.
 
 [Release notes, SHA-256 and known issues](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1) · [Release policy](development/release-policy.en.md)
 
-Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Select the exact board and release, or choose **本地 BIN** (local BIN) to load a file from the table below.
+Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Select your board and the matching `xiaotai` release listed below, or choose **本地 BIN** (local BIN) to load a file from the table below.
 
 Use the complete image for your board and display variant. ESP32 files end in `_merged.bin` and BK7258 files in `_all-app.bin`. Both start at `0x0`.
 
@@ -93,7 +93,7 @@ For the **8 MiB Flash, dual-eye-display** board.
 ## Historical firmware archives
 
 - [v1.0.0: five historical complete BINs](https://github.com/tangeai/xiaotai/releases/tag/v1.0.0).
-- [v1.1.0: five historical complete BINs](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0); pre-release because the archived LCKFB S3 image has a known AI issue.
+- [v1.1.0: five historical complete BINs](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0). LCKFB S3 build.68 has a known AI SDK issue. The release notes describe the archive as a pre-release. GitHub does not mark it as one.
 
 Archives retain actual embedded versions and hashes. They are for historical reproduction; current testing uses v1.2.0-beta.1 above.
 
