@@ -8,7 +8,7 @@ XiaoTai is open-source AI (artificial intelligence) audio and video firmware for
 
 ![XiaoTai features: AI chat, WeChat calls, device intercom, and remote real-time audio and video](docs/images/xiaotai.gif)
 
-**Quick start: choose a board → download and flash firmware → configure Wi-Fi → bind the device.** Features vary by board. See its guide for supported features and known limitations.
+**Quick start: choose a board → flash firmware from your browser → configure Wi-Fi → bind the device.** Features vary by board. See its guide for supported features and known limitations.
 
 Online features require a device binding and signaling platform, TiRTC real-time audio and video services, and AI or WeChat service configuration. This repository provides device firmware.
 
@@ -34,21 +34,9 @@ See the [complete board catalog](docs/boards/README.en.md) for specifications, f
 
 ## Flash the firmware
 
-Open the flashing guide for your board, connect it to your computer, and enter download mode. Then select the file listed below. Replace `<version>` with the full version from the download page, including the build number.
+Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Select the chip platform, connect the serial port and choose your exact board and firmware version. See the flashing guide in the table above for your board’s USB port, download mode and screenshots.
 
-| Platform | File for the first installation | Tool and address |
-|---|---|---|
-| ESP32-S3 / ESP32-P4 | The `-merged.bin` image for your board and variant | Open [Espressif's browser flashing tool](https://espressif.github.io/esptool-js/) in Chrome or Edge; add only one BIN at `0x0` |
-| LCKFB BK7258 | Extract the ZIP and select `lckfb-bk7258-<version>-all-app.bin` | Beken download tool, address `0x00000000` |
-| MGKFB BK7258 | Extract the ZIP and select `mgkfb-bk7258-<version>-all-app.bin` | Beken download tool, address `0x00000000` |
-
-For ESP32, you can also use the individual files from the ZIP. Flash every BIN listed in `flash_files` in `MANIFEST.json`: three files for LCKFB S3 or M5, and four for Waveshare P4. **Choose either the merged image or the individual files.** Do not flash an application BIN at `0x0` as if it were a merged image.
-
-ZIP, ELF, and JSON files cannot be flashed directly.
-
-An ESP32 merged image overwrites saved Wi-Fi and binding information. To preserve settings during an upgrade, use the individual files, check partition and configuration compatibility, and avoid a full-chip erase. BK `-app_pack.rbl` files are only for OTA (over-the-air) updates, not a first serial installation.
-
-OTA has not received dedicated validation on MGKFB. See your board guide for connection, reset, and flashing steps.
+To use a downloaded release, choose **本地 BIN** (local BIN). Use one complete `_merged.bin` for ESP32-S3/P4 or the board-specific `_all-app.bin` for BK7258, starting at `0x0`. An ESP32 full image overwrites saved Wi-Fi and binding settings. For BK7258, back up factory calibration and avoid full-chip erase.
 
 ## First use
 

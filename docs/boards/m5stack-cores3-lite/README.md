@@ -9,38 +9,26 @@
 
 ## 烧录
 
-文件名中的版本为统一发行版本，设备内嵌版本按发布页的对应关系核对。只下载完整 BIN，无需解压；截图中的版本和路径仅作示例。
-
 ### 确认开发板
 
 本项目仅支持 **CoreS3-Lite K128-Lite / ILI9342C**。下载页只提供这一种完整镜像，
 不需要选择屏幕型号，也不提供其他面板的构建配置。
 
-### 打开烧录工具
+### 网页烧录
 
-使用电脑上的 **Chrome 或 Edge** 打开[乐鑫 ESP Web Tool](https://espressif.github.io/esptool-js/)；
-网页烧录无需安装 ESP-IDF。关闭占用设备串口的终端或其他烧录网页。
-接口和下载模式位置见[板卡官方说明](https://docs.m5stack.com/en/core/CoreS3-Lite)。
+用 USB 数据线连接开发板的 Type-C 接口。长按底部复位键约 3 秒，绿灯亮起后松手，灯灭时即进入下载模式。关闭占用该串口的日志终端。
 
-### 烧录步骤
+完整镜像会覆盖 NVS 中的 Wi-Fi 凭证、设备绑定和服务发现地址。烧录后需要重新配网、绑定。
 
-1. 从下载页获取本板完整 `_merged.bin`。烧录时只选择这一个 BIN，地址为 **`0x0`**。
-2. 使用本机 Type-C 接口连接电脑。长按底侧复位键约 3 秒，绿色灯亮后松开，灯熄灭后进入下载模式。识别结果必须是 **ESP32-S3**。
-3. 在网页工具的 **Program** 区域选择 `Baudrate`（可先用 `921600`，不稳定时改为 `115200`），点击 **Connect** 并选择本板串口。桌面串口方式不勾选 `WebUSB (CH340)`。
-4. 点击 **Choose File** 选择下载的完整 BIN，**Flash Address 改为 `0x0`**；Flash Mode、Flash Frequency、Flash Size 均选 `keep`。只添加这一行，点击 **Program**。
-5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `m5stack_cores3_lite_xiaotai`，以及发布说明列出的内嵌版本，再进入“首次使用”。
+1. 用电脑上的 Chrome 或 Edge 打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/)。在 **芯片平台** 选择 **乐鑫 Espressif（ESP32 系列）**，点击 **连接设备**，在浏览器弹窗中选择本板串口。确认识别到 ESP32-S3。
+2. 在 **小钛固件** 下选择 **M5Stack开发板 · ESP32-S3(CoreS3-Lite)**，再选择固件版本。
+   已下载[发布镜像](../../downloads.md#m5stack-cores3-lite)时，切换到 **本地 BIN**，打开 `v<发行版本>_m5stack-cores3-lite_ili9342c_merged.bin`。
+3. 确认完整镜像起始地址为 `0x0`，点击 **开始烧录**。写入期间保持 USB 连接，在 **烧录过程** 中查看结果。
+4. 设备重启后，打开 **串口日志**，波特率设为 115200。确认项目名为 `m5stack_cores3_lite_xiaotai`，再将日志中的固件版本与发布说明里的内嵌版本对照。
 
-连接位置和烧录参数见下图，图中的端口号与路径只是示例：
+![小钛网页烧录工具中已选中M5Stack开发板 · ESP32-S3(CoreS3-Lite)](../../images/flashing/xiaotai-m5stack-cores3-lite.png)
 
-![ESP Web Tool 的 Connect 和 Program 区域](../../images/flashing/web-connect.png)
-
-![M5Stack CoreS3-Lite 完整镜像的文件、0x0 地址与 Program 按钮](../../images/flashing/web-m5stack-cores3-lite.png)
-
-**完整镜像会覆盖 NVS（非易失性存储）中的 Wi-Fi、绑定和 EP（服务发现地址）覆盖项等持久配置。** 烧录后需重新配网、绑定。
-`keep` 仅保留镜像中的 Flash 参数，不表示保留设备配置。若网页连接失败，按第 2 步进入下载模式后重连；
-若写入或校验失败，检查串口、数据线、文件和地址后重试，不按进度条 100% 判定成功。
-
-完整镜像为 `v<发行版本>_m5stack-cores3-lite_ili9342c_merged.bin`，只烧录这一份，地址 `0x0`。
+接口与下载模式详见[板卡官方说明](https://docs.m5stack.com/en/core/CoreS3-Lite)。
 
 如需校验，使用发布说明中的 BIN SHA-256；Windows 用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`，
 Linux 用 `sha256sum "实际BIN路径"`，macOS 用 `shasum -a 256 "实际BIN路径"`。

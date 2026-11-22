@@ -12,11 +12,23 @@ Operation uses physical buttons; touch, device-to-device calls, and group interc
 
 ## Flashing
 
-The filename uses the distribution version; compare embedded firmware identity with the release notes. Download one complete BIN without extraction. Screenshot versions and paths are examples.
-
 See [Downloads](../../downloads.en.md#mgkfb-bk7258) for firmware for the **MGKFB BK7258 dual-display board with 8 MiB Flash**.
 
-### Install the flashing tool
+### Flash with the browser
+
+Plug a USB data cable into the board’s communication Type-C port. Close any serial monitor using this port.
+
+Before the first flash, back up the factory firmware and RF calibration data. Avoid a full-chip erase.
+
+1. Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Under **芯片平台** (chip platform), select **博通集成 Beken（BK7258）**. Click **连接设备** (connect device) and select the board’s serial port in the browser prompt.
+2. Under **小钛固件** (published firmware), choose **觅感 AI 玩具开发板 · BK7258（双屏眼睛）** under **开发板** (board), then select the release under **固件版本** (version).
+   If you already have the BIN, choose **本地 BIN** (local BIN) and open the [release file](../../downloads.en.md#mgkfb-bk7258) named `v<release-version>_mgkfb-bk7258_all-app.bin`.
+3. Confirm the complete image starts at `0x0` and click **开始烧录** (start flashing). If prompted, reset the board or cycle its power. Keep the board connected until **烧录过程** (flash log) reports completion.
+4. After reboot, open **串口日志** (serial log) at 115200 baud. Look for board ID `mgkfb-bk7258` and compare the reported firmware version with the embedded version in the release notes.
+
+![XiaoTai Web Flasher with mgkfb-bk7258 selected](../../images/flashing/xiaotai-mgkfb-bk7258.png)
+
+### Alternative desktop tool (BKFIL)
 
 Install Beken's official **BKFIL v4** for your computer:
 
@@ -28,7 +40,7 @@ Install Beken's official **BKFIL v4** for your computer:
 
 Choose the appropriate installer from the directory. See the [BKFIL v4 manual (Chinese)](https://docs.bekencorp.com/arminodoc/bk_app/bkfil_v4/zh_CN/latest/index.html) for UI and settings.
 
-### Flashing steps
+### BKFIL flashing steps
 
 1. Download the [complete BIN](../../downloads.en.md#mgkfb-bk7258).
 2. Connect the board's communication Type-C port, close serial log terminals, open BKFIL, and use **Select Port** to choose the corresponding COM port.
