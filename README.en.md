@@ -34,7 +34,7 @@ See the [complete board catalog](docs/boards/README.en.md) for specifications, f
 
 ## Flash the firmware
 
-Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Select the chip platform, connect the serial port and choose your exact board and firmware version. See the flashing guide in the table above for your board’s USB port, download mode and screenshots.
+Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Select the chip platform, connect the serial port and choose your exact board and the `xiaotai` release listed on the downloads page. See the flashing guide in the table above for your board’s USB port, download mode and screenshots.
 
 To use a downloaded release, choose **本地 BIN** (local BIN). Use one complete `_merged.bin` for ESP32-S3/P4 or the board-specific `_all-app.bin` for BK7258, starting at `0x0`. An ESP32 full image overwrites saved Wi-Fi and binding settings. For BK7258, back up factory calibration and avoid full-chip erase.
 
@@ -48,7 +48,9 @@ If the setup page does not open automatically, visit `http://192.168.6.1`, selec
 
 ### 2. Bind the device
 
-Once online, the device displays or speaks a six-digit verification code. Reconnect your phone or computer to the internet, sign in to the [XiaoTai devices page](https://xiaotai.chat/devices), and enter the code under “添加设备” (Add device). If it expires, use the newly generated code.
+An already bound device is ready to use once it comes online. If binding is required, the device displays or reads out a six-digit verification code.
+
+Reconnect your phone or computer to the internet, sign in to the [XiaoTai devices page](https://xiaotai.chat/devices), and enter the code under “添加设备” (Add device). If it expires, use the newly generated code.
 
 Binding succeeds when the device appears in the list and returns to its home screen, eye display, or ready state.
 
