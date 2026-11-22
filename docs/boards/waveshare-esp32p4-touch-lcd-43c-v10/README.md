@@ -9,22 +9,21 @@
 
 ## 烧录
 
-文件名中的版本为统一发行版本，设备内嵌版本按发布页的对应关系核对。选择本地 BIN 时只需下载一个完整镜像。截图中的版本仅作示例。
-
 ### 网页烧录
 
-使用板上的 **USB TO UART** Type-C 接口连接电脑，不要连接 USB OTG 或 C6 烧录焊盘。连接失败时按住 BOOT，按一下 RESET，再松开 BOOT。识别结果必须是 **ESP32-P4**；若显示 ESP32-C6，检查接口。使用支持数据传输的 USB 线，关闭占用串口的日志终端。完整镜像会覆盖 NVS 中的 Wi-Fi、绑定和 EP 设置。烧录后需要重新配网、绑定。
+用 USB 数据线连接标有 **USB TO UART** 的 Type-C 接口。关闭占用该串口的日志终端。
 
-1. 用电脑上的 Chrome 或 Edge 打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/)。在 **芯片平台** 选择 **乐鑫 Espressif（ESP32 系列）**，点击 **连接设备**，在浏览器弹窗中选择本板串口。
-2. 选 **小钛固件**，在 **开发板** 中选择 **微雪开发板 · ESP32-P4（4.3寸屏）**，再选 **固件版本**。如果已经下载了[发布镜像](../../downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)，可切换至 **本地 BIN**，选择以 `waveshare-esp32p4-touch-lcd-43c-v10_merged.bin` 结尾的文件。
-3. 确认完整镜像起始地址为 `0x0`，点击 **开始烧录**。保持连接，直到 **烧录过程** 显示完成。
-4. 设备重启后，在 **串口日志** 中以 115200 波特率核对 `xiaotai_esp32p4` 和发布说明中的内嵌版本，再进行配网。
+完整镜像会覆盖 NVS 中的 Wi-Fi 凭证、设备绑定和服务发现地址。烧录后需要重新配网、绑定。
+
+1. 用电脑上的 Chrome 或 Edge 打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/)。在 **芯片平台** 选择 **乐鑫 Espressif（ESP32 系列）**，点击 **连接设备**，在浏览器弹窗中选择本板串口。若连接失败，按住 BOOT，按一下 RESET，再松开 BOOT。确认识别到 ESP32-P4。如果显示 ESP32-C6，请检查接线。
+2. 在 **小钛固件** 下选择 **微雪开发板 · ESP32-P4（4.3寸屏）**，再选择固件版本。
+   已下载[发布镜像](../../downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)时，切换到 **本地 BIN**，打开 `v<发行版本>_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin`。
+3. 确认完整镜像起始地址为 `0x0`，点击 **开始烧录**。写入期间保持 USB 连接，在 **烧录过程** 中查看结果。
+4. 设备重启后，打开 **串口日志**，波特率设为 115200。确认项目名为 `xiaotai_esp32p4`，再将日志中的固件版本与发布说明里的内嵌版本对照。
 
 ![小钛网页烧录工具中已选中微雪开发板 · ESP32-P4（4.3寸屏）](../../images/flashing/xiaotai-waveshare-esp32p4-touch-lcd-43c-v10.png)
 
 接口与下载模式详见[板卡官方说明](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/)。
-
-完整镜像为 `v<发行版本>_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin`，只烧录这一份，地址 `0x0`。
 
 如需校验，使用发布说明中的 BIN SHA-256；Windows 用 `Get-FileHash -Algorithm SHA256 "实际BIN路径"`，
 Linux 用 `sha256sum "实际BIN路径"`，macOS 用 `shasum -a 256 "实际BIN路径"`。

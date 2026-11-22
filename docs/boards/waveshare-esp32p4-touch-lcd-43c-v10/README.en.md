@@ -8,24 +8,21 @@ Board ID: `waveshare-esp32p4-touch-lcd-43c-v10`. See [Downloads](../../downloads
 
 ## Flashing
 
-The filename uses the distribution version; compare embedded firmware identity with the release notes. For local flashing, download one complete BIN. Screenshot versions are examples.
-
 ### Flash with the browser
 
-Connect the **USB TO UART** Type-C port, not USB OTG or C6 flashing pads. If connection fails, hold BOOT, press RESET, then release BOOT. Detection must show **ESP32-P4**; if it shows ESP32-C6, check the connector. Use a USB data cable and close any serial monitor using the port.
+Plug a USB data cable into the Type-C port marked **USB TO UART**. Close any serial monitor using this port.
 
-The merged image overwrites NVS, including saved Wi-Fi, binding and EP settings. Set up Wi-Fi and bind again after flashing.
+The full image overwrites saved Wi-Fi credentials, device binding and service-discovery settings in NVS. After flashing, configure Wi-Fi and bind the device again.
 
-1. Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Under **芯片平台** (chip platform), select **乐鑫 Espressif（ESP32 系列）**. Click **连接设备** (connect device) and select the board’s serial port in the browser prompt.
-2. Select **小钛固件** (published firmware), choose **微雪开发板 · ESP32-P4（4.3寸屏）** under **开发板** (board), then select the release under **固件版本** (version). For a downloaded image, select **本地 BIN** (local BIN) and open the [release file](../../downloads.en.md#waveshare-esp32p4-touch-lcd-43c-v10) ending in `waveshare-esp32p4-touch-lcd-43c-v10_merged.bin`.
+1. Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Under **芯片平台** (chip platform), select **乐鑫 Espressif（ESP32 系列）**. Click **连接设备** (connect device) and select the board’s serial port in the browser prompt. If the connection fails, hold BOOT, press RESET, then release BOOT. Check that the tool detects ESP32-P4. If it shows ESP32-C6, check the connection.
+2. Under **小钛固件** (published firmware), choose **微雪开发板 · ESP32-P4（4.3寸屏）** under **开发板** (board), then select the release under **固件版本** (version).
+   If you already have the BIN, choose **本地 BIN** (local BIN) and open the [release file](../../downloads.en.md#waveshare-esp32p4-touch-lcd-43c-v10) named `v<release-version>_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin`.
 3. Confirm the complete image starts at `0x0` and click **开始烧录** (start flashing). Keep the board connected until **烧录过程** (flash log) reports completion.
-4. After reboot, open **串口日志** (serial log) at 115200 baud. Check `xiaotai_esp32p4` and the embedded version against the release notes before Wi-Fi setup.
+4. After reboot, open **串口日志** (serial log) at 115200 baud. Look for project name `xiaotai_esp32p4` and compare the reported firmware version with the embedded version in the release notes.
 
 ![XiaoTai Web Flasher with waveshare-esp32p4-touch-lcd-43c-v10 selected](../../images/flashing/xiaotai-waveshare-esp32p4-touch-lcd-43c-v10.png)
 
 Connector and download-mode details are in the [official board guide](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/).
-
-The complete image is `v<release-version>_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin`. Flash only this file at `0x0`.
 
 Compare its SHA-256 with the release notes. Use `Get-FileHash -Algorithm SHA256 "BIN-path"` on Windows, `sha256sum "BIN-path"` on Linux, or `shasum -a 256 "BIN-path"` on macOS.
 
