@@ -8,7 +8,7 @@ Board ID: `lckfb-bk7258`. Touchscreen and buttons control browser-based (H5) liv
 
 ## Flashing
 
-The filename uses the distribution version; compare embedded firmware identity with the release notes. Download one complete BIN without extraction. Screenshot versions and paths are examples.
+The filename uses the distribution version; compare embedded firmware identity with the release notes. For local flashing, download one complete BIN. Screenshot versions are examples.
 
 See [Downloads](../../downloads.en.md#lckfb-bk7258) for firmware for **LCKFB BK7258**.
 
@@ -16,7 +16,20 @@ The current beta awaits hardware acceptance; historical results do not validate 
 
 Build identities, scope, and outstanding checks are in [Validation (Chinese)](VALIDATION.md) and [release notes](../../downloads.en.md#lckfb-bk7258).
 
-### Install the flashing tool
+### Flash with the browser
+
+Connect the board as shown in the [LCKFB wiring guide](https://wiki.lckfb.com/zh-hans/szpi-bk7258/szpi-bk7258/basic/burn.html). Use a USB data cable and close any serial monitor using the port.
+
+Back up factory firmware and RF calibration before the first write. Avoid full-chip erase.
+
+1. Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Under **芯片平台** (chip platform), select **博通集成 Beken（BK7258）**. Click **连接设备** (connect device) and select the board’s serial port in the browser prompt.
+2. Select **小钛固件** (published firmware), choose **立创实战派开发板 · BK7258** under **开发板** (board), then select the release under **固件版本** (version). For a downloaded image, select **本地 BIN** (local BIN) and open the [release file](../../downloads.en.md#lckfb-bk7258) ending in `lckfb-bk7258_all-app.bin`.
+3. Confirm the complete image starts at `0x0` and click **开始烧录** (start flashing). Reset or power-cycle when prompted during the download handshake. Keep the board connected until **烧录过程** (flash log) reports completion.
+4. After reboot, open **串口日志** (serial log) at 115200 baud. Check `lckfb-bk7258` and the embedded version against the release notes before Wi-Fi setup.
+
+![XiaoTai Web Flasher with lckfb-bk7258 selected](../../images/flashing/xiaotai-lckfb-bk7258.png)
+
+### Alternative desktop tool (BKFIL)
 
 Install Beken's official **BKFIL v4** for your computer:
 
@@ -30,7 +43,7 @@ Choose the appropriate installer.
 
 The [BKFIL v4 manual (Chinese)](https://docs.bekencorp.com/arminodoc/bk_app/bkfil_v4/zh_CN/latest/index.html) describes settings; the [official LCKFB flashing tutorial (Chinese)](https://wiki.lckfb.com/zh-hans/szpi-bk7258/szpi-bk7258/basic/burn.html) covers wiring, reset, and the download handshake.
 
-### Flashing steps
+### BKFIL flashing steps
 
 1. Download the [complete BIN](../../downloads.en.md#lckfb-bk7258).
 2. Connect as described in the LCKFB tutorial and close serial log terminals. Open BKFIL and use **Select Port** to select this board.
@@ -59,8 +72,6 @@ The official BKFIL screenshots mark controls in red. Ports, paths, and baud rate
 Use the BIN SHA-256 in the release notes to verify the download. Back up factory firmware and RF calibration before initial flashing. Preserve calibration, factory-data, and credential partitions during ordinary updates; do not erase the whole chip.
 
 For source builds, flash the `package/all-app.bin` under Building, also at `0x0`.
-
-Alternatively, import the complete BIN into the [LCKFB BK7258 browser flasher](https://wiki.lckfb.com/storage/html/bk7258-web-flasher/#/download) in Chrome or Edge, following the official tutorial.
 
 ## First use
 

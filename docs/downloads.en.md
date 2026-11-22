@@ -8,7 +8,9 @@ Current distribution: **v1.2.0-beta.1 — pre-release, pending hardware acceptan
 
 Download one complete BIN for your board and display variant; no extraction or split-file package is needed. ESP images end in `_merged.bin`; BK images end in `_all-app.bin`. Do not mix firmware between boards sharing a chip.
 
-ESP full images are flashed at `0x0` and overwrite NVS settings, including Wi-Fi and binding. For BK, use the board guide’s native serial tool at `0x0`, not esptool; preserve factory calibration and avoid full-chip erase. Prepare to configure the device again.
+ESP full images are flashed at `0x0` and overwrite NVS settings, including Wi-Fi and binding.
+
+For either platform, open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge and select your board or load the downloaded BIN. For BK7258, write at `0x0`, preserve factory calibration and avoid full-chip erase. Prepare to configure the device again.
 
 The distribution version differs from the reused firmware’s embedded identity. Check the device log against the identity column below. No firmware was rebuilt for this distribution change.
 

@@ -9,31 +9,20 @@
 
 ## 烧录
 
-文件名中的版本为统一发行版本，设备内嵌版本按发布页的对应关系核对。只下载完整 BIN，无需解压；截图中的版本和路径仅作示例。
+文件名中的版本为统一发行版本，设备内嵌版本按发布页的对应关系核对。选择本地 BIN 时只需下载一个完整镜像。截图中的版本仅作示例。
 
-### 打开烧录工具
+### 网页烧录
 
-使用电脑上的 **Chrome 或 Edge** 打开[乐鑫 ESP Web Tool](https://espressif.github.io/esptool-js/)；
-网页烧录无需安装 ESP-IDF。关闭占用设备串口的终端或其他烧录网页。
-接口和下载模式位置见[板卡官方说明](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/)。
+使用板上的 **USB TO UART** Type-C 接口连接电脑，不要连接 USB OTG 或 C6 烧录焊盘。连接失败时按住 BOOT，按一下 RESET，再松开 BOOT。识别结果必须是 **ESP32-P4**；若显示 ESP32-C6，检查接口。使用支持数据传输的 USB 线，关闭占用串口的日志终端。完整镜像会覆盖 NVS 中的 Wi-Fi、绑定和 EP 设置。烧录后需要重新配网、绑定。
 
-### 烧录步骤
+1. 用电脑上的 Chrome 或 Edge 打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/)。在 **芯片平台** 选择 **乐鑫 Espressif（ESP32 系列）**，点击 **连接设备**，在浏览器弹窗中选择本板串口。
+2. 选 **小钛固件**，在 **开发板** 中选择 **微雪开发板 · ESP32-P4（4.3寸屏）**，再选 **固件版本**。如果已经下载了[发布镜像](../../downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)，可切换至 **本地 BIN**，选择以 `waveshare-esp32p4-touch-lcd-43c-v10_merged.bin` 结尾的文件。
+3. 确认完整镜像起始地址为 `0x0`，点击 **开始烧录**。保持连接，直到 **烧录过程** 显示完成。
+4. 设备重启后，在 **串口日志** 中以 115200 波特率核对 `xiaotai_esp32p4` 和发布说明中的内嵌版本，再进行配网。
 
-1. 下载 [完整镜像（BIN）](../../downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)。本版只选择这一个完整 BIN，地址为 **`0x0`**。
-2. 使用板上的 **USB TO UART** Type-C 接口连接电脑，不要连接 USB OTG 或 C6 烧录焊盘。连接失败时按住 BOOT，按一下 RESET，再松开 BOOT。识别结果必须是 **ESP32-P4**；若显示 ESP32-C6，检查接口。
-3. 在网页工具的 **Program** 区域选择 `Baudrate`（可先用 `921600`，不稳定时改为 `115200`），点击 **Connect** 并选择本板串口。桌面串口方式不勾选 `WebUSB (CH340)`。
-4. 点击 **Choose File** 选择下载的完整 BIN，**Flash Address 改为 `0x0`**；Flash Mode、Flash Frequency、Flash Size 均选 `keep`。只添加这一行，点击 **Program**。
-5. 等待每个文件显示 `Hash of data verified.`，最终显示 `Leaving...` 且没有 `Error:`。点击 **Disconnect**，按板卡复位键重启，用 115200 波特率日志核对项目 `xiaotai_esp32p4` 和发布说明列出的内嵌版本，再进入“首次使用”。
+![小钛网页烧录工具中已选中微雪开发板 · ESP32-P4（4.3寸屏）](../../images/flashing/xiaotai-waveshare-esp32p4-touch-lcd-43c-v10.png)
 
-连接位置和烧录参数见下图，图中的端口号与路径只是示例：
-
-![ESP Web Tool 的 Connect 和 Program 区域](../../images/flashing/web-connect.png)
-
-![微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 完整镜像的文件、0x0 地址与 Program 按钮](../../images/flashing/web-waveshare-esp32p4-touch-lcd-43c-v10.png)
-
-**完整镜像会覆盖 NVS（非易失性存储）中的 Wi-Fi、绑定和 EP（服务发现地址）覆盖项等持久配置。** 烧录后需重新配网、绑定。
-`keep` 仅保留镜像中的 Flash 参数，不表示保留设备配置。若网页连接失败，按第 2 步进入下载模式后重连；
-若写入或校验失败，检查串口、数据线、文件和地址后重试，不按进度条 100% 判定成功。
+接口与下载模式详见[板卡官方说明](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/)。
 
 完整镜像为 `v<发行版本>_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin`，只烧录这一份，地址 `0x0`。
 
