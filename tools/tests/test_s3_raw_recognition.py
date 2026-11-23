@@ -130,7 +130,6 @@ int main(void) {
         runtime=(ROOT/'platforms/esp-idf/components/starter_runtime/src/starter_runtime.c').read_text()
         self.assertTrue('XIAOTAI_RECOGNITION_HOME_SWITCH=1' in ui)
         self.assertTrue('!strcmp(XIAOTAI_BOARD_MODEL, "m5stack-cores3-lite")' in runtime)
-        self.assertTrue('set(PROJECT_VER "1.1.0")' in (project/'CMakeLists.txt').read_text())
 
 
 if __name__ == "__main__":

@@ -126,6 +126,7 @@ static int s_page=PAGE_ROOM_PASSWORD, error=-1,calls;
 static bool s_room_input_create;
 static char s_room_input[16]="1234",s_room_join_code[16]="123456";
 static bool room_action_submitted(int err){return err==0;}
+static void refresh_room_input_feedback(void){}
 static int starter_runtime_room_create(const char *pass){calls++;return error;}
 static int starter_runtime_room_join(const char *code,const char *pass){calls++;return error;}
 static void act(int action){
@@ -364,8 +365,9 @@ typedef int esp_err_t;
 #define ACTION_ROOM_LEAVE_CANCEL 3
 #define PAGE_ROOM 1
 #define PAGE_ROOM_LEAVE_CONFIRM 2
-static int s_page=PAGE_ROOM, leaves, error, feedbacks;
+static int s_page=PAGE_ROOM, leaves, error, feedbacks, renders;
 static char s_voice_feedback[64];
+static void render_page(void) { renders++; }
 static int starter_runtime_room_leave(void) { leaves++; return error; }
 static int64_t monotonic_ms(void) {return 100;}
 static void set_voice_feedback(const char *text,int64_t now) {
@@ -378,9 +380,9 @@ static void act(int action) {
 int main(void) {
     act(ACTION_ROOM_LEAVE);error=-1;
     act(ACTION_ROOM_LEAVE_CONFIRM);
-    assert(s_page==PAGE_ROOM_LEAVE_CONFIRM && leaves==1 && feedbacks==1);
+    assert(s_page==PAGE_ROOM_LEAVE_CONFIRM && leaves==1 && feedbacks==1 && renders==1);
     error=0;act(ACTION_ROOM_LEAVE_CONFIRM);
-    assert(s_page==PAGE_ROOM && leaves==2);
+    assert(s_page==PAGE_ROOM && leaves==2 && renders==1);
     act(ACTION_ROOM_LEAVE_CONFIRM);assert(leaves==2);
 }
 ''')

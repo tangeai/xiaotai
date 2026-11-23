@@ -387,12 +387,12 @@ class RepositoryLayoutTests(unittest.TestCase):
             "waveshare-esp32p4-touch-lcd-43c-v10": (
                 "b774170ff46c393eeb5e495ea37936038d3f4f4f",
                 "riscv32-esp-elf-gcc 14.2.0",
-                "554295a06173478ba51cb6fc4fc42a09431787377aef7e4ded4ab17165f39cac",
+                "c2b88d10e4adf812de22051c22fbff3194b7bd8d82e8fa3f1df98be51e41d268",
             ),
             "lckfb-bk7258": (
                 "398cab28b938e69ba2071a597daf00845dd080b6",
                 "arm-none-eabi-gcc 10.3.1",
-                "ae5c9e85b8247c8a8d6ed2ef50e2c2199276c3e113d6a71c57e235d934dde968",
+                "77b2b91c1d98cfd3035b61d3f453541deff0eacc3b7df34fada1d55abcc55478",
             ),
         }
         for board_id, facts in expected.items():

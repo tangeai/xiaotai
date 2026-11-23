@@ -34,7 +34,9 @@ typedef struct obj {int x,y,w,h,ext,action; struct obj *parent;} lv_obj_t;
 static lv_obj_t objects[80]; static int used;
 static bool s_header_has_back, s_room_input_create;
 static product_page_t s_page=PAGE_ROOM_CODE;
-static char s_room_input[16],s_voice_feedback[80];
+static char s_room_input[16];
+static lv_obj_t *s_room_input_feedback_label;
+static void refresh_room_input_feedback(void) {}
 static lv_obj_t *lv_obj_create(lv_obj_t *p){lv_obj_t *o=&objects[used++];*o=(lv_obj_t){.parent=p,.action=-1};return o;}
 #define lv_btn_create lv_obj_create
 #define lv_label_create lv_obj_create

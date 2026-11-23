@@ -25,5 +25,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes build-essential libcjson-dev libopus-dev python3 ripgrep
 
+      - name: Check out LVGL 8.3.11 for font lookup tests
+        uses: actions/checkout@v7
+        with:
+          repository: lvgl/lvgl
+          ref: 74d0a816a440eea53e030c4f1af842a94f7ce3d3
+          path: .tools/lvgl-host-test
+          persist-credentials: false
+
       - name: Run full repository checks
+        env:
+          XIAOTAI_HOST_LVGL: .tools/lvgl-host-test
         run: bash tools/check.sh

@@ -232,7 +232,9 @@ static product_page_t s_page = PAGE_HOME_FACE;
 static bool s_room_ui_active;
 static uint8_t s_room_members_page;
 static lv_obj_t *s_room_code_label;
+static lv_obj_t *s_room_online_label;
 static lv_obj_t *s_room_status_label;
+static lv_obj_t *s_room_input_feedback_label;
 static lv_obj_t *s_room_members_caption;
 static lv_obj_t *s_room_member_labels[3];
 static lv_obj_t *s_room_member_status_labels[3];
@@ -787,6 +789,7 @@ static lv_obj_t *make_button(lv_obj_t *parent,
                              lv_coord_t height,
                              product_action_t action);
 static void set_object_visible(lv_obj_t *object, bool visible);
+static void refresh_room_input_feedback(void);
 static void refresh_room_controls(const starter_runtime_product_snapshot_t *room);
 static void render_page(void);
 #if CONFIG_IDF_TARGET_ESP32P4
@@ -1213,11 +1216,14 @@ static void on_action(lv_event_t *event)
         (void)starter_runtime_room_refresh();
     } else if (action == ACTION_ROOM_CREATE) {
         if (room_action_submitted(starter_runtime_room_create(""))) s_page = PAGE_ROOM;
+        else render_page();
     } else if (action == ACTION_ROOM_CREATE_PASSWORD) {
+        s_voice_feedback[0] = '\0';
         memset(s_room_input, 0, sizeof(s_room_input));
         s_room_input_create = true;
         s_page = PAGE_ROOM_PASSWORD;
     } else if (action == ACTION_ROOM_JOIN) {
+        s_voice_feedback[0] = '\0';
         memset(s_room_input, 0, sizeof(s_room_input));
         memset(s_room_join_code, 0, sizeof(s_room_join_code));
         s_room_input_create = false;
@@ -1229,8 +1235,11 @@ static void on_action(lv_event_t *event)
                s_page == PAGE_ROOM_LEAVE_CONFIRM) {
         if (room_action_submitted(starter_runtime_room_leave())) {
             s_page = PAGE_ROOM;
+        } else {
+            render_page();
         }
     } else if (action == ACTION_ROOM_LEAVE_CANCEL) {
+        s_voice_feedback[0] = '\0';
         s_page = PAGE_ROOM;
     } else if (action >= ACTION_ROOM_DIGIT_BASE &&
                action < ACTION_ROOM_DIGIT_BASE + 10) {
@@ -1256,6 +1265,7 @@ static void on_action(lv_event_t *event)
                 ? starter_runtime_room_create(s_room_input)
                 : starter_runtime_room_join(s_room_join_code, s_room_input);
             if (room_action_submitted(err)) s_page = PAGE_ROOM;
+            else refresh_room_input_feedback();
         }
     } else if (action >= ACTION_DIAG_SYSTEM && action <= ACTION_DIAG_EVENTS) {
         s_diagnostics_tab = (unsigned)(action - ACTION_DIAG_SYSTEM);
@@ -2190,8 +2200,13 @@ static void refresh_room_controls(const starter_runtime_product_snapshot_t *room
     (void)snprintf(line, sizeof(line), "房间号  %s%s", room->room_code,
                    room->room_password_set ? "  |  有密码" : "");
     label_set_text_if_changed(s_room_code_label, line);
-    (void)snprintf(line, sizeof(line), "在线 %u 人  |  %s",
-                   room->room_online_count, room->room_message);
+    (void)snprintf(line, sizeof(line), "在线 %u 人", room->room_online_count);
+    label_set_text_if_changed(s_room_online_label, line);
+    (void)snprintf(line, sizeof(line), "%s", room->room_message);
+    // Keep the message on one scrolling row even if the server sends a newline.
+    for (char *p = line; *p != '\0'; ++p) {
+        if (*p == '\r' || *p == '\n') *p = ' ';
+    }
     label_set_text_if_changed(s_room_status_label, line);
     const unsigned per_page = 3U;
     unsigned pages = room->room_member_count == 0U ? 1U :
@@ -2269,7 +2284,10 @@ static void render_room(lv_obj_t *screen)
         return;
     }
     s_room_code_label = make_label(screen, "", 18, 34, 284, lv_color_hex(0xFFFFFF));
-    s_room_status_label = make_label(screen, "", 18, 56, 284, lv_color_hex(0xBFE9F3));
+    s_room_online_label = make_label(screen, "", 18, 56, 88, lv_color_hex(0xBFE9F3));
+    s_room_status_label = make_label(screen, "", 114, 56, 188, lv_color_hex(0xBFE9F3));
+    lv_obj_set_height(s_room_status_label, 22);
+    lv_label_set_long_mode(s_room_status_label, LV_LABEL_LONG_SCROLL);
     s_room_members_caption = make_label(screen, "房间成员", 18, 78, 284, lv_color_hex(0xBFE9F3));
     memset(s_room_member_text, 0, sizeof(s_room_member_text));
     for (unsigned row = 0; row < 3U; ++row) {
@@ -2309,6 +2327,21 @@ static void render_room_leave_confirm(lv_obj_t *screen)
         (void)make_label(screen, s_voice_feedback, 24, 153, 272, lv_color_hex(0xFF9D9D));
 }
 
+static void refresh_room_input_feedback(void)
+{
+    if (s_room_input_feedback_label == NULL) return;
+    const bool has_error = s_voice_feedback[0] != '\0';
+    const bool show_hint = s_page == PAGE_ROOM_PASSWORD && !s_room_input_create;
+    label_set_text_if_changed(s_room_input_feedback_label,
+                              has_error ? s_voice_feedback :
+                              show_hint ? XIAOTAI_UI_ROOM_PASSWORD_HINT : "");
+    lv_obj_set_style_text_color(s_room_input_feedback_label,
+                               lv_color_hex(has_error ? 0xFF9D9D : 0xB8D4E0), 0);
+    lv_obj_set_style_text_align(s_room_input_feedback_label,
+                               has_error ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_CENTER, 0);
+    set_object_visible(s_room_input_feedback_label, has_error || show_hint);
+}
+
 static void render_room_input(lv_obj_t *screen)
 {
     bool code = s_page == PAGE_ROOM_CODE;
@@ -2343,13 +2376,9 @@ static void render_room_input(lv_obj_t *screen)
                       key_w, key_h, ACTION_ROOM_DIGIT_BASE);
     (void)make_button(screen, "确定", key_x + 2 * step_x, key_y + 3 * step_y,
                       key_w, key_h, ACTION_ROOM_INPUT_SUBMIT);
-    if (s_voice_feedback[0] != '\0')
-        (void)make_label(screen, s_voice_feedback, 24, hint_y, 272, lv_color_hex(0xFF9D9D));
-    else if (!code && !s_room_input_create) {
-        lv_obj_t *hint = make_label(screen, XIAOTAI_UI_ROOM_PASSWORD_HINT,
-                                    24, hint_y, 272, lv_color_hex(0xB8D4E0));
-        lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
-    }
+    s_room_input_feedback_label = make_label(screen, "", 24, hint_y, 272,
+                                             lv_color_hex(0xB8D4E0));
+    refresh_room_input_feedback();
 }
 
 static void render_menu(lv_obj_t *screen)
@@ -3050,7 +3079,9 @@ static void render_page(void)
     s_binding_countdown_label = NULL;
     lv_obj_clean(screen);
     s_room_code_label = NULL;
+    s_room_online_label = NULL;
     s_room_status_label = NULL;
+    s_room_input_feedback_label = NULL;
     s_room_members_caption = NULL;
     memset(s_room_member_labels, 0, sizeof(s_room_member_labels));
     memset(s_room_member_status_labels, 0, sizeof(s_room_member_status_labels));
@@ -3688,6 +3719,11 @@ static void product_tick(lv_timer_t *timer)
     }
     if (s_voice_feedback[0] != '\0' && now >= s_voice_feedback_hide_ms) {
         s_voice_feedback[0] = '\0';
+        refresh_room_input_feedback();
+        if (s_page == PAGE_ROOM_LEAVE_CONFIRM ||
+            (s_page == PAGE_ROOM && s_room_code_label == NULL)) {
+            render_page();
+        }
         s_wifi_notice = WIFI_NOTICE_NONE;
         voice_state_changed = true;
     }

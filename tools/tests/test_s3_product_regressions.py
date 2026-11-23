@@ -79,6 +79,7 @@ int main(void) {
 #define ESP_OK 0
 static int s_page=PAGE_ROOM, leaves;
 static char s_voice_feedback[64];
+static void render_page(void) { assert(!"unexpected intermediate redraw"); }
 static int room_action_submitted(int err) {return err==0;}
 static int starter_runtime_room_leave(void) { leaves++; return 0; }
 static int64_t monotonic_ms(void) {return 0;}

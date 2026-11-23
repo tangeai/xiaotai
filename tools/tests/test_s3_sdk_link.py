@@ -2,6 +2,7 @@
 """Configure the production S3 SDK component and validate the linked archives."""
 from pathlib import Path
 import hashlib
+import json
 import subprocess
 import tempfile
 
@@ -50,3 +51,13 @@ for name in ("lckfb-esp32s3-xiaotai",):
             subprocess.run(["ar", "p", str(archive), "crc32.o"], stdout=output, check=True)
         assert "Xtensa" in subprocess.check_output(["readelf", "-h", str(p / "member.o")], text=True)
     print("PASS: actual S3 component selects the supplied Xtensa TiRTC 2.6.3 archive")
+
+for project_name, hardware_ir in (
+    ("lckfb-esp32s3-xiaotai", project / "hardware-ir.json"),
+    ("m5stack-cores3-lite", root / "boards/m5stack/cores3-lite/hardware-ir.json"),
+):
+    metadata = json.loads(hardware_ir.read_text())["toolchain"]["tirtc"]
+    assert metadata["version"] == "2.6.3", hardware_ir
+    assert metadata["archive_sha256"] == hashlib.sha256(data).hexdigest(), hardware_ir
+    guide = root / "firmware/esp-idf/esp32s3" / project_name / "README.md"
+    assert "TiRTC SDK 2.6.3" in guide.read_text(), guide

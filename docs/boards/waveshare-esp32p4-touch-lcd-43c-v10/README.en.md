@@ -132,11 +132,11 @@ Screen changes require registered resolution, orientation, and layout plus font,
 | Host | Linux/WSL2, Git, Python 3 | [Git](https://git-scm.com/downloads), [Python](https://www.python.org/downloads/) | — |
 | ESP-IDF | `v5.5.5`, commit `b774170ff46c393eeb5e495ea37936038d3f4f4f` | [Official repository](https://github.com/espressif/esp-idf/tree/b774170ff46c393eeb5e495ea37936038d3f4f4f) | — |
 | C/C++ compiler | `riscv32-esp-elf-gcc 14.2.0`, build `esp-14.2.0_20260121` | [ESP-IDF tools manifest](https://github.com/espressif/esp-idf/blob/b774170ff46c393eeb5e495ea37936038d3f4f4f/tools/tools.json) | Installer checks downloads against manifest |
-| TiRTC | 2.6.0, `lib/libTiRTC.a` | [ESP32-P4 releases](https://repo-sdk.tange-ai.com/service/rest/repository/browse/tirtc-sdks/releases/espressif_esp32p4/) | `554295a06173478ba51cb6fc4fc42a09431787377aef7e4ded4ab17165f39cac` |
+| TiRTC | 2.6.3, `lib/libTiRTC.a` | [ESP32-P4 releases](https://repo-sdk.tange-ai.com/service/rest/repository/browse/tirtc-sdks/releases/espressif_esp32p4/) | `c2b88d10e4adf812de22051c22fbff3194b7bd8d82e8fa3f1df98be51e41d268` |
 | ESP-IDF components | ESP-Hosted 1.4.7, ESP-SR 2.4.6, `esp_h264` 1.3.8, `esp_codec_dev` 1.5.10, Waveshare 4.3 BSP v1.0.1 | [Dependency lockfile](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/dependencies.lock) | — |
 | C6 slave firmware | Version matching the current host project | — | — |
 
-The user-supplied P4 SDK reports `v2.6.0-894972fb` and requires 10 lwIP sockets.
+The user-supplied P4 SDK reports `v2.6.3-22271f54` and requires 10 lwIP sockets.
 Identity and ABI requirements are recorded in
 `platforms/esp-idf/third_party/tirtc/esp32p4/VERSION.md` and its manifest.
 Earlier local-patch hardware results do not validate this replacement.

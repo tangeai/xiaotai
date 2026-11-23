@@ -20,7 +20,6 @@ class CoreS3BoardTest(unittest.TestCase):
             command, project = build_command(ROOT, board, variant)
             self.assertIn(f"-DXIAOTAI_BOARD_VARIANT={variant}", command)
             self.assertEqual(project.name, "m5stack-cores3-lite")
-        self.assertEqual(str(read_board_version(ROOT, board.id)), "1.1.0")
         result = subprocess.run(
             [sys.executable, str(ROOT / "tools/build.py"), "--board", board.id,
              "--variant", "ili9342c", "--dry-run"],
@@ -213,7 +212,7 @@ int main(void) {
 #include <stddef.h>
 #define CONFIG_IDF_TARGET_ESP32P4 0
 #define XIAOTAI_BOARD_MODEL "m5stack-cores3-lite"
-#define XIAOTAI_S3_PROFILE_VERSION "1.0.1"
+#define XIAOTAI_PROFILE_VERSION "1.0.1"
 #define PLATFORM_SERVICE_DEVICE 1
 #define ESP_OK 0
 #define ESP_LOGI(...) ((void)0)

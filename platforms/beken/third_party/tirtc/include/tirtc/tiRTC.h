@@ -172,7 +172,7 @@ extern "C" {
 
 #define TIRTC_VERSION_MAJOR     2
 #define TIRTC_VERSION_MINOR     6
-#define TIRTC_VERSION_PATCH     0
+#define TIRTC_VERSION_PATCH     3
 /* -------------------------------------------------------------------------
  * 错误码
  * ------------------------------------------------------------------------- */
@@ -956,6 +956,11 @@ TiRTC_EXPORT int TiRtcServiceRequest(const char *path,
                                      TIRTCSERVICEREQUESTCALLBACK cb,
                                      void *user_data);
 
+/** 设置发送冗余音频包时的丢包阈值.
+ * \param loss_percent 丢包百分比.
+ * \return 实际生效的百分比.
+ */
+TiRTC_EXPORT int TiRtcSetAudioRedundancyLossThreshold(int loss_percent);
 /** @} */ /* tirtc_misc */
 
 #ifdef __cplusplus
