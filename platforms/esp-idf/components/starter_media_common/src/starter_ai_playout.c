@@ -1,6 +1,6 @@
 #include "starter_ai_playout.h"
 #include "xiaotai_audio_buffer.h"
-#include "xiaotai_audio_recovery.h"
+#include "xiaotai_audio_pause.h"
 #include "xiaotai_media_policy.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
@@ -15,9 +15,8 @@ static uint32_t s_waits;
 static bool s_ended;
 /* Sender media clock (ms). It only places omitted silence between packets of
  * one turn; no deadline or buffering decision is derived from it. */
-static uint32_t s_pause_next_ms;
-static uint8_t s_pause_stream;
-static bool s_pause_valid;
+static xiaotai_audio_pause_t s_pause;
+static xiaotai_audio_pause_stats_t s_pause_stats;
 static xiaotai_audio_buffer_t s_buffer;
 
 static uint16_t opus_samples_16k(const uint8_t *packet, size_t size)
@@ -46,7 +45,8 @@ void starter_ai_playout_reset(uint32_t generation)
     s_queued_packets = 0U;
     s_waits = 0U;
     s_ended = false;
-    s_pause_valid = false;
+    xiaotai_audio_pause_reset(&s_pause);
+    s_pause_stats = (xiaotai_audio_pause_stats_t){0};
     xiaotai_audio_buffer_reset(&s_buffer);
     portEXIT_CRITICAL(&s_lock);
 }
@@ -98,26 +98,12 @@ uint16_t starter_ai_playout_pause_ms(uint32_t generation, uint32_t media_ms,
                                      uint8_t stream, uint16_t samples)
 {
     uint32_t pause = 0U;
-    uint32_t duration_ms = samples / 16U;
-    if (generation == 0U || duration_ms == 0U) return 0U;
+    if (generation == 0U) return 0U;
     portENTER_CRITICAL(&s_lock);
     if (generation == s_generation) {
-        if (!s_pause_valid || stream != s_pause_stream) {
-            s_pause_valid = true;
-            s_pause_stream = stream;
-            s_pause_next_ms = media_ms + duration_ms;
-        } else if (xiaotai_audio_recovery_before(media_ms, s_pause_next_ms)) {
-            /* Late, duplicate or reordered packets must not move the timeline
-             * backwards, or the next in-order packet would look like a gap.
-             * A large step back is a sender clock reset: restart there. */
-            if ((uint32_t)(s_pause_next_ms - media_ms) > STARTER_AI_PAUSE_RESET_MS)
-                s_pause_next_ms = media_ms + duration_ms;
-        } else {
-            uint32_t gap = media_ms - s_pause_next_ms;
-            if (gap >= STARTER_AI_PAUSE_MIN_MS)
-                pause = gap < STARTER_AI_PAUSE_MAX_MS ? gap : STARTER_AI_PAUSE_MAX_MS;
-            s_pause_next_ms = media_ms + duration_ms;
-        }
+        /* The ESP Opus decoder has no concealment, so every gap is silence. */
+        pause = xiaotai_audio_pause_plan(&s_pause, media_ms, stream, samples, 0U);
+        xiaotai_audio_pause_stats_add(&s_pause_stats, pause);
     }
     portEXIT_CRITICAL(&s_lock);
     return (uint16_t)pause;
@@ -136,7 +122,7 @@ void starter_media_ai_playback_boundary(uint32_t generation, bool ended)
     portENTER_CRITICAL(&s_lock);
     if (generation != 0U && generation == s_generation) {
         /* Each turn has its own sender timeline; a duplicate start has none. */
-        if (ended || s_ended) s_pause_valid = false;
+        if (ended || s_ended) xiaotai_audio_pause_reset(&s_pause);
         if (!ended) {
             if (s_ended) xiaotai_audio_buffer_begin_round(&s_buffer);
             /* A new round must not learn from the preceding turn's silence.
@@ -157,6 +143,9 @@ starter_ai_playout_status_t starter_ai_playout_status(void)
         .underruns = s_buffer.underruns,
         .waits = s_waits,
         .timeout_releases = s_buffer.timeout_releases,
+        .pause_ms = s_pause_stats.total_ms,
+        .pause_count = s_pause_stats.count,
+        .pause_max_ms = s_pause_stats.max_ms,
     };
     portEXIT_CRITICAL(&s_lock);
     return result;

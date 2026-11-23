@@ -61,7 +61,7 @@ static xiaotai_audio_buffer_t s_ai_buffer={.target_ms=100};
 static bool s_ai_buffer_ended=true;
 ''' + diagnostic_block(s) + function(s,'xiaotai_audio_play_opus_stream') + function(s,'xiaotai_audio_play_opus') + function(s,'opus_ring_take') + r'''
 int main(void){
- (void)s_plc_rendered_ms;
+ (void)s_plc_rendered_ms;(void)s_pause_rendered_ms;(void)s_pause_count;(void)s_pause_max_ms;
  ai_playback_timing_t quiet={0}; ai_uplink_timing_t quiet_up={0};
  ai_audio_written(&quiet,100,102,103,123,true);
  assert(strstr(logs,"AI_AUDIO event=first_write") && strstr(logs,"rx_to_write_ms=123"));

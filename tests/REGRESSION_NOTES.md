@@ -25,8 +25,18 @@
 - 绿：`starter_ai_playout_pause_ms()`（公共 ESP 实现）按媒体时间戳给出缺口，S3/CoreS3/P4
   的 `play_audio_item` 在写包前调用 `play_ai_pause()`。S3/P4 原有的 sink、DMA、Opus
   时长回放同步更新桩，行为未变。
-- 范围：BK7258 仍用受限补偿，未接入静音时间线，本轮不修改、不重编译；实板听感、首音等待与
-  主动打断是否退化均待验收。固件状态保持 `BUILD_VERIFIED_HIL_PENDING`。
+- 实机（立创 S3，build.103，同板）：停顿恢复、不加快；新抓取 363 包全程四阶段一致，板端与
+  电脑解码逐样本相同。较早一份抓取（build.103a）显示服务端曾在有声语音中间少发 60–120 ms 的
+  帧（每 100 ms 才一个包），字被吃掉；服务端修改后再抓，媒体时间线缺口为 0，用户确认听得清、
+  停顿自然。结论：缺字根因在服务端，设备端停顿还原是兜底，不是丢包补偿。
+- 公共化：缺口计算移到 `platforms/common/include/xiaotai_audio_pause.h`，ESP 与 BK7258 共用；
+  BK 的 libopus 已补 1–2 帧，只对超过 40 ms 的缺口补静音，ESP 解码器无 PLC 接口，全部补静音。
+  `test_media_queue_policy.test_sender_pauses_replay_for_every_audio_board` 对每块音频板回放
+  同一份实机缺口时间线；`test_bk_call_ringtone` 回放 BK 播放线程的 460/60 ms 缺口、800 ms 上限
+  与首包不补，并注入两处变异（缺口阈值归零、不写静音）确认测试会失败。
+- 日志：ESP 与 BK 的 AI 播放摘要新增 `pause-ms`、`pauses`、`pause-max-ms`。
+- 范围：BK7258 的停顿还原仅主机回放与构建，尚未上板；五板实板听感、首音等待与主动打断是否
+  退化均待验收。固件状态保持 `BUILD_VERIFIED_HIL_PENDING`。
 
 ## 2026-11-11：提交前统一检查
 

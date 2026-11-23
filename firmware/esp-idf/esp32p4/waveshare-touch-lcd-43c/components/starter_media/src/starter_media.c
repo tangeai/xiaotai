@@ -2346,6 +2346,9 @@ starter_media_status_t starter_media_status(void)
         .audio_rx_prefill_waits = playout.waits,
         .audio_rx_buffered_ms = playout.queued_samples / 16U,
         .audio_rx_timeout_releases = playout.timeout_releases,
+        .audio_pause_ms = playout.pause_ms,
+        .audio_pause_count = playout.pause_count,
+        .audio_pause_max_ms = playout.pause_max_ms,
         .audio_rx_rebuffers = playout.underruns,
         .audio_rx_prefill_target_ms = playout.target_ms,
         .audio_rx_queue_capacity = atomic_load(&s_mode) == STARTER_TIRTC_AI

@@ -70,6 +70,59 @@ int main(void){
      adapter=MEDIA if 'starter_media_s3/starter_media.c' in cmake else P4
      self.assertNotIn('xiaotai_opus_plc_decode(',adapter.read_text())
 
+ def test_sender_pauses_replay_for_every_audio_board(self):
+  """Same captured sender timeline on each board; only decoder capability differs."""
+  from test_s3_product_regressions import run_c
+  # (start_ms, gap_ms) from a 2026-11-23 lckfb-esp32s3 capture: the sender omits
+  # silent frames, so its media clock leaves these holes between words.
+  gaps=[(100,100),(260,160),(560,140),(720,100),(840,180),(1140,240),(1400,60),
+        (1600,60),(1680,60),(1760,100),(1880,100),(2640,300),(3080,140),(3240,280),
+        (4780,280),(5080,20),(5240,60),(5340,80),(5440,80),(5540,80),(6960,300),
+        (7400,160),(7720,140)]
+  stamps=[];ts=20
+  holes=dict(gaps)
+  while ts<=8400:
+   stamps.append(ts)
+   ts+=20
+   if ts in holes: ts+=holes[ts]
+  for board in load_boards(ROOT):
+   if 'audio' not in board.data['capabilities']: continue
+   capable = board.data['platform'] == 'beken'
+   concealed = 40 if capable else 0
+   floor = concealed + 20 if concealed >= 20 else 20
+   expected=sum(g for _,g in gaps if g>=floor)
+   with self.subTest(board=board.id):
+    run_c('#define CONCEALED_MS '+str(concealed)+'\nstatic const unsigned stamps[]={'+
+      ','.join(map(str,stamps))+'};\n#define COUNT '+str(len(stamps))+'\n#define EXPECTED '+str(expected)+r'''
+#include "xiaotai_audio_pause.h"
+#include <assert.h>
+int main(void){
+ xiaotai_audio_pause_t state={0}; xiaotai_audio_pause_stats_t stats={0};
+ for(unsigned i=0;i<COUNT;i++){
+  unsigned pause=xiaotai_audio_pause_plan(&state,stamps[i],14,320,CONCEALED_MS);
+  xiaotai_audio_pause_stats_add(&stats,pause);
+ }
+ assert(stats.total_ms==EXPECTED);
+ /* New turn: the first packet has no pause and the old timeline is forgotten. */
+ xiaotai_audio_pause_reset(&state);
+ assert(xiaotai_audio_pause_plan(&state,90000,14,320,CONCEALED_MS)==0);
+ /* Late and duplicate packets never move the timeline backwards. */
+ assert(xiaotai_audio_pause_plan(&state,90000,14,320,CONCEALED_MS)==0);
+ assert(xiaotai_audio_pause_plan(&state,90020,14,320,CONCEALED_MS)==0);
+ /* A stall is capped; a foreign stream restarts instead of inventing a pause. */
+ assert(xiaotai_audio_pause_plan(&state,95000,14,320,CONCEALED_MS)==XIAOTAI_AUDIO_PAUSE_MAX_MS);
+ assert(xiaotai_audio_pause_plan(&state,200000,15,320,CONCEALED_MS)==0);
+}
+''',[ROOT/'platforms/common/include'])
+   # The adapter must use the shared planner with its decoder capability.
+   if capable:
+    source=(ROOT/'platforms/beken/runtime/src/xiaotai_audio.c').read_text()
+    self.assertIn('XIAOTAI_AUDIO_PAUSE_DECODER_SPAN_MS',source)
+   else:
+    source=(ROOT/'platforms/esp-idf/components/starter_media_common/src/starter_ai_playout.c').read_text()
+    self.assertIn('xiaotai_audio_pause_plan(&s_pause, media_ms, stream, samples, 0U)',source)
+   self.assertIn('xiaotai_audio_pause_plan(',source)
+
  def test_short_gap_after_successful_write_keeps_playout_running(self):
   from test_esp_ai_playout import run_playout
   run_playout(r"""
