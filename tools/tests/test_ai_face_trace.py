@@ -74,6 +74,7 @@ static void log_msg(const char *fmt,...){
     size_t n=strlen(logs);vsnprintf(logs+n,sizeof(logs)-n,fmt,args);va_end(args);
 }
 #define ESP_LOGI(tag,...) log_msg(__VA_ARGS__)
+#define ESP_LOGD(tag,...) log_msg(__VA_ARGS__)
 #define ESP_LOGE(tag,...) log_msg(__VA_ARGS__)
 static void diagnostic_event(const char *label,int value){}
 static starter_runtime_state_t session_state(void){return state;}

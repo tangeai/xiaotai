@@ -259,7 +259,11 @@ static void starter_start_task(void *argument)
                        sizeof(s_tirtc_config.client_id),
                        "%s",
                        default_client_id);
-        ESP_LOGW(TAG, "device is not bound; starting verification-code binding");
+        if (err != ESP_ERR_NVS_NOT_FOUND) {
+            ESP_LOGW(TAG, "stored binding unavailable: %s",
+                     esp_err_to_name(err == ESP_OK ? ESP_ERR_INVALID_ARG : err));
+        }
+        ESP_LOGI(TAG, "starting verification-code binding");
         for (;;) {
             while (!wifi_manager_connected()) {
                 vTaskDelay(pdMS_TO_TICKS(250));
@@ -268,7 +272,7 @@ static void starter_start_task(void *argument)
             if (err == ESP_OK) {
                 break;
             }
-            ESP_LOGE(TAG,
+            ESP_LOGW(TAG,
                      "binding incomplete; retrying in %u ms: %s",
                      START_RETRY_DELAY_MS,
                      esp_err_to_name(err));

@@ -32,8 +32,7 @@ SHA-256：`ea671a0750944b5da87833a90bd7893ab57cc0af250714163e0da47fe00e59c3`。
 ## 准备
 
 - 固件：`build/bk7258/lckfb-bk7258-xiaotai/package/all-app.bin`
-- 默认 DEBUG 固件会完整打印 HTTP、MQTT、WHIP 请求和返回值（包括 token），
-  用于开发联调，日志按敏感开发资料处理；切换到 INFO 后不打印完整网络载荷。
+- 应用默认使用 INFO。采集周期资源或媒体统计时，运行 `ap_cmd log-level app 4`，采集结束后用 `ap_cmd log-level app 3` 恢复。
 - 使用 BK7258 配套烧录工具执行接线、Boot 键和复位操作；工程不自动控制硬件。
 
 ## 历史跨板候选 build.69

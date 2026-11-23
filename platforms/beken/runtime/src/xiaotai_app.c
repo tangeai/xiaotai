@@ -717,7 +717,8 @@ static void navigate_to(ui_page_t page)
         s_room_key_talking = false;
         s_room_touch_talking = false;
         int rc = xiaotai_room_action(&s_room, XIAOTAI_ROOM_ACTION_END, NULL);
-        BK_LOGI(TAG, "room menu exited target=%d rc=%d\n", (int)page, rc);
+        xiaotai_log_write(rc == BK_OK ? XIAOTAI_LOG_INFO : XIAOTAI_LOG_WARN, TAG,
+                         "room menu exited target=%d rc=%d\n", (int)page, rc);
     }
     s_ui_page = page;
 }
@@ -1241,7 +1242,8 @@ static void room_input_submit(void)
         xiaotai_room_action(&s_room, s_room_input_create ?
                             XIAOTAI_ROOM_ACTION_CREATE : XIAOTAI_ROOM_ACTION_JOIN,
                             request) : BK_ERR_PARAM;
-    BK_LOGI(TAG, "room input submitted create=%d rc=%d\n",
+    xiaotai_log_write(rc == BK_OK ? XIAOTAI_LOG_INFO : XIAOTAI_LOG_WARN, TAG,
+                     "room input submission create=%d rc=%d\n",
             s_room_input_create ? 1 : 0, rc);
     if (rc == BK_OK) {
         memset(s_room_password_input, 0, sizeof(s_room_password_input));
@@ -1379,7 +1381,8 @@ static void handle_touch(const control_event_t *event)
             s_touch_action_consumed = true;
             int rc = xiaotai_room_action(&s_room,
                                          XIAOTAI_ROOM_ACTION_LEAVE, NULL);
-            BK_LOGI(TAG, "room leave confirmed rc=%d\n", rc);
+            xiaotai_log_write(rc == BK_OK ? XIAOTAI_LOG_INFO : XIAOTAI_LOG_WARN, TAG,
+                             "room leave confirmed rc=%d\n", rc);
             if (rc == BK_OK) {
                 s_ui_page = UI_PAGE_HOME;
                 s_home_last_refresh_ms = 0U;
@@ -1403,7 +1406,8 @@ static void handle_touch(const control_event_t *event)
                 static const char request[] = "{\"password\":\"\"}";
                 int rc = xiaotai_room_action(&s_room,
                     XIAOTAI_ROOM_ACTION_CREATE, request);
-                BK_LOGI(TAG, "open room create submitted rc=%d\n", rc);
+                xiaotai_log_write(rc == BK_OK ? XIAOTAI_LOG_INFO : XIAOTAI_LOG_WARN, TAG,
+                                 "open room create submission rc=%d\n", rc);
                 s_touch_action_consumed = true;
                 room_render();
             } else if (action == XIAOTAI_UI_ACTION_ROOM_CREATE_PASSWORD &&
@@ -3876,6 +3880,7 @@ int xiaotai_app_start(void)
     xiaotai_contacts_init(&s_contacts);
     s_ai_history = psram_malloc(sizeof(*s_ai_history));
     if (s_ai_history != NULL) memset(s_ai_history, 0, sizeof(*s_ai_history));
+    else BK_LOGW(TAG, "AI history unavailable: PSRAM allocation failed\n");
     xiaotai_product_settings_default(&s_settings);
     (void)xiaotai_storage_load_settings(&s_settings);
     xiaotai_audio_set_volume(s_settings.volume);
@@ -3885,16 +3890,28 @@ int xiaotai_app_start(void)
         s_settings.microphone_sensitivity);
     s_last_activity_ms = rtos_get_time();
     int rc = rtos_init_mutex(&s_runtime_mutex);
-    if (rc != BK_OK) return rc;
+    if (rc != BK_OK) {
+        BK_LOGE(TAG, "runtime mutex initialization failed rc=%d\n", rc);
+        return rc;
+    }
     rc = rtos_init_mutex(&s_room_snapshot_mutex);
-    if (rc != BK_OK) return rc;
+    if (rc != BK_OK) {
+        BK_LOGE(TAG, "room snapshot mutex initialization failed rc=%d\n", rc);
+        return rc;
+    }
     room_init(NULL);
     rc = rtos_init_queue(&s_control_queue, "xiaotai_control",
                          sizeof(control_event_t), CONTROL_QUEUE_DEPTH);
-    if (rc != BK_OK) return rc;
+    if (rc != BK_OK) {
+        BK_LOGE(TAG, "control queue initialization failed rc=%d\n", rc);
+        return rc;
+    }
     rc = rtos_create_psram_thread(&s_control_thread, 5, "xiaotai_control",
                                   control_task, CONTROL_TASK_STACK_SIZE, NULL);
-    if (rc != BK_OK) return rc;
+    if (rc != BK_OK) {
+        BK_LOGE(TAG, "control thread initialization failed rc=%d\n", rc);
+        return rc;
+    }
     const xiaotai_tirtc_handlers_t tirtc_handlers = {
         .on_stream_connected = on_stream_connected,
         .on_stream_disconnected = on_stream_disconnected,
@@ -3942,6 +3959,7 @@ int xiaotai_app_start(void)
     rc = rtos_create_psram_thread(NULL, BEKEN_APPLICATION_PRIORITY,
                                   "xiaotai_supervisor", supervisor_task,
                                   TIRTC_SUPERVISOR_STACK_SIZE, NULL);
+    if (rc != BK_OK) BK_LOGE(TAG, "supervisor thread initialization failed rc=%d\n", rc);
     return rc;
 }
 

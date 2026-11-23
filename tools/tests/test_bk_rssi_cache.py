@@ -33,7 +33,8 @@ class TestBkRssiCache(unittest.TestCase):
 #define BK_FAIL -1
 #define BK_ERR_BUSY -2
 #define BK_LOG_NONE 0
-#define BK_LOG_INFO 3
+#define XIAOTAI_LOG_DEBUG 4
+static int xiaotai_log_get_level(void){return XIAOTAI_LOG_DEBUG;}
 #define TAG "xiaotai_metrics"
 #define METRICS_INTERVAL_MS 10000U
 #define configMAX_TASK_NAME_LEN 16
@@ -48,7 +49,7 @@ static void BK_LOGI(const char *tag, const char *fmt, ...)
 }
 static void bk_printf_nonblock(int level, char *tag, const char *fmt, ...)
 {
-    assert(level == BK_LOG_INFO);
+    assert(level == XIAOTAI_LOG_DEBUG);
     assert(strcmp(tag, "xiaotai_metrics") == 0);
     assert(strncmp(fmt, "METRICS ", 8) == 0);
     nonblocking_metrics_calls++;
