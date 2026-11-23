@@ -19,7 +19,7 @@ def font_glyphs(source):
         data = re.search(r'\b' + name + r'\[\] = \{(.*?)\};', source, re.S).group(1)
         return [int(value, 0) for value in re.findall(r'0x[0-9a-fA-F]+|\d+', data)]
 
-    pattern = (r'\.range_start = (\d+), \.range_length = (\d+), '
+    pattern = (r'\.range_start = (\d+), \.range_length = (?:XIAOTAI_CMAP_LENGTH\()?(\d+)\)?, '
                r'\.glyph_id_start = (\d+),\s*\.unicode_list = (\w+), '
                r'\.glyph_id_ofs_list = (\w+)')
     for start, length, first, offsets, ids in re.findall(pattern, source):

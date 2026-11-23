@@ -360622,377 +360622,378 @@ static const uint16_t unicode_list_3[] = {
     0x34, 0x35, 0x3e
 };
 
-static const uint8_t glyph_id_ofs_list_89[] = {
-    0, 1, 2, 3, 4, 5, 0, 0,
-    6, 7, 8, 9, 10, 11, 0, 0,
-    12, 13, 14, 15, 16, 17, 0, 0,
-    18, 19, 20, 0, 0, 0, 21, 22,
-    23, 24, 25, 26, 27, 0, 28, 29,
-    30, 31, 32, 33, 34
+static const uint16_t unicode_list_89[] = {
+    0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x18, 0x19, 0x1a, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c
 };
 
 /*Collect the unicode lists and glyph_id offsets*/
+/* LVGL 8.3.11 treats range_length as an inclusive upper bound. */
+#if LVGL_VERSION_MAJOR == 8 && LVGL_VERSION_MINOR == 3 && LVGL_VERSION_PATCH == 11
+#define XIAOTAI_CMAP_LENGTH(count) ((count) - 1)
+#else
+#define XIAOTAI_CMAP_LENGTH(count) (count)
+#endif
 static const lv_font_fmt_txt_cmap_t cmaps[] =
 {
     {
-        .range_start = 32, .range_length = 95, .glyph_id_start = 1,
+        .range_start = 32, .range_length = XIAOTAI_CMAP_LENGTH(95), .glyph_id_start = 1,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 176, .range_length = 8768, .glyph_id_start = 96,
+        .range_start = 176, .range_length = XIAOTAI_CMAP_LENGTH(8768), .glyph_id_start = 96,
         .unicode_list = unicode_list_1, .glyph_id_ofs_list = NULL, .list_length = 136, .type = LV_FONT_FMT_TXT_CMAP_SPARSE_TINY
     },
     {
-        .range_start = 9472, .range_length = 172, .glyph_id_start = 232,
+        .range_start = 9472, .range_length = XIAOTAI_CMAP_LENGTH(172), .glyph_id_start = 232,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 9649, .range_length = 63, .glyph_id_start = 404,
+        .range_start = 9649, .range_length = XIAOTAI_CMAP_LENGTH(63), .glyph_id_start = 404,
         .unicode_list = unicode_list_3, .glyph_id_ofs_list = NULL, .list_length = 27, .type = LV_FONT_FMT_TXT_CMAP_SPARSE_TINY
     },
     {
-        .range_start = 12288, .range_length = 49, .glyph_id_start = 431,
+        .range_start = 12288, .range_length = XIAOTAI_CMAP_LENGTH(49), .glyph_id_start = 431,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 12339, .range_length = 13, .glyph_id_start = 480,
+        .range_start = 12339, .range_length = XIAOTAI_CMAP_LENGTH(13), .glyph_id_start = 480,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 19968, .range_length = 240, .glyph_id_start = 493,
+        .range_start = 19968, .range_length = XIAOTAI_CMAP_LENGTH(240), .glyph_id_start = 493,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 20208, .range_length = 256, .glyph_id_start = 733,
+        .range_start = 20208, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 733,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 20464, .range_length = 256, .glyph_id_start = 989,
+        .range_start = 20464, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 989,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 20720, .range_length = 256, .glyph_id_start = 1245,
+        .range_start = 20720, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 1245,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 20976, .range_length = 256, .glyph_id_start = 1501,
+        .range_start = 20976, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 1501,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 21232, .range_length = 256, .glyph_id_start = 1757,
+        .range_start = 21232, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 1757,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 21488, .range_length = 256, .glyph_id_start = 2013,
+        .range_start = 21488, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 2013,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 21744, .range_length = 256, .glyph_id_start = 2269,
+        .range_start = 21744, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 2269,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 22000, .range_length = 256, .glyph_id_start = 2525,
+        .range_start = 22000, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 2525,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 22256, .range_length = 256, .glyph_id_start = 2781,
+        .range_start = 22256, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 2781,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 22512, .range_length = 256, .glyph_id_start = 3037,
+        .range_start = 22512, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 3037,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 22768, .range_length = 256, .glyph_id_start = 3293,
+        .range_start = 22768, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 3293,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 23024, .range_length = 256, .glyph_id_start = 3549,
+        .range_start = 23024, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 3549,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 23280, .range_length = 256, .glyph_id_start = 3805,
+        .range_start = 23280, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 3805,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 23536, .range_length = 256, .glyph_id_start = 4061,
+        .range_start = 23536, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 4061,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 23792, .range_length = 256, .glyph_id_start = 4317,
+        .range_start = 23792, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 4317,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 24048, .range_length = 256, .glyph_id_start = 4573,
+        .range_start = 24048, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 4573,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 24304, .range_length = 256, .glyph_id_start = 4829,
+        .range_start = 24304, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 4829,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 24560, .range_length = 256, .glyph_id_start = 5085,
+        .range_start = 24560, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 5085,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 24816, .range_length = 256, .glyph_id_start = 5341,
+        .range_start = 24816, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 5341,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 25072, .range_length = 256, .glyph_id_start = 5597,
+        .range_start = 25072, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 5597,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 25328, .range_length = 256, .glyph_id_start = 5853,
+        .range_start = 25328, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 5853,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 25584, .range_length = 256, .glyph_id_start = 6109,
+        .range_start = 25584, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 6109,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 25840, .range_length = 256, .glyph_id_start = 6365,
+        .range_start = 25840, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 6365,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 26096, .range_length = 256, .glyph_id_start = 6621,
+        .range_start = 26096, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 6621,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 26352, .range_length = 256, .glyph_id_start = 6877,
+        .range_start = 26352, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 6877,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 26608, .range_length = 256, .glyph_id_start = 7133,
+        .range_start = 26608, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 7133,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 26864, .range_length = 256, .glyph_id_start = 7389,
+        .range_start = 26864, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 7389,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 27120, .range_length = 256, .glyph_id_start = 7645,
+        .range_start = 27120, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 7645,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 27376, .range_length = 256, .glyph_id_start = 7901,
+        .range_start = 27376, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 7901,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 27632, .range_length = 256, .glyph_id_start = 8157,
+        .range_start = 27632, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 8157,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 27888, .range_length = 256, .glyph_id_start = 8413,
+        .range_start = 27888, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 8413,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 28144, .range_length = 256, .glyph_id_start = 8669,
+        .range_start = 28144, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 8669,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 28400, .range_length = 256, .glyph_id_start = 8925,
+        .range_start = 28400, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 8925,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 28656, .range_length = 256, .glyph_id_start = 9181,
+        .range_start = 28656, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 9181,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 28912, .range_length = 256, .glyph_id_start = 9437,
+        .range_start = 28912, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 9437,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 29168, .range_length = 256, .glyph_id_start = 9693,
+        .range_start = 29168, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 9693,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 29424, .range_length = 256, .glyph_id_start = 9949,
+        .range_start = 29424, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 9949,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 29680, .range_length = 256, .glyph_id_start = 10205,
+        .range_start = 29680, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 10205,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 29936, .range_length = 256, .glyph_id_start = 10461,
+        .range_start = 29936, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 10461,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 30192, .range_length = 256, .glyph_id_start = 10717,
+        .range_start = 30192, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 10717,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 30448, .range_length = 256, .glyph_id_start = 10973,
+        .range_start = 30448, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 10973,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 30704, .range_length = 256, .glyph_id_start = 11229,
+        .range_start = 30704, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 11229,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 30960, .range_length = 256, .glyph_id_start = 11485,
+        .range_start = 30960, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 11485,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 31216, .range_length = 256, .glyph_id_start = 11741,
+        .range_start = 31216, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 11741,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 31472, .range_length = 256, .glyph_id_start = 11997,
+        .range_start = 31472, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 11997,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 31728, .range_length = 256, .glyph_id_start = 12253,
+        .range_start = 31728, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 12253,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 31984, .range_length = 256, .glyph_id_start = 12509,
+        .range_start = 31984, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 12509,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 32240, .range_length = 256, .glyph_id_start = 12765,
+        .range_start = 32240, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 12765,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 32496, .range_length = 256, .glyph_id_start = 13021,
+        .range_start = 32496, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 13021,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 32752, .range_length = 256, .glyph_id_start = 13277,
+        .range_start = 32752, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 13277,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 33008, .range_length = 256, .glyph_id_start = 13533,
+        .range_start = 33008, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 13533,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 33264, .range_length = 256, .glyph_id_start = 13789,
+        .range_start = 33264, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 13789,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 33520, .range_length = 256, .glyph_id_start = 14045,
+        .range_start = 33520, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 14045,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 33776, .range_length = 256, .glyph_id_start = 14301,
+        .range_start = 33776, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 14301,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 34032, .range_length = 256, .glyph_id_start = 14557,
+        .range_start = 34032, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 14557,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 34288, .range_length = 256, .glyph_id_start = 14813,
+        .range_start = 34288, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 14813,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 34544, .range_length = 256, .glyph_id_start = 15069,
+        .range_start = 34544, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 15069,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 34800, .range_length = 256, .glyph_id_start = 15325,
+        .range_start = 34800, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 15325,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 35056, .range_length = 256, .glyph_id_start = 15581,
+        .range_start = 35056, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 15581,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 35312, .range_length = 256, .glyph_id_start = 15837,
+        .range_start = 35312, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 15837,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 35568, .range_length = 256, .glyph_id_start = 16093,
+        .range_start = 35568, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 16093,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 35824, .range_length = 256, .glyph_id_start = 16349,
+        .range_start = 35824, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 16349,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 36080, .range_length = 256, .glyph_id_start = 16605,
+        .range_start = 36080, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 16605,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 36336, .range_length = 256, .glyph_id_start = 16861,
+        .range_start = 36336, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 16861,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 36592, .range_length = 256, .glyph_id_start = 17117,
+        .range_start = 36592, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 17117,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 36848, .range_length = 256, .glyph_id_start = 17373,
+        .range_start = 36848, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 17373,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 37104, .range_length = 256, .glyph_id_start = 17629,
+        .range_start = 37104, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 17629,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 37360, .range_length = 256, .glyph_id_start = 17885,
+        .range_start = 37360, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 17885,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 37616, .range_length = 256, .glyph_id_start = 18141,
+        .range_start = 37616, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 18141,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 37872, .range_length = 256, .glyph_id_start = 18397,
+        .range_start = 37872, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 18397,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 38128, .range_length = 256, .glyph_id_start = 18653,
+        .range_start = 38128, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 18653,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 38384, .range_length = 256, .glyph_id_start = 18909,
+        .range_start = 38384, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 18909,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 38640, .range_length = 256, .glyph_id_start = 19165,
+        .range_start = 38640, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 19165,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 38896, .range_length = 256, .glyph_id_start = 19421,
+        .range_start = 38896, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 19421,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 39152, .range_length = 256, .glyph_id_start = 19677,
+        .range_start = 39152, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 19677,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 39408, .range_length = 256, .glyph_id_start = 19933,
+        .range_start = 39408, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 19933,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 39664, .range_length = 256, .glyph_id_start = 20189,
+        .range_start = 39664, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 20189,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 39920, .range_length = 256, .glyph_id_start = 20445,
+        .range_start = 39920, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 20445,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 40176, .range_length = 256, .glyph_id_start = 20701,
+        .range_start = 40176, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 20701,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 40432, .range_length = 256, .glyph_id_start = 20957,
+        .range_start = 40432, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 20957,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 40688, .range_length = 256, .glyph_id_start = 21213,
+        .range_start = 40688, .range_length = XIAOTAI_CMAP_LENGTH(256), .glyph_id_start = 21213,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 65281, .range_length = 190, .glyph_id_start = 21469,
+        .range_start = 65281, .range_length = XIAOTAI_CMAP_LENGTH(190), .glyph_id_start = 21469,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
     {
-        .range_start = 65474, .range_length = 45, .glyph_id_start = 21659,
-        .unicode_list = NULL, .glyph_id_ofs_list = glyph_id_ofs_list_89, .list_length = 45, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_FULL
+        .range_start = 65474, .range_length = XIAOTAI_CMAP_LENGTH(45), .glyph_id_start = 21659,
+        .unicode_list = unicode_list_89, .glyph_id_ofs_list = NULL, .list_length = 35, .type = LV_FONT_FMT_TXT_CMAP_SPARSE_TINY
     }
 };
 
