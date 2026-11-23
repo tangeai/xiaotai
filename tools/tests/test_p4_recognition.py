@@ -24,9 +24,8 @@ class P4RecognitionTest(unittest.TestCase):
         cmake=(P4/'components/starter_product/CMakeLists.txt').read_text()
         self.assertIn('XIAOTAI_RECOGNITION_HOME_SWITCH=1', cmake)
         self.assertIn('if(NOT CMAKE_BUILD_EARLY_EXPANSION)', cmake)
-        self.assertIn('set(PROJECT_VER "1.1.0")', (P4/'CMakeLists.txt').read_text())
         p4_profile=source.split('#if CONFIG_IDF_TARGET_ESP32P4\n    static const char profile[] =')[1].split('#else')[0]
-        self.assertIn('\\"firmware_version\\":\\"1.1.0\\"', p4_profile)
+        self.assertIn("XIAOTAI_PROFILE_VERSION", p4_profile)
 
 if __name__ == '__main__':
     unittest.main()

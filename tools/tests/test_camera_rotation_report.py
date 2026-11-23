@@ -32,6 +32,7 @@ FAKES = r'''
 #include <stdio.h>
 #include <string.h>
 #include <stdatomic.h>
+#define XIAOTAI_PROFILE_VERSION "1.2.3"
 #define ESP_OK 0
 #define ESP_LOGI(...) ((void)0)
 #define ESP_LOGW(...) ((void)0)

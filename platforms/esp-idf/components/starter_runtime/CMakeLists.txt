@@ -22,3 +22,9 @@ idf_component_register(
         starter_media
         starter_tirtc
 )
+
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    idf_build_get_property(firmware_identity PROJECT_VER)
+    string(REGEX REPLACE "[+].*$" "" product_version "${firmware_identity}")
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE XIAOTAI_PROFILE_VERSION="${product_version}")
+endif()

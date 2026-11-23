@@ -12,18 +12,15 @@ repo_root = Path(__file__).resolve().parents[5]
 source = (repo_root / "platforms/esp-idf/components/starter_runtime/src/starter_runtime.c").read_text()
 start = source.index("static void request_device_profile(void)")
 profiles = re.findall(r"static const char profile\[\] =\s*(.*?);", source[start:], re.S)
-def decode(text):
+def decode(text, version=""):
     # The common S3 runtime's board identity is selected by its component.
     # Resolve the default literal for this LCKFB baseline; CoreS3's override
     # is exercised through the compiled public submission in test_cores3_board.
     default_board = re.search(r'#define XIAOTAI_BOARD_MODEL ("[^"]+")', source)
     if default_board:
         text = text.replace("XIAOTAI_BOARD_MODEL", default_board.group(1))
-    default_s3_version = re.search(r'#define XIAOTAI_S3_PROFILE_VERSION ("[^"]+")', source)
-    if default_s3_version:
-        text = text.replace("XIAOTAI_S3_PROFILE_VERSION", default_s3_version.group(1))
+    text = text.replace("XIAOTAI_PROFILE_VERSION", json.dumps(version))
     return json.loads("".join(ast.literal_eval(s) for s in re.findall(r'"(?:\\.|[^"\\])*"', text)))
-p4, s3 = map(decode, profiles[:2])
 p4_manifest = json.loads((repo_root / "boards/waveshare/esp32p4-touch-lcd-43c/board.json").read_text())
 s3_manifest = json.loads((repo_root / "boards/lckfb/esp32s3/board.json").read_text())
 def project_version(project_dir):
@@ -33,6 +30,8 @@ def project_version(project_dir):
     assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+",
                         match.group(1))
     return match.group(1)
+p4, s3 = (decode(text, project_version(repo_root / manifest["project_dir"]))
+          for text, manifest in zip(profiles, (p4_manifest, s3_manifest)))
 assert p4["hardware"] == {
     "chip_model": "ESP32-P4",
     "board_model": p4_manifest["id"],

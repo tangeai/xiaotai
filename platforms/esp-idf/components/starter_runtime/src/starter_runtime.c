@@ -45,9 +45,6 @@
 #ifndef XIAOTAI_BOARD_MODEL
 #define XIAOTAI_BOARD_MODEL "lckfb-esp32s3"
 #endif
-#ifndef XIAOTAI_S3_PROFILE_VERSION
-#define XIAOTAI_S3_PROFILE_VERSION "1.1.0"
-#endif
 
 /* Receiver presentation only; the encoder keeps the sensor's pixels.
  * Boards without an override retain their existing profile and call metadata. */
@@ -1238,7 +1235,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-P4\","
         "\"board_model\":\"waveshare-esp32p4-touch-lcd-43c-v10\"},"
-        "\"firmware_version\":\"1.1.0\",\"profiles\":{"
+        "\"firmware_version\":\"" XIAOTAI_PROFILE_VERSION "\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,"
         "\"up_audio_mt\":[\"alaw\"],\"up_video_mt\":[\"h264\"],"
@@ -1265,7 +1262,7 @@ static void request_device_profile(void)
     static const char profile[] =
         "{\"hardware\":{\"chip_model\":\"ESP32-S3\","
         "\"board_model\":\"" XIAOTAI_BOARD_MODEL "\"},"
-        "\"firmware_version\":\"" XIAOTAI_S3_PROFILE_VERSION "\",\"profiles\":{"
+        "\"firmware_version\":\"" XIAOTAI_PROFILE_VERSION "\",\"profiles\":{"
         "\"stream\":{\"up_audio_streamid\":10,\"up_video_streamid\":11,"
         "\"down_audio_streamid\":14,\"down_video_streamid\":15,\"up_video_mt\":[\"mjpeg\"],"
         "\"up_audio_mt\":[\"alaw\"],\"down_audio_mt\":[\"alaw\"],"

@@ -5,7 +5,7 @@ xiaotai_find_repository_root(XIAOTAI_REPO_ROOT)
 
 # Diagnostic firmware identity. Keep this explicit so ESP-IDF embeds the same
 # human-readable version in the app descriptor and bootloader startup output.
-set(PROJECT_VER "1.1.0")
+set(PROJECT_VER "1.2.0")
 include("${XIAOTAI_REPO_ROOT}/platforms/esp-idf/cmake/xiaotai_build_version.cmake")
 
 # Migrate only the former board-local default; preserve explicit SDK overrides.
