@@ -2966,12 +2966,10 @@ static void render_network(lv_obj_t *screen)
         char details[384];
         (void)snprintf(details, sizeof(details),
                        "让设备连接家庭 Wi-Fi\n"
-                       "1. 连接设备热点\n"
-                       "打开手机“设置 > Wi-Fi”，连接：\n%s（无需密码）\n"
-                       "提示“无互联网”是正常现象\n"
-                       "2. 配置家庭网络\n"
-                       "在弹出的页面选择家庭 Wi-Fi，并输入密码\n"
-                       "未自动打开时，请在浏览器访问 %s",
+                       "1. 手机连接设备热点\n%s（无需密码）\n"
+                       "提示“无互联网”是正常的\n"
+                       "2. 选择家庭 Wi-Fi 并输入密码\n"
+                       "没自动弹出？请访问 %s",
                        wifi_manager_provisioning_ssid(),
                        wifi_manager_provisioning_url());
         (void)make_label(screen, details, 18, 36, 284, lv_color_hex(0xFFFFFF));
