@@ -1333,7 +1333,8 @@ static bool play_audio_item(const audio_rx_item_t *item)
         update_timing_average(&s_write_average, item->generation, &s_audio_write_avg_us, write_us);
         if (played) {
             if (item->mode == STARTER_TIRTC_AI)
-                starter_ai_playout_written(item->generation, mono_samples);
+                starter_ai_playout_written(item->generation, mono_samples,
+                                          (uint32_t)(esp_timer_get_time() / 1000));
             if (item->mode == STARTER_TIRTC_AI) {
                 starter_playback_scope_publish(&s_playback_scope, s_decode_pcm,
                     mono_samples, (uint32_t)(esp_timer_get_time() / 1000),

@@ -10,6 +10,8 @@
 typedef struct {
     uint32_t target_ms;
     uint32_t stable_ms;
+    uint32_t last_write_ms;
+    bool have_write;
     uint32_t starvation_ms;
     uint32_t wait_started_ms;
     uint32_t wait_target_ms;
@@ -39,6 +41,7 @@ typedef struct {
 #ifndef AI_BUFFER_STARVATION_GRACE_MS
 #define AI_BUFFER_STARVATION_GRACE_MS 20U
 #endif
+#define AI_BUFFER_WRITE_IDLE_MS 120U
 /* With no round boundary, long gaps are ambiguous (TTS/turn/network).
  * Rebuffer them, but do not train the target on silence. */
 #ifndef AI_BUFFER_TRAIN_GAP_MS
@@ -60,8 +63,18 @@ static inline void xiaotai_audio_buffer_reset(xiaotai_audio_buffer_t *buffer)
 static inline void xiaotai_audio_buffer_begin_round(xiaotai_audio_buffer_t *buffer)
 {
     buffer->playing = false;
+    buffer->have_write = false;
     buffer->recovering = false;
     buffer->waiting = false;
+}
+
+/* An empty queue alone says nothing about the samples still in DMA. Use
+ * arrival time for a queued packet so a delayed worker cannot invent a gap. */
+static inline bool xiaotai_audio_output_idle(const xiaotai_audio_buffer_t *buffer,
+    uint32_t observed_ms, uint32_t playback_tail_ms)
+{
+    return (int32_t)(observed_ms - playback_tail_ms) >= (int32_t)AI_BUFFER_STARVATION_GRACE_MS &&
+           (!buffer->have_write || (int32_t)(observed_ms - buffer->last_write_ms) >= (int32_t)AI_BUFFER_WRITE_IDLE_MS);
 }
 
 static inline bool xiaotai_audio_buffer_ready(xiaotai_audio_buffer_t *buffer,
@@ -72,8 +85,7 @@ static inline bool xiaotai_audio_buffer_ready(xiaotai_audio_buffer_t *buffer,
         if (ended) {
             xiaotai_audio_buffer_begin_round(buffer);
         } else if (buffer->playing &&
-                   (int32_t)(now_ms - playback_tail_ms) >=
-                       (int32_t)AI_BUFFER_STARVATION_GRACE_MS) {
+                   xiaotai_audio_output_idle(buffer, now_ms, playback_tail_ms)) {
             buffer->playing = false;
             buffer->recovering = true;
             buffer->starvation_ms = playback_tail_ms;
@@ -84,8 +96,7 @@ static inline bool xiaotai_audio_buffer_ready(xiaotai_audio_buffer_t *buffer,
      * queue. Arrival after the estimated DAC tail is also supply starvation;
      * old queued packets decoded late must not be classified this way. */
     if (!ended && buffer->playing &&
-        (int32_t)(oldest_rx_ms - playback_tail_ms) >=
-            (int32_t)AI_BUFFER_STARVATION_GRACE_MS) {
+        xiaotai_audio_output_idle(buffer, oldest_rx_ms, playback_tail_ms)) {
         buffer->playing = false;
         buffer->recovering = true;
         buffer->starvation_ms = playback_tail_ms;
@@ -131,8 +142,10 @@ static inline bool xiaotai_audio_buffer_ready(xiaotai_audio_buffer_t *buffer,
 }
 
 static inline void xiaotai_audio_buffer_written(xiaotai_audio_buffer_t *buffer,
-    uint32_t duration_ms)
+    uint32_t duration_ms, uint32_t now_ms)
 {
+    buffer->last_write_ms = now_ms;
+    buffer->have_write = true;
     buffer->stable_ms += duration_ms;
     if (buffer->stable_ms >= 10000U) {
         buffer->stable_ms = 0U;

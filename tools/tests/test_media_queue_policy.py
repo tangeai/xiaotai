@@ -70,6 +70,25 @@ int main(void){
      adapter=MEDIA if 'starter_media_s3/starter_media.c' in cmake else P4
      self.assertNotIn('xiaotai_opus_plc_decode(',adapter.read_text())
 
+ def test_short_gap_after_successful_write_keeps_playout_running(self):
+  from test_esp_ai_playout import run_playout
+  run_playout(r"""
+ const uint8_t packet[] = {0x08};
+ for (unsigned gap = 119; gap <= 120; ++gap) {
+     starter_ai_playout_reset(7);
+     for (unsigned i = 0; i < 10; ++i)
+         starter_ai_playout_admit(7, packet, 1);
+     assert(starter_ai_playout_ready(7, 1000, 1000, 0));
+     for (unsigned i = 0; i < 10; ++i)
+         starter_ai_playout_retire(7, 320);
+     starter_ai_playout_written(7, 320, 1000);
+     starter_ai_playout_admit(7, packet, 1);
+     unsigned arrival = 1000 + gap;
+     assert(starter_ai_playout_ready(7, arrival + 80, arrival, 1090) == (gap < 120));
+     assert(starter_ai_playout_status().underruns == (gap == 120));
+ }
+ """)
+
  def test_ai_prefill_covers_delayed_second_burst(self):
   from test_esp_ai_playout import run_playout
   run_playout(r"""

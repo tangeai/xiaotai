@@ -11,6 +11,22 @@ class AdaptivePlayback(unittest.TestCase):
         run_c('#include <assert.h>\n#include <stdio.h>\n' + POLICY.read_text() +
               '\nint main(void) {\n' + body + '\n}\n', [INCLUDE])
 
+    def test_empty_poll_respects_output_idle_across_clock_wrap(self):
+        self.replay(r'''
+    xiaotai_audio_buffer_t p;
+    xiaotai_audio_buffer_reset(&p);
+    uint32_t write_ms = UINT32_MAX - 50U;
+    uint32_t tail_ms = write_ms + 90U;
+    assert(xiaotai_audio_buffer_ready(&p,write_ms,200,write_ms,write_ms,false,false));
+    xiaotai_audio_buffer_written(&p,20,write_ms);
+    assert(!xiaotai_audio_buffer_ready(&p,write_ms+119U,0,0,tail_ms,false,false));
+    assert(p.playing && !p.recovering);
+    assert(!xiaotai_audio_buffer_ready(&p,write_ms+120U,0,0,tail_ms,false,false));
+    assert(!p.playing && p.recovering);
+    assert(!xiaotai_audio_buffer_ready(&p,write_ms+121U,20,write_ms+121U,tail_ms,false,false));
+    assert(p.underruns==1);
+''')
+
     def test_one_packet_without_end_has_bounded_wait(self):
         self.replay(r'''
     xiaotai_audio_buffer_t p;
@@ -68,9 +84,9 @@ class AdaptivePlayback(unittest.TestCase):
         now+=1000;
     }
     assert(p.target_ms==300 && p.underruns==20);
-    for(unsigned i=0;i<500;i++) xiaotai_audio_buffer_written(&p,20);
+    for(unsigned i=0;i<500;i++) xiaotai_audio_buffer_written(&p,20,now);
     assert(p.target_ms==280);
-    for(unsigned i=0;i<10000;i++) xiaotai_audio_buffer_written(&p,20);
+    for(unsigned i=0;i<10000;i++) xiaotai_audio_buffer_written(&p,20,now);
     assert(p.target_ms==60);
     xiaotai_audio_buffer_reset(&p);
     assert(xiaotai_audio_buffer_ready(&p,0,200,0,0,false,false));
@@ -114,7 +130,7 @@ class AdaptivePlayback(unittest.TestCase):
                 if(played==0) first=t;
                 ++played;
                 tail=xiaotai_audio_playback_tail_after_write(tail,t,20);
-                xiaotai_audio_buffer_written(&p,20);
+                xiaotai_audio_buffer_written(&p,20,t);
             }
             if(played && played<101 && t>=tail) gap_ms+=5;
         }
