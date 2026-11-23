@@ -18,7 +18,8 @@ Create annotated tags that state when and why a historical milestone was recorde
 |---|---|---|---|
 | `v1.0.0` | 2026-11-06 | `01841cb8d0dee54e1d302e3b8ee92e66905a7903` | Five-board features and sound-recognition integration; retrospective source milestone |
 | `v1.1.0` | 2026-11-11 | `0540ad0fe9c6166625220147ba8d0d822c5c1b77` | Unified five-board media buffering and four-viewer talkback; retrospective source milestone |
-| `v1.2.0-beta.1` | 2026-11-21 | `1e9f0811f251c8d9fdab7b910ba2c74bc7596ec1` | PLC/FEC, SDK, serial recovery and lifecycle fixes; current test distribution |
+| `v1.2.0-beta.1` | 2026-11-21 | `1e9f0811f251c8d9fdab7b910ba2c74bc7596ec1` | PLC/FEC, SDK, serial recovery and lifecycle fixes |
+| `v1.2.0-beta.2` | 2026-11-23 | `4dc2f93d278d0fcb39be9bc7f7bbfe651f000a55` | Five boards rebuilt with TiRTC 2.6.3, hardware acceptance pending |
 | `v1.2.0` | Pending acceptance | Undetermined | Stable distribution; do not create it early as a substitute for beta |
 
 `v1.0.0` and `v1.1.0` are retrospective source tags with archives of actual historical complete BINs. Each board retains its original embedded version, build source, and hash; not all images were compiled from the unified tag.
@@ -33,7 +34,7 @@ Use `1.2.1` for compatible fixes, `1.3.0` for compatible features, and `2.0.0` f
 
 ## Distribution and firmware identities
 
-`1.2.0-beta.1` is the unified distribution version, not a newly compiled embedded firmware version. Reused builds retain their actual identities; do not claim that devices report `1.2.0`.
+For the historical beta.1 release, `1.2.0-beta.1` was the unified distribution version, not a newly compiled embedded firmware version. Reused builds retain their actual identities; do not claim that devices report `1.2.0`.
 
 | Board / variant | Reused embedded firmware identity |
 |---|---|
@@ -45,7 +46,7 @@ Use `1.2.1` for compatible fixes, `1.3.0` for compatible features, and `2.0.0` f
 
 Record distribution version, channel, board ID, variant, embedded version, build number, original build commit, integrated commit, and download BIN SHA-256 in release notes. When build and release commits differ, retain source-equivalence evidence and distinguish the identities.
 
-Align base firmware versions to `1.2.0` during subsequent firmware changes; this requires separate implementation and builds and is not completed by this document. Board build counters remain independent and monotonic, including failures and retries.
+Starting with beta.2, all five boards use firmware base version `1.2.0`. Board build counters remain independent and monotonic, including failures and retries.
 
 ## Downloads
 
@@ -87,7 +88,7 @@ Host checks and native builds with pending hardware testing permit only pre-rele
 
 After publication, check tag targets, pre-release state, asset set and names, and download every BIN to verify SHA-256. Update beta navigation only after remote verification, never labeling the beta as stable. Do not overwrite historical releases or assets.
 
-`v1.0.0` is a historical stable archive, while `v1.1.0` remains a pre-release due to known issues and the current `v1.2.0-beta.1` candidate remains a beta.
+`v1.0.0` is a historical stable archive, while `v1.1.0` remains a pre-release due to known issues and the current `v1.2.0-beta.2` candidate remains a beta.
 
 Hardware acceptance applies to exact BIN bytes. An accepted BIN may be promoted to stable by external renaming without changing its hash. Changing embedded versions or recompiling requires new validation. Include only accepted boards/variants in stable releases; never borrow another variant's results.
 
