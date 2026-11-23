@@ -15,9 +15,9 @@ class AdaptivePlayback(unittest.TestCase):
         self.replay(r'''
     xiaotai_audio_buffer_t p;
     xiaotai_audio_buffer_reset(&p);
-    assert(!xiaotai_audio_buffer_ready(&p, 1000, 20, 1000, 1000, false));
-    assert(!xiaotai_audio_buffer_ready(&p, 1399, 20, 1000, 1000, false));
-    assert(xiaotai_audio_buffer_ready(&p, 1400, 20, 1000, 1000, false));
+    assert(!xiaotai_audio_buffer_ready(&p, 1000, 20, 1000, 1000, false,false));
+    assert(!xiaotai_audio_buffer_ready(&p, 1399, 20, 1000, 1000, false,false));
+    assert(xiaotai_audio_buffer_ready(&p, 1400, 20, 1000, 1000, false,false));
     assert(p.target_ms == 100);
 ''')
 
@@ -26,16 +26,16 @@ class AdaptivePlayback(unittest.TestCase):
     xiaotai_audio_buffer_t p;
     xiaotai_audio_buffer_reset(&p);
     for (unsigned t=0; t<10000; t+=5)
-        assert(!xiaotai_audio_buffer_ready(&p,t,0,0,0,false));
+        assert(!xiaotai_audio_buffer_ready(&p,t,0,0,0,false,false));
     assert(p.target_ms==100 && p.underruns==0 && p.timeout_releases==0);
-    assert(!xiaotai_audio_buffer_ready(&p,10000,20,10000,0,false));
-    assert(xiaotai_audio_buffer_ready(&p,10005,20,10000,0,true));
-    assert(!xiaotai_audio_buffer_ready(&p,10025,0,0,10025,true));
+    assert(!xiaotai_audio_buffer_ready(&p,10000,20,10000,0,false,false));
+    assert(xiaotai_audio_buffer_ready(&p,10005,20,10000,0,true,false));
+    assert(!xiaotai_audio_buffer_ready(&p,10025,0,0,10025,true,false));
     /* The command can overtake the only audio packet. Keep accepting tail. */
-    assert(xiaotai_audio_buffer_ready(&p,10040,20,10040,10025,true));
+    assert(xiaotai_audio_buffer_ready(&p,10040,20,10040,10025,true,false));
     xiaotai_audio_buffer_begin_round(&p);
-    assert(!xiaotai_audio_buffer_ready(&p,11000,20,11000,10060,false));
-    assert(xiaotai_audio_buffer_ready(&p,11400,20,11000,10060,false));
+    assert(!xiaotai_audio_buffer_ready(&p,11000,20,11000,10060,false,false));
+    assert(xiaotai_audio_buffer_ready(&p,11400,20,11000,10060,false,false));
     assert(p.underruns==0);
 ''')
 
@@ -44,16 +44,16 @@ class AdaptivePlayback(unittest.TestCase):
     xiaotai_audio_buffer_t p;
     xiaotai_audio_buffer_reset(&p);
     p.target_ms=60;
-    assert(xiaotai_audio_buffer_ready(&p,0,100,0,0,false));
-    assert(!xiaotai_audio_buffer_ready(&p,105,0,0,120,false));
+    assert(xiaotai_audio_buffer_ready(&p,0,100,0,0,false,false));
+    assert(!xiaotai_audio_buffer_ready(&p,105,0,0,120,false,false));
     assert(p.playing); /* Queue empty while hardware still plays. */
-    assert(!xiaotai_audio_buffer_ready(&p,145,0,0,120,false));
-    assert(!xiaotai_audio_buffer_ready(&p,150,20,150,120,false));
+    assert(!xiaotai_audio_buffer_ready(&p,145,0,0,120,false,false));
+    assert(!xiaotai_audio_buffer_ready(&p,150,20,150,120,false,false));
     assert(p.target_ms==100 && p.underruns==1);
-    assert(!xiaotai_audio_buffer_ready(&p,200,100,150,120,false));
-    assert(xiaotai_audio_buffer_ready(&p,220,140,150,120,false));
+    assert(!xiaotai_audio_buffer_ready(&p,200,100,150,120,false,false));
+    assert(xiaotai_audio_buffer_ready(&p,220,140,150,120,false,false));
     assert(p.underruns==1);
-    assert(xiaotai_audio_buffer_ready(&p,240,20,230,240,false));
+    assert(xiaotai_audio_buffer_ready(&p,240,20,230,240,false,false));
 ''')
 
     def test_caps_stable_media_time_long_gaps_and_clock_wrap(self):
@@ -62,9 +62,9 @@ class AdaptivePlayback(unittest.TestCase):
     xiaotai_audio_buffer_reset(&p);
     unsigned now=100;
     for(unsigned i=0;i<20;i++) {
-        assert(xiaotai_audio_buffer_ready(&p,now,300,now,now,false));
-        assert(!xiaotai_audio_buffer_ready(&p,now+40,0,0,now,false));
-        assert(!xiaotai_audio_buffer_ready(&p,now+60,20,now+60,now,false));
+        assert(xiaotai_audio_buffer_ready(&p,now,300,now,now,false,false));
+        assert(!xiaotai_audio_buffer_ready(&p,now+40,0,0,now,false,false));
+        assert(!xiaotai_audio_buffer_ready(&p,now+60,20,now+60,now,false,false));
         now+=1000;
     }
     assert(p.target_ms==300 && p.underruns==20);
@@ -73,14 +73,14 @@ class AdaptivePlayback(unittest.TestCase):
     for(unsigned i=0;i<10000;i++) xiaotai_audio_buffer_written(&p,20);
     assert(p.target_ms==60);
     xiaotai_audio_buffer_reset(&p);
-    assert(xiaotai_audio_buffer_ready(&p,0,100,0,0,false));
-    assert(!xiaotai_audio_buffer_ready(&p,100,0,0,20,false));
-    assert(!xiaotai_audio_buffer_ready(&p,5000,20,5000,20,false));
+    assert(xiaotai_audio_buffer_ready(&p,0,100,0,0,false,false));
+    assert(!xiaotai_audio_buffer_ready(&p,100,0,0,20,false,false));
+    assert(!xiaotai_audio_buffer_ready(&p,5000,20,5000,20,false,false));
     assert(p.target_ms==100 && p.underruns==0);
     xiaotai_audio_buffer_reset(&p);
-    assert(!xiaotai_audio_buffer_ready(&p,UINT32_MAX-99,20,UINT32_MAX-99,0,false));
-    assert(!xiaotai_audio_buffer_ready(&p,299,20,UINT32_MAX-99,0,false));
-    assert(xiaotai_audio_buffer_ready(&p,300,20,UINT32_MAX-99,0,false));
+    assert(!xiaotai_audio_buffer_ready(&p,UINT32_MAX-99,20,UINT32_MAX-99,0,false,false));
+    assert(!xiaotai_audio_buffer_ready(&p,299,20,UINT32_MAX-99,0,false,false));
+    assert(xiaotai_audio_buffer_ready(&p,300,20,UINT32_MAX-99,0,false,false));
 ''')
 
     def test_timeout_survives_changing_queue_head(self):
@@ -88,10 +88,10 @@ class AdaptivePlayback(unittest.TestCase):
     xiaotai_audio_buffer_t p;
     xiaotai_audio_buffer_reset(&p);
     p.target_ms=300;
-    assert(!xiaotai_audio_buffer_ready(&p,1000,20,1000,0,false));
+    assert(!xiaotai_audio_buffer_ready(&p,1000,20,1000,0,false,false));
     /* Eviction/new arrivals must not restart this wait forever. */
-    assert(!xiaotai_audio_buffer_ready(&p,1399,160,1390,0,false));
-    assert(xiaotai_audio_buffer_ready(&p,1400,160,1395,0,false));
+    assert(!xiaotai_audio_buffer_ready(&p,1399,160,1390,0,false,false));
+    assert(xiaotai_audio_buffer_ready(&p,1400,160,1395,0,false,false));
     assert(p.timeout_releases==1);
 ''')
 
@@ -109,7 +109,7 @@ class AdaptivePlayback(unittest.TestCase):
             while((int32_t)(tail-t)<40) {
                 bool ready = adaptive ? xiaotai_audio_buffer_ready(&p,t,
                     (received-played)*20,played<received?arrival[played]:t,
-                    tail,false) : played<received;
+                    tail,false,false) : played<received;
                 if(!ready || played==received) break;
                 if(played==0) first=t;
                 ++played;
@@ -131,11 +131,11 @@ class AdaptivePlayback(unittest.TestCase):
         self.replay(r'''
     xiaotai_audio_buffer_t p;
     xiaotai_audio_buffer_reset(&p);
-    assert(xiaotai_audio_buffer_ready(&p,0,100,0,0,false));
+    assert(xiaotai_audio_buffer_ready(&p,0,100,0,0,false,false));
     /* Sink was waiting in receive; data arrived after the hardware tail. */
-    assert(!xiaotai_audio_buffer_ready(&p,200,20,180,100,false));
+    assert(!xiaotai_audio_buffer_ready(&p,200,20,180,100,false,false));
     assert(p.target_ms==140 && p.underruns==1);
-    assert(xiaotai_audio_buffer_ready(&p,580,20,180,100,false));
+    assert(xiaotai_audio_buffer_ready(&p,580,20,180,100,false,false));
 ''')
 
 

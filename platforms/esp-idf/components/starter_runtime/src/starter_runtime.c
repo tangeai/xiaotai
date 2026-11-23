@@ -755,13 +755,17 @@ static void log_ai_playback_status(const char *stage)
 {
     starter_media_status_t media = starter_media_status();
     ESP_LOGI(TAG,
-             "AI playback stage=%s generation=%lu rx=%lu decoded=%lu written=%lu overflow=%lu pending=%lu active=%d pcm-ms=%lu dma-ms=%lu queued-ms=%lu target-ms=%lu underruns=%lu timeout-releases=%lu last-rx-age-ms=%lu",
+             "AI playback stage=%s generation=%lu rx=%lu decoded=%lu written=%lu overflow=%lu pending=%lu peak=%lu decode-fail=%lu blocked=%lu write-fail=%lu active=%d pcm-ms=%lu dma-ms=%lu queued-ms=%lu target-ms=%lu underruns=%lu timeout-releases=%lu last-rx-age-ms=%lu",
              stage, (unsigned long)session_generation(),
              (unsigned long)media.audio_received,
              (unsigned long)media.audio_decoded,
              (unsigned long)media.audio_played,
              (unsigned long)media.audio_rx_overflow,
              (unsigned long)media.audio_playback_pending,
+             (unsigned long)media.audio_rx_queue_peak,
+             (unsigned long)media.audio_decode_failed,
+             (unsigned long)media.audio_playback_blocked,
+             (unsigned long)media.audio_write_failed,
              media.audio_playback_active ? 1 : 0,
              (unsigned long)media.audio_playback_pcm_ms,
              (unsigned long)media.audio_playback_dma_ms,

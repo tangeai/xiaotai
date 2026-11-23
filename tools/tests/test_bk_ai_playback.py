@@ -122,6 +122,33 @@ int main(void){
 }
 ''', [ROOT / 'platforms/beken/runtime/include', ROOT / 'platforms/common/include'])
 
+    def test_full_short_packet_ring_and_ten_mixed_bursts(self):
+        self.replay(r'''
+    uint8_t packet,output;
+    s_ai_buffer_ended=false;
+    s_ai_buffer.target_ms=300;
+    packet_samples=40;
+    for(unsigned i=0;i<63;i++){
+        packet=(uint8_t)i;assert(xiaotai_audio_play_opus(&packet,1,i)==1);
+    }
+    assert(!opus_ring_take(&output,1));
+    packet=63;assert(xiaotai_audio_play_opus(&packet,1,63)==1);
+    for(unsigned i=0;i<64;i++)assert(opus_ring_take(&output,1)==1 && output==i);
+    assert(!s_ai_buffer.timeout_releases);
+    unsigned sent=0,received=0;
+    for(unsigned batch=0;batch<10;batch++){
+        for(unsigned j=0;j<50;j++,sent++){
+            packet=(uint8_t)sent;packet_samples=sent%2?320:160;
+            assert(xiaotai_audio_play_opus(&packet,1,sent)==1);
+        }
+        while(s_opus_count>(batch==9?0:14)){
+            assert(opus_ring_take(&output,1)==1 && output==(uint8_t)received);
+            assert(s_ai_packet.opus.media_ms==received++);
+        }
+    }
+    assert(received==500 && s_dropped_bytes==0 && s_opus_queued_samples==0);
+''')
+
     def test_duplicate_boundaries_preserve_packet_epochs(self):
         self.replay(r'''
     uint8_t packet=42, output=0;

@@ -139,6 +139,20 @@ static int xQueueSend(queue_t*q,const uint8_t*v,unsigned timeout){
  if(ok)q->slots[(q->head+q->count++)%64]=*v;
  pthread_mutex_unlock(&queue_lock);return ok;
 }
+/* Interleave another receiver just before each pending-count CAS. Both
+ * interleavings represent a valid change to the pending count, with many
+ * free slots left. */
+static unsigned competing_callbacks;
+static bool preempting;
+static void (*compete)(void);
+#undef atomic_compare_exchange_strong
+#define atomic_compare_exchange_strong(p, expected, desired) \
+ (run_competitor(),atomic_compare_exchange_strong_explicit(p,expected,desired,memory_order_seq_cst,memory_order_seq_cst))
+static void run_competitor(void){
+ if(competing_callbacks && !preempting){
+  --competing_callbacks;preempting=true;compete();preempting=false;
+ }
+}
 ''' + helpers + function(source,'starter_media_submit_audio') + r'''
 static void release_all(void){uint8_t slot;while(xQueueReceive(&readyq,&slot,0)){xQueueSend(&freeq,&slot,0);atomic_fetch_sub(&s_audio_playback_pending,1);}}
 static atomic_uint producers_done;
@@ -163,6 +177,10 @@ static void *sink(void *unused){
   assert(xQueueSend(&freeq,&slot,0));
  }
  return NULL;
+}
+static void competing_ai(void){
+ uint8_t payload[]={0x08};starter_tirtc_frame_t frame={.length=1,.timestamp_ms=303};
+ starter_media_submit_audio(STARTER_TIRTC_AI,7,&frame,payload);
 }
 static void concurrent_arrival(void){uint8_t data[160]={0};starter_tirtc_frame_t f={.length=160,.timestamp_ms=200};starter_media_submit_audio(1,7,&f,data);}
 int main(void){
@@ -191,9 +209,42 @@ int main(void){
  assert(readyq.count==7 && s_audio_playback_pending==7 && freeq.count==57);
  release_all();assert(freeq.count==64 && s_audio_playback_pending==0);
  starter_ai_playout_reset(7);
+ compete=competing_ai;competing_callbacks=2;
+ f.timestamp_ms=999;starter_media_submit_audio(STARTER_TIRTC_AI,7,&f,data);
+ unsigned observed=0;uint8_t taken;
+ while(xQueueReceive(&readyq,&taken,0)){
+  if(pool[taken].frame.timestamp_ms==999)++observed;
+  starter_ai_playout_retire(7,pool[taken].pcm_samples);
+  atomic_fetch_sub(&s_audio_playback_pending,1);assert(xQueueSend(&freeq,&taken,0));
+ }
+ assert(observed==1 && freeq.count==64);
+ competing_callbacks=0;
  for(unsigned i=0;i<65;i++){f.timestamp_ms=i;starter_media_submit_audio(2,7,&f,data);}
  assert(readyq.count==64 && s_audio_playback_pending==64);
  for(unsigned i=0;i<64;i++){uint8_t slot;assert(xQueueReceive(&readyq,&slot,0));assert(pool[slot].frame.timestamp_ms==i);atomic_fetch_sub(&s_audio_playback_pending,1);starter_ai_playout_retire(7,pool[slot].pcm_samples);memset(&pool[slot],0,sizeof(pool[slot]));xQueueSend(&freeq,&slot,0);}
+ /* Ten bursts with a 14-packet backlog, mixed 10/20 ms TOCs and wraparound.
+  * Drop no packet within the 64-slot budget and preserve the entire payload. */
+ unsigned next_seq=0, consumed_seq=0;
+ const unsigned before_overflows=s_audio_rx_overflow;
+ for(unsigned batch=0;batch<10;batch++){
+  for(unsigned j=0;j<50;j++,next_seq++){
+   memset(data,(uint8_t)next_seq,sizeof(data));
+   data[0]=(next_seq%2)?0x08:0;
+   f.timestamp_ms=next_seq;
+   starter_media_submit_audio(STARTER_TIRTC_AI,7,&f,data);
+  }
+  unsigned keep=batch==9?0:14;
+  while(readyq.count>keep){
+   uint8_t slot;assert(xQueueReceive(&readyq,&slot,0));
+   assert(pool[slot].frame.timestamp_ms==consumed_seq);
+   assert(pool[slot].pcm_samples==(consumed_seq%2?320:160));
+   for(unsigned k=1;k<sizeof(data);k++)assert(pool[slot].payload[k]==(uint8_t)consumed_seq);
+   starter_ai_playout_retire(7,pool[slot].pcm_samples);
+   atomic_fetch_sub(&s_audio_playback_pending,1);
+   assert(xQueueSend(&freeq,&slot,0));consumed_seq++;
+  }
+ }
+ assert(consumed_seq==500 && freeq.count==64 && s_audio_rx_overflow==before_overflows);
  if(RUN_THREADED){
   pthread_t a,b,c;assert(!pthread_create(&c,NULL,sink,NULL));
   assert(!pthread_create(&a,NULL,producer,(void*)1));assert(!pthread_create(&b,NULL,producer,(void*)2));

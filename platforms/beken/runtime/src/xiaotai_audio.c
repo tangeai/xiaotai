@@ -821,7 +821,7 @@ static size_t opus_ring_take(uint8_t *output, size_t capacity)
         s_opus_queued_samples / (OPUS_SAMPLE_RATE_HZ / 1000U),
         s_opus_count == 0U ? now_ms : s_ai_packet_stamps[s_opus_head].opus.rx_ms,
         atomic_load_explicit(&s_playback_tail_ms, memory_order_acquire),
-        s_ai_buffer_ended);
+        s_ai_buffer_ended, s_opus_count == OPUS_PACKET_SLOTS);
     if (!ready || s_opus_count == 0U) {
         rtos_unlock_mutex(&s_ring_mutex);
         return 0U;

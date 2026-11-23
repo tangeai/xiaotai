@@ -39,6 +39,27 @@ def run_playout(body):
 
 
 class ESPAIPlayout(unittest.TestCase):
+    def test_full_short_packet_queue_can_recover_before_timeout(self):
+        run_playout(r'''
+ const uint8_t normal[] = {0x08}, shortest[] = {0x80};
+ starter_ai_playout_reset(7);
+ for(unsigned gap=0; gap<2; ++gap) {
+     unsigned start=1000+gap*500;
+     for(unsigned i=0; i<9; ++i) assert(starter_ai_playout_admit(7,normal,1)==320);
+     assert(starter_ai_playout_ready(7,start,start,start-100));
+     for(unsigned i=0; i<9; ++i) starter_ai_playout_retire(7,320);
+ }
+ /* The next gap raises the target to 180 ms. A full pool of 2.5 ms
+  * packets only contains 160 ms. The worker must start freeing slots. */
+ for(unsigned i=0; i<63; ++i) assert(starter_ai_playout_admit(7,shortest,1)==40);
+ assert(!starter_ai_playout_ready(7,2000,2000,1900));
+ assert(starter_ai_playout_admit(7,shortest,1)==40);
+ assert(starter_ai_playout_ready(7,2001,2000,1900));
+ assert(starter_ai_playout_status().timeout_releases==0);
+ for(unsigned i=0; i<64; ++i) starter_ai_playout_retire(7,40);
+ assert(starter_ai_playout_status().queued_samples==0);
+''')
+
     def test_single_packet_timeout_and_early_end(self):
         run_playout(r'''
     const uint8_t packet[]={0x08}; /* SILK 20 ms, mono. */
@@ -89,7 +110,7 @@ class ESPAIPlayout(unittest.TestCase):
  starter_ai_playout_reset(7);
  for(unsigned i=0;i<5;i++)starter_ai_playout_admit(7,packet,1);
  assert(starter_ai_playout_ready(7,1000,1000,0));
- starter_ai_playout_retire(7,1600);
+ for(unsigned i=0;i<5;i++) starter_ai_playout_retire(7,320);
  /* Worker resumes on a late packet without polling an empty queue. */
  starter_ai_playout_admit(7,packet,1);
  assert(!starter_ai_playout_ready(7,1150,1150,1100));
@@ -97,7 +118,7 @@ class ESPAIPlayout(unittest.TestCase):
  assert(starter_ai_playout_status().underruns==1);
  for(unsigned i=0;i<6;i++)starter_ai_playout_admit(7,packet,1);
  assert(starter_ai_playout_ready(7,1200,1150,1100));
- starter_ai_playout_retire(7,2240);
+ for(unsigned i=0;i<7;i++) starter_ai_playout_retire(7,320);
  /* Silence alone must never decay target; successful output does. */
  starter_media_ai_playback_boundary(7,true);
  starter_media_ai_playback_boundary(7,false);

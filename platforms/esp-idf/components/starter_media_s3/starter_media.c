@@ -2079,35 +2079,40 @@ void starter_media_submit_audio(starter_tirtc_mode_t mode,
     }
     uint8_t slot = 0;
     audio_rx_record_arrival();
-    unsigned limit = mode == STARTER_TIRTC_AI
-        ? AUDIO_RX_QUEUE_DEPTH : AUDIO_RX_LIVE_QUEUE_DEPTH;
     bool acquired = false;
-    /* Reserve before taking a free slot. Checking free-queue depth alone races
-     * another callback and can exceed the live budget. Pending includes ingress
-     * reservations, queued items and the sink-held slot. Two bounded attempts;
-     * no lock, wait or unbounded CAS loop in the SDK callback. */
-    for (unsigned attempt = 0; attempt < 2U && !acquired; ++attempt) {
-        unsigned pending = atomic_load(&s_audio_playback_pending);
-        if (pending < limit) {
-            if (!atomic_compare_exchange_strong(&s_audio_playback_pending,
-                                                  &pending, pending + 1U))
-                continue;
-            if (xQueueReceive(s_audio_rx_free_queue, &slot, 0) == pdTRUE) {
-                acquired = true;
-                break;
+    if (mode == STARTER_TIRTC_AI) {
+        /* AI owns the full pool. The free queue is already an atomic capacity
+         * reservation; competing callbacks must not cause a false overflow. */
+        acquired = xQueueReceive(s_audio_rx_free_queue, &slot, 0) == pdTRUE;
+        if (acquired) atomic_fetch_add(&s_audio_playback_pending, 1);
+    } else {
+        /* Reserve before taking a free slot. Checking free-queue depth alone races
+         * another callback and can exceed the live budget. Pending includes ingress
+         * reservations, queued items and the sink-held slot. Two bounded attempts;
+         * no lock, wait or unbounded CAS loop in the SDK callback. */
+        for (unsigned attempt = 0; attempt < 2U && !acquired; ++attempt) {
+            unsigned pending = atomic_load(&s_audio_playback_pending);
+            if (pending < AUDIO_RX_LIVE_QUEUE_DEPTH) {
+                if (!atomic_compare_exchange_strong(&s_audio_playback_pending,
+                                                      &pending, pending + 1U))
+                    continue;
+                if (xQueueReceive(s_audio_rx_free_queue, &slot, 0) == pdTRUE) {
+                    acquired = true;
+                    break;
+                }
+                atomic_fetch_sub(&s_audio_playback_pending, 1);
             }
-            atomic_fetch_sub(&s_audio_playback_pending, 1);
-        }
-        if (xiaotai_media_overflow(mode == STARTER_TIRTC_AI) ==
-                XIAOTAI_QUEUE_REPLACE_OLDEST &&
-            xQueueReceive(s_audio_rx_ready_queue, &slot, 0) == pdTRUE) {
-            /* Atomic queue receive transfers the old pending reservation.
-             * A worker-held slot is never present in this queue. */
-            starter_ai_playout_retire(s_audio_rx_pool[slot].generation,
-                                      s_audio_rx_pool[slot].pcm_samples);
-            atomic_fetch_add(&s_audio_rx_overflow, 1);
-            atomic_fetch_add(&s_audio_dropped, 1);
-            acquired = true;
+            if (xiaotai_media_overflow(false) ==
+                    XIAOTAI_QUEUE_REPLACE_OLDEST &&
+                xQueueReceive(s_audio_rx_ready_queue, &slot, 0) == pdTRUE) {
+                /* Atomic queue receive transfers the old pending reservation.
+                 * A worker-held slot is never present in this queue. */
+                starter_ai_playout_retire(s_audio_rx_pool[slot].generation,
+                                          s_audio_rx_pool[slot].pcm_samples);
+                atomic_fetch_add(&s_audio_rx_overflow, 1);
+                atomic_fetch_add(&s_audio_dropped, 1);
+                acquired = true;
+            }
         }
     }
     if (!acquired || slot >= AUDIO_RX_QUEUE_DEPTH) {

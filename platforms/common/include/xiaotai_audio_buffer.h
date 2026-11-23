@@ -66,7 +66,7 @@ static inline void xiaotai_audio_buffer_begin_round(xiaotai_audio_buffer_t *buff
 
 static inline bool xiaotai_audio_buffer_ready(xiaotai_audio_buffer_t *buffer,
     uint32_t now_ms, uint32_t queued_ms, uint32_t oldest_rx_ms,
-    uint32_t playback_tail_ms, bool ended)
+    uint32_t playback_tail_ms, bool ended, bool queue_full)
 {
     if (queued_ms == 0U) {
         if (ended) {
@@ -120,10 +120,11 @@ static inline bool xiaotai_audio_buffer_ready(xiaotai_audio_buffer_t *buffer,
         }
     }
     uint32_t target_ms = buffer->wait_target_ms;
-    if (queued_ms < target_ms &&
+    /* Short Opus frames can fill every slot before reaching the duration target. */
+    if (!queue_full && queued_ms < target_ms &&
         (uint32_t)(now_ms - buffer->wait_started_ms) < AI_BUFFER_WAIT_LIMIT_MS)
         return false;
-    if (queued_ms < target_ms) ++buffer->timeout_releases;
+    if (!queue_full && queued_ms < target_ms) ++buffer->timeout_releases;
     buffer->playing = true;
     buffer->waiting = false;
     return true;
