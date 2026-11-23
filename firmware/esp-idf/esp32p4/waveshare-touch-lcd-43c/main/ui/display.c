@@ -26,7 +26,7 @@
 #include "sdkconfig.h"
 #include "extra/libs/qrcode/qrcodegen.h"
 
-#include "app_version.h"
+#include "tiRTC.h"
 #include "app_memory_policy.h"
 #include "app_task_affinity.h"
 #include "app_config.h"
@@ -1204,7 +1204,6 @@ static void display_show_wechat_delete_confirm(uint8_t contact_index);
 #define DISPLAY_KB_BTN_SPACE_ID              37
 #define DISPLAY_KB_BTN_CURSOR_RIGHT_ID       38
 #define DISPLAY_KB_BTN_JOIN_ID               39
-#define DISPLAY_TIRTC_VERSION_TEXT           "TiRTC " APP_DEMO_TIRTC_SDK_VERSION
 #define DISPLAY_AI_CHAT_STATE_IDLE           0U
 #define DISPLAY_AI_CHAT_STATE_STARTING       1U
 #define DISPLAY_AI_CHAT_STATE_TOKEN          2U
@@ -10864,6 +10863,12 @@ static void display_update_wifi_connect_feedback(const display_status_t *status)
     }
 }
 
+static const char *display_tirtc_version(void)
+{
+    const char *version = TiRtcGetVersion();
+    return version && version[0] ? version : "--";
+}
+
 static void display_update_ota_page(const display_status_t *status)
 {
     char progress_text[16] = {0};
@@ -10897,9 +10902,9 @@ static void display_update_ota_page(const display_status_t *status)
 
     display_text_set(s_ota_version_label, current_version);
     display_text_set(s_ota_second_label,
-                      status->ota_target_version[0] != '\0' || ready_to_reboot || failed ? "目标版本" : "协议版本");
+                      status->ota_target_version[0] != '\0' || ready_to_reboot || failed ? "目标版本" : "TiRTC");
     display_text_set(s_ota_second_value_label,
-                      status->ota_target_version[0] != '\0' || ready_to_reboot || failed ? target_version : DISPLAY_TIRTC_VERSION_TEXT);
+                      status->ota_target_version[0] != '\0' || ready_to_reboot || failed ? target_version : display_tirtc_version());
 
     lv_obj_add_flag(s_ota_action_panel, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_ota_progress_bar, LV_OBJ_FLAG_HIDDEN);
@@ -13130,8 +13135,8 @@ static void display_build_ota_page(lv_obj_t *screen)
                                   &s_ota_version_label);
     (void)display_create_info_row(s_ota_page,
                                   82,
-                                  "协议版本",
-                                  DISPLAY_TIRTC_VERSION_TEXT,
+                                  "TiRTC",
+                                  display_tirtc_version(),
                                   lv_color_hex(0x10243E),
                                   &s_ota_second_value_label);
     s_ota_second_label = lv_obj_get_child(lv_obj_get_parent(s_ota_second_value_label), 0);
