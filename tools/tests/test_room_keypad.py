@@ -17,6 +17,7 @@ class RoomKeypad(unittest.TestCase):
 #include <stdio.h>
 #include <string.h>
 typedef int lv_obj_t;
+typedef int lv_coord_t;
 #define lv_color_hex(c) (c)
 #define STARTER_ROOM_NONE 0
 #define STARTER_ROOM_ERROR 1
@@ -26,6 +27,11 @@ typedef struct {char room_code[8],room_message[80];int room_phase;} starter_runt
 static char s_voice_feedback[80];
 static lv_obj_t *s_room_code_label,*s_room_status_label,*s_room_member_labels[3],
  *s_room_page_label,*s_room_ptt_button,*s_room_connecting_label,*s_room_previous_button,*s_room_next_button,*s_room_members_caption;
+lv_obj_t *s_room_member_status_labels[3];
+char s_room_member_text[3][65];
+#define LV_LABEL_LONG_DOT 1
+static void lv_obj_set_height(lv_obj_t *obj,int height) {}
+static void lv_label_set_long_mode(lv_obj_t *obj,int mode) {}
 static struct {const char *label;int x,y,w,h;product_action_t action;} buttons[16];
 static unsigned count;
 static int scenario;
@@ -100,7 +106,10 @@ static lv_obj_t *make_header_back_button(lv_obj_t *o, product_action_t a) { retu
 static void render_header(lv_obj_t *o, const char *text) {}
 static lv_obj_t *make_label(lv_obj_t *o, const char *text, int x,int y,int w,int c) {
     if (y==34) strcpy(shown_value,text);
-    if(strcmp(text,"无密码直接点击确定")==0) hint_seen=true;
+    if(strcmp(text,"无密码直接点击确定")==0) {
+        assert(y + 22 <= 240);
+        hint_seen=true;
+    }
     return o;
 }
 static void lv_obj_set_style_text_align(lv_obj_t *o,int a,int b) {}
@@ -148,7 +157,7 @@ int main(void) {
     dispatch(ACTION_ROOM_LEAVE_CANCEL); assert(s_page==PAGE_ROOM && leaves==0);
     dispatch(ACTION_ROOM_LEAVE); dispatch(ACTION_ROOM_LEAVE_CONFIRM); assert(leaves==1);
 }
-''', include_dirs=(ROOT / 'product/include',))
+''', include_dirs=(ROOT / 'product/include',), cflags=('-DCONFIG_IDF_TARGET_ESP32S3=1',))
 
 
 if __name__ == '__main__':
