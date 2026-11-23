@@ -45,7 +45,7 @@ static struct {bool microphone_muted;} starter_media_status(void){return (__type
 static void starter_media_cancel_ai_preroll(uint32_t token){cancelled++;}
 static void product_set_ai_start_pending(bool pending,const char *text){snprintf(message,sizeof(message),"%s",text);}
 static void room_set_foreground(bool active){s_room_page_active=active;}
-static int enqueue_simple(int event){queued=event;return ESP_OK;}
+static int enqueue_simple(int event,const char *action){queued=event;return ESP_OK;}
 ''' + function(source, 'starter_runtime_ai_start') + start + r'''
 static void request(void){
  assert(starter_runtime_ai_start()==ESP_OK && queued==EVENT_AI_START);

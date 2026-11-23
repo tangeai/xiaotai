@@ -352,7 +352,7 @@ static void call_video_log_memory_once(uint32_t generation,
         return;
     }
 
-    ESP_LOGI(TAG,
+    ESP_LOGD(TAG,
              "downlink first-frame memory: stage=%s gen=%lu internal=%u largest=%u "
              "dma=%u largest=%u psram=%u largest=%u internal_min=%u",
              stage,
@@ -1513,7 +1513,7 @@ static void call_video_log_stats_if_due(call_video_log_window_t *window,
     }
 
     if (CONFIG_APP_MEDIA_PERIODIC_DIAGNOSTICS) {
-        ESP_LOGI(TAG,
+        ESP_LOGD(TAG,
                  "H264 downlink stats: src=%ux%u rx=%u.%ufps/%ukbps queued=%u.%ufps "
                  "decoded=%u.%ufps converted=%u.%ufps presented=%u.%ufps "
                  "drop=input:%u display:%u fail=decode:%u convert:%u q=input:%u display:%u "
@@ -1567,7 +1567,7 @@ static void call_video_log_stats_if_due(call_video_log_window_t *window,
                  stale_received_delta,
                  stale_presented_delta);
     } else if (CONFIG_APP_MEDIA_COMPACT_HEALTH_LOG) {
-        ESP_LOGI(TAG,
+        ESP_LOGD(TAG,
                  "VRX %ux%u in=%u.%u/%uk q/d/c/o=%u.%u/%u.%u/%u.%u/%u.%u "
                  "drop=%u/%u fail=%u/%u age=%u/%ums depth=%u/%u "
                  "buf=%u/%u@%ums adapt=%u ms=au/cvt/ppa:%u/%u/%u kd=%u/%u gap=%u/%u "
@@ -1620,7 +1620,7 @@ static void call_video_log_stats_if_due(call_video_log_window_t *window,
     }
     if (qvga_imgfx_delta > 0U &&
         (CONFIG_APP_MEDIA_PERIODIC_DIAGNOSTICS || CONFIG_APP_MEDIA_COMPACT_HEALTH_LOG)) {
-        ESP_LOGI(TAG, "QVGA phases frames=%u avg-us color/clear/copy=%u/%u/%u max-us=%u/%u/%u",
+        ESP_LOGD(TAG, "QVGA phases frames=%u avg-us color/clear/copy=%u/%u/%u max-us=%u/%u/%u",
                  qvga_imgfx_delta,
                  (unsigned)(qvga_color_delta / qvga_imgfx_delta),
                  (unsigned)(qvga_clear_delta / qvga_imgfx_delta),
@@ -1967,6 +1967,7 @@ static void call_video_converter_task(void *arg)
     video_frame_converter_handle_t converter = (video_frame_converter_handle_t)arg;
     int64_t last_stall_log_at_us = 0;
     int64_t next_idle_window_us = 0;
+    int64_t next_conversion_warning_us = 0;
 
     while (!call_video_stop_requested()) {
         uint8_t index = 0;
@@ -2068,11 +2069,13 @@ static void call_video_converter_task(void *arg)
         }
         if (convert_ret != ESP_OK && generation_matches) {
             taskENTER_CRITICAL(&s_renderer.lock);
-            s_renderer.conversion_failures++;
+            uint32_t failures = ++s_renderer.conversion_failures;
             taskEXIT_CRITICAL(&s_renderer.lock);
-            ESP_LOGW(TAG,
-                     "H264 downlink display conversion failed: %s",
-                     esp_err_to_name(convert_ret));
+            if (convert_finished_us >= next_conversion_warning_us) {
+                ESP_LOGW(TAG, "H264 downlink display conversion failed: %s failures=%lu",
+                         esp_err_to_name(convert_ret), (unsigned long)failures);
+                next_conversion_warning_us = convert_finished_us + CALL_VIDEO_STALL_LOG_INTERVAL_US;
+            }
         }
         call_video_return_decoded_slot(index);
         call_video_worker_scheduling_window(&next_idle_window_us);
@@ -2541,7 +2544,7 @@ static void call_video_log_mjpeg_stats_if_due(call_video_mjpeg_log_window_t *win
         process_delta > 0U ? (uint32_t)(decode_time_delta / process_delta) : 0U;
     uint32_t queue_depth = call_video_input_queue_depth();
 
-    ESP_LOGI(TAG,
+    ESP_LOGD(TAG,
              "MJPEG downlink stats: src=%ux%u rx=%u.%ufps/%ukbps "
              "decoded=%u.%ufps presented=%u.%ufps drop=%u fail=%u "
              "decode_us=%u q=%u",
@@ -2914,7 +2917,7 @@ static void call_video_mjpeg_renderer_task(void *arg)
                     now_us - first_frame_ready_us >=
                         CALL_VIDEO_MJPEG_STARTUP_SAMPLE_US) {
                     startup_sample_logged = true;
-                    ESP_LOGI(TAG,
+                    ESP_LOGD(TAG,
                              "MJPEG downlink startup sample: source=%ux%u "
                              "rotation=%s crop=%ux%u+%u+%u "
                              "render=%ux%u+%u+%u age=%llums frame=%u "

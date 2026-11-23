@@ -2170,7 +2170,7 @@ static void camera_pipeline_run_call_mjpeg(void)
         int64_t now_us = esp_timer_get_time();
         if (now_us - stats_started_us >= 10000000LL) {
             uint64_t elapsed_us = (uint64_t)(now_us - stats_started_us);
-            ESP_LOGI(TAG, "CAM MJPEG %ux%u quality=%u attempt=%u encoded=%u sent=%u drop=%u budget-drop=%u fps=%u.%u wire=%ukbps avg-jpeg=%uB phase-us-avg=c/x/e/tx:%u/%u/%u/%u max=%u/%u/%u/%u",
+            ESP_LOGD(TAG, "CAM MJPEG %ux%u quality=%u attempt=%u encoded=%u sent=%u drop=%u budget-drop=%u fps=%u.%u wire=%ukbps avg-jpeg=%uB phase-us-avg=c/x/e/tx:%u/%u/%u/%u max=%u/%u/%u/%u",
                      APP_MEDIA_CALL_VIDEO_WIDTH, APP_MEDIA_CALL_VIDEO_HEIGHT,
                      APP_MEDIA_CALL_JPEG_QUALITY, attempted, encoded,
                      sent, dropped, budget_dropped,
@@ -3056,7 +3056,7 @@ static void camera_pipeline_task(void *arg)
                                                   capture_fail_count,
                                                   encode_fail_count);
 #if CONFIG_APP_MEDIA_PERIODIC_DIAGNOSTICS
-            ESP_LOGI(TAG,
+            ESP_LOGD(TAG,
                      "camera pipeline stats: target=%ux%u@%u cfg_bitrate=%ukbps encoded=%lu upstream=%lu fps=%lu.%lu bitrate=%lukbps drop=%lu bp_skip=%lu guard_drop=%lu keywait_drop=%lu cap_fail=%lu scale_fail=%lu enc_fail=%lu key=%lu large=%lu slow_cap=%lu slow_scale=%lu slow_enc=%lu slow_cb=%lu slow_loop=%lu payload[min/avg/max]=%lu/%lu/%lu luma_src_delta=%lu.%lu luma_src_change=%lu/%lu luma_src_range=%u-%u luma_enc_delta=%lu.%lu luma_enc_change=%lu/%lu luma_enc_range=%u-%u avg_gap_us=%lu max_gap_us=%llu cam_drain=%lu seq_delta_avg=%lu.%lu seq_delta_max=%lu avg_cap_us=%lu avg_scale_us=%lu avg_enc_us=%lu avg_h264[sync_in/hw/sync_out]=%lu/%lu/%lu avg_cb_us=%lu avg_loop_us=%lu avg_ts_lag_us=%lu max_ts_lag_us=%llu internal_free=%u internal_largest=%u dma_free=%u dma_largest=%u psram_free=%u psram_largest=%u h264_out_buf=%u",
                      (unsigned)h264.width,
                      (unsigned)h264.height,
@@ -3120,7 +3120,7 @@ static void camera_pipeline_task(void *arg)
                      (unsigned)psram_largest,
                      (unsigned)h264.capture_buffer_size);
 #elif CONFIG_APP_MEDIA_COMPACT_HEALTH_LOG
-            ESP_LOGI(TAG,
+            ESP_LOGD(TAG,
                      "CAM %ux%u@%u f=%lu.%lu br=%luk gap=%lu/%llums "
                      "us=c/s/e/cb/l:%lu/%lu/%lu/%lu/%lu "
                      "motion=s/e:%lu.%lu/%lu.%lu chg=%lu/%lu,%lu/%lu "
