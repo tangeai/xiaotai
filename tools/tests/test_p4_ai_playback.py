@@ -338,11 +338,13 @@ int main(void){starter_ai_playout_reset(7);
     media=(starter_media_status_t){.audio_received=2614,.audio_decoded=2600,
         .audio_played=2599,.audio_rx_overflow=2,.audio_playback_pending=15,
         .audio_playback_active=true,.audio_playback_pcm_ms=51980,
-        .audio_playback_dma_ms=90,.audio_rx_last_ms=209950};
+        .audio_playback_dma_ms=90,.audio_rx_last_ms=209950,
+        .audio_rx_queue_peak=62,.audio_decode_failed=3,.audio_playback_blocked=1,.audio_write_failed=2};
     log_ai_playback_status("transport-close");
     assert(strstr(log_text,"stage=transport-close generation=7"));
     assert(strstr(log_text,"rx=2614 decoded=2600 written=2599 overflow=2"));
     assert(strstr(log_text,"pending=15 active=1 pcm-ms=51980 dma-ms=90 queued-ms=0 target-ms=0 underruns=0 timeout-releases=0 last-rx-age-ms=50"));
+    assert(strstr(log_text,"peak=62 decode-fail=3 blocked=1 write-fail=2"));
     media.audio_playback_pending=0;media.audio_playback_active=false;
     media.audio_playback_dma_ms=0;
     log_ai_playback_status("drained");
