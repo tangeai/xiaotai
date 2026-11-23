@@ -149,6 +149,8 @@ H.264 恢复和多轮连接回收；五板分别构建。四个真实观看端�
 
 ### 五板 AI 下行自适应缓冲
 
+缺字定位、逐板内存账本及候选方案的采用条件见 [AI 对讲下行缓冲设计与试验依据](AI_DOWNLINK_BUFFER_PLAN.md)。
+
 立创、觅感 BK7258、立创 ESP32-S3、M5Stack CoreS3-Lite 和微雪 ESP32-P4
 共用 `platforms/common/include/xiaotai_audio_buffer.h` 的轻量决策，仅作用于 AI Opus
 下行。各板保留 64 包有界压缩缓存，起播水位与队列容量分开，按 Opus 包实际采样数
