@@ -62,7 +62,8 @@ ESP-IDF v5.5.5 下，`UI refresh slow` 是 100 ms 产品 tick 的墙钟耗时；
 这些阶段之和等于 `total`，但任一阶段变慢仍可能来自任务抢占。
 不能把 `expression=0` 的慢回调解释为嘴部绘制慢。
 
-两个 S3 工程还安装 LVGL 8 `monitor_cb`，每约 5 秒汇总一行
+两个 S3 工程还安装 LVGL 8 `monitor_cb`，默认 INFO 构建不输出周期汇总。诊断构建需将编译日志上限设为 DEBUG 或更高，
+并为 `starter_product` 启用 DEBUG，之后每约 5 秒汇总一行
 `UI render window`。`refreshes` 是有脏区的刷新次数，`pixels` 是该窗口累计刷新
 像素数，`max-pixels` 是单次最大值。320×240 全屏为 76800 像素；累计值允许超过
 全屏大小，不能据此判断单帧全刷。
