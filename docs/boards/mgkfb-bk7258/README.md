@@ -238,7 +238,7 @@ ap_cmd help
 
 `status` 查看联网、绑定、当前会话和内存，`call-status` 查看通话状态。
 完整命令、参数、平台地址设置及两块 BK7258 的适用范围见
-[BK7258 串口命令](../../development/BK7258_SERIAL_COMMANDS.md)。
+[ESP32 与 BK7258 串口命令](../../development/SERIAL_COMMANDS.md)。
 
 ## 验证状态与已知限制
 

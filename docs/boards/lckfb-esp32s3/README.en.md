@@ -1,5 +1,7 @@
 # LCKFB ESP32-S3
 
+[ESP32 and BK7258 serial commands](../../development/SERIAL_COMMANDS.en.md)
+
 [Back to boards](../README.en.md) · [Firmware and release notes](../../downloads.en.md#lckfb-esp32s3)
 
 [中文](README.md) · [English](README.en.md)

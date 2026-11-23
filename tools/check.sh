@@ -69,6 +69,7 @@ python3 "$repo_dir/tools/tests/test_bk_opus_fec.py"
 python3 "$repo_dir/tools/tests/test_bk_adaptive_playback.py"
 python3 "$repo_dir/tools/tests/test_esp_ai_playout.py"
 python3 "$repo_dir/tools/tests/test_esp_uplink_freshness.py"
+python3 "$repo_dir/tools/tests/test_serial_command_parity.py"
 python3 "$repo_dir/tools/tests/test_media_queue_policy.py"
 python3 "$repo_dir/tools/tests/test_bk_ai_timing.py"
 # AI audio timestamps plus INFO/DEBUG filtering through the public logger.

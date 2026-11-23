@@ -84,5 +84,5 @@ bash tools/check.sh
 TODO：补充可公开的 PCB（印刷电路板）版本照片、Flash（闪存）实测容量，以及新固件的完整
 实板回归日志。证据补充不改变当前项目方确认的“已验证”状态，也不阻塞源码提交。
 
-串口调试见[BK7258 串口命令](../../../../docs/development/BK7258_SERIAL_COMMANDS.md)，
+串口调试见[ESP32 与 BK7258 串口命令](../../../../docs/development/SERIAL_COMMANDS.md)，
 两块 BK7258 板共用命令实现，常用 CP 串口入口需加 `ap_cmd` 前缀。

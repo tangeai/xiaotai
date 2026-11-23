@@ -210,7 +210,7 @@ ap_cmd call-status
 ap_cmd help
 ```
 
-`status` shows network, binding, current activity, and memory; `call-status` shows call state. See [BK7258 serial commands](../../development/BK7258_SERIAL_COMMANDS.en.md) for parameters, platform addresses, and board applicability.
+`status` shows network, binding, current activity, and memory; `call-status` shows call state. See [ESP32 and BK7258 serial commands](../../development/SERIAL_COMMANDS.en.md) for parameters, platform addresses, and board applicability.
 
 ## Validation status and limitations
 

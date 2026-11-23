@@ -94,6 +94,8 @@ typedef struct {
 
 /** 以下版本字符串由 SDK 持有，调用者不得释放。 */
 const char *starter_tirtc_version(void);
+int starter_tirtc_log_level(void);
+void starter_tirtc_set_log_level(int level);
 const char *starter_tirtc_build_info(void);
 
 /** 设置事件处理器；starter_runtime_start() 会在 SDK 启动前调用。 */

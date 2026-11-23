@@ -272,7 +272,7 @@ bash tools/check.sh
 | 微雪 ESP32-P4 | `docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md` |
 | M5Stack CoreS3-Lite | `docs/boards/m5stack-cores3-lite/README.md` |
 | 觅感 BK7258 | `docs/boards/mgkfb-bk7258/README.md` |
-| BK7258 串口命令 | `docs/development/BK7258_SERIAL_COMMANDS.md` |
+| ESP32 与 BK7258 串口命令 | `docs/development/SERIAL_COMMANDS.md` |
 | BK7258 Opus 丢包补偿实践 | `docs/development/bk-opus-plc.md` |
 | 开发注意事项 | `docs/development/pitfalls.md` |
 | 统一发行规则 | `docs/development/release-policy.md` |

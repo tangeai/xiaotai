@@ -165,6 +165,15 @@ esp_err_t starter_runtime_call_contact_video(uint8_t index);
 esp_err_t starter_runtime_call_set_camera_enabled(uint32_t session_generation, bool enabled);
 #endif
 esp_err_t starter_runtime_call_accept(void);
+esp_err_t starter_runtime_accept_from(starter_contact_source_t source);
+esp_err_t starter_runtime_dial_named(starter_contact_source_t source, const char *name);
+typedef struct {
+    bool incoming, wechat, ptt;
+    starter_room_ui_phase_t room_phase;
+    unsigned members, online;
+    char room_code[7];
+} starter_service_status_t;
+bool starter_runtime_service_status(starter_service_status_t *out);
 esp_err_t starter_runtime_call_reject(void);
 esp_err_t starter_runtime_call_hangup(void);
 esp_err_t starter_runtime_call_set_microphone_muted(bool muted);

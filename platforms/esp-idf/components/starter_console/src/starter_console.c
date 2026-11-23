@@ -22,6 +22,7 @@
 
 #include "esp_app_desc.h"
 #include "esp_check.h"
+#include "esp_log.h"
 #include "esp_console.h"
 #include "esp_heap_caps.h"
 #include "esp_system.h"
@@ -142,6 +143,7 @@ static int command_version(int argc, char **argv)
         return 1;
     }
     print_firmware_identity();
+    printf("TiRTC SDK: %s\n", starter_tirtc_version());
     return 0;
 }
 
@@ -845,6 +847,94 @@ static int command_face_animation(int argc, char **argv)
     return 0;
 }
 
+static int request_result(const char *name, esp_err_t result)
+{
+    if (result == ESP_OK) {
+        printf("%s requested\n", name);
+        return 0;
+    }
+    printf("%s rejected: %s\n", name, esp_err_to_name(result));
+    return 1;
+}
+
+static int command_wifi_change(int argc, char **argv)
+{
+    if (argc != 1 || starter_runtime_status_snapshot().state != STARTER_RUNTIME_WAITING)
+        return request_result(argv[0], ESP_ERR_INVALID_STATE);
+    return request_result(argv[0], wifi_manager_request_provisioning());
+}
+
+static int command_service_status(int argc, char **argv)
+{
+    starter_service_status_t service;
+    if (argc != 1 || !starter_runtime_service_status(&service)) return 1;
+    starter_runtime_status_t runtime = starter_runtime_status_snapshot();
+    if (!strcmp(argv[0], "room-status")) {
+        printf("room phase=%u code=%s members=%u online=%u ptt=%u\n",
+               (unsigned)service.room_phase, service.room_code, service.members,
+               service.online, (unsigned)service.ptt);
+    } else {
+        bool call = service.incoming || runtime.state == STARTER_RUNTIME_CALL_ACTIVE ||
+                    runtime.state == STARTER_RUNTIME_CALL_CONNECTING;
+        printf("call=%s state=%s incoming=%u generation=%lu\n",
+               call ? (service.wechat ? "wechat" : "device") : "none",
+               starter_runtime_state_name(runtime.state), (unsigned)service.incoming,
+               (unsigned long)runtime.session_generation);
+    }
+    return 0;
+}
+
+static int command_dial(int argc, char **argv)
+{
+    bool wechat = !strcmp(argv[0], "wechat-call");
+    if (wechat && argc == 1) return request_result(argv[0], starter_runtime_wechat_quick_call());
+    if (argc != 2 || !argv[1][0]) return request_result(argv[0], ESP_ERR_INVALID_ARG);
+    return request_result(argv[0], starter_runtime_dial_named(
+        wechat ? STARTER_CONTACT_WECHAT : STARTER_CONTACT_DEVICE, argv[1]));
+}
+
+static int command_call_control(int argc, char **argv)
+{
+    if (argc != 1) return request_result(argv[0], ESP_ERR_INVALID_ARG);
+    if (!strcmp(argv[0], "call-answer")) return request_result(argv[0], starter_runtime_call_accept());
+    if (!strcmp(argv[0], "call-hangup")) return request_result(argv[0], starter_runtime_call_hangup());
+    return request_result(argv[0], starter_runtime_accept_from(
+        !strcmp(argv[0], "wechat-answer") ? STARTER_CONTACT_WECHAT : STARTER_CONTACT_DEVICE));
+}
+
+static int command_room_control(int argc, char **argv)
+{
+    const char *name = argv[0];
+    if (!strcmp(name, "room-join")) {
+        if (argc != 2 && argc != 3) return request_result(name, ESP_ERR_INVALID_ARG);
+        return request_result(name, starter_runtime_room_join(argv[1], argc == 3 ? argv[2] : NULL));
+    }
+    if (argc != 1) return request_result(name, ESP_ERR_INVALID_ARG);
+    if (!strcmp(name, "room-sync")) return request_result(name, starter_runtime_room_refresh());
+    if (!strcmp(name, "room-leave")) return request_result(name, starter_runtime_room_leave());
+    return request_result(name, starter_runtime_room_ptt(!strcmp(name, "room-talk-start")));
+}
+
+static int command_log_level(int argc, char **argv)
+{
+    if (argc == 1) {
+        printf("app=%d tirtc=%d compiled-max=%d\n", (int)esp_log_level_get("*"),
+               starter_tirtc_log_level(), CONFIG_LOG_MAXIMUM_LEVEL);
+        return 0;
+    }
+    if (argc != 3 || !argv[2][0] || strspn(argv[2], "0123456789") != strlen(argv[2]))
+        return request_result(argv[0], ESP_ERR_INVALID_ARG);
+    long level = strtol(argv[2], NULL, 10);
+    if (!strcmp(argv[1], "app") && level <= 4) {
+        esp_log_level_set("*", (esp_log_level_t)level);
+        printf("app=%ld compiled-max=%d\n", level, CONFIG_LOG_MAXIMUM_LEVEL);
+    } else if (!strcmp(argv[1], "tirtc") && level <= 17) {
+        starter_tirtc_set_log_level((int)level);
+        printf("tirtc=%ld\n", level);
+    } else return request_result(argv[0], ESP_ERR_INVALID_ARG);
+    return 0;
+}
+
 typedef struct {
     const char *name;
     esp_console_cmd_func_t function;
@@ -903,6 +993,38 @@ static esp_err_t register_command(const char *name,
 
 static esp_err_t register_console_commands(void)
 {
+    ESP_RETURN_ON_ERROR(register_command("wifi-change", "Open Wi-Fi provisioning and retain credentials", command_wifi_change),
+                        "starter_console", "register wifi-change");
+    ESP_RETURN_ON_ERROR(register_command("wificlear", "Alias for wifi-clear", command_wifi_clear),
+                        "starter_console", "register wificlear");
+    ESP_RETURN_ON_ERROR(register_command("log-level", "log-level [app <0..4>|tirtc <0..17>]", command_log_level),
+                        "starter_console", "register log-level");
+    ESP_RETURN_ON_ERROR(register_command("call-status", "Show call status", command_service_status),
+                        "starter_console", "register call-status");
+    ESP_RETURN_ON_ERROR(register_command("room-status", "Show room status", command_service_status),
+                        "starter_console", "register room-status");
+    ESP_RETURN_ON_ERROR(register_command("wechat-call", "wechat-call [name]", command_dial),
+                        "starter_console", "register wechat-call");
+    ESP_RETURN_ON_ERROR(register_command("device-call", "device-call <name>", command_dial),
+                        "starter_console", "register device-call");
+    ESP_RETURN_ON_ERROR(register_command("call-answer", "call-answer", command_call_control),
+                        "starter_console", "register call-answer");
+    ESP_RETURN_ON_ERROR(register_command("wechat-answer", "wechat-answer", command_call_control),
+                        "starter_console", "register wechat-answer");
+    ESP_RETURN_ON_ERROR(register_command("device-answer", "device-answer", command_call_control),
+                        "starter_console", "register device-answer");
+    ESP_RETURN_ON_ERROR(register_command("call-hangup", "call-hangup", command_call_control),
+                        "starter_console", "register call-hangup");
+    ESP_RETURN_ON_ERROR(register_command("room-join", "room-join <code> [password]", command_room_control),
+                        "starter_console", "register room-join");
+    ESP_RETURN_ON_ERROR(register_command("room-sync", "room-sync", command_room_control),
+                        "starter_console", "register room-sync");
+    ESP_RETURN_ON_ERROR(register_command("room-leave", "room-leave", command_room_control),
+                        "starter_console", "register room-leave");
+    ESP_RETURN_ON_ERROR(register_command("room-talk-start", "room-talk-start", command_room_control),
+                        "starter_console", "register room-talk-start");
+    ESP_RETURN_ON_ERROR(register_command("room-talk-stop", "room-talk-stop", command_room_control),
+                        "starter_console", "register room-talk-stop");
     ESP_RETURN_ON_ERROR(register_command("version", "Show firmware identity", command_version),
                         "starter_console", "register version");
     ESP_RETURN_ON_ERROR(register_command("video-submit", "Development probe: pause|resume|show encoded video submission", command_video_submit),

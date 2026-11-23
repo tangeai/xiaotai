@@ -12,5 +12,5 @@
 用户已确认完成开发板验证。
 正式下载、构建身份及剩余专项验证见开发板指南。
 
-串口调试见[BK7258 串口命令](../../../../docs/development/BK7258_SERIAL_COMMANDS.md)，
+串口调试见[ESP32 与 BK7258 串口命令](../../../../docs/development/SERIAL_COMMANDS.md)，
 两块 BK7258 板共用命令实现，常用 CP 串口入口需加 `ap_cmd` 前缀。

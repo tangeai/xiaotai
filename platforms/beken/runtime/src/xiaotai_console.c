@@ -1,4 +1,6 @@
 #include "xiaotai_console.h"
+#include "xiaotai_build_identity.h"
+#include "xiaotai_metrics.h"
 
 #include <common/bk_err.h>
 #include <components/system.h>
@@ -160,6 +162,44 @@ static void command_wifi_change(char *output, int capacity,
              "Wi-Fi disconnected; provisioning opened; credentials retained\r\n" :
              argc == 1 ? "Wi-Fi change rejected\r\n" :
              "usage: wifi-change\r\n");
+}
+
+static void command_version(char *output, int capacity, int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) { response(output, capacity, "usage: version\r\n"); return; }
+    if (output && capacity > 0)
+        snprintf(output, (size_t)capacity, "firmware=%s board=%s TiRTC=%s\r\n",
+                 XIAOTAI_BUILD_VERSION, XIAOTAI_BOARD_ID, xiaotai_tirtc_version());
+}
+
+static void command_task_diag(char *output, int capacity, int argc, char **argv)
+{
+    (void)argv;
+    if (argc != 1) { response(output, capacity, "usage: task-diag\r\n"); return; }
+    xiaotai_metrics_snapshot_t snapshot;
+    xiaotai_metrics_snapshot(&snapshot);
+    if (!snapshot.sampled) { response(output, capacity, "task sample pending\r\n"); return; }
+    if (output && capacity > 0)
+        snprintf(output, (size_t)capacity, "tasks=%u cpu=%u%% lowest-stack=%s:%u words\r\n",
+                 snapshot.task_count, snapshot.cpu_percent, snapshot.stack_low_task, snapshot.stack_low_words);
+}
+
+static void command_tirtc_set(char *output, int capacity, int argc, char **argv)
+{
+    xiaotai_device_credentials_t value = {0};
+    if ((argc != 3 && argc != 4) || !argv[1][0] || !argv[2][0] ||
+        strlen(argv[1]) >= sizeof(value.device_id) || strlen(argv[2]) >= sizeof(value.device_secret) ||
+        (argc == 4 && strlen(argv[3]) >= sizeof(value.client_id))) {
+        response(output, capacity, "usage: tirtc-set <device_id> <device_secret> [client_id]\r\n");
+        return;
+    }
+    strcpy(value.device_id, argv[1]);
+    strcpy(value.device_secret, argv[2]);
+    if (argc == 4) strcpy(value.client_id, argv[3]);
+    complete_configuration_change(output, capacity, xiaotai_storage_recover_device(&value),
+                                  "device credentials saved; restarting\r\n",
+                                  "device credentials save failed\r\n");
 }
 
 static void command_tirtc_clear(char *output, int capacity,
@@ -488,6 +528,9 @@ static void command_log_level(char *output, int capacity,
 }
 
 static const struct cli_command s_commands[] = {
+    {"version", "Show firmware and SDK identity", command_version},
+    {"task-diag", "Show latest task and stack sample", command_task_diag},
+    {"tirtc-set", "Pre-load device credentials", command_tirtc_set},
     {"status", "Show XiaoTai runtime and resource status", command_status},
     {"ai-start", "Start AI talk", command_ai_start},
     {"ai-stop", "Stop AI talk", command_ai_stop},

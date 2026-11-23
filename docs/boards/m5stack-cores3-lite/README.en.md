@@ -1,5 +1,7 @@
 # M5Stack CoreS3-Lite
 
+[ESP32 and BK7258 serial commands](../../development/SERIAL_COMMANDS.en.md)
+
 [Back to boards](../README.en.md) · [Firmware and release notes](../../downloads.en.md#m5stack-cores3-lite)
 
 [中文](README.md) · [English](README.en.md)

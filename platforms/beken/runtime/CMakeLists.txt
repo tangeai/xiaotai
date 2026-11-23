@@ -141,6 +141,7 @@ armino_component_register(
     PRIV_REQUIRES "${priv_req}"
 )
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
+    XIAOTAI_BOARD_ID="${XIAOTAI_BOARD_ID}"
     XIAOTAI_FIRMWARE_VERSION=\"${XIAOTAI_FIRMWARE_VERSION}\")
 get_filename_component(identity_dir "${CMAKE_BINARY_DIR}/.." ABSOLUTE)
 if(NOT EXISTS "${identity_dir}/xiaotai_build_identity.h")
@@ -158,8 +159,7 @@ target_link_libraries(${COMPONENT_LIB} INTERFACE
 
 if(XIAOTAI_HEADLESS)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE
-        XIAOTAI_HEADLESS=1 ${XIAOTAI_FEATURE_DEFINITIONS}
-        XIAOTAI_BOARD_ID="${XIAOTAI_BOARD_ID}")
+        XIAOTAI_HEADLESS=1 ${XIAOTAI_FEATURE_DEFINITIONS})
 endif()
 
 if(XIAOTAI_DUAL_EYES)

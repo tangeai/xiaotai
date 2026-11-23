@@ -1,5 +1,7 @@
 # Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3
 
+[ESP32 and BK7258 serial commands](../../development/SERIAL_COMMANDS.en.md)
+
 [Back to boards](../README.en.md) · [Firmware and release notes](../../downloads.en.md#waveshare-esp32p4-touch-lcd-43c-v10)
 
 [中文](README.md) · [English](README.en.md)

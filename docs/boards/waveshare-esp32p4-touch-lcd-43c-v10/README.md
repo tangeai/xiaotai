@@ -1,5 +1,7 @@
 # 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3
 
+[ESP32 与 BK7258 串口命令](../../development/SERIAL_COMMANDS.md)
+
 [返回开发板目录](../README.md) · [固件下载与发布说明](../../downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)
 
 [中文](README.md) · [English](README.en.md)

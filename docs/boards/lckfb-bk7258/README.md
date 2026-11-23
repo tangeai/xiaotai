@@ -99,7 +99,7 @@
 
 需要更换网络或重新绑定时，进入“设备设置 → 重置设备”，确认后重新配网并绑定。
 串口也可使用 `ap_cmd wifi-clear` 清除 Wi-Fi，或用 `ap_cmd tirtc-clear` 清除本机绑定凭证。
-命令效果和重启说明见[BK7258 串口命令](../../development/BK7258_SERIAL_COMMANDS.md)。
+命令效果和重启说明见[ESP32 与 BK7258 串口命令](../../development/SERIAL_COMMANDS.md)。
 
 ## 规格
 
@@ -295,7 +295,7 @@ ap_cmd help
 
 `status` 查看联网、绑定、当前会话和内存，`call-status` 查看通话状态。
 完整命令、参数、平台地址设置及两块 BK7258 的适用范围见
-[BK7258 串口命令](../../development/BK7258_SERIAL_COMMANDS.md)。
+[ESP32 与 BK7258 串口命令](../../development/SERIAL_COMMANDS.md)。
 
 
 - H5 下行无声：检查流 14 是否收到数据、A-law 解码是否产出 PCM、DAC 写入和功放 GPIO。
