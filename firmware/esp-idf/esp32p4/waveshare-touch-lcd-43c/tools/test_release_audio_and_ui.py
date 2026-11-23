@@ -351,11 +351,11 @@ class P4ReleaseContractTest(unittest.TestCase):
         ]
         for text in (
             "让设备连接家庭 Wi-Fi",
-            "1. 连接设备热点",
-            "打开手机“设置 > Wi-Fi”",
-            "提示“无互联网”是正常现象",
-            "2. 配置家庭网络",
-            "未自动打开时，请在浏览器访问",
+            "1. 手机连接设备热点",
+            "（无需密码）",
+            "提示“无互联网”是正常的",
+            "2. 选择家庭 Wi-Fi 并输入密码",
+            "没自动弹出？请访问",
         ):
             self.assertIn(text, wifi)
             self.assertIn(text, requirements)
