@@ -143,6 +143,7 @@ static int command_version(int argc, char **argv)
         return 1;
     }
     print_firmware_identity();
+    printf("TiRTC SDK: %s\n", starter_tirtc_version());
     return 0;
 }
 

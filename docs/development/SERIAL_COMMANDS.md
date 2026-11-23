@@ -19,7 +19,7 @@
 
 | 命令 | 用途 |
 |---|---|
-| `version` | 查看固件身份；BK 同时显示链接的 SDK 版本。 |
+| `version` | 查看固件身份和链接的 TiRTC SDK 版本。 |
 | `status` | 查看联网、TiRTC 和当前会话；字段按平台有所不同 |
 | `call-status` | 查看通话类型、状态和代次；BK 另报超时时刻 |
 | `log-level` | 查看当前应用及 TiRTC 日志级别 |
@@ -37,7 +37,7 @@ BK 的 `status` 中，`owner` 表示当前业务，`pending` 表示待处理来�
 log-level app 3
 ```
 
-采集周期性的 `METRICS` 和视频帧率统计前，先运行 `log-level app 4`。
+BK 采集周期性的 `METRICS` 和视频帧率统计前，先运行 `log-level app 4`。
 
 排查时可临时使用 `log-level app 4`。日志级别不保存，重启后恢复固件默认值；
 编译时关闭的 SDK 日志不能靠此命令恢复。分享日志前删除密码、令牌等敏感内容。

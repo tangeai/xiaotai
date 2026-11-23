@@ -13,13 +13,15 @@ Follow the board guide and close the flasher before opening the port. Use 115200
 | ESP32 application console, prompt `starter>` | `help` | `status` |
 | BK7258 CP shell, forwarding to the AP | `ap_cmd help` | `ap_cmd status` |
 
-Examples below use the application command. **On BK prefix each line with `ap_cmd `.** Bare `help` at the BK CP lists CP commands. Replace angle-bracketed values and omit brackets around optional arguments. Use double quotes around names containing spaces. A submitted request completes asynchronously. Check status and subsequent logs.
+Examples below use the application command. **On BK prefix each line with `ap_cmd `.** Bare `help` at the BK CP lists CP commands.
+
+Replace angle-bracketed values and omit brackets around optional arguments. Use double quotes around names containing spaces. A submitted request completes asynchronously. Check status and subsequent logs.
 
 ## Status and logging
 
 | Command | Purpose |
 |---|---|
-| `version` | Show firmware identity. BK also reports the linked SDK version. |
+| `version` | Show firmware identity and the linked TiRTC SDK version. |
 | `status` | Network, TiRTC and current session; individual fields depend on platform |
 | `call-status` | Call type, state and generation; BK also reports its deadline |
 | `log-level` | Current application and TiRTC log levels |
@@ -36,7 +38,7 @@ Normally keep information logging:
 log-level app 3
 ```
 
-Run `log-level app 4` before capturing periodic `METRICS` and video frame-rate statistics.
+On BK, run `log-level app 4` before capturing periodic `METRICS` and video frame-rate statistics.
 
 Use `log-level app 4` temporarily for diagnosis. Levels are not persisted and revert to firmware defaults after reboot. This command cannot enable SDK logs removed at compile time. Remove passwords, tokens, and other secrets before sharing logs.
 
@@ -57,7 +59,7 @@ End AI, live view, or calls before using `wifi-change`. Connect a phone to the d
 wifi-set "Home WiFi" "your-password"
 ```
 
-Replace the example with the actual name and password. The terminal may retain input history. `wificlear` is a compatibility alias for `wifi-clear`, used as `wificlear`.
+Replace the example with the actual name and password. The terminal may retain input history. `wificlear` is a compatibility alias for `wifi-clear`, entered with the usual board prefix.
 
 ## AI and calls
 
@@ -155,7 +157,9 @@ ntp-reset
 | `audio-trace`, `audio-capture` | S3 debug images with packet trace enabled. Both accept arm/stop/status/dump/clear. Arm while idle; captures may contain private audio. |
 | `camera-snapshot`, `video-capture`, `downlink-capture` | Waveshare P4 development capture when registered. Consult local help for capture formats. |
 
-ESP app log control changes the ESP-IDF default filter. Its compiled maximum can limit debug output; the TiRTC level is set separately. BK metrics names and counters are platform-specific. For one AI test, run `version`, `status`, `ai-start`, speak several short replies, then run `ai-stop` and `status`. Save the session-end summary.
+ESP app log control changes the ESP-IDF default filter. Its compiled maximum can limit debug output; the TiRTC level is set separately. BK metrics names and counters are platform-specific.
+
+For one AI test, run `version`, `status`, `ai-start`, speak several short replies, then run `ai-stop` and `status`. Save the session-end summary.
 
 ## Implementation and validation entry points
 

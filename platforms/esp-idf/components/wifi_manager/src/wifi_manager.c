@@ -594,9 +594,9 @@ static void wifi_event(void *argument,
     (void)event_data;
     if (event_base == XIAOTAI_WIFI_CONTROL) {
         start_provisioning();
-        if (s_provisioning && s_connected) {
+        if (s_provisioning && s_has_saved_credentials) {
             esp_err_t err = esp_wifi_disconnect();
-            if (err != ESP_OK) ESP_LOGW(TAG, "Wi-Fi change disconnect: %s", esp_err_to_name(err));
+            if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_CONNECT) ESP_LOGW(TAG, "Wi-Fi change disconnect: %s", esp_err_to_name(err));
         }
         return;
     }
