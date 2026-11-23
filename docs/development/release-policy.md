@@ -66,6 +66,18 @@ v1.2.0-beta.1_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin
 v1.2.0-beta.1_m5stack-cores3-lite_ili9342c_merged.bin
 ```
 
+正式版的 `<发行版本>` 不带 `-beta.N`，例如 `v1.2.0_lckfb-esp32s3_merged.bin`；其余规则相同。
+
+**本地候选包。** 实板验收前，在 `output/validation/<发行版本>-candidate/` 按下列方式生成，
+验收通过的字节即公开附件，不再重新编译：
+
+1. 内部验证包（ZIP、含 `+build.N` 的名称）和 ESP 的 `merged` 原始名称 BIN 留在该目录，不对外。
+2. `public/` 子目录放五个公开名称的 BIN。它们是已校验 BIN 的逐字节副本，只更改文件名：
+   ESP 取 `merge_esp_firmware.py` 的输出，BK 取验证包内的 `all-app.bin`。
+3. `public/SHA256SUMS.txt` 逐行记录这五个文件；发布说明和验收记录引用同一份哈希。
+4. 构建号、`BUILD_VERIFIED_HIL_PENDING` 状态和各板原始构建提交写入发布说明，
+   不写入文件名。
+
 ESP 下载完整 raw BIN，从本次原生 `flasher_args.json` 的实际地址合并，基址 `0x0`。
 校验每段原始字节、地址、总长度及 `0xFF` 填充；不得遗漏 P4 的 OTA 初始化数据。
 完整烧录覆盖间隙内 NVS，需重新配置 Wi-Fi 和绑定，不承诺保留配置或 OTA。
