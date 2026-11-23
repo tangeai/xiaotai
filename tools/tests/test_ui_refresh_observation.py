@@ -88,6 +88,12 @@ int main(void){
     def test_render_monitor_counts_actual_pixels_and_keeps_previous_callback(self):
         source = PRODUCT.read_text()
         run_c(PREAMBLE + r'''
+/* Only DEBUG should receive the periodic summary. */
+#undef ESP_LOGI
+#undef ESP_LOGW
+#define ESP_LOGI(tag,...) ((void)0)
+#define ESP_LOGW(tag,...) ((void)0)
+#define ESP_LOGD(tag,...) capture(__VA_ARGS__)
 typedef struct drv drv;
 struct drv {void (*monitor_cb)(drv *,uint32_t,uint32_t);};
 typedef drv lv_disp_drv_t;

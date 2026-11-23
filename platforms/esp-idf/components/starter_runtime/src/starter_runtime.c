@@ -2882,7 +2882,7 @@ static void ai_face_apply_event(const cJSON *root, const char *json, uint32_t at
     if (kind == NULL || (strcmp(kind, "event") == 0 && strcmp(input, "none") == 0)) return;
     if (caption && !new_group && !final && !changed && synced != 0 &&
         strcmp(input, "none") == 0) return;
-    ESP_LOGI(TAG, "AI face trace: generation=%lu at-ms=%lu event=%s input=%s "
+    ESP_LOGD(TAG, "AI face trace: generation=%lu at-ms=%lu event=%s input=%s "
              "group=%s speaker=%d valid=%d final=%d tag=%d->%d emotion=%s pending=%d sync=%d",
              (unsigned long)s_connection_generation, (unsigned long)at_ms, kind, input,
              caption ? (new_group ? "new" : "same") : "-", speaker,
@@ -4287,16 +4287,19 @@ esp_err_t starter_runtime_start(const char *device_id)
     return ESP_OK;
 }
 
-static esp_err_t enqueue_simple(runtime_event_type_t type)
+static esp_err_t enqueue_simple(runtime_event_type_t type, const char *action)
 {
     /* 返回成功只代表控制意图已入队，状态转换结果通过 status 查询。 */
     const runtime_event_t event = {.type = type};
-    return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
+    if (queue_event(&event)) return ESP_OK;
+    ESP_LOGW(TAG, "control action enqueue failed: %s rc=%s", action,
+             esp_err_to_name(ESP_ERR_TIMEOUT));
+    return ESP_ERR_TIMEOUT;
 }
 
 esp_err_t starter_runtime_ai_start(void)
 {
-    return enqueue_simple(EVENT_AI_START);
+    return enqueue_simple(EVENT_AI_START, __func__);
 }
 
 esp_err_t starter_runtime_ai_start_from_wake(uint32_t wake_token)
@@ -4308,7 +4311,7 @@ esp_err_t starter_runtime_ai_start_from_wake(uint32_t wake_token)
 
 esp_err_t starter_runtime_ai_stop(void)
 {
-    return enqueue_simple(EVENT_AI_STOP);
+    return enqueue_simple(EVENT_AI_STOP, __func__);
 }
 
 esp_err_t starter_runtime_main_key(bool double_click)
@@ -4319,12 +4322,12 @@ esp_err_t starter_runtime_main_key(bool double_click)
 
 esp_err_t starter_runtime_contacts_refresh(void)
 {
-    return enqueue_simple(EVENT_CONTACTS_REFRESH);
+    return enqueue_simple(EVENT_CONTACTS_REFRESH, __func__);
 }
 
 esp_err_t starter_runtime_wechat_quick_call(void)
 {
-    return enqueue_simple(EVENT_WECHAT_QUICK_CALL);
+    return enqueue_simple(EVENT_WECHAT_QUICK_CALL, __func__);
 }
 
 static bool decimal_string(const char *text, size_t length, bool allow_empty)
@@ -4453,17 +4456,17 @@ esp_err_t starter_runtime_call_set_camera_enabled(uint32_t session_generation, b
 #endif
 esp_err_t starter_runtime_call_accept(void)
 {
-    return enqueue_simple(EVENT_CALL_ACCEPT);
+    return enqueue_simple(EVENT_CALL_ACCEPT, __func__);
 }
 
 esp_err_t starter_runtime_call_reject(void)
 {
-    return enqueue_simple(EVENT_CALL_REJECT);
+    return enqueue_simple(EVENT_CALL_REJECT, __func__);
 }
 
 esp_err_t starter_runtime_call_hangup(void)
 {
-    return enqueue_simple(EVENT_CALL_HANGUP);
+    return enqueue_simple(EVENT_CALL_HANGUP, __func__);
 }
 
 esp_err_t starter_runtime_call_set_microphone_muted(bool muted)

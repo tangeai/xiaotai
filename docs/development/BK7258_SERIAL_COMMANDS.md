@@ -50,6 +50,8 @@ ap_cmd call-status
 ap_cmd log-level app 3
 ```
 
+采集周期性的 `METRICS` 和视频帧率统计前，先运行 `ap_cmd log-level app 4`。
+
 排查时可临时使用 `ap_cmd log-level app 4`。日志级别不保存，重启后恢复固件默认值；
 编译时关闭的 SDK 日志不能靠此命令恢复。分享日志前删除密码、令牌等敏感内容。
 

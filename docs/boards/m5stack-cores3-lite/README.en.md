@@ -8,35 +8,25 @@ Board ID: `m5stack-cores3-lite`. See [Downloads](../../downloads.en.md#m5stack-c
 
 ## Flashing
 
-The filename uses the distribution version; compare embedded firmware identity with the release notes. Download one complete BIN without extraction. Screenshot versions and paths are examples.
-
 ### Confirm the board
 
 This project supports **CoreS3-Lite K128-Lite / ILI9342C** only. The download page provides one complete image; there is no display choice or build configuration for other panels.
 
-### Open the flashing tool
+### Flash with the browser
 
-Open [Espressif ESP Web Tool](https://espressif.github.io/esptool-js/) in desktop **Chrome or Edge**. ESP-IDF installation is unnecessary for browser flashing. Close terminals and other pages using the serial port. See the [official guide](https://docs.m5stack.com/en/core/CoreS3-Lite) for connectors and download mode.
+Connect the Type-C port with a USB data cable. Hold the bottom reset button for about 3 seconds and release it when the green LED lights up. The board enters download mode when the LED goes out. Close any serial monitor using this port.
 
-### Flashing steps
+The full image overwrites saved Wi-Fi credentials, device binding and service-discovery settings in NVS. After flashing, configure Wi-Fi and bind the device again.
 
-1. Download this board’s complete `_merged.bin` from Downloads. Select only this BIN at **`0x0`**.
-2. Connect Type-C to the computer. Hold the bottom reset button for about 3 seconds, release when the green LED lights, and wait until it goes out to enter download mode. Detection must show **ESP32-S3**.
-3. In **Program**, set `Baudrate` to `921600`, or `115200` if unstable. Click **Connect** and select the board. Leave `WebUSB (CH340)` unchecked for desktop serial mode.
-4. Click **Choose File**, select the merged BIN, and set **Flash Address to `0x0`**. Set Flash Mode, Flash Frequency, and Flash Size to `keep`. Add only one row and click **Program**.
-5. Wait for `Hash of data verified.` and a final `Leaving...` with no `Error:`. Click **Disconnect**, reset, and check 115200-baud logs for `m5stack_cores3_lite_xiaotai`, the embedded version listed in the release notes before first use.
+1. Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Under **芯片平台** (chip platform), select **乐鑫 Espressif（ESP32 系列）**. Click **连接设备** (connect device) and select the board’s serial port in the browser prompt. Check that the tool detects ESP32-S3.
+2. Under **小钛固件** (published firmware), choose **M5Stack开发板 · ESP32-S3(CoreS3-Lite)** under **开发板** (board), then choose the **固件版本** (version) entry labeled `xiaotai` that matches the release on the downloads page.
+   If you already have the BIN, choose **本地 BIN** (local BIN) and open the [release file](../../downloads.en.md#m5stack-cores3-lite) named `v<release-version>_m5stack-cores3-lite_ili9342c_merged.bin`.
+3. Confirm the complete image starts at `0x0` and click **开始烧录** (start flashing). Keep the board connected until **烧录过程** (flash log) reports completion.
+4. After reboot, open **串口日志** (serial log) at 115200 baud. Look for project name `m5stack_cores3_lite_xiaotai` and compare the reported firmware version with the embedded version in the release notes.
 
-Connection and programming controls are shown below; port numbers and paths are examples:
+![XiaoTai Web Flasher with m5stack-cores3-lite selected](../../images/flashing/xiaotai-m5stack-cores3-lite.png)
 
-![ESP Web Tool Connect and Program controls](../../images/flashing/web-connect.png)
-
-![CoreS3-Lite merged BIN, address 0x0, and Program](../../images/flashing/web-m5stack-cores3-lite.png)
-
-**The merged image overwrites Wi-Fi, binding, and EP service-discovery overrides in nonvolatile storage (NVS).** Configure Wi-Fi and bind again afterward. `keep` preserves image Flash parameters, not device settings.
-
-Repeat step 2 for connection failures; check the port, cable, file, and address for write/verification failures. A 100% progress bar alone does not prove success.
-
-The complete image is `v<release-version>_m5stack-cores3-lite_ili9342c_merged.bin`. Flash only this file at `0x0`.
+Connector and download-mode details are in the [official guide](https://docs.m5stack.com/en/core/CoreS3-Lite).
 
 Compare its SHA-256 with the release notes. Use `Get-FileHash -Algorithm SHA256 "BIN-path"` on Windows, `sha256sum "BIN-path"` on Linux, or `shasum -a 256 "BIN-path"` on macOS.
 
@@ -45,7 +35,7 @@ Compare its SHA-256 with the release notes. Use `Get-FileHash -Algorithm SHA256 
 Confirm the complete `_merged.bin` was flashed at `0x0` and the device rebooted, then configure Wi-Fi and bind.
 
 1. **Wi-Fi:** without saved credentials, the screen prompts for setup. Connect a phone/computer to the open hotspot beginning `XiaoTai-`; “no internet” is normal. Select 2.4 GHz Wi-Fi in the setup page, enter the password, and submit. If no page opens, visit `http://192.168.6.1`. A reappearing hotspot indicates failure; check password and signal.
-2. **Binding:** after connection, the display shows a six-digit code. Restore the phone/computer's internet connection, open the [XiaoTai device page](https://xiaotai.chat/devices), sign up or sign in, and enter the code under Add device. Use a refreshed code if expired. The home screen and an entry in the device list indicate success.
+2. **Binding:** when binding is required, the display shows a six-digit code. Restore the phone/computer's internet connection, open the [XiaoTai device page](https://xiaotai.chat/devices), sign up or sign in, and enter the code under Add device. Use a refreshed code if expired. The home screen and an entry in the device list indicate success.
 3. **Try features and recover:** use the touch menu for AI, contacts, group intercom, and settings. To change network or rebind, confirm Reset device in settings, then set up and bind again. Do not erase the entire Flash.
 
 Wi-Fi and binding credentials are stored in NVS; source code contains no account or password.

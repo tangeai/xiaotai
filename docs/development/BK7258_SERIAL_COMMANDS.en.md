@@ -42,6 +42,8 @@ Normally keep information logging:
 ap_cmd log-level app 3
 ```
 
+Run `ap_cmd log-level app 4` before capturing periodic `METRICS` and video frame-rate statistics.
+
 Use `ap_cmd log-level app 4` temporarily for diagnosis. Levels are not persisted and revert to firmware defaults after reboot. This command cannot enable SDK logs removed at compile time. Remove passwords, tokens, and other secrets before sharing logs.
 
 ## Wi-Fi, binding, and reboot

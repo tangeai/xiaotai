@@ -2,16 +2,14 @@
 
 [中文](downloads.md) · [English](downloads.en.md)
 
-当前统一发行：**v1.2.0-beta.1 — 测试版，待实板验收**。下方另列 `v1.0.0` 历史正式归档和 `v1.1.0` 历史预发布归档。
+当前统一发行：**v1.2.0-beta.1 — 测试版，待实板验收**。历史归档见下方的 `v1.0.0` 和 `v1.1.0`。
 旧板卡 tag 及其失效下载链接已清理。
 
 [发布说明、SHA-256 与已知问题](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1) · [发布规范](development/release-policy.md)
 
-按开发板和屏幕变体只下载一个完整 BIN，无需解压，不提供分文件烧录包。
-ESP 文件以 `_merged.bin` 结尾，BK 文件以 `_all-app.bin` 结尾。相同芯片的不同板卡不能混用固件。
+在电脑上用 Chrome 或 Edge 打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/)，选中开发板型号，再选与下载页一致的 `xiaotai` 发行版本。也可以从下表下载与板型、屏幕匹配的完整镜像，再用 **本地 BIN** 打开。
 
-ESP 完整镜像从 `0x0` 烧录，会覆盖 Wi-Fi、绑定等 NVS 配置。BK 使用本板指南中的原生串口工具，
-地址为 `0x0`，不用 esptool；保留原厂校准资料，不全片擦除。烧录后准备重新配置设备。
+ESP32 镜像以 `_merged.bin` 结尾，BK7258 镜像以 `_all-app.bin` 结尾，两者都从 `0x0` 写入。ESP32 完整镜像会覆盖 NVS 中的 Wi-Fi 和绑定信息。BK7258 烧录前请备份原厂校准数据，避免全片擦除。
 
 统一发行版本与复用固件的内嵌身份不同，请按下表“内嵌版本”核对设备日志。本次整理未重新编译固件。
 
@@ -94,7 +92,7 @@ M5Stack CoreS3-Lite / M5Stack CoreS3-Lite
 ## 历史固件归档
 
 - [v1.0.0：五板历史完整 BIN](https://github.com/tangeai/xiaotai/releases/tag/v1.0.0)。
-- [v1.1.0：五板历史完整 BIN](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0)；归档的立创 S3 镜像存在 AI 已知问题，保留 pre-release。
+- [v1.1.0：五板历史完整 BIN](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0)。立创 S3 的 build.68 有已知 AI SDK 问题。发布正文将此归档列为预发布，GitHub 页面未标记为预发布。
 
 归档保留实际内嵌版本与哈希，供复现历史使用；当前测试使用上方 v1.2.0-beta.1。
 

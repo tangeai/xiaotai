@@ -211,7 +211,7 @@ void stats_timer_func(void * arg)
 {
 	/* Host-side cumulative observations, not C6 counters or peer delivery.
 	 * Fields are independent snapshots while RX/TX workers keep running. */
-	ESP_LOGI(TAG, "[DEBUG-link71] host rx-valid/stack-ok/stack-fail=%lu/%lu/%lu "
+	ESP_LOGD(TAG, "[DEBUG-link71] host rx-valid/stack-ok/stack-fail=%lu/%lu/%lu "
 			"tx-queued/drop/bus-written=%lu/%lu/%lu throttle=%u",
 			(unsigned long)atomic_load_explicit(&pkt_stats.sta_rx_in, memory_order_relaxed),
 			(unsigned long)atomic_load_explicit(&pkt_stats.sta_rx_out, memory_order_relaxed),
