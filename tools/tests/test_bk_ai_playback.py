@@ -111,7 +111,7 @@ static int opus_packet_get_nb_samples(const uint8_t *p,opus_int32 n,int rate) {
     (void)p;(void)n;assert(rate==16000);return packet_samples;
 }
 static uint32_t s_opus_queued_samples;
-static xiaotai_audio_buffer_t s_ai_buffer={.target_ms=100};
+static xiaotai_audio_buffer_t s_ai_buffer={.target_ms=AI_BUFFER_DEFAULT_MS};
 /* Legacy ownership/timing cases release immediately; adaptive cases override. */
 static bool s_ai_buffer_ended=true;
 ''' + diagnostic_block(source) + function(source, 'xiaotai_audio_play_opus_stream') + function(source, 'xiaotai_audio_play_opus') + function(source, 'opus_ring_take')
@@ -252,8 +252,13 @@ int main(void){
     packet_samples=960;assert(xiaotai_audio_play_opus(&packet,1,0)==1);
     assert(opus_ring_take(&output,1)==0); /* 60 ms, not one nominal frame. */
     packet_samples=640;assert(xiaotai_audio_play_opus(&packet,1,60)==1);
-    assert(opus_ring_take(&output,1)==1); /* 60+40 reaches 100 ms. */
-    assert(s_opus_queued_samples==640);s_playback_tail_ms=now+60;
+    assert(opus_ring_take(&output,1)==0); /* 60+40 still needs 100 ms. */
+    for(unsigned i=0;i<5;i++) {
+        packet_samples=320;assert(xiaotai_audio_play_opus(&packet,1,100+i*20)==1);
+    }
+    assert(opus_ring_take(&output,1)==1);
+    assert(s_opus_queued_samples==2240);s_playback_tail_ms=now+60;
+    for(unsigned i=0;i<5;i++) assert(opus_ring_take(&output,1)==1);
     assert(opus_ring_take(&output,1)==1 && s_opus_queued_samples==0);
     packet_samples=-1;assert(xiaotai_audio_play_opus(&packet,1,0)==BK_ERR_PARAM);
     packet_samples=1920;assert(xiaotai_audio_play_opus(&packet,1,0)==BK_ERR_PARAM);
@@ -268,16 +273,16 @@ int main(void){
         self.replay(r'''
     uint8_t packet=42,output=0;
     xiaotai_audio_playback_boundary(false);
-    for(unsigned i=0;i<5;i++) assert(xiaotai_audio_play_opus(&packet,1,0)==1);
+    for(unsigned i=0;i<10;i++) assert(xiaotai_audio_play_opus(&packet,1,0)==1);
     s_playback_tail_ms=now+100;
-    for(unsigned i=0;i<5;i++) assert(opus_ring_take(&output,1)==1);
+    for(unsigned i=0;i<10;i++) assert(opus_ring_take(&output,1)==1);
     s_playback_in_progress=false;s_playback_tail_ms=1100;
     now=1140;assert(opus_ring_take(&output,1)==0);
     assert(s_ai_buffer.recovering);
     xiaotai_audio_playback_boundary(false); /* New round; previous end was lost. */
     assert(xiaotai_audio_play_opus(&packet,1,0)==1);
     assert(opus_ring_take(&output,1)==0);
-    assert(s_ai_buffer.target_ms==100 && s_ai_buffer.underruns==0);
+    assert(s_ai_buffer.target_ms==AI_BUFFER_DEFAULT_MS && s_ai_buffer.underruns==0);
 ''')
 
     def test_session_reset_cancels_wait_and_discards_old_audio(self):
@@ -291,7 +296,7 @@ int main(void){
     s_running=false;ring_reset(); /* Existing stop/start lifecycle boundary. */
     xiaotai_audio_playback_boundary(true); /* Late end cannot arm stopped audio. */
     assert(!s_ai_buffer_ended && !s_ai_buffer.waiting);
-    assert(s_ai_buffer.target_ms==100 && s_opus_count==0 && s_opus_queued_samples==0);
+    assert(s_ai_buffer.target_ms==AI_BUFFER_DEFAULT_MS && s_opus_count==0 && s_opus_queued_samples==0);
     s_running=true;now=1200;packet=99;
     assert(xiaotai_audio_play_opus(&packet,1,100)==1);
     now=1400;assert(opus_ring_take(&output,1)==0); /* Old deadline must not release. */
