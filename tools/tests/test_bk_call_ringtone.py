@@ -274,14 +274,25 @@ static size_t sink_bytes,reference_samples;
 typedef int opus_int32;
 typedef int beken_thread_arg_t;
 static unsigned rtos_get_time(void){return 200;}
-static size_t opus_ring_take(void *p,size_t n){if(packet){memset(p,0,n);return 5;}return 0;}
+/* Pause scenarios feed a fixed packet list with sender media timestamps;
+ * ring_packets<0 keeps the original "one packet per call" behaviour. */
+static int ring_packets=-1,silent_writes,write_limit=1;
+static unsigned stamp_list[8],stamp_next,pending_ms;
+static size_t opus_ring_take(void *p,size_t n){
+ if(packet&&ring_packets!=0){
+  if(ring_packets>0){--ring_packets;pending_ms=stamp_list[stamp_next++];}
+  memset(p,0,n);return 5;}
+ return 0;}
 #include "xiaotai_opus_plc.h"
+#include "xiaotai_audio_pause.h"
 int xiaotai_opus_plc_decode(xiaotai_opus_plc_t *s,struct OpusDecoder *d,
  const xiaotai_opus_stamp_t *stamp,const uint8_t *p,int n,int16_t *pcm,int max){
+ /* The worker reads the stamp it passed in; the ring supplies its media time. */
+ if(ring_packets>=0)((xiaotai_opus_stamp_t *)stamp)->media_ms=pending_ms;
  int samples=packet==2?(concealment_only?640:960):320;assert(max>=samples);
  decodes++;s->output_concealed_samples=packet==2?640:0;
  s->output_packet_decoded=!concealment_only;
- for(int i=0;i<samples;i++)pcm[i]=packet==2?2048:0;
+ for(int i=0;i<samples;i++)pcm[i]=packet==2?2048:(ring_packets>=0?1000:0);
  return samples;
 }
 static size_t ring_take(void *p,size_t n){if(packet){memset(p,0,n);return n;}return 0;}
@@ -296,13 +307,18 @@ static void rtos_unlock_mutex(int *m){}
 static void aec_reference_push(const int16_t *pcm,size_t n){refs++;reference_samples+=n;}
 static int write_pcm(void *c,const int16_t *pcm,size_t n,size_t *bytes){
  bool audible=false;for(size_t i=0;i<n;i++)audible|=pcm[i]!=0;
+ if(ring_packets>=0){
+  /* Sender-pause scenario: every write is either a 20 ms silent chunk or a decoded packet. */
+  if(!audible&&n==320)silent_writes++;
+  *bytes=n*2;writes++;if(writes>=write_limit)s_play_run=false;return 0;
+ }
  assert(audible==!s_speaker_muted);
  if(packet==2){assert(n==(concealment_only?640:960) && pcm[0]==1024 && pcm[n-1]==1024);}
  *bytes=sink_bytes==SIZE_MAX?0:(sink_bytes?sink_bytes:n*2);writes++;s_play_run=false;return sink_result;
 }
 static struct {void *context;int (*write_pcm)(void *,const int16_t *,size_t,size_t *);} board={0,write_pcm},*s_board_audio=&board;
 ''' + (AUDIO.parent / 'xiaotai_audio_policy.c').read_text() + '\nstatic xiaotai_audio_buffer_t s_ai_buffer;\n' + diagnostic_block(source) + function(source,'call_ringtone_pcm') + function(source,'mix_call_ringtone') +
-            function(source,'playback_task') + r'''
+            function(source,'write_ai_pause') + function(source,'playback_task') + r'''
 int main(void){
  for(int codec=0;codec<2;codec++)for(int mute=0;mute<2;mute++)for(packet=0;packet<2;packet++){
   s_codec=codec;s_frame_samples=codec?320:160;s_speaker_muted=mute;
@@ -341,7 +357,39 @@ int main(void){
  playback_task(0);
  assert(writes==1 && decodes==1 && refs==1 && s_downlink_frames==0);
 
+ /* Sender pauses (captured pattern: media clock leaves 460 ms between words).
+  * Packets 1000,1020 are contiguous; 1500 follows a 460 ms gap; 1520 is
+  * contiguous; 1540 -> 1580 leaves 20 ms and 1580 -> 1660 leaves 60 ms. The
+  * decoder conceals up to 40 ms, so only the 460 ms and 60 ms gaps get silence. */
+ concealment_only=false;sink_result=0;sink_bytes=0;
+ s_codec=XIAOTAI_AUDIO_CODEC_OPUS_16K;s_speaker_muted=false;s_volume=5;
+ s_ai_packet.opus.samples=320;s_ai_packet.opus.epoch=7;s_ai_packet.opus.stream=14;
+ packet=1;ring_packets=7;write_limit=1000;writes=refs=silent_writes=0;
+ stamp_next=0;
+ { unsigned list[]={1000,1020,1500,1520,1540,1580,1660};
+   for(int i=0;i<7;i++)stamp_list[i]=list[i]; }
+ s_play_run=true;s_playback_pcm_ms=0;s_playback_tail_ms=0;
+ s_pause_rendered_ms=0;s_pause_count=0;s_pause_max_ms=0;
+ playback_task(0);
+ assert(silent_writes==(460+60)/20);
+ assert(writes==7+silent_writes);
+ assert(s_pause_rendered_ms==520 && s_pause_count==2 && s_pause_max_ms==460);
+ assert(s_playback_pcm_ms==7*20+520);
 
+ /* A stall or clock jump adds at most 800 ms of silence. */
+ ring_packets=2;writes=refs=silent_writes=0;stamp_next=0;
+ stamp_list[0]=100;stamp_list[1]=9000;
+ s_ai_packet.opus.epoch=8;s_play_run=true;
+ s_pause_rendered_ms=0;s_pause_count=0;s_pause_max_ms=0;
+ playback_task(0);
+ assert(s_pause_rendered_ms==800 && silent_writes==40);
+
+ /* The first packet of a session never gets a pause. */
+ ring_packets=1;writes=refs=silent_writes=0;stamp_next=0;
+ stamp_list[0]=50000;s_ai_packet.opus.epoch=9;s_play_run=true;
+ playback_task(0);
+ assert(silent_writes==0 && writes==1);
+ ring_packets=-1;write_limit=1;
 }
 ''',[ROOT/'platforms/beken/runtime/include',ROOT/'platforms/beken/runtime/assets',
      ROOT/'platforms/common/include'])

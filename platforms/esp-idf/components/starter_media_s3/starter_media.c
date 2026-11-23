@@ -1015,6 +1015,36 @@ static void audio_capture_task(void *argument)
     }
 }
 
+/* Renders silence the sender left out between words. Each 20 ms write holds
+ * the output mutex alone, so volume/stop requests wait at most one write, and
+ * a new session or mute ends the pause immediately. A failure only skips the
+ * remaining silence; the packet itself still goes through the normal checks. */
+static bool play_ai_pause(uint32_t generation, uint32_t pause_ms)
+{
+    while (pause_ms != 0U) {
+        uint32_t chunk_ms = pause_ms < AUDIO_PACKET_MS ? pause_ms : AUDIO_PACKET_MS;
+        size_t frames = (size_t)chunk_ms * (OPUS_SAMPLE_RATE_HZ / 1000U);
+        size_t bytes = frames * 2U * sizeof(int16_t);
+        if (xSemaphoreTake(s_audio_output_mutex, pdMS_TO_TICKS(500)) != pdTRUE) {
+            return false;
+        }
+        size_t written = 0U;
+        bool ok = same_session(STARTER_TIRTC_AI, generation) && s_amp_enabled &&
+            !atomic_load_explicit(&s_speaker_muted, memory_order_acquire);
+        if (ok) {
+            memset(s_play_stereo, 0, bytes);
+            ok = s_audio_adapter->write_pcm(s_audio_adapter->context,
+                                            s_play_stereo, frames, &written) == ESP_OK &&
+                 written == bytes;
+        }
+        if (ok) audio_playback_track_write(frames);
+        xSemaphoreGive(s_audio_output_mutex);
+        if (!ok) return false;
+        pause_ms -= chunk_ms;
+    }
+    return true;
+}
+
 static bool play_audio_item(const audio_rx_item_t *item)
 {
     /* Only the sink worker uses this decoder; reset its prediction state at
@@ -1070,6 +1100,13 @@ static bool play_audio_item(const audio_rx_item_t *item)
     if (mono_samples > sizeof(s_play_stereo) / sizeof(s_play_stereo[0]) / expansion) {
         atomic_fetch_add_explicit(&s_audio_decode_failed, 1, memory_order_relaxed);
         return false;
+    }
+    if (item->mode == STARTER_TIRTC_AI) {
+        /* The sender drops silent frames; keep its pauses between words. */
+        uint16_t pause_ms = starter_ai_playout_pause_ms(
+            item->generation, item->frame.timestamp_ms, item->frame.stream_id,
+            (uint16_t)mono_samples);
+        if (pause_ms != 0U) (void)play_ai_pause(item->generation, pause_ms);
     }
     int64_t lock_start_us = esp_timer_get_time();
     bool locked = xSemaphoreTake(s_audio_output_mutex, pdMS_TO_TICKS(500)) == pdTRUE;
@@ -2196,6 +2233,9 @@ starter_media_status_t starter_media_status(void)
         .audio_rx_prefill_target_ms = playout.target_ms,
         .audio_rx_buffered_ms = playout.queued_samples / 16U,
         .audio_rx_timeout_releases = playout.timeout_releases,
+        .audio_pause_ms = playout.pause_ms,
+        .audio_pause_count = playout.pause_count,
+        .audio_pause_max_ms = playout.pause_max_ms,
         .audio_rx_queue_capacity =
             atomic_load_explicit(&s_mode, memory_order_acquire) == STARTER_TIRTC_AI
                 ? AUDIO_RX_QUEUE_DEPTH : AUDIO_RX_LIVE_QUEUE_DEPTH,

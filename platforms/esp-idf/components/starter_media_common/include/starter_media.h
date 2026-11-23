@@ -35,6 +35,9 @@ typedef struct {
     uint32_t audio_rx_rebuffers; /**< Supply interruptions, not network packet loss. */
     uint32_t audio_rx_buffered_ms;
     uint32_t audio_rx_timeout_releases;
+    uint32_t audio_pause_ms;     /**< AI 本会话还原的发送端停顿总时长。 */
+    uint32_t audio_pause_count;  /**< 还原停顿的次数。 */
+    uint32_t audio_pause_max_ms; /**< 单次还原的最长停顿。 */
     uint32_t audio_rx_prefill_target_ms;
     uint32_t audio_rx_prefill_waits; /**< 为吸收下行抖动进行预缓冲的次数。 */
     uint32_t audio_rx_queue_capacity; /**< 接收缓冲容量；0 表示未提供该诊断。 */

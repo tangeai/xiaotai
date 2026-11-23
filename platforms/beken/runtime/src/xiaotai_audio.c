@@ -19,6 +19,7 @@
 
 #define XIAOTAI_MEDIA_PROFILE 1
 #include "../../../common/include/xiaotai_media_policy.h"
+#include "../../../common/include/xiaotai_audio_pause.h"
 
 #define TAG "xiaotai_audio"
 
@@ -458,6 +459,10 @@ typedef struct {
 static ai_packet_timing_t s_ai_packet_stamps[OPUS_PACKET_SLOTS], s_ai_packet;
 static uint32_t s_ai_rx_seq, s_ai_rx_previous_ms, s_plc_epoch;
 static atomic_uint s_plc_rendered_ms __attribute__((section(".sram_spinlock_section"), aligned(4)));
+/* Silence restored for sender pauses (see xiaotai_audio_pause.h). */
+static atomic_uint s_pause_rendered_ms __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_pause_count __attribute__((section(".sram_spinlock_section"), aligned(4)));
+static atomic_uint s_pause_max_ms __attribute__((section(".sram_spinlock_section"), aligned(4)));
 typedef struct {
     uint32_t frames, failed, queue_max, decode_max, write_max, gap_max;
     uint32_t last_report_ms, last_write_ms;
@@ -1026,6 +1031,29 @@ static void capture_task(beken_thread_arg_t argument)
     rtos_delete_thread(NULL);
 }
 
+/* Writes the silence the sender's clock leaves before the next AI packet.
+ * 20 ms chunks keep a stop request from waiting out a long pause. The
+ * silence advances the hardware tail and AEC reference like any other PCM. */
+static void write_ai_pause(uint32_t pause_ms)
+{
+    static const int16_t silence[320];
+    for (uint32_t done = 0U; done < pause_ms && s_play_run; done += 20U) {
+        size_t bytes_written = 0U;
+        atomic_store_explicit(&s_playback_in_progress, true, memory_order_release);
+        int rc = s_board_audio->write_pcm(s_board_audio->context, silence,
+                                          320U, &bytes_written);
+        if (rc != BK_OK || bytes_written != sizeof(silence)) break;
+        uint32_t now_ms = rtos_get_time();
+        atomic_fetch_add_explicit(&s_playback_pcm_ms, 20U, memory_order_relaxed);
+        uint32_t tail_ms = atomic_load_explicit(&s_playback_tail_ms,
+                                                memory_order_acquire);
+        atomic_store_explicit(&s_playback_tail_ms,
+            xiaotai_audio_playback_tail_after_write(tail_ms, now_ms, 20U),
+            memory_order_release);
+        aec_reference_push(silence, 320U);
+    }
+}
+
 static void playback_task(beken_thread_arg_t argument)
 {
     (void)argument;
@@ -1034,7 +1062,12 @@ static void playback_task(beken_thread_arg_t argument)
     int16_t pcm[OPUS_MAX_DECODE_SAMPLES];
     ai_playback_timing_t timing = {0};
     xiaotai_opus_plc_t plc = {0};
+    xiaotai_audio_pause_t pause_timeline = {0};
+    uint32_t pause_epoch = 0U;
     atomic_store(&s_plc_rendered_ms, 0U);
+    atomic_store(&s_pause_rendered_ms, 0U);
+    atomic_store(&s_pause_count, 0U);
+    atomic_store(&s_pause_max_ms, 0U);
 
     BK_LOGI(TAG, "playback task started: codec=%s jitter=%u ms\n",
             s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K ? "opus" : "alaw",
@@ -1074,6 +1107,28 @@ static void playback_task(beken_thread_arg_t argument)
                 continue;
             }
             samples = (size_t)decoded;
+            if (media_frame) {
+                /* Each round has its own sender timeline. The decoder conceals
+                 * one or two missing frames itself; only longer gaps get silence. */
+                if (s_ai_packet.opus.epoch != pause_epoch) {
+                    pause_epoch = s_ai_packet.opus.epoch;
+                    xiaotai_audio_pause_reset(&pause_timeline);
+                }
+                uint32_t pause_ms = xiaotai_audio_pause_plan(&pause_timeline,
+                    s_ai_packet.opus.media_ms, s_ai_packet.opus.stream,
+                    s_ai_packet.opus.samples, XIAOTAI_AUDIO_PAUSE_DECODER_SPAN_MS);
+                if (pause_ms != 0U) {
+                    write_ai_pause(pause_ms);
+                    atomic_fetch_add_explicit(&s_pause_rendered_ms, pause_ms,
+                                              memory_order_relaxed);
+                    atomic_fetch_add_explicit(&s_pause_count, 1U,
+                                              memory_order_relaxed);
+                    if (pause_ms > atomic_load_explicit(&s_pause_max_ms,
+                                                        memory_order_relaxed))
+                        atomic_store_explicit(&s_pause_max_ms, pause_ms,
+                                              memory_order_relaxed);
+                }
+            }
         } else {
             if (ring_take(alaw, sizeof(alaw)) != sizeof(alaw)) {
                 if (atomic_load(&s_call_ring_kind) == XIAOTAI_CALL_RING_NONE) {
@@ -1697,7 +1752,7 @@ void xiaotai_audio_log_playback_status(const char *stage)
     uint32_t now_ms = rtos_get_time();
     int32_t tail_ms = (int32_t)(atomic_load(&s_playback_tail_ms) - now_ms);
     BK_LOGI(TAG,
-            "AI playback stage=%s rx=%u written=%u overflow=%u pending=%u peak=%u slots=%u active=%d pcm-ms=%u tail-ms=%u last-rx-age-ms=%u busy=%u queued-ms=%u target-ms=%u underruns=%u timeout-releases=%u plc-ms=%u\n",
+            "AI playback stage=%s rx=%u written=%u overflow=%u pending=%u peak=%u slots=%u active=%d pcm-ms=%u tail-ms=%u last-rx-age-ms=%u busy=%u queued-ms=%u target-ms=%u underruns=%u timeout-releases=%u plc-ms=%u pause-ms=%u pauses=%u pause-max-ms=%u\n",
             stage, (unsigned)atomic_load(&s_opus_received_frames),
             (unsigned)atomic_load(&s_downlink_frames),
             (unsigned)dropped, (unsigned)queued, (unsigned)peak,
@@ -1709,7 +1764,10 @@ void xiaotai_audio_log_playback_status(const char *stage)
             (unsigned)atomic_load(&s_admission_busy),
             (unsigned)queued_ms, (unsigned)buffer.target_ms,
             (unsigned)buffer.underruns, (unsigned)buffer.timeout_releases,
-            (unsigned)atomic_load(&s_plc_rendered_ms));
+            (unsigned)atomic_load(&s_plc_rendered_ms),
+            (unsigned)atomic_load(&s_pause_rendered_ms),
+            (unsigned)atomic_load(&s_pause_count),
+            (unsigned)atomic_load(&s_pause_max_ms));
 }
 
 uint32_t xiaotai_audio_playback_columns(void)

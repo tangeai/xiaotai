@@ -324,7 +324,7 @@ static int write_pcm(void *context,const int16_t *pcm,size_t frames,size_t *writ
     *written=frames*4;writes++;return 0;
 }
 static struct {void *context;int (*write_pcm)(void *,const int16_t *,size_t,size_t *);} adapter={NULL,write_pcm},*s_audio_adapter=&adapter;
-''' + playback_fixture(MEDIA.read_text()) + function(MEDIA.read_text(), 'update_max_counter') + function(MEDIA.read_text(), 'update_timing_average') + function(MEDIA.read_text(), 'play_audio_item') + r'''
+''' + playback_fixture(MEDIA.read_text()) + function(MEDIA.read_text(), 'update_max_counter') + function(MEDIA.read_text(), 'update_timing_average') + '\n#define AUDIO_PACKET_MS 20U\n#define OPUS_SAMPLE_RATE_HZ 16000U\n' + function(MEDIA.read_text(), 'play_ai_pause') + function(MEDIA.read_text(), 'play_audio_item') + r'''
 static bool play(audio_rx_item_t *item){item->received_at_ms=(uint32_t)(esp_timer_get_time()/1000);memset(s_play_stereo,0x55,sizeof(s_play_stereo));return play_audio_item(item);}
 int main(void){starter_ai_playout_reset(7);
     audio_rx_item_t item={.generation=7,.frame.length=37};
