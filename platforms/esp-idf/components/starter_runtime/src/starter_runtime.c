@@ -3831,6 +3831,7 @@ static void handle_room_action(const runtime_event_t *event)
         room_set_foreground(event->flag);
         return;
     }
+    if (event->command == ROOM_ACTION_JOIN && event->flag) room_set_foreground(true);
     if (event->command == ROOM_ACTION_SYNC) { s_room_sync_due_ms = now_ms(); return; }
     if (event->command == ROOM_ACTION_PTT) {
         if (!s_room_joined || session_state() != STARTER_RUNTIME_ROOM_ACTIVE) return;
@@ -4106,7 +4107,12 @@ static void runtime_task(void *argument)
                     dial_selected_contact((const starter_product_contact_t *)event.text, event.flag);
                 break;
             case EVENT_CALL_ACCEPT:
-                accept_call();
+                if (event.command == 0U ||
+                    (event.request_tag == session_generation() &&
+                     s_call_wechat == (event.mode == STARTER_TIRTC_VOIP))) {
+                    accept_call();
+                }
+
                 break;
             case EVENT_CALL_REJECT:
                 reject_or_hangup_call(true);
@@ -4342,9 +4348,9 @@ static bool decimal_string(const char *text, size_t length, bool allow_empty)
     return true;
 }
 
-static esp_err_t enqueue_room_json(room_action_t action, const char *json)
+static esp_err_t enqueue_room_json(room_action_t action, const char *json, bool foreground)
 {
-    runtime_event_t event = {.type = EVENT_ROOM_ACTION, .command = action};
+    runtime_event_t event = {.type = EVENT_ROOM_ACTION, .command = action, .flag = foreground};
     size_t length = strlen(json);
     if (!copy_event_text(&event, json, length)) return ESP_ERR_NO_MEM;
     if (!queue_event(&event)) { release_event(&event); return ESP_ERR_TIMEOUT; }
@@ -4372,10 +4378,10 @@ esp_err_t starter_runtime_room_create(const char *password)
         return ESP_ERR_INVALID_ARG;
     char json[48];
     (void)snprintf(json, sizeof(json), "{\"password\":\"%s\"}", password);
-    return enqueue_room_json(ROOM_ACTION_CREATE, json);
+    return enqueue_room_json(ROOM_ACTION_CREATE, json, false);
 }
 
-esp_err_t starter_runtime_room_join(const char *room_code, const char *password)
+static esp_err_t request_room_join(const char *room_code, const char *password, bool foreground)
 {
     if (!decimal_string(room_code, 6U, false)) return ESP_ERR_INVALID_ARG;
     if (password == NULL) password = "";
@@ -4385,7 +4391,17 @@ esp_err_t starter_runtime_room_join(const char *room_code, const char *password)
     (void)snprintf(json, sizeof(json),
                    "{\"room_code\":\"%s\",\"password\":\"%s\"}",
                    room_code, password);
-    return enqueue_room_json(ROOM_ACTION_JOIN, json);
+    return enqueue_room_json(ROOM_ACTION_JOIN, json, foreground);
+}
+
+esp_err_t starter_runtime_room_join(const char *room_code, const char *password)
+{
+    return request_room_join(room_code, password, false);
+}
+
+esp_err_t starter_runtime_room_join_from_console(const char *room_code, const char *password)
+{
+    return request_room_join(room_code, password, true);
 }
 
 esp_err_t starter_runtime_room_leave(void)
@@ -4455,6 +4471,49 @@ esp_err_t starter_runtime_call_set_camera_enabled(uint32_t session_generation, b
     return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 #endif
+esp_err_t starter_runtime_accept_from(starter_contact_source_t source)
+{
+    const runtime_event_t event = {
+        .type = EVENT_CALL_ACCEPT, .command = 1, .request_tag = session_generation(),
+        .mode = source == STARTER_CONTACT_WECHAT ? STARTER_TIRTC_VOIP : STARTER_TIRTC_CALL,
+    };
+    starter_service_status_t status;
+    if (!starter_runtime_service_status(&status) || !status.incoming ||
+        status.wechat != (source == STARTER_CONTACT_WECHAT)) return ESP_ERR_INVALID_STATE;
+    return queue_event(&event) ? ESP_OK : ESP_ERR_TIMEOUT;
+}
+
+bool starter_runtime_service_status(starter_service_status_t *out)
+{
+    if (!out || !s_product_mutex ||
+        xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(100)) != pdTRUE) return false;
+    *out = (starter_service_status_t){
+        .incoming = s_product_snapshot.call_incoming, .wechat = s_product_snapshot.call_wechat,
+        .ptt = s_product_snapshot.room_ptt, .room_phase = s_product_snapshot.room_phase,
+        .members = s_product_snapshot.room_member_count, .online = s_product_snapshot.room_online_count,
+    };
+    memcpy(out->room_code, s_product_snapshot.room_code, sizeof(out->room_code));
+    xSemaphoreGive(s_product_mutex);
+    return true;
+}
+
+esp_err_t starter_runtime_dial_named(starter_contact_source_t source, const char *name)
+{
+    if (!name || !name[0]) return ESP_ERR_INVALID_ARG;
+    if (!s_product_mutex ||
+        xSemaphoreTake(s_product_mutex, pdMS_TO_TICKS(100)) != pdTRUE) return ESP_ERR_TIMEOUT;
+    starter_product_contact_t target = {0};
+    for (unsigned i = 0; i < s_product_snapshot.contact_count; ++i) {
+        const starter_product_contact_t *contact = &s_product_snapshot.contacts[i];
+        if (contact->source == source && strcmp(contact->name, name) == 0) {
+            target = *contact;
+            break;
+        }
+    }
+    xSemaphoreGive(s_product_mutex);
+    return target.id[0] ? starter_runtime_call_target(&target, false) : ESP_ERR_NOT_FOUND;
+}
+
 esp_err_t starter_runtime_call_accept(void)
 {
     return enqueue_simple(EVENT_CALL_ACCEPT, __func__);

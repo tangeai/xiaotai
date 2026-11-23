@@ -29,6 +29,7 @@ typedef struct {
 
 /** 初始化网络栈并启动 STA/SoftAP 流程；重复调用安全。 */
 esp_err_t wifi_manager_start(void);
+esp_err_t wifi_manager_request_provisioning(void);
 
 /** 以下查询函数返回当前瞬时状态。 */
 bool wifi_manager_connected(void);

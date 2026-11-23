@@ -576,6 +576,14 @@ static void start_provisioning(void)
              WIFI_SETUP_URL);
 }
 
+ESP_EVENT_DEFINE_BASE(XIAOTAI_WIFI_CONTROL);
+
+esp_err_t wifi_manager_request_provisioning(void)
+{
+    if (!s_started) return ESP_ERR_INVALID_STATE;
+    return esp_event_post(XIAOTAI_WIFI_CONTROL, 0, NULL, 0, 0);
+}
+
 static void wifi_event(void *argument,
                        esp_event_base_t event_base,
                        int32_t event_id,
@@ -584,6 +592,14 @@ static void wifi_event(void *argument,
     /* 所有连接/重试/降级到 SoftAP 的转换都集中在 ESP-IDF 网络事件中。 */
     (void)argument;
     (void)event_data;
+    if (event_base == XIAOTAI_WIFI_CONTROL) {
+        start_provisioning();
+        if (s_provisioning && s_connected) {
+            esp_err_t err = esp_wifi_disconnect();
+            if (err != ESP_OK) ESP_LOGW(TAG, "Wi-Fi change disconnect: %s", esp_err_to_name(err));
+        }
+        return;
+    }
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         wifi_manager_credentials_t credentials;
         if (wifi_manager_load_credentials(&credentials) == ESP_OK) {
@@ -716,6 +732,8 @@ esp_err_t wifi_manager_start(void)
     if (err != ESP_OK) {
         return err;
     }
+    err = esp_event_handler_register(XIAOTAI_WIFI_CONTROL, 0, wifi_event, NULL);
+    if (err != ESP_OK) return err;
     err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event, NULL);
     if (err != ESP_OK) return err;
     err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event, NULL);

@@ -652,6 +652,19 @@ static const TIRTCCALLBACKS s_callbacks = {
     .on_update_bitrate = on_update_bitrate,
 };
 
+static atomic_int s_sdk_log_level = 3;
+
+int starter_tirtc_log_level(void)
+{
+    return atomic_load(&s_sdk_log_level);
+}
+
+void starter_tirtc_set_log_level(int level)
+{
+    TiRtcLogSetLevel(level);
+    atomic_store(&s_sdk_log_level, level);
+}
+
 const char *starter_tirtc_version(void) { return TiRtcGetVersion(); }
 const char *starter_tirtc_build_info(void) { return TiRtcGetBuildInfo(); }
 
@@ -737,7 +750,7 @@ int starter_tirtc_start(const starter_tirtc_config_t *config)
      * 正常业务切换只连接/断开，不反复 Stop/Uninit SDK。
      */
     TiRtcLogSetCallback(sdk_log);
-    TiRtcLogSetLevel(config->log_level > 0 ? config->log_level : 3);
+    starter_tirtc_set_log_level(config->log_level > 0 ? config->log_level : 3);
 #if CONFIG_IDF_TARGET_ESP32P4 && CONFIG_STARTER_PIPELINE_DIAGNOSTICS
     /* NOTICE only, no STAT/per-packet logging. Unknown formats are discarded
      * before reading varargs or formatting. A library version is not proof
