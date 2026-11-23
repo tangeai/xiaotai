@@ -9,6 +9,7 @@
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static uint32_t s_generation;
 static uint32_t s_queued_samples;
+static uint32_t s_queued_packets;
 static uint32_t s_waits;
 static bool s_ended;
 static xiaotai_audio_buffer_t s_buffer;
@@ -36,6 +37,7 @@ void starter_ai_playout_reset(uint32_t generation)
     portENTER_CRITICAL(&s_lock);
     s_generation = generation;
     s_queued_samples = 0U;
+    s_queued_packets = 0U;
     s_waits = 0U;
     s_ended = false;
     xiaotai_audio_buffer_reset(&s_buffer);
@@ -49,9 +51,10 @@ uint16_t starter_ai_playout_admit(uint32_t generation,
     if (samples == 0U) return 0U;
     portENTER_CRITICAL(&s_lock);
     if (generation == 0U || generation != s_generation ||
-        s_queued_samples > XIAOTAI_AI_PACKET_CAPACITY * 1920U - samples) {
+        s_queued_packets >= XIAOTAI_AI_PACKET_CAPACITY) {
         samples = 0U;
     } else {
+        ++s_queued_packets;
         s_queued_samples += samples;
     }
     portEXIT_CRITICAL(&s_lock);
@@ -61,7 +64,8 @@ uint16_t starter_ai_playout_admit(uint32_t generation,
 void starter_ai_playout_retire(uint32_t generation, uint16_t samples)
 {
     portENTER_CRITICAL(&s_lock);
-    if (generation != 0U && generation == s_generation) {
+    if (generation != 0U && generation == s_generation && samples && s_queued_packets) {
+        --s_queued_packets;
         s_queued_samples = samples <= s_queued_samples ? s_queued_samples - samples : 0U;
     }
     portEXIT_CRITICAL(&s_lock);
@@ -75,7 +79,8 @@ bool starter_ai_playout_ready(uint32_t generation, uint32_t now_ms,
     if (generation != 0U && generation == s_generation) {
         bool waiting = s_buffer.waiting;
         ready = xiaotai_audio_buffer_ready(&s_buffer, now_ms,
-            s_queued_samples / 16U, first_rx_ms, dma_tail_ms, s_ended);
+            s_queued_samples / 16U, first_rx_ms, dma_tail_ms, s_ended,
+            s_queued_packets == XIAOTAI_AI_PACKET_CAPACITY);
         if (!waiting && s_buffer.waiting) ++s_waits;
     }
     portEXIT_CRITICAL(&s_lock);

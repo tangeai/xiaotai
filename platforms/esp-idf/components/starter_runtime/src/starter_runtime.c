@@ -755,7 +755,7 @@ static void log_ai_playback_status(const char *stage)
 {
     starter_media_status_t media = starter_media_status();
     ESP_LOGI(TAG,
-             "AI playback stage=%s generation=%lu rx=%lu decoded=%lu written=%lu overflow=%lu pending=%lu active=%d pcm-ms=%lu dma-ms=%lu queued-ms=%lu target-ms=%lu underruns=%lu timeout-releases=%lu last-rx-age-ms=%lu",
+             "AI playback stage=%s generation=%lu rx=%lu decoded=%lu written=%lu overflow=%lu pending=%lu active=%d pcm-ms=%lu dma-ms=%lu queued-ms=%lu target-ms=%lu underruns=%lu timeout-releases=%lu last-rx-age-ms=%lu peak=%lu decode-fail=%lu blocked=%lu write-fail=%lu",
              stage, (unsigned long)session_generation(),
              (unsigned long)media.audio_received,
              (unsigned long)media.audio_decoded,
@@ -770,7 +770,11 @@ static void log_ai_playback_status(const char *stage)
              (unsigned long)media.audio_rx_rebuffers,
              (unsigned long)media.audio_rx_timeout_releases,
              (unsigned long)(media.audio_rx_last_ms != 0U
-                 ? (uint32_t)now_ms() - media.audio_rx_last_ms : 0U));
+                 ? (uint32_t)now_ms() - media.audio_rx_last_ms : 0U),
+             (unsigned long)media.audio_rx_queue_peak,
+             (unsigned long)media.audio_decode_failed,
+             (unsigned long)media.audio_playback_blocked,
+             (unsigned long)media.audio_write_failed);
 }
 
 static void begin_ai_end_drain(uint32_t arrival_grace_ms,
