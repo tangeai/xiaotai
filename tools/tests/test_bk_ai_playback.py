@@ -127,6 +127,7 @@ int main(void){
     uint8_t packet,output;
     s_ai_buffer_ended=false;
     s_ai_buffer.target_ms=300;
+    s_playback_tail_ms=now;
     packet_samples=40;
     for(unsigned i=0;i<63;i++){
         packet=(uint8_t)i;assert(xiaotai_audio_play_opus(&packet,1,i)==1);
@@ -286,6 +287,7 @@ int main(void){
     assert(xiaotai_audio_play_opus(&packet,1,0)==1);
     assert(opus_ring_take(&output,1)==0);
     s_ai_buffer.target_ms=300;
+    s_playback_tail_ms=now;
     s_running=false;ring_reset(); /* Existing stop/start lifecycle boundary. */
     xiaotai_audio_playback_boundary(true); /* Late end cannot arm stopped audio. */
     assert(!s_ai_buffer_ended && !s_ai_buffer.waiting);
