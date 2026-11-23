@@ -4,9 +4,14 @@
 
 ## 两个可复核的基线
 
-当前基线是五板 `v1.2.0-beta.2`（`4dc2f93`，TiRTC 2.6.3）。默认 AI 下行是 16 kHz 单声道 Opus，按实际采样数累计待播时长。64 个压缩包槽和起播水位分别控制。目标初始 100 ms，范围 60–300 ms，断供后恢复至少 140 ms；有数据等待最多 400 ms，轮次结束可提前放行，结束后还有尾包到达窗口。AI 队列满时计数并拒绝新包，已接收部分按序播放。ESP 的待处理数包括入队预留和播放线程持有的槽，BK 的环计数在播放线程取走一包时减少。跨平台比较统一使用实际包、时间戳和已写采样数。[公共缓冲决策](../../platforms/common/include/xiaotai_audio_buffer.h)
+当前基线是五板 `v1.2.0-beta.2`（`4dc2f93`，TiRTC 2.6.3）。默认 AI 下行是 16 kHz 单声道 Opus，按实际采样数累计待播时长。64 个压缩包槽和起播水位分别控制。目标初始 100 ms，范围 60–300 ms，断供后恢复至少 140 ms；有数据等待最多 400 ms，轮次结束可提前放行，结束后还有尾包到达窗口。AI 队列满时计数并拒绝新包，已接收部分按序播放。ESP 的待处理数包括入队预留和播放线程持有的槽，BK 的环计数在播放线程取走一包时减少。跨平台比较统一使用实际包、时间戳和已写采样数。
 
-参考版本为 xiaotai-esp32 v0.3.0（`f4161b3`）。它的 AI 模块请求 8 kHz G.711 A-law，以 20 ms 为名义包长，声明一次可到达 1000 ms 音频，媒体层默认另留 200 ms。变长记录按载荷、头部和对齐占字节环，容量计算还留回绕空间。两款 S3 的定时播放从 200 ms 起步；立创和 M5 的预填包数分别为 64 和 32，这两个值是启动条件之一，不能用作环容量。参考 P4 型号和尾音配置也与当前微雪 4.3C 不同。[参考 AI 模块](https://github.com/tangeai/xiaotai-esp32/blob/f4161b325e93a80f7b8077c53cd8dc0db5d5e994/sdk/modules/xiaotai_mod_ai_talk/src/ai_talk.c) · [环与预算公式](https://github.com/tangeai/xiaotai-esp32/blob/f4161b325e93a80f7b8077c53cd8dc0db5d5e994/sdk/xiaotai_media/include/xiaotai/media_downlink.h)
+- [公共缓冲决策](../../platforms/common/include/xiaotai_audio_buffer.h)
+
+参考版本为 xiaotai-esp32 v0.3.0（`f4161b3`）。它的 AI 模块请求 8 kHz G.711 A-law，以 20 ms 为名义包长，声明一次可到达 1000 ms 音频，媒体层默认另留 200 ms。变长记录按载荷、头部和对齐占字节环，容量计算还留回绕空间。两款 S3 的定时播放从 200 ms 起步；立创和 M5 的预填包数分别为 64 和 32，这两个值是启动条件之一，不能用作环容量。参考 P4 型号和尾音配置也与当前微雪 4.3C 不同。
+
+- [参考 AI 模块](https://github.com/tangeai/xiaotai-esp32/blob/f4161b325e93a80f7b8077c53cd8dc0db5d5e994/sdk/modules/xiaotai_mod_ai_talk/src/ai_talk.c)
+- [环与预算公式](https://github.com/tangeai/xiaotai-esp32/blob/f4161b325e93a80f7b8077c53cd8dc0db5d5e994/sdk/xiaotai_media/include/xiaotai/media_downlink.h)
 
 同样是 1.2 秒，20 ms 包约需 60 槽，10 ms 包约需 120 槽。开始时已积压 20 包，紧接着到达 50 个 20 ms 包，若期间未消费，64 槽会拒绝 6 包，即 120 ms。稍后槽释放又能接收后续语音，听感可能是句中缺字。反过来，若队列曾经见底且所有包后来都成功写入，优先检查供给间隔与输出节奏。抬高起播水位会推迟首音，还可能让下一批到达前积压更多包。这个算例说明应分别测量容量与水位，不能用来判定现场根因。
 
@@ -22,7 +27,13 @@
 | 立创 BK7258 | 工程声明 16 MiB PSRAM、640 KiB SRAM，AP 动态堆仅为其中一部分 | 32 KiB 载荷，另有 2176 B 静态包长与时间记录 | AP/CP 两侧预算、AEC、工作栈、反复启停后的连续块 |
 | 觅感 BK7258 | 物理 PSRAM 容量待核；须用本板运行数据 | 同为 32 KiB + 2176 B | 双屏 DMA、音频和会话切换；独立采样 |
 
-ESP 每槽允许 1500 B 载荷，表内已含槽内元数据和对齐；空闲与就绪队列、队列控制块、分配器开销、解码工作区和 DMA 另计。BK 每槽载荷最多 512 B；表内两个静态数组分别为 128 B 和 2048 B，未含线程当前持包、PCM、Opus 状态和 AEC。上述数值可在发布 ELF 上用目标 GDB 的 `p sizeof(audio_rx_item_t)` 或在 BK AP ELF 上用 `nm -S` 查 `s_opus_lengths`、`s_ai_packet_stamps` 复核。ESP 若改成 128 个固定槽，每块 S3 要再分配 95.5 KiB，P4 再分配 95.75 KiB，且整个新池需要连续空间；BK 再增 32 KiB 载荷及 2176 B 静态数组。不能从标称 PSRAM 推算出这些空间一定可用。[S3 接收池](../../platforms/esp-idf/components/starter_media_s3/starter_media.c) · [P4 接收池](../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/starter_media/src/starter_media.c) · [BK 音频分配](../../platforms/beken/runtime/src/xiaotai_audio.c)
+ESP 每槽允许 1500 B 载荷，表内已含槽内元数据和对齐；空闲与就绪队列、队列控制块、分配器开销、解码工作区和 DMA 另计。BK 每槽载荷最多 512 B；表内两个静态数组分别为 128 B 和 2048 B，未含线程当前持包、PCM、Opus 状态和 AEC。
+
+上述数值可在发布 ELF 上用目标 GDB 的 `p sizeof(audio_rx_item_t)` 或在 BK AP ELF 上用 `nm -S` 查 `s_opus_lengths`、`s_ai_packet_stamps` 复核。ESP 若改成 128 个固定槽，每块 S3 要再分配 95.5 KiB，P4 再分配 95.75 KiB，且整个新池需要连续空间；BK 再增 32 KiB 载荷及 2176 B 静态数组。不能从标称 PSRAM 推算出这些空间一定可用。
+
+- [S3 接收池](../../platforms/esp-idf/components/starter_media_s3/starter_media.c)
+- [P4 接收池](../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/components/starter_media/src/starter_media.c)
+- [BK 音频分配](../../platforms/beken/runtime/src/xiaotai_audio.c)
 
 ### 怎样把账本用于选型
 
