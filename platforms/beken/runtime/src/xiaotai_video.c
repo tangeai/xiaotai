@@ -107,7 +107,10 @@ static void sender_task(beken_thread_arg_t argument)
             }
         } else {
             ++s_dropped_frames;
-            ++stats_dropped;
+            if (stats_dropped++ == 0U) {
+                BK_LOGW(TAG, "H264 uplink send failed rc=%d total-dropped=%u\n",
+                        rc, (unsigned)s_dropped_frames);
+            }
         }
         frame_buffer_encode_free(frame);
 
@@ -118,7 +121,7 @@ static void sender_task(beken_thread_arg_t argument)
                 (stats_sent * 100000U) / elapsed_ms;
             uint32_t kbps = elapsed_ms == 0U ? 0U :
                 (stats_bytes * 8U) / elapsed_ms;
-            BK_LOGI(TAG,
+            BK_LOGD(TAG,
                     "H264 uplink actual=%u.%02u fps target=%u bitrate=%u kbps sent=%u dropped=%u\n",
                     (unsigned)(fps_x100 / 100U),
                     (unsigned)(fps_x100 % 100U),

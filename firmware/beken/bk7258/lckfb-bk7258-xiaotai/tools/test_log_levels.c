@@ -33,11 +33,9 @@ void bk_printf_nonblock(int level, char *tag, const char *format, ...)
 
 int main(void)
 {
-#if defined(CONFIG_LOG_LEVEL) && CONFIG_LOG_LEVEL <= XIAOTAI_LOG_INFO
     assert(xiaotai_log_get_level() == XIAOTAI_LOG_INFO);
-#else
-    assert(xiaotai_log_get_level() == XIAOTAI_LOG_DEBUG);
-#endif
+    xiaotai_log_write(XIAOTAI_LOG_DEBUG, "test", "hidden by default");
+    assert(s_writes == 0);
     assert(xiaotai_log_set_level(XIAOTAI_LOG_WARN) == 0);
     xiaotai_log_write(XIAOTAI_LOG_INFO, "test", "filtered");
     assert(s_writes == 0);

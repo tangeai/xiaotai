@@ -6,11 +6,7 @@
 #include <common/bk_err.h>
 #include <components/system.h>
 
-#if defined(CONFIG_LOG_LEVEL) && CONFIG_LOG_LEVEL <= XIAOTAI_LOG_INFO
 static volatile int s_app_log_level = XIAOTAI_LOG_INFO;
-#else
-static volatile int s_app_log_level = XIAOTAI_LOG_DEBUG;
-#endif
 
 int xiaotai_log_set_level(int level)
 {

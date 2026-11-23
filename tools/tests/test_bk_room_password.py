@@ -54,6 +54,9 @@ int main(void){
 #include <string.h>
 #define TAG "test"
 #define BK_LOGI(tag,...) do { if (0) printf(__VA_ARGS__); } while (0)
+#define XIAOTAI_LOG_INFO 3
+#define XIAOTAI_LOG_WARN 2
+#define xiaotai_log_write(level,tag,...) BK_LOGI(tag,__VA_ARGS__)
 #define BK_ERR_PARAM -1
 #define BK_OK 0
 #define XIAOTAI_TOUCH_DOWN 1

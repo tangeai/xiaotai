@@ -57,7 +57,7 @@ static void video_health(void)
     s_health_due_us = now + 5000000;
     call_video_renderer_stats_t stats = {0};
     call_video_renderer_get_stats(&stats);
-    ESP_LOGI("p4_video", "downlink generation=%lu mode=%d tx=%u tx-fail=%u tx-ret=%d send-buffer=%u/%u subscribed=%d rx=%u drop=%u "
+    ESP_LOGD("p4_video", "downlink generation=%lu mode=%d tx=%u tx-fail=%u tx-ret=%d send-buffer=%u/%u subscribed=%d rx=%u drop=%u "
              "stream=%u media=%u decoded=%lu converted=%lu presented=%lu decode-fail=%lu",
              (unsigned long)generation, (int)starter_tirtc_mode(),
              atomic_load(&s_sent), atomic_load(&s_tx_failed), atomic_load(&s_tx_last_error),

@@ -1,4 +1,5 @@
 #include "xiaotai_metrics.h"
+#include "xiaotai_log.h"
 
 #include "xiaotai_log.h"
 #include <components/system.h>
@@ -88,7 +89,8 @@ void xiaotai_metrics_network_event(bool connected)
 static void emit_snapshot(void)
 {
 #if CONFIG_LOG_LEVEL > 3
-    bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE metrics-begin\n");
+    if (xiaotai_log_get_level() >= XIAOTAI_LOG_DEBUG)
+        bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE metrics-begin\n");
 #endif
     char state[sizeof(s_state)];
     rtos_lock_mutex(&s_state_mutex);
@@ -130,13 +132,14 @@ static void emit_snapshot(void)
     s_snapshot.stack_low_words = stack_low;
     snprintf(s_snapshot.stack_low_task, sizeof(s_snapshot.stack_low_task), "%s", stack_low_task);
     rtos_unlock_mutex(&s_state_mutex);
+    if (xiaotai_log_get_level() < XIAOTAI_LOG_DEBUG) return;
 #if CONFIG_LOG_LEVEL > 3
     bk_printf_raw_nonblock(BK_LOG_NONE, NULL, "HBTRACE metrics-log-enter\n");
 #endif
     /* The shell's common log mode can wait for buffer space. This periodic
      * task must never hold that path while AP heartbeat scheduling depends on
      * the same SMP kernel. A full log buffer may drop this sample. */
-    bk_printf_nonblock(BK_LOG_INFO, TAG,
+    bk_printf_nonblock(XIAOTAI_LOG_DEBUG, TAG,
             "METRICS {\"uptime_ms\":%u,\"state\":\"%s\","
             "\"internal\":{\"free\":%u,\"minimum\":%u,"
             "\"largest\":null,\"blocks\":null},"

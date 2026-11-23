@@ -201,6 +201,12 @@ Before changing shared drivers or SDK patches in `platforms/beken/runtime` or `p
 
 Full LCKFB BK7258 hardware acceptance steps are in [Hardware acceptance (Chinese)](firmware/beken/bk7258/lckfb-bk7258-xiaotai/HARDWARE_ACCEPTANCE.md#一次完整验收).
 
+### Firmware log levels
+
+The default application log level for all five boards is INFO. Log startup readiness, user action outcomes and business transitions such as binding, connections, calls and room membership once per transition at INFO.
+Use ERROR when a failure prevents startup or an operation from completing. Identify the failed step and error code. Use WARN for recoverable errors, degraded features and dropped operations. Report the first failure promptly and rate-limit repeated frame or retry failures while retaining counts.
+Use DEBUG for diagnostic details such as periodic performance statistics, frame rates, queue depths and stage timings. Keep state sampling and failure counters independent of log visibility.
+
 ## Testing requirements
 
 Use test-driven development for behavior changes: add a test that reproduces the target behavior or defect, confirm it fails before the change, implement the change, and run all checks. Prefer public interfaces in `product/include/` for business tests.

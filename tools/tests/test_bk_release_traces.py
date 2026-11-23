@@ -41,7 +41,7 @@ int main(void){if(!setjmp(done))mb_ipc_task(0);
  assert(logs==(CONFIG_LOG_LEVEL>3 ? 6U:0U));}
 ''')
 
-    def test_metrics_preserves_info_sample_without_release_trace(self):
+    def test_metrics_samples_silently_until_debug_is_enabled(self):
         source = (ROOT / 'platforms/beken/runtime/src/xiaotai_metrics.c').read_text()
         for level in (3, 4):
             run_c(f'#define CONFIG_LOG_LEVEL {level}\n' + r'''
@@ -55,6 +55,9 @@ int main(void){if(!setjmp(done))mb_ipc_task(0);
 #define BK_OK 0
 #define BK_FAIL -1
 #define TAG "metrics"
+#define XIAOTAI_LOG_DEBUG 4
+static int app_level=3;
+static int xiaotai_log_get_level(void){return app_level;}
 #define configMAX_TASK_NAME_LEN 16
 static unsigned traces,samples;
 static int s_state_mutex;
@@ -71,9 +74,10 @@ static unsigned rtos_get_minimum_free_heap_size(void){return 56672;}
 static unsigned rtos_get_psram_free_heap_size(void){return 10673000;}
 static unsigned rtos_get_psram_minimum_free_heap_size(void){return 10663000;}
 static void bk_printf_raw_nonblock(int level,void *tag,const char *fmt,...){traces++;}
-static void bk_printf_nonblock(int level,const char *tag,const char *fmt,...){assert(level==3);samples++;}
+static void bk_printf_nonblock(int level,const char *tag,const char *fmt,...){assert(level==4);samples++;}
 ''' + function(source, 'emit_snapshot') + r'''
-int main(void){emit_snapshot();assert(samples==1 && s_snapshot.task_count==28);
+int main(void){emit_snapshot();assert(samples==0 && s_snapshot.task_count==28);
+ app_level=4;emit_snapshot();assert(samples==1);
  assert(traces==(CONFIG_LOG_LEVEL>3 ? 3U:0U));}
 ''')
 

@@ -62,7 +62,7 @@ static void capture(int tag,const char*format,...){
  vsnprintf(output+strlen(output),sizeof(output)-strlen(output),format,ap);va_end(ap);
 }
 #define TAG 0
-#define ESP_LOGI capture
+#define ESP_LOGD capture
 ''' + function(source, 'stats_timer_func') + r'''
 int main(void){
  pkt_stats.sta_rx_in=100;pkt_stats.sta_rx_out=90;pkt_stats.sta_rx_fail=3;
