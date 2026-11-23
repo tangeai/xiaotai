@@ -21,7 +21,7 @@ typedef struct {
 } xiaotai_audio_buffer_t;
 
 #ifndef AI_BUFFER_DEFAULT_MS
-#define AI_BUFFER_DEFAULT_MS 100U
+#define AI_BUFFER_DEFAULT_MS 200U
 #endif
 #ifndef AI_BUFFER_MIN_MS
 #define AI_BUFFER_MIN_MS 60U

@@ -70,6 +70,22 @@ int main(void){
      adapter=MEDIA if 'starter_media_s3/starter_media.c' in cmake else P4
      self.assertNotIn('xiaotai_opus_plc_decode(',adapter.read_text())
 
+ def test_ai_prefill_covers_delayed_second_burst(self):
+  from test_esp_ai_playout import run_playout
+  run_playout(r"""
+ const uint8_t packet[] = {0x08}; /* 20 ms Opus */
+ starter_ai_playout_reset(7);
+ for (unsigned batch = 0; batch < 2; ++batch) {
+     for (unsigned i = 0; i < 5; ++i)
+         assert(starter_ai_playout_admit(7, packet, 1) == 320);
+     unsigned arrival = 1000 + 150 * batch;
+     assert(starter_ai_playout_ready(7, arrival, 1000, 0) == (batch == 1));
+ }
+ for (unsigned i = 0; i < 10; ++i)
+     starter_ai_playout_retire(7, 320);
+ assert(starter_ai_playout_status().queued_samples == 0);
+ """)
+
  def test_business_decision_is_independent_of_board_budgets(self):
   from test_s3_product_regressions import run_c
   for age,capacity in ((80,8),(160,64),(240,128)):

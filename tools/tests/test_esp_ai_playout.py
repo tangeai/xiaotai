@@ -45,11 +45,11 @@ class ESPAIPlayout(unittest.TestCase):
  starter_ai_playout_reset(7);
  for(unsigned gap=0; gap<2; ++gap) {
      unsigned start=1000+gap*500;
-     for(unsigned i=0; i<9; ++i) assert(starter_ai_playout_admit(7,normal,1)==320);
+     for(unsigned i=0; i<12; ++i) assert(starter_ai_playout_admit(7,normal,1)==320);
      assert(starter_ai_playout_ready(7,start,start,start-100));
-     for(unsigned i=0; i<9; ++i) starter_ai_playout_retire(7,320);
+     for(unsigned i=0; i<12; ++i) starter_ai_playout_retire(7,320);
  }
- /* The next gap raises the target to 180 ms. A full pool of 2.5 ms
+ /* The next gap raises the target to 280 ms. A full pool of 2.5 ms
   * packets only contains 160 ms. The worker must start freeing slots. */
  for(unsigned i=0; i<63; ++i) assert(starter_ai_playout_admit(7,shortest,1)==40);
  assert(!starter_ai_playout_ready(7,2000,2000,1900));
@@ -108,32 +108,32 @@ class ESPAIPlayout(unittest.TestCase):
         run_playout(r'''
  const uint8_t packet[]={0x08};
  starter_ai_playout_reset(7);
- for(unsigned i=0;i<5;i++)starter_ai_playout_admit(7,packet,1);
+ for(unsigned i=0;i<10;i++)starter_ai_playout_admit(7,packet,1);
  assert(starter_ai_playout_ready(7,1000,1000,0));
- for(unsigned i=0;i<5;i++) starter_ai_playout_retire(7,320);
+ for(unsigned i=0;i<10;i++) starter_ai_playout_retire(7,320);
  /* Worker resumes on a late packet without polling an empty queue. */
  starter_ai_playout_admit(7,packet,1);
  assert(!starter_ai_playout_ready(7,1150,1150,1100));
- assert(starter_ai_playout_status().target_ms==140);
+ assert(starter_ai_playout_status().target_ms==240);
  assert(starter_ai_playout_status().underruns==1);
- for(unsigned i=0;i<6;i++)starter_ai_playout_admit(7,packet,1);
+ for(unsigned i=0;i<11;i++)starter_ai_playout_admit(7,packet,1);
  assert(starter_ai_playout_ready(7,1200,1150,1100));
- for(unsigned i=0;i<7;i++) starter_ai_playout_retire(7,320);
+ for(unsigned i=0;i<12;i++) starter_ai_playout_retire(7,320);
  /* Silence alone must never decay target; successful output does. */
  starter_media_ai_playback_boundary(7,true);
  starter_media_ai_playback_boundary(7,false);
  starter_ai_playout_admit(7,packet,1);
  assert(!starter_ai_playout_ready(7,20000,20000,1200));
- assert(starter_ai_playout_status().target_ms==140);
+ assert(starter_ai_playout_status().target_ms==240);
  starter_media_ai_playback_boundary(7,false); /* duplicate start */
  assert(!starter_ai_playout_ready(7,20399,20000,1200));
  assert(starter_ai_playout_ready(7,20400,20000,1200));
  for(unsigned i=0;i<500;i++)starter_ai_playout_written(7,320);
- assert(starter_ai_playout_status().target_ms==120);
+ assert(starter_ai_playout_status().target_ms==220);
  starter_ai_playout_retire(7,320);
  starter_ai_playout_admit(7,packet,1);
  assert(!starter_ai_playout_ready(7,30000,30000,20420));
- assert(starter_ai_playout_status().target_ms==120); /* ambiguous long gap */
+ assert(starter_ai_playout_status().target_ms==220); /* ambiguous long gap */
  starter_media_ai_playback_boundary(7,true);
  assert(starter_ai_playout_ready(7,30001,30000,20420));
  assert(starter_ai_playout_status().timeout_releases==1);
@@ -175,8 +175,8 @@ int main(void){
  s_speaker_muted=false;mute_at=0;starter_media_ai_playback_boundary(7,true);
  assert(audio_rx_prefill(&item) && now==1420); /* explicit end releases tail */
  starter_ai_playout_reset(7);item.received_at_ms=now;
- for(unsigned i=0;i<5;i++)starter_ai_playout_admit(7,packet,1);
- assert(audio_rx_prefill(&item) && now==1420); /* 100 ms ready */
+ for(unsigned i=0;i<10;i++)starter_ai_playout_admit(7,packet,1);
+ assert(audio_rx_prefill(&item) && now==1420); /* 200 ms ready */
  mode=3;item.mode=3;starter_ai_playout_reset(0);
  assert(audio_rx_prefill(&item) && now==1420); /* live media unchanged */
  generation++;assert(!audio_rx_prefill(&item));
