@@ -4311,7 +4311,7 @@ static void product_render_monitor(lv_disp_drv_t *driver, uint32_t elapsed_ms,
     if (pixels > max_pixels) max_pixels = pixels;
     if (elapsed_ms > max_render_ms) max_render_ms = elapsed_ms;
     if (now_us - window_started_us >= PRODUCT_UI_REFRESH_LOG_INTERVAL_US) {
-        ESP_LOGI(TAG,
+        ESP_LOGD(TAG,
                  "UI render window: span-ms=%lld refreshes=%lu pixels=%llu "
                  "max-pixels=%lu render-ms=%llu max-render-ms=%lu",
                  (long long)((now_us - window_started_us) / 1000),
