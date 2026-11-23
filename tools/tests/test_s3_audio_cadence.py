@@ -192,6 +192,10 @@ int main(void){starter_ai_playout_reset(7);
         from test_esp_ai_playout import check_prefill
         check_prefill(MEDIA.read_text())
 
+    def test_sender_pauses_are_rendered_in_bounded_silence_writes(self):
+        from test_esp_ai_playout import check_pause_render
+        check_pause_render(MEDIA.read_text())
+
 
 if __name__ == '__main__':
     unittest.main()

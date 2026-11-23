@@ -172,6 +172,10 @@ int main(void){starter_ai_playout_reset(7);
         from test_esp_ai_playout import check_prefill
         check_prefill(P4_MEDIA.read_text())
 
+    def test_sender_pauses_are_rendered_in_bounded_silence_writes(self):
+        from test_esp_ai_playout import check_pause_render
+        check_pause_render(P4_MEDIA.read_text())
+
     def test_dma_audio_remains_active_after_write_returns(self):
         source = P4_MEDIA.read_text()
         status = function(source, 'starter_media_status')
@@ -199,8 +203,10 @@ static unsigned p4_video_sent(void){return 0;}
 static bool uplink_allowed(int m){return true;}
 static void *s_audio_rx_ready_queue;
 static unsigned uxQueueMessagesWaiting(void *q){return 0;}
-typedef struct {int mode;uint32_t generation;struct {size_t length;} frame;
+typedef struct {int mode;uint32_t generation;struct {size_t length;uint32_t timestamp_ms;uint8_t stream_id;} frame;
     uint32_t received_at_ms,arrival_gap_ms;uint8_t payload[1500];} audio_rx_item_t;
+#define AUDIO_PACKET_MS 20U
+#define OPUS_SAMPLE_RATE_HZ 16000U
 static int16_t s_decode_pcm[1500],s_play_stereo[6000];
 static uint32_t s_playback_resampler_generation;
 static int16_t s_playback_previous;
@@ -226,7 +232,7 @@ static int write_pcm(void *context,const int16_t *pcm,size_t frames,size_t *writ
     return write_fails ? -1 : 0;
 }
 static struct {void *context;int (*write_pcm)(void *,const int16_t *,size_t,size_t *);} adapter={NULL,write_pcm},*s_audio_adapter=&adapter;
-''' + helpers + function(source, 'play_audio_item') + r'''
+''' + helpers + function(source, 'play_ai_pause') + function(source, 'play_audio_item') + r'''
 /* Finish the sink immediately after the status reader observes the old DMA
  * deadline. This is a legal task interleaving, with no new network arrivals. */
 static bool finish_during_snapshot;

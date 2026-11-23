@@ -140,6 +140,165 @@ class ESPAIPlayout(unittest.TestCase):
 ''')
 
 
+def sender_timeline(gaps, count):
+    """Media stamps of 20 ms packets; gaps maps packet index to omitted ms."""
+    stamps, stamp = [], 20
+    for index in range(count):
+        stamp += gaps.get(index, 0)
+        stamps.append(stamp)
+        stamp += 20
+    return stamps
+
+
+# Silence gaps observed in the 2026-11-11 S3 capture (index -> omitted ms).
+CAPTURED_GAPS = {4: 20, 5: 120, 19: 120, 20: 320, 21: 40, 25: 40, 26: 260,
+                 32: 380, 67: 280, 74: 240, 75: 200, 138: 140, 141: 100,
+                 147: 40, 148: 80, 156: 180}
+
+
+class ESPAIPause(unittest.TestCase):
+    def test_captured_silence_gaps_are_restored_as_one_timeline(self):
+        stamps = sender_timeline(CAPTURED_GAPS, 184)
+        self.assertEqual(stamps[-1], 6240)
+        values = ','.join(map(str, stamps))
+        omitted = ','.join(str(CAPTURED_GAPS.get(i, 0)) for i in range(184))
+        run_playout(f'''
+ const uint32_t stamp[]={{{values}}};
+ const uint16_t omitted[]={{{omitted}}};
+ uint32_t restored=0, played=0;
+ starter_ai_playout_reset(7);
+ for(unsigned i=0;i<184;i++){{
+     unsigned pause=starter_ai_playout_pause_ms(7,stamp[i],3,320);
+     assert(pause==omitted[i]);
+     restored+=pause; played+=20;
+ }}
+ /* 3.68 s of voice plus 2.56 s of omitted silence is the sender's 6.24 s. */
+ assert(played==3680 && restored==2560 && played+restored==6240);
+''')
+
+    def test_pause_is_bounded_and_ignores_ambiguous_stamps(self):
+        run_playout(r'''
+ starter_ai_playout_reset(7);
+ assert(starter_ai_playout_pause_ms(7,1000,3,320)==0);   /* first packet */
+ assert(starter_ai_playout_pause_ms(7,1020,3,320)==0);   /* contiguous */
+ assert(starter_ai_playout_pause_ms(7,1030,3,320)==0);   /* early stamp */
+ assert(starter_ai_playout_pause_ms(7,1060,3,320)==20);  /* one omitted frame */
+ assert(starter_ai_playout_pause_ms(7,1080,3,320)==0);
+ assert(starter_ai_playout_pause_ms(7,1080,3,320)==0);   /* duplicate */
+ assert(starter_ai_playout_pause_ms(7,1060,3,320)==0);   /* late reorder */
+ assert(starter_ai_playout_pause_ms(7,1100,3,320)==0);   /* no phantom gap */
+ assert(starter_ai_playout_pause_ms(7,6000,3,320)==800); /* long stall capped */
+ assert(starter_ai_playout_pause_ms(7,6020,3,960)==0);
+ assert(starter_ai_playout_pause_ms(7,6080,3,320)==0);   /* 60 ms packet span */
+ assert(starter_ai_playout_pause_ms(7,6120,3,320)==20);
+ /* Sender clock reset: restart the timeline instead of inventing silence. */
+ assert(starter_ai_playout_pause_ms(7,50,3,320)==0);
+ assert(starter_ai_playout_pause_ms(7,70,3,320)==0);
+ assert(starter_ai_playout_pause_ms(7,100,3,320)==0);    /* below one frame */
+''')
+
+    def test_pause_state_follows_generation_stream_boundary_and_rollover(self):
+        run_playout(r'''
+ starter_ai_playout_reset(7);
+ assert(starter_ai_playout_pause_ms(8,1000,3,320)==0);   /* stale generation */
+ assert(starter_ai_playout_pause_ms(0,1000,3,320)==0);
+ assert(starter_ai_playout_pause_ms(7,1000,3,0)==0);     /* invalid duration */
+ assert(starter_ai_playout_pause_ms(7,1000,3,320)==0);
+ assert(starter_ai_playout_pause_ms(7,1200,4,320)==0);   /* other stream restarts */
+ assert(starter_ai_playout_pause_ms(7,1220,4,320)==0);
+ assert(starter_ai_playout_pause_ms(7,1280,4,320)==40);
+ starter_media_ai_playback_boundary(7,true);             /* turn ends */
+ assert(starter_ai_playout_pause_ms(7,5000,4,320)==0);
+ starter_media_ai_playback_boundary(7,false);            /* turn starts */
+ assert(starter_ai_playout_pause_ms(7,9000,4,320)==0);
+ assert(starter_ai_playout_pause_ms(7,9040,4,320)==20);
+ starter_media_ai_playback_boundary(7,false);            /* duplicate start */
+ assert(starter_ai_playout_pause_ms(7,9060,4,320)==0);
+ starter_ai_playout_reset(7);
+ assert(starter_ai_playout_pause_ms(7,UINT32_MAX-30,3,320)==0);
+ assert(starter_ai_playout_pause_ms(7,9,3,320)==20);     /* 32-bit wrap */
+ assert(starter_ai_playout_pause_ms(7,30,3,320)==0);
+''')
+
+
+def check_pause_render(source):
+    from test_s3_product_regressions import function
+    run_media_c(r'''
+#include <assert.h>
+#include <stdatomic.h>
+#include <string.h>
+#define STARTER_TIRTC_AI 2
+#define ESP_OK 0
+#define pdTRUE 1
+#define pdMS_TO_TICKS(x) (x)
+#define AUDIO_PACKET_MS 20U
+#define OPUS_SAMPLE_RATE_HZ 16000U
+typedef int SemaphoreHandle_t;
+typedef int esp_err_t;
+typedef struct {
+    void *context;
+    esp_err_t (*write_pcm)(void *, const int16_t *, size_t, size_t *);
+} audio_adapter_t;
+static SemaphoreHandle_t s_audio_output_mutex;
+static atomic_bool s_speaker_muted;
+static bool s_amp_enabled = true;
+static uint32_t generation = 7;
+static int takes, gives, take_fail_at, mode_fail_after, mute_after, write_fail_at;
+static unsigned writes, tracked;
+static size_t last_bytes;
+static int16_t s_play_stereo[6000];
+static bool same_session(int mode, uint32_t value)
+{ return mode == STARTER_TIRTC_AI && value == generation && (!mode_fail_after || writes < (unsigned)mode_fail_after); }
+static int xSemaphoreTake(SemaphoreHandle_t m, int ticks)
+{ (void)m; (void)ticks; ++takes; return take_fail_at == takes ? 0 : pdTRUE; }
+static void xSemaphoreGive(SemaphoreHandle_t m) { (void)m; ++gives; }
+static int64_t esp_timer_get_time(void) { return 1000; }
+static void audio_playback_track_write(size_t frames) { tracked += (unsigned)frames; }
+static void audio_track_dma_write(int64_t start, size_t frames) { (void)start; tracked += (unsigned)frames; }
+static esp_err_t fake_write(void *context, const int16_t *pcm, size_t frames, size_t *written)
+{
+    (void)context;
+    ++writes;
+    if (write_fail_at == (int)writes) return -1;
+    for (size_t i = 0; i < frames * 2U; ++i) assert(pcm[i] == 0);
+    *written = frames * 4U; last_bytes = *written;
+    if (mute_after == (int)writes) atomic_store(&s_speaker_muted, true);
+    return ESP_OK;
+}
+static audio_adapter_t adapter = {.write_pcm = fake_write};
+static audio_adapter_t *s_audio_adapter = &adapter;
+''' + function(source, 'play_ai_pause') + r'''
+static void reset(void)
+{
+    memset(s_play_stereo, 0x55, sizeof(s_play_stereo));
+    takes = gives = take_fail_at = mode_fail_after = mute_after = write_fail_at = 0;
+    writes = tracked = 0; last_bytes = 0; generation = 7;
+    atomic_store(&s_speaker_muted, false); s_amp_enabled = true;
+}
+int main(void)
+{
+    reset(); assert(play_ai_pause(7, 0) && writes == 0 && takes == 0);
+    /* 100 ms is rendered in bounded 20 ms writes, never one long mutex hold. */
+    reset(); assert(play_ai_pause(7, 100));
+    assert(writes == 5 && tracked == 1600 && last_bytes == 1280);
+    assert(takes == 5 && gives == 5);
+    reset(); assert(play_ai_pause(7, 30) && writes == 2 && tracked == 480); /* 20 + 10 */
+    reset(); mode_fail_after = 2; assert(!play_ai_pause(7, 100));        /* new session */
+    assert(writes == 2 && takes == gives);
+    reset(); mute_after = 1; assert(!play_ai_pause(7, 100));             /* speaker muted */
+    assert(writes == 1 && takes == gives);
+    reset(); s_amp_enabled = false; assert(!play_ai_pause(7, 100));
+    assert(writes == 0 && takes == gives);
+    reset(); write_fail_at = 2; assert(!play_ai_pause(7, 100));
+    assert(writes == 2 && tracked == 320 && takes == gives);
+    reset(); take_fail_at = 3; assert(!play_ai_pause(7, 100));
+    assert(writes == 2 && takes == 3 && gives == 2);
+    reset(); generation = 8; assert(!play_ai_pause(7, 100) && writes == 0 && takes == gives);
+    return 0;
+}
+''')
+
+
 def check_prefill(source):
     from test_s3_product_regressions import function
     run_media_c(r'''
