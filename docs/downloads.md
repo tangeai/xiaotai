@@ -2,10 +2,10 @@
 
 [中文](downloads.md) · [English](downloads.en.md)
 
-当前统一发行：**v1.2.0-beta.3 — 测试版，待实板验收**。历史归档见下方的 `v1.0.0` 和 `v1.1.0`。
+当前统一发行：**v1.2.0 — 正式版**。历史归档见下方的 `v1.0.0` 和 `v1.1.0`。
 旧板卡 tag 及其失效下载链接已清理。
 
-[发布说明、SHA-256 与已知问题](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.3) · [发布规范](development/release-policy.md)
+[发布说明、SHA-256 与已知问题](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0) · [发布规范](development/release-policy.md)
 
 在电脑上用 Chrome 或 Edge 打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/)，选中开发板型号，再选与下载页一致的 `xiaotai` 发行版本。也可以从下表下载与板型、屏幕匹配的完整镜像，再用 **本地 BIN** 打开。
 
@@ -23,7 +23,7 @@ ESP32 镜像以 `_merged.bin` 结尾，BK7258 镜像以 `_all-app.bin` 结尾，
 
 | 变体 | 内嵌固件版本 | 完整烧录 BIN |
 |---|---|---|
-| 默认 | `1.2.0+build.110` | [v1.2.0-beta.3_lckfb-bk7258_all-app.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.3/v1.2.0-beta.3_lckfb-bk7258_all-app.bin) |
+| 默认 | `1.2.0+build.112` | [v1.2.0_lckfb-bk7258_all-app.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0/v1.2.0_lckfb-bk7258_all-app.bin) |
 
 [烧录步骤与开发板指南](boards/lckfb-bk7258/README.md)
 
@@ -37,7 +37,7 @@ ESP32 镜像以 `_merged.bin` 结尾，BK7258 镜像以 `_all-app.bin` 结尾，
 
 | 变体 | 内嵌固件版本 | 完整烧录 BIN |
 |---|---|---|
-| 默认 | `1.2.0+build.96` | [v1.2.0-beta.3_lckfb-esp32s3_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.3/v1.2.0-beta.3_lckfb-esp32s3_merged.bin) |
+| 默认 | `1.2.0+build.98` | [v1.2.0_lckfb-esp32s3_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0/v1.2.0_lckfb-esp32s3_merged.bin) |
 
 [烧录步骤与开发板指南](boards/lckfb-esp32s3/README.md)
 
@@ -53,7 +53,7 @@ ESP32 镜像以 `_merged.bin` 结尾，BK7258 镜像以 `_all-app.bin` 结尾，
 
 | 变体 | 内嵌固件版本 | 完整烧录 BIN |
 |---|---|---|
-| 默认 | `1.2.0+build.64` | [v1.2.0-beta.3_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.3/v1.2.0-beta.3_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin) |
+| 默认 | `1.2.0+build.66` | [v1.2.0_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0/v1.2.0_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin) |
 
 [烧录步骤与开发板指南](boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md)
 
@@ -69,7 +69,7 @@ M5Stack CoreS3-Lite / M5Stack CoreS3-Lite
 
 | 变体 | 内嵌固件版本 | 完整烧录 BIN |
 |---|---|---|
-| ILI9342C | `1.2.0+build.106` | [v1.2.0-beta.3_m5stack-cores3-lite_ili9342c_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.3/v1.2.0-beta.3_m5stack-cores3-lite_ili9342c_merged.bin) |
+| ILI9342C | `1.2.0+build.108` | [v1.2.0_m5stack-cores3-lite_ili9342c_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0/v1.2.0_m5stack-cores3-lite_ili9342c_merged.bin) |
 
 [烧录步骤与开发板指南](boards/m5stack-cores3-lite/README.md)
 
@@ -85,20 +85,22 @@ M5Stack CoreS3-Lite / M5Stack CoreS3-Lite
 
 | 变体 | 内嵌固件版本 | 完整烧录 BIN |
 |---|---|---|
-| 默认 | `1.2.0+build.59` | [v1.2.0-beta.3_mgkfb-bk7258_all-app.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.3/v1.2.0-beta.3_mgkfb-bk7258_all-app.bin) |
+| 默认 | `1.2.0+build.60` | [v1.2.0_mgkfb-bk7258_all-app.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0/v1.2.0_mgkfb-bk7258_all-app.bin) |
 
 [烧录步骤与开发板指南](boards/mgkfb-bk7258/README.md)
 
 ## 历史固件归档
 
-- [v1.2.0-beta.2 上一测试版](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.2)
+- [v1.2.0-beta.3 上一测试版](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.3)
+
+- [v1.2.0-beta.2 历史测试版](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.2)
 
 - [v1.2.0-beta.1 历史测试版](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1)
 
 - [v1.0.0：五板历史完整 BIN](https://github.com/tangeai/xiaotai/releases/tag/v1.0.0)。
 - [v1.1.0：五板历史完整 BIN](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0)。立创 S3 的 build.68 有已知 AI SDK 问题。发布正文将此归档列为预发布，GitHub 页面未标记为预发布。
 
-归档保留实际内嵌版本与哈希，供复现历史使用；当前测试使用上方 v1.2.0-beta.3。
+归档保留实际内嵌版本与哈希，供复现历史使用；当前使用上方 v1.2.0。
 
 ## 二次开发
 

@@ -21,7 +21,7 @@ Create annotated tags that state when and why a historical milestone was recorde
 | `v1.2.0-beta.1` | 2026-11-21 | `1e9f0811f251c8d9fdab7b910ba2c74bc7596ec1` | PLC/FEC, SDK, serial recovery and lifecycle fixes |
 | `v1.2.0-beta.2` | 2026-11-23 | `4dc2f93d278d0fcb39be9bc7f7bbfe651f000a55` | Five boards rebuilt with TiRTC 2.6.3, hardware acceptance pending |
 | `v1.2.0-beta.3` | 2026-11-23 | `6b6a9d607f1f2bb181298ac32f068e011261bff6` | AI short-packet and concurrent admission fixes, shared maintenance console, hardware acceptance pending |
-| `v1.2.0` | Pending acceptance | Undetermined | Stable distribution; do not create it early as a substitute for beta |
+| `v1.2.0` | 2026-11-23 | `3db47969be8bd17bce5068a10fc4bbd65d51505f` | Stable distribution: AI talkback pause restoration and playback buffering changes, same source for five boards |
 
 `v1.0.0` and `v1.1.0` are retrospective source tags with archives of actual historical complete BINs. Each board retains its original embedded version, build source, and hash; not all images were compiled from the unified tag.
 
@@ -89,7 +89,7 @@ Host checks and native builds with pending hardware testing permit only pre-rele
 
 After publication, check tag targets, pre-release state, asset set and names, and download every BIN to verify SHA-256. Update beta navigation only after remote verification, never labeling the beta as stable. Do not overwrite historical releases or assets.
 
-`v1.0.0` is a historical stable archive, while `v1.1.0` remains a pre-release due to known issues and the current `v1.2.0-beta.3` candidate remains a beta.
+`v1.0.0` is a historical stable archive, while `v1.1.0` remains a pre-release due to known issues and the current stable release is `v1.2.0`, and `v1.2.0-beta.*` stay pre-releases.
 
 Hardware acceptance applies to exact BIN bytes. An accepted BIN may be promoted to stable by external renaming without changing its hash. Changing embedded versions or recompiling requires new validation. Include only accepted boards/variants in stable releases; never borrow another variant's results.
 
