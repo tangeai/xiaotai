@@ -264,7 +264,7 @@ Maintain English for the following scope, rather than translating every file. Ro
 | Waveshare ESP32-P4 | `docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md` |
 | M5Stack CoreS3-Lite | `docs/boards/m5stack-cores3-lite/README.md` |
 | MGKFB BK7258 | `docs/boards/mgkfb-bk7258/README.md` |
-| BK7258 serial commands | `docs/development/BK7258_SERIAL_COMMANDS.md` |
+| ESP32 and BK7258 serial commands | `docs/development/SERIAL_COMMANDS.md` |
 | BK7258 Opus packet loss concealment | `docs/development/bk-opus-plc.md` |
 | Development pitfalls | `docs/development/pitfalls.md` |
 | Unified release policy | `docs/development/release-policy.md` |

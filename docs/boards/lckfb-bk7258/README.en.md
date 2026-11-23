@@ -92,7 +92,7 @@ The “Ready” display and serial `READY` indicate successful binding.
 
 Try AI, then browser live view and two-way audio. With WeChat contacts available, try a WeChat call. The device should return to Ready after the session. Development acceptance is described under Testing.
 
-To change networks or rebind, open Device settings → Reset device, confirm, and repeat setup and binding. Serial `ap_cmd wifi-clear` clears Wi-Fi; `ap_cmd tirtc-clear` clears local binding credentials. See [BK7258 serial commands](../../development/BK7258_SERIAL_COMMANDS.en.md) for effects and reboot behavior.
+To change networks or rebind, open Device settings → Reset device, confirm, and repeat setup and binding. Serial `ap_cmd wifi-clear` clears Wi-Fi; `ap_cmd tirtc-clear` clears local binding credentials. See [ESP32 and BK7258 serial commands](../../development/SERIAL_COMMANDS.en.md) for effects and reboot behavior.
 
 ## Specifications
 
@@ -266,7 +266,7 @@ ap_cmd call-status
 ap_cmd help
 ```
 
-`status` shows connectivity, binding, current session, and memory; `call-status` shows call state. See [BK7258 serial commands](../../development/BK7258_SERIAL_COMMANDS.en.md) for complete commands, parameters, service addresses, and board applicability.
+`status` shows connectivity, binding, current session, and memory; `call-status` shows call state. See [ESP32 and BK7258 serial commands](../../development/SERIAL_COMMANDS.en.md) for complete commands, parameters, service addresses, and board applicability.
 
 - H5 downlink silence: check stream 14 reception, A-law-to-PCM decoding, DAC writes, and amplifier GPIO.
 - WeChat uplink silence: check platform acceptance for stream 0; persistent `rc=-40006` means uplink is not ready.

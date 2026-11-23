@@ -3831,7 +3831,6 @@ static void handle_room_action(const runtime_event_t *event)
         room_set_foreground(event->flag);
         return;
     }
-    if (event->command == ROOM_ACTION_JOIN && event->flag) room_set_foreground(true);
     if (event->command == ROOM_ACTION_SYNC) { s_room_sync_due_ms = now_ms(); return; }
     if (event->command == ROOM_ACTION_PTT) {
         if (!s_room_joined || session_state() != STARTER_RUNTIME_ROOM_ACTIVE) return;
@@ -4348,9 +4347,9 @@ static bool decimal_string(const char *text, size_t length, bool allow_empty)
     return true;
 }
 
-static esp_err_t enqueue_room_json(room_action_t action, const char *json, bool foreground)
+static esp_err_t enqueue_room_json(room_action_t action, const char *json)
 {
-    runtime_event_t event = {.type = EVENT_ROOM_ACTION, .command = action, .flag = foreground};
+    runtime_event_t event = {.type = EVENT_ROOM_ACTION, .command = action};
     size_t length = strlen(json);
     if (!copy_event_text(&event, json, length)) return ESP_ERR_NO_MEM;
     if (!queue_event(&event)) { release_event(&event); return ESP_ERR_TIMEOUT; }
@@ -4378,10 +4377,10 @@ esp_err_t starter_runtime_room_create(const char *password)
         return ESP_ERR_INVALID_ARG;
     char json[48];
     (void)snprintf(json, sizeof(json), "{\"password\":\"%s\"}", password);
-    return enqueue_room_json(ROOM_ACTION_CREATE, json, false);
+    return enqueue_room_json(ROOM_ACTION_CREATE, json);
 }
 
-static esp_err_t request_room_join(const char *room_code, const char *password, bool foreground)
+esp_err_t starter_runtime_room_join(const char *room_code, const char *password)
 {
     if (!decimal_string(room_code, 6U, false)) return ESP_ERR_INVALID_ARG;
     if (password == NULL) password = "";
@@ -4391,17 +4390,7 @@ static esp_err_t request_room_join(const char *room_code, const char *password, 
     (void)snprintf(json, sizeof(json),
                    "{\"room_code\":\"%s\",\"password\":\"%s\"}",
                    room_code, password);
-    return enqueue_room_json(ROOM_ACTION_JOIN, json, foreground);
-}
-
-esp_err_t starter_runtime_room_join(const char *room_code, const char *password)
-{
-    return request_room_join(room_code, password, false);
-}
-
-esp_err_t starter_runtime_room_join_from_console(const char *room_code, const char *password)
-{
-    return request_room_join(room_code, password, true);
+    return enqueue_room_json(ROOM_ACTION_JOIN, json);
 }
 
 esp_err_t starter_runtime_room_leave(void)

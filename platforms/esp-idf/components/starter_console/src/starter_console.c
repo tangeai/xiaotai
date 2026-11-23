@@ -906,7 +906,7 @@ static int command_room_control(int argc, char **argv)
     const char *name = argv[0];
     if (!strcmp(name, "room-join")) {
         if (argc != 2 && argc != 3) return request_result(name, ESP_ERR_INVALID_ARG);
-        return request_result(name, starter_runtime_room_join_from_console(argv[1], argc == 3 ? argv[2] : NULL));
+        return request_result(name, starter_runtime_room_join(argv[1], argc == 3 ? argv[2] : NULL));
     }
     if (argc != 1) return request_result(name, ESP_ERR_INVALID_ARG);
     if (!strcmp(name, "room-sync")) return request_result(name, starter_runtime_room_refresh());

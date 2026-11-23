@@ -184,7 +184,6 @@ esp_err_t starter_runtime_room_set_foreground(bool active);
 esp_err_t starter_runtime_room_refresh(void);
 esp_err_t starter_runtime_room_create(const char *password);
 esp_err_t starter_runtime_room_join(const char *room_code, const char *password);
-esp_err_t starter_runtime_room_join_from_console(const char *room_code, const char *password);
 esp_err_t starter_runtime_room_leave(void);
 esp_err_t starter_runtime_room_ptt(bool pressed);
 

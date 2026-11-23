@@ -1,5 +1,7 @@
 # 立创·实战派 ESP32-S3
 
+[ESP32 与 BK7258 串口命令](../../development/SERIAL_COMMANDS.md)
+
 [返回开发板目录](../README.md) · [固件下载与发布说明](../../downloads.md#lckfb-esp32s3)
 
 [中文](README.md) · [English](README.en.md)
