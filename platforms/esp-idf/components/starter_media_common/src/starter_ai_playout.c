@@ -87,11 +87,11 @@ bool starter_ai_playout_ready(uint32_t generation, uint32_t now_ms,
     return ready;
 }
 
-void starter_ai_playout_written(uint32_t generation, size_t samples)
+void starter_ai_playout_written(uint32_t generation, size_t samples, uint32_t now_ms)
 {
     portENTER_CRITICAL(&s_lock);
     if (generation != 0U && generation == s_generation && samples <= 1920U)
-        xiaotai_audio_buffer_written(&s_buffer, (uint32_t)samples / 16U);
+        xiaotai_audio_buffer_written(&s_buffer, (uint32_t)samples / 16U, now_ms);
     portEXIT_CRITICAL(&s_lock);
 }
 

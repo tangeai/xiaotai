@@ -1148,7 +1148,7 @@ static void playback_task(beken_thread_arg_t argument)
                 memory_order_release);
             if (s_codec == XIAOTAI_AUDIO_CODEC_OPUS_16K) {
                 rtos_lock_mutex(&s_ring_mutex);
-                xiaotai_audio_buffer_written(&s_ai_buffer, frame_duration_ms);
+                xiaotai_audio_buffer_written(&s_ai_buffer, frame_duration_ms, now_ms);
                 rtos_unlock_mutex(&s_ring_mutex);
             }
             aec_reference_push(pcm, accepted_samples);

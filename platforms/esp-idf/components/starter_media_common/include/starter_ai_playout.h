@@ -23,7 +23,7 @@ uint16_t starter_ai_playout_admit(uint32_t generation,
 void starter_ai_playout_retire(uint32_t generation, uint16_t samples);
 bool starter_ai_playout_ready(uint32_t generation, uint32_t now_ms,
                              uint32_t first_rx_ms, uint32_t dma_tail_ms);
-void starter_ai_playout_written(uint32_t generation, size_t samples);
+void starter_ai_playout_written(uint32_t generation, size_t samples, uint32_t now_ms);
 /* Called by runtime after validating its session generation; safe if stale. */
 void starter_media_ai_playback_boundary(uint32_t generation, bool ended);
 starter_ai_playout_status_t starter_ai_playout_status(void);

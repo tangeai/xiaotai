@@ -1119,7 +1119,8 @@ static bool play_audio_item(const audio_rx_item_t *item)
                               &s_audio_write_avg_us, write_us);
         if (played) {
             if (item->mode == STARTER_TIRTC_AI)
-                starter_ai_playout_written(item->generation, mono_samples);
+                starter_ai_playout_written(item->generation, mono_samples,
+                                          (uint32_t)(esp_timer_get_time() / 1000));
 #if CONFIG_STARTER_AUDIO_PACKET_TRACE
             if (item->mode == STARTER_TIRTC_AI) starter_audio_trace_record(AUDIO_TRACE_WRITTEN,
                 item->generation, item->frame.timestamp_ms, item->frame.length,

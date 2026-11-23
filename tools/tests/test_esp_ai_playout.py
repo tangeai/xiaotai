@@ -92,7 +92,7 @@ class ESPAIPlayout(unittest.TestCase):
  assert(starter_ai_playout_admit(7,NULL,0)==0);
  starter_ai_playout_reset(8);starter_ai_playout_admit(8,frame20,1);
  starter_ai_playout_retire(7,1920);starter_media_ai_playback_boundary(7,true);
- starter_ai_playout_written(7,1600);
+ starter_ai_playout_written(7,1600,1000);
  assert(starter_ai_playout_status().queued_samples==320);
  assert(!starter_ai_playout_ready(7,1000,1000,0));
  assert(!starter_ai_playout_ready(8,1000,1000,0));
@@ -128,14 +128,14 @@ class ESPAIPlayout(unittest.TestCase):
  starter_media_ai_playback_boundary(7,false); /* duplicate start */
  assert(!starter_ai_playout_ready(7,20399,20000,1200));
  assert(starter_ai_playout_ready(7,20400,20000,1200));
- for(unsigned i=0;i<500;i++)starter_ai_playout_written(7,320);
+ for(unsigned i=0;i<500;i++)starter_ai_playout_written(7,320,20400+i*20);
  assert(starter_ai_playout_status().target_ms==220);
  starter_ai_playout_retire(7,320);
  starter_ai_playout_admit(7,packet,1);
- assert(!starter_ai_playout_ready(7,30000,30000,20420));
+ assert(!starter_ai_playout_ready(7,32000,32000,30400));
  assert(starter_ai_playout_status().target_ms==220); /* ambiguous long gap */
  starter_media_ai_playback_boundary(7,true);
- assert(starter_ai_playout_ready(7,30001,30000,20420));
+ assert(starter_ai_playout_ready(7,32001,32000,30400));
  assert(starter_ai_playout_status().timeout_releases==1);
 ''')
 
