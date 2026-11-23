@@ -2,9 +2,9 @@
 
 [中文](downloads.md) · [English](downloads.en.md)
 
-Current distribution: **v1.2.0-beta.2 — pre-release, pending hardware acceptance**. See the historical archives below for `v1.0.0` and `v1.1.0`. Legacy board tags and their invalid download links have been removed.
+Current distribution: **v1.2.0-beta.3 — pre-release, pending hardware acceptance**. See the historical archives below for `v1.0.0` and `v1.1.0`. Legacy board tags and their invalid download links have been removed.
 
-[Release notes, SHA-256 and known issues](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.2) · [Release policy](development/release-policy.en.md)
+[Release notes, SHA-256 and known issues](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.3) · [Release policy](development/release-policy.en.md)
 
 Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Select your board and the matching `xiaotai` release listed below, or choose **本地 BIN** (local BIN) to load a file from the table below.
 
@@ -24,7 +24,7 @@ All five boards use TiRTC SDK 2.6.3 and firmware base version 1.2.0. Check the b
 
 | Variant | Embedded firmware identity | Complete BIN |
 |---|---|---|
-| Default | `1.2.0+build.105` | [v1.2.0-beta.2_lckfb-bk7258_all-app.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.2/v1.2.0-beta.2_lckfb-bk7258_all-app.bin) |
+| Default | `1.2.0+build.110` | [v1.2.0-beta.3_lckfb-bk7258_all-app.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.3/v1.2.0-beta.3_lckfb-bk7258_all-app.bin) |
 
 [Flashing and board guide](boards/lckfb-bk7258/README.en.md)
 
@@ -38,7 +38,7 @@ All five boards use TiRTC SDK 2.6.3 and firmware base version 1.2.0. Check the b
 
 | Variant | Embedded firmware identity | Complete BIN |
 |---|---|---|
-| Default | `1.2.0+build.92` | [v1.2.0-beta.2_lckfb-esp32s3_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.2/v1.2.0-beta.2_lckfb-esp32s3_merged.bin) |
+| Default | `1.2.0+build.96` | [v1.2.0-beta.3_lckfb-esp32s3_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.3/v1.2.0-beta.3_lckfb-esp32s3_merged.bin) |
 
 [Flashing and board guide](boards/lckfb-esp32s3/README.en.md)
 
@@ -54,7 +54,7 @@ For the 4.3-inch display and **PCB V1.0**.
 
 | Variant | Embedded firmware identity | Complete BIN |
 |---|---|---|
-| Default | `1.2.0+build.60` | [v1.2.0-beta.2_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.2/v1.2.0-beta.2_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin) |
+| Default | `1.2.0+build.64` | [v1.2.0-beta.3_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.3/v1.2.0-beta.3_waveshare-esp32p4-touch-lcd-43c-v10_merged.bin) |
 
 [Flashing and board guide](boards/waveshare-esp32p4-touch-lcd-43c-v10/README.en.md)
 
@@ -70,7 +70,7 @@ For CoreS3-Lite **K128-Lite / ILI9342C**. Download the single complete image bel
 
 | Variant | Embedded firmware identity | Complete BIN |
 |---|---|---|
-| ILI9342C | `1.2.0+build.102` | [v1.2.0-beta.2_m5stack-cores3-lite_ili9342c_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.2/v1.2.0-beta.2_m5stack-cores3-lite_ili9342c_merged.bin) |
+| ILI9342C | `1.2.0+build.106` | [v1.2.0-beta.3_m5stack-cores3-lite_ili9342c_merged.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.3/v1.2.0-beta.3_m5stack-cores3-lite_ili9342c_merged.bin) |
 
 [Flashing and board guide](boards/m5stack-cores3-lite/README.en.md)
 
@@ -86,18 +86,20 @@ For the **8 MiB Flash, dual-eye-display** board.
 
 | Variant | Embedded firmware identity | Complete BIN |
 |---|---|---|
-| Default | `1.2.0+build.55` | [v1.2.0-beta.2_mgkfb-bk7258_all-app.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.2/v1.2.0-beta.2_mgkfb-bk7258_all-app.bin) |
+| Default | `1.2.0+build.59` | [v1.2.0-beta.3_mgkfb-bk7258_all-app.bin](https://github.com/tangeai/xiaotai/releases/download/v1.2.0-beta.3/v1.2.0-beta.3_mgkfb-bk7258_all-app.bin) |
 
 [Flashing and board guide](boards/mgkfb-bk7258/README.en.md)
 
 ## Historical firmware archives
 
-- [Previous pre-release v1.2.0-beta.1](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1)
+- [Previous pre-release v1.2.0-beta.2](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.2)
+
+- [Archived pre-release v1.2.0-beta.1](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1)
 
 - [v1.0.0: five historical complete BINs](https://github.com/tangeai/xiaotai/releases/tag/v1.0.0).
 - [v1.1.0: five historical complete BINs](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0). LCKFB S3 build.68 has a known AI SDK issue. The release notes describe the archive as a pre-release. GitHub does not mark it as one.
 
-Archives retain actual embedded versions and hashes. They are for historical reproduction; current testing uses v1.2.0-beta.2 above.
+Archives retain actual embedded versions and hashes. They are for historical reproduction; current testing uses v1.2.0-beta.3 above.
 
 ## Development
 
