@@ -244,9 +244,10 @@
     "verification": "corroborated",
     "tirtc": {
       "platform": "espressif-esp32s3",
-      "version": "2.6.0",
+      "version": "2.6.3",
       "sdk_path": "../../../platforms/esp-idf/third_party/tirtc/esp32s3",
-      "build_contract": "manifest/build-contract.env"
+      "build_contract": "manifest/build-contract.env",
+      "archive_sha256": "87f9fc6eac5d1c5bd1bd4877fc00abdd115101e85181c035e76089343486f850"
     },
     "source_refs": [
       "project-adapter"

@@ -154,11 +154,11 @@ TODO：下一次实板回归时，重新保存主叫、被叫、上行首包和�
 | 主机环境 | Linux/WSL2、Git、Python 3 | [Git](https://git-scm.com/downloads)、[Python](https://www.python.org/downloads/) | 无 |
 | ESP-IDF | `v5.5.5`，提交 `b774170ff46c393eeb5e495ea37936038d3f4f4f` | [Espressif 官方仓库](https://github.com/espressif/esp-idf/tree/b774170ff46c393eeb5e495ea37936038d3f4f4f) | 无 |
 | C/C++ 编译器 | `riscv32-esp-elf-gcc 14.2.0`，构建标识 `esp-14.2.0_20260121` | [ESP-IDF 工具清单](https://github.com/espressif/esp-idf/blob/b774170ff46c393eeb5e495ea37936038d3f4f4f/tools/tools.json) | 无，安装器按工具清单校验下载文件 |
-| TiRTC | 2.6.0，`lib/libTiRTC.a` | [ESP32-P4 发布目录](https://repo-sdk.tange-ai.com/service/rest/repository/browse/tirtc-sdks/releases/espressif_esp32p4/) | `554295a06173478ba51cb6fc4fc42a09431787377aef7e4ded4ab17165f39cac` |
+| TiRTC | 2.6.3，`lib/libTiRTC.a` | [ESP32-P4 发布目录](https://repo-sdk.tange-ai.com/service/rest/repository/browse/tirtc-sdks/releases/espressif_esp32p4/) | `c2b88d10e4adf812de22051c22fbff3194b7bd8d82e8fa3f1df98be51e41d268` |
 | ESP-IDF 组件 | ESP-Hosted 1.4.7、ESP-SR 2.4.6、`esp_h264` 1.3.8、`esp_codec_dev` 1.5.10、Waveshare 4.3 BSP v1.0.1 | [工程依赖锁定文件](../../../firmware/esp-idf/esp32p4/waveshare-touch-lcd-43c/dependencies.lock) | 无 |
 | C6 从机固件 | 与当前主工程匹配的版本 | 无 | 无 |
 
-当前使用用户提供的 P4 SDK，内嵌版本 `v2.6.0-894972fb`，要求 lwIP socket 数量为 10。
+当前使用用户提供的 P4 SDK，内嵌版本 `v2.6.3-22271f54`，要求 lwIP socket 数量为 10。
 身份和构建契约见 `platforms/esp-idf/third_party/tirtc/esp32p4/VERSION.md` 及随包 manifest。
 旧本地修复批次的实板结果不能作为新库的验证结论。
 

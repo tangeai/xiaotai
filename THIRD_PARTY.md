@@ -8,7 +8,7 @@
 
 | 资产 | 授权状态 | 当前来源线索 | 发布前动作 |
 | --- | --- | --- | --- |
-| `platforms/**/third_party/tirtc/` 和 `firmware/**/components/tirtc_sdk/` 内的 TiRTC 静态库及头文件 | **需单独授权** | 各 SDK 包的 README/manifest；当前板卡包版本并不完全相同，BK7258 包标记为 2.6.1 | 逐包取得二进制、头文件、商业使用及再分发许可；无法公开源码分发时改为授权用户自行下载 |
+| `platforms/**/third_party/tirtc/` 和 `firmware/**/components/tirtc_sdk/` 内的 TiRTC 静态库及头文件 | **需单独授权** | 各 SDK 包的 README/manifest；ESP32-S3、ESP32-P4 和 BK7258 包均为 2.6.3 | 逐包取得二进制、头文件、商业使用及再分发许可；无法公开源码分发时改为授权用户自行下载 |
 | `platforms/esp-idf/components/starter_voice/vendor/` | **许可证待确认** | Voicute onnx-wakeword 的 ESP32 前处理/后处理子集，实际提交见下一段 | 核实固定提交的 LICENSE、NOTICE 和署名要求；无明确许可证则替换或取得权利人书面授权 |
 | `product/assets/models/nihaoxiaotai/` 及固件工程中的目标模型副本 | **需单独授权** | 用户提供的唤醒模型和配套 head 数据 | 确认模型、训练数据和导出产物权利人，并取得源码仓库及固件再分发许可 |
 | ESP32 共用 `ui_font_cn_16.c`、`ui_font_cn_24.c` 及 P4 `main/ui/font/lv_font_cn_14.c` | **SIL OFL 1.1** | Noto Sans CJK SC Regular 2.004，固定源码与哈希见[字体来源](product/assets/fonts/noto-sans-sc/README.md) | 随源码和固件分发保留该目录的 OFL 与版权声明；生成子集仍遵循 OFL，实板显示效果须验证 |

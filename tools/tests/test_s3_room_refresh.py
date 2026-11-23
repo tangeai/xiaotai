@@ -36,7 +36,7 @@ static lv_obj_t pool[256];
 static unsigned nodes;
 static char s_voice_feedback[64];
 static uint8_t s_room_members_page;
-lv_obj_t *s_room_code_label,*s_room_status_label,*s_room_member_labels[3],*s_room_page_label;
+lv_obj_t *s_room_code_label,*s_room_online_label,*s_room_status_label,*s_room_member_labels[3],*s_room_page_label;
 lv_obj_t *s_room_member_status_labels[3];
 char s_room_member_text[3][65];
 lv_obj_t *s_room_ptt_button,*s_room_connecting_label,*s_room_previous_button,*s_room_next_button,*s_room_members_caption;
@@ -58,6 +58,7 @@ static void lv_obj_clear_state(lv_obj_t *o,int s){if(o)o->disabled=false;}
 #define ACTION_ROOM_NEXT 7
 #define LV_EVENT_ALL 0
 #define LV_LABEL_LONG_DOT 1
+#define LV_LABEL_LONG_SCROLL 2
 #define lv_color_hex(x) (x)
 static int s_page=PAGE_ROOM,s_previous_room_phase;
 static bool s_previous_room_ptt;
@@ -161,6 +162,26 @@ class RoomRefreshRegressions(unittest.TestCase):
  assert(name && status && next && nodes==initial_nodes);
  assert(name->mode==LV_LABEL_LONG_DOT && name->h==22 && name->y==status->y);
  assert(name->x+name->w<=status->x && status->w>=64 && name->y+name->h<=next->y);
+''')
+
+    def test_long_room_status_preserves_online_count_and_member_heading(self):
+        run_room_case(r'''
+ const char *message="已结束本机对讲，房间已保留";
+ snapshot.room_phase=STARTER_ROOM_ASSIGNED;
+ strcpy(snapshot.room_message,message);product=snapshot;refresh_tick();
+ lv_obj_t *online=NULL,*status=NULL,*heading=NULL;
+ for(unsigned i=0;i<nodes;i++) {
+   if(!pool[i].visible) continue;
+   if(strcmp(pool[i].text,"在线 100 人")==0) online=&pool[i];
+   if(strcmp(pool[i].text,message)==0) status=&pool[i];
+   if(strstr(pool[i].text,"房间成员")) heading=&pool[i];
+ }
+ assert(online && status && heading && nodes==initial_nodes);
+ assert(online->y==status->y && online->x+online->w<=status->x);
+ assert(status->mode==LV_LABEL_LONG_SCROLL && status->h==22);
+ assert(status->y+status->h<=heading->y);
+ strcpy(snapshot.room_message,"连接失败\n请重试");product=snapshot;refresh_tick();
+ assert(strcmp(status->text,"连接失败 请重试")==0 && nodes==initial_nodes);
 ''')
 
 

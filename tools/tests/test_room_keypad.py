@@ -25,11 +25,12 @@ typedef int lv_coord_t;
 typedef struct {char room_code[8],room_message[80];int room_phase;} starter_runtime_product_snapshot_t;
 ''' + enums + r'''
 static char s_voice_feedback[80];
-static lv_obj_t *s_room_code_label,*s_room_status_label,*s_room_member_labels[3],
+static lv_obj_t *s_room_code_label,*s_room_online_label,*s_room_status_label,*s_room_member_labels[3],
  *s_room_page_label,*s_room_ptt_button,*s_room_connecting_label,*s_room_previous_button,*s_room_next_button,*s_room_members_caption;
 lv_obj_t *s_room_member_status_labels[3];
 char s_room_member_text[3][65];
 #define LV_LABEL_LONG_DOT 1
+#define LV_LABEL_LONG_SCROLL 2
 static void lv_obj_set_height(lv_obj_t *obj,int height) {}
 static void lv_label_set_long_mode(lv_obj_t *obj,int mode) {}
 static struct {const char *label;int x,y,w,h;product_action_t action;} buttons[16];
@@ -74,41 +75,65 @@ int main(void){
         start = handler.index('action == ACTION_ROOM) {')
         end = handler.index('} else if (action >= ACTION_DIAG_SYSTEM', start)
         dispatch = 'static void dispatch(product_action_t action) { if (' + handler[start:end] + '} }'
-        run_c(r'''
+        expiration = source.index("    if (s_voice_feedback[0] != '\\0' && now >= s_voice_feedback_hide_ms)")
+        expiration_end = source.index('    const int64_t queue_finished_us', expiration)
+        code = r'''
 #include "xiaotai_ui_copy.h"
 #include <assert.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 typedef int lv_obj_t;
 typedef int esp_err_t;
 #define lv_color_hex(c) (c)
 #define LV_TEXT_ALIGN_CENTER 0
+#define LV_TEXT_ALIGN_LEFT 1
+#define WIFI_NOTICE_NONE 0
 ''' + enums + r'''
 static product_page_t s_page;
 static char s_room_input[16], s_room_join_code[16], s_voice_feedback[80];
 static bool s_room_input_create;
 static unsigned s_room_members_page;
 static int joins, leaves, creates;
+static int request_result;
+static unsigned rendered_pages;
+static int s_wifi_notice;
+static int64_t s_voice_feedback_hide_ms;
+static lv_obj_t feedback_object,*s_room_input_feedback_label;
+static lv_obj_t *s_room_code_label;
+static char feedback_text[80];
+static bool feedback_visible;
 static char joined_code[16], joined_password[16], shown_value[16];
 static struct { const char *label; product_action_t action; } buttons[16];
 static unsigned button_count;
 static bool hint_seen;
 static int starter_runtime_room_set_foreground(bool value) { return 0; }
 static int starter_runtime_room_refresh(void) { return 0; }
-static int starter_runtime_room_create(const char *password) { creates++; return 0; }
-static int starter_runtime_room_leave(void) { leaves++; return 0; }
+static int starter_runtime_room_create(const char *password) { creates++; return request_result; }
+static int starter_runtime_room_leave(void) { leaves++; return request_result; }
 static int starter_runtime_room_join(const char *code, const char *password) {
-    joins++; strcpy(joined_code,code); strcpy(joined_password,password); return 0;
+    joins++; strcpy(joined_code,code); strcpy(joined_password,password); return request_result;
 }
-static bool room_action_submitted(int result) { return result==0; }
+static bool room_action_submitted(int result) {
+    strcpy(s_voice_feedback,result ? "请求未提交，请重试" : "");
+    return result==0;
+}
+static void label_set_text_if_changed(lv_obj_t *o,const char *text) {
+    assert(o==&feedback_object);
+    strcpy(feedback_text,text);
+    if (strcmp(text,"无密码直接点击确定")==0) hint_seen=true;
+}
+static void set_object_visible(lv_obj_t *o,bool visible) { feedback_visible=visible; }
+static void render_page(void) { rendered_pages++; }
+static void lv_obj_set_style_text_color(lv_obj_t *o,int color,int selector) {}
 static lv_obj_t *make_header_back_button(lv_obj_t *o, product_action_t a) { return o; }
 static void render_header(lv_obj_t *o, const char *text) {}
 static lv_obj_t *make_label(lv_obj_t *o, const char *text, int x,int y,int w,int c) {
     if (y==34) strcpy(shown_value,text);
-    if(strcmp(text,"无密码直接点击确定")==0) {
-        assert(y + 22 <= 240);
-        hint_seen=true;
+    if (y>200) {
+        assert(y + (CONFIG_IDF_TARGET_ESP32S3 ? 22 : 17) <= 240);
+        return &feedback_object;
     }
     return o;
 }
@@ -117,7 +142,13 @@ static lv_obj_t *make_button(lv_obj_t *o,const char *label,int x,int y,int w,int
     assert(button_count<16); buttons[button_count].label=label;
     buttons[button_count++].action=a; return o;
 }
-''' + dispatch + function(source, 'render_room_input') + r'''
+''' + function(source, 'refresh_room_input_feedback') + dispatch + function(source, 'render_room_input') + r'''
+static void expire_feedback(void) {
+    int64_t now=s_voice_feedback_hide_ms;
+    bool voice_state_changed=false;
+''' + source[expiration:expiration_end] + r'''
+    assert(voice_state_changed);
+}
 static void click(const char *label) {
     button_count=0; render_room_input(NULL);
     for(unsigned i=0;i<button_count;i++) if(strcmp(buttons[i].label,label)==0) {
@@ -156,8 +187,45 @@ int main(void) {
     dispatch(ACTION_ROOM_LEAVE); assert(s_page==PAGE_ROOM_LEAVE_CONFIRM && leaves==0);
     dispatch(ACTION_ROOM_LEAVE_CANCEL); assert(s_page==PAGE_ROOM && leaves==0);
     dispatch(ACTION_ROOM_LEAVE); dispatch(ACTION_ROOM_LEAVE_CONFIRM); assert(leaves==1);
+
+    dispatch(ACTION_ROOM_JOIN);
+    for(int i=0;i<6;i++) click("8");
+    click("确定");
+    request_result=-1;
+    click("确定");
+    assert(s_page==PAGE_ROOM_PASSWORD && feedback_visible);
+    assert(strcmp(feedback_text,"请求未提交，请重试")==0);
+    assert(strcmp(s_room_join_code,"888888")==0);
+    expire_feedback();
+    assert(feedback_visible && strcmp(feedback_text,"无密码直接点击确定")==0);
+    request_result=0;click("确定");
+    assert(s_page==PAGE_ROOM && s_voice_feedback[0]==0);
+
+    dispatch(ACTION_ROOM_CREATE_PASSWORD);
+    click("0");click("1");click("2");click("3");
+    request_result=-1;click("确定");
+    assert(s_page==PAGE_ROOM_PASSWORD && feedback_visible);
+    assert(strcmp(feedback_text,"请求未提交，请重试")==0);
+    assert(strcmp(s_room_input,"0123")==0);
+    expire_feedback();
+    assert(!feedback_visible);
+    request_result=0;click("确定");
+    assert(s_page==PAGE_ROOM && s_voice_feedback[0]==0);
+
+    request_result=-1;
+    unsigned pages=rendered_pages;
+    dispatch(ACTION_ROOM_CREATE);
+    assert(s_page==PAGE_ROOM && rendered_pages==pages+1 && s_voice_feedback[0]!=0);
+    dispatch(ACTION_ROOM_LEAVE);
+    pages=rendered_pages;
+    dispatch(ACTION_ROOM_LEAVE_CONFIRM);
+    assert(s_page==PAGE_ROOM_LEAVE_CONFIRM && rendered_pages==pages+1 && s_voice_feedback[0]!=0);
 }
-''', include_dirs=(ROOT / 'product/include',), cflags=('-DCONFIG_IDF_TARGET_ESP32S3=1',))
+'''
+        for compact in (0, 1):
+            with self.subTest(compact=bool(compact)):
+                run_c(code, include_dirs=(ROOT / 'product/include',),
+                      cflags=(f'-DCONFIG_IDF_TARGET_ESP32S3={compact}',))
 
 
 if __name__ == '__main__':

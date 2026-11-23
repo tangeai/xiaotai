@@ -44,6 +44,8 @@ typedef int starter_media_status_t;
 #include <stdatomic.h>
 #define PREFERENCES_FAILED 3
 #define PAGE_SETTINGS 10
+#define PAGE_ROOM 11
+#define PAGE_ROOM_LEAVE_CONFIRM 12
 static atomic_int s_preferences_save_status;
 static void preferences_poll(void){}
 static int page_renders;
@@ -53,6 +55,8 @@ static void set_voice_feedback(const char *t,int64_t n){}
 static int64_t s_ui_refresh_slow_last_us;
 static char s_voice_feedback[2];
 static int s_voice_feedback_hide_ms, s_wifi_notice, s_page;
+static void *s_room_code_label;
+static void refresh_room_input_feedback(void) {}
 static void *s_voice_queue;
 #define WIFI_NOTICE_NONE 0
 #define PRODUCT_VOICE_QUEUE_LENGTH 8

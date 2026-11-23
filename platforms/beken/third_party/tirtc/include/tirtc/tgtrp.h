@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-#define TGTRP_INTERFACE_VERSION "tag.v1.5.29" // tag.v1.5.29版本修改完成
+#define TGTRP_INTERFACE_VERSION "tag.v1.5.30" // tag.v1.5.30版本修改完成
 
 #define MAX_TGTRP_ADDR_INFO_SIZE 40
 

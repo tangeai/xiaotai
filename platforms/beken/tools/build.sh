@@ -18,7 +18,7 @@ ap_release_config="$project_dir/ap/config/bk7258_ap/release.config"
 cp_release_config="$project_dir/cp/config/bk7258/release.config"
 tirtc_archive="$support_dir/third_party/tirtc/lib/libTiRTC.a"
 tirtc_manifest="$support_dir/third_party/tirtc/manifest/build-info.env"
-expected_tirtc_sha256="ae5c9e85b8247c8a8d6ed2ef50e2c2199276c3e113d6a71c57e235d934dde968"
+expected_tirtc_sha256="77b2b91c1d98cfd3035b61d3f453541deff0eacc3b7df34fada1d55abcc55478"
 sdk_patches=(
     "$support_dir/tools/patches/bk-avdk-scheduler-snapshot.patch"
     "$support_dir/tools/patches/bk-avdk-dvp-sccb-diagnostics.patch"
@@ -117,12 +117,13 @@ fi
 actual_tirtc_sha256=$(sha256sum "$tirtc_archive" | cut -d ' ' -f 1)
 if [ "$actual_tirtc_sha256" != "$expected_tirtc_sha256" ]; then
     echo "Refusing unverified TiRTC archive: $actual_tirtc_sha256" >&2
-    echo "Expected BK7258 v2.6.1 mini archive: $expected_tirtc_sha256" >&2
+    echo "Expected BK7258 v2.6.3 mini archive: $expected_tirtc_sha256" >&2
     exit 1
 fi
 
 for fact in \
     'TARGET=beken-bk7258' \
+    'SDK_VERSION=v2.6.3' \
     'BUILD_PLATFORM_SDK_VERSION=3.1.1.10-official-398cab28' \
     'SSL=disabled' \
     'DTLS=disabled' \
