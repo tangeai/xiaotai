@@ -8,7 +8,9 @@ Flash open-source firmware from your desktop browser to turn a dev board into a 
 
 ![XiaoTai features: AI chat, WeChat calls, device intercom, and remote real-time audio and video](docs/images/xiaotai.gif)
 
-▶ [Watch demo video on Bilibili (Chinese)](https://www.bilibili.com/video/BV1JpsP63EhY/) · **Quick start**: choose a board → open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) → configure Wi-Fi → bind the device. Features vary by board. Online features depend on the XiaoTai binding/signaling platform, TiRTC, and AI/WeChat services; self-hosted setups require separate addresses and credentials.
+▶ [Watch demo video on Bilibili (Chinese)](https://www.bilibili.com/video/BV1JpsP63EhY/) · **Quick start**: choose a board → open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) → configure Wi-Fi → bind the device.
+
+**Online service**: Individuals can self-register and bind devices on [xiaotai.chat](https://xiaotai.chat) with no usage or time cap for test devices. WeChat voice calls work via the Tange XiaoTai Mini Program with no extra credentials required; custom model APIs and self-hosted backends are also supported.
 
 ## Choose a board and firmware
 
@@ -22,7 +24,11 @@ Match the physical model, PCB (printed circuit board) revision, and display vari
 | <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite board" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342C display<br>`m5stack-cores3-lite` | 320×240 touchscreen<br>WeChat voice calls, browser live view & intercom, AI chat, group intercom | [Downloads](docs/downloads.en.md#m5stack-cores3-lite)<br>[Flashing guide](docs/boards/m5stack-cores3-lite/README.en.md#flashing) |
 | <img src="docs/images/boards/mgkfb-bk7258.webp" alt="MGKFB BK7258 AI toy board with dual-eye displays" width="180"> | MGKFB BK7258 AI toy board<br>Dual-eye displays · 8 MiB Flash<br>`mgkfb-bk7258` | Dual-eye displays + physical buttons<br>WeChat voice calls, browser live view & intercom, AI chat | [Downloads](docs/downloads.en.md#mgkfb-bk7258)<br>[Flashing guide](docs/boards/mgkfb-bk7258/README.en.md#flashing) |
 
-M5 supports only the ILI9342C display controller; MGKFB BK7258 targets the 8 MiB Flash dual-eye board. See the [complete board catalog](docs/boards/README.en.md) and [Firmware downloads](docs/downloads.en.md) for full specs and archives.
+See the [complete board catalog](docs/boards/README.en.md) and [Firmware downloads](docs/downloads.en.md) for full specs and archives.
+
+Example pictures:
+
+<img src="docs/images/boards/example-av-1.webp" alt="Remote picture during a WeChat video call" width="240"> <img src="docs/images/boards/example-av-2.webp" alt="WeChat voice call" width="240"> <img src="docs/images/boards/example-av-3.webp" alt="AI reply" width="240">
 
 ## Flash the firmware
 

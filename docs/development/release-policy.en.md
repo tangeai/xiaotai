@@ -89,7 +89,7 @@ Host checks and native builds with pending hardware testing permit only pre-rele
 
 After publication, check tag targets, pre-release state, asset set and names, and download every BIN to verify SHA-256. Update beta navigation only after remote verification, never labeling the beta as stable. Do not overwrite historical releases or assets.
 
-`v1.0.0` is a historical stable archive. `v1.1.0` should be marked pre-release because of a known issue; GitHub currently lists it as a normal release and that flag still needs to be set. The current stable release is `v1.2.0`, and `v1.2.0-beta.*` stay pre-releases.
+`v1.0.0` is a historical stable archive, `v1.1.0` stays a pre-release because of a known issue, the current stable release is `v1.2.0`, and `v1.2.0-beta.*` stay pre-releases.
 
 Hardware acceptance applies to exact BIN bytes. An accepted BIN may be promoted to stable by external renaming without changing its hash. Changing embedded versions or recompiling requires new validation. Include only accepted boards/variants in stable releases; never borrow another variant's results.
 
