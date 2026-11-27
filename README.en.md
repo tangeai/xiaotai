@@ -50,7 +50,7 @@ See each board's flashing guide above for USB ports and download mode. For a dow
 Pick the entry point that fits you:
 
 - **Flash and try it**: If you have one of the boards above, flash it from the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/). Share photos or ask setup questions in [GitHub Discussions](https://github.com/tangeai/xiaotai/discussions) rather than opening an issue for usage help.
-- **Updates and community events (Chinese)**: Follow the **探鸽小钛** WeChat Official Account for firmware updates and dev-board giveaway events ([event details](https://mp.weixin.qq.com/s/30dIka9AfbfTDSSgZNpd2g)).
+- **Updates & adaptation program (Chinese)**: Follow the **探鸽小钛** WeChat Official Account. Through Dec 31, 2026, merged PRs adding a new board or feature qualify for a dev board of your choice (up to CNY 300; 50 total), and shipping teams can apply for 1,000 device IDs plus 1-on-1 support (50 slots). Reply **扶持** in WeChat or see [event details](https://mp.weixin.qq.com/s/30dIka9AfbfTDSSgZNpd2g).
 - **Help without writing firmware**: Submit serial logs, board photos matching the exact PCB revision, flashing troubleshooting notes, or fixes for Chinese/English documentation mismatches.
 - **Write code or add a board**: Start with issues labeled [`good first issue`](https://github.com/tangeai/xiaotai/labels/good%20first%20issue), or follow [Adding a board](CONTRIBUTING.en.md#adding-a-board) to register new hardware.
 
