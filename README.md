@@ -18,11 +18,11 @@
 
 | 开发板图片 | 型号与板卡 ID | 形态与主要能力 | 下载与指南 |
 |---|---|---|---|
-| <img src="docs/images/boards/lckfb-esp32s3.webp" alt="立创·实战派 ESP32-S3 开发板" width="128"> <img src="docs/images/boards/lckfb-esp32s3-running.webp" alt="立创·实战派 ESP32-S3 正在运行小钛" width="136"> | 立创·实战派 ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | 320×240 触摸屏<br>微信语音通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#lckfb-esp32s3)<br>[烧录指南](docs/boards/lckfb-esp32s3/README.md#烧录) |
-| <img src="docs/images/boards/lckfb-bk7258.webp" alt="立创·实战派 BK7258 开发板，屏幕正在运行小钛" width="300"> | 立创·实战派 BK7258<br>`lckfb-bk7258` | 触摸屏 + 按键<br>微信语音通话、网页看画面对讲、AI 对话、多人对讲 | [下载固件](docs/downloads.md#lckfb-bk7258)<br>[烧录指南](docs/boards/lckfb-bk7258/README.md#烧录) |
-| <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10.webp" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="128"> <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10-running.webp" alt="微雪 ESP32-P4 正在运行小钛" width="210"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | 4.3 寸 800×480 触摸屏<br>微信音视频通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)<br>[烧录指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录) |
-| <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite 开发板" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342C 屏幕<br>`m5stack-cores3-lite` | 320×240 触摸屏<br>微信语音通话、网页看画面对讲、AI 对话、多人对讲 | [下载固件](docs/downloads.md#m5stack-cores3-lite)<br>[烧录指南](docs/boards/m5stack-cores3-lite/README.md#烧录) |
-| <img src="docs/images/boards/mgkfb-bk7258.webp" alt="觅感 AI 玩具开发板 BK7258 双屏眼睛" width="180"> | 觅感 AI 玩具开发板 BK7258<br>双屏眼睛 · 8 MiB Flash<br>`mgkfb-bk7258` | 双屏眼睛 + 实体按键<br>微信语音通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#mgkfb-bk7258)<br>[烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录) |
+| <img src="docs/images/boards/lckfb-esp32s3.webp" alt="立创·实战派 ESP32-S3 开发板" width="160"><br><img src="docs/images/boards/lckfb-esp32s3-running.webp" alt="立创·实战派 ESP32-S3 正在运行小钛" width="160"> | 立创·实战派 ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | 320×240 触摸屏<br>微信语音通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#lckfb-esp32s3)<br>[烧录指南](docs/boards/lckfb-esp32s3/README.md#烧录) |
+| <img src="docs/images/boards/lckfb-bk7258.webp" alt="立创·实战派 BK7258 开发板，屏幕正在运行小钛" width="160"> | 立创·实战派 BK7258<br>`lckfb-bk7258` | 触摸屏 + 按键<br>微信语音通话、网页看画面对讲、AI 对话、多人对讲 | [下载固件](docs/downloads.md#lckfb-bk7258)<br>[烧录指南](docs/boards/lckfb-bk7258/README.md#烧录) |
+| <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10.webp" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="160"><br><img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10-running.webp" alt="微雪 ESP32-P4 正在运行小钛" width="160"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | 4.3 寸 800×480 触摸屏<br>微信音视频通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)<br>[烧录指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录) |
+| <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite 开发板" width="160"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342C 屏幕<br>`m5stack-cores3-lite` | 320×240 触摸屏<br>微信语音通话、网页看画面对讲、AI 对话、多人对讲 | [下载固件](docs/downloads.md#m5stack-cores3-lite)<br>[烧录指南](docs/boards/m5stack-cores3-lite/README.md#烧录) |
+| <img src="docs/images/boards/mgkfb-bk7258.webp" alt="觅感 AI 玩具开发板 BK7258 双屏眼睛" width="160"> | 觅感 AI 玩具开发板 BK7258<br>双屏眼睛 · 8 MiB Flash<br>`mgkfb-bk7258` | 双屏眼睛 + 实体按键<br>微信语音通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#mgkfb-bk7258)<br>[烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录) |
 
 M5 仅支持 ILI9342C 屏幕；觅感 BK7258 适用于 8 MiB Flash、双屏眼睛开发板。
 完整规格与历史版本见[完整开发板目录](docs/boards/README.md)与[固件下载](docs/downloads.md)。
@@ -51,6 +51,7 @@ M5 仅支持 ILI9342C 屏幕；觅感 BK7258 适用于 8 MiB Flash、双屏眼�
 欢迎按自己的方式参与小钛项目：
 
 - **直接烧录体验**：手里有上表开发板时，打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/)即可体验。欢迎在 [GitHub Discussions](https://github.com/tangeai/xiaotai/discussions) 晒出你的设备或发帖求助；使用问题请优先发在 Discussions，不要直接堆进 Issues。
+- **关注动态与活动**：欢迎关注「**探鸽小钛**」微信公众号获取固件更新与玩法分享，近期送开发板活动见[活动详情](https://mp.weixin.qq.com/s/30dIka9AfbfTDSSgZNpd2g)。
 - **不改代码也能帮忙**：欢迎补充串口日志、与 PCB 版本一致的板卡实拍照片、烧录排查步骤，或修正中英文文档不一致的地方。
 - **提交代码或适配新板**：想改代码可先看标有 [`good first issue`](https://github.com/tangeai/xiaotai/labels/good%20first%20issue) 的任务；想接入新开发板，请按[新增开发板](CONTRIBUTING.md#新增开发板)准备资料并提交登记。
 
