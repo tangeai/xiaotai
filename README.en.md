@@ -54,6 +54,8 @@ Pick the entry point that fits you:
 - **Help without writing firmware**: Submit serial logs, board photos matching the exact PCB revision, flashing troubleshooting notes, or fixes for Chinese/English documentation mismatches.
 - **Write code or add a board**: Start with issues labeled [`good first issue`](https://github.com/tangeai/xiaotai/labels/good%20first%20issue), or follow [Adding a board](CONTRIBUTING.en.md#adding-a-board) to register new hardware.
 
+<img src="docs/images/xiaotai-weixin.png" alt="Tange XiaoTai WeChat Official Account QR code" width="360">
+
 ## Build from source
 
 You do not need a development environment to use prebuilt firmware. For development, clone the source and inspect the board registry:
