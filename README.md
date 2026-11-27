@@ -4,23 +4,16 @@
 
 [中文](README.md) · [English](README.en.md)
 
-用电脑浏览器把开源固件刷到开发板上，就能实现 **微信通话、网页实时看画面与对讲、设备互呼和 AI（人工智能）聊天**。
-无需先装编译环境，可直接通过网页烧录体验，也可从源码开发自己的设备。
-
-**[网页一键烧录](https://xiaotai.chat/web-flasher/)** · **[v1.2.0 固件下载](docs/downloads.md)** · **[晒图与求助 (Discussions)](https://github.com/tangeai/xiaotai/discussions)**
+用电脑浏览器把开源固件刷到开发板上，就能实现 **微信通话、网页实时看画面与对讲、设备互呼和 AI（人工智能）聊天**。无需先装编译环境，可直接烧录体验，也可从源码开发自己的设备。
 
 ![探鸽小钛功能示意：运行小钛固件的设备可接入 AI 聊天、微信通话、设备对讲和远程实时音视频](docs/images/xiaotai.gif)
 
-**快速开始：选择开发板 → 浏览器烧录固件 → 配置 Wi-Fi → 绑定设备。**
-各板支持的形态与能力不同，具体范围和已知限制见对应指南。
-
-在线功能依赖小钛设备绑定与信令平台、TiRTC 实时音视频服务，以及 AI 或微信服务配置。
-本仓库提供设备固件；使用发布包可按下文体验，接入自建平台则需另行配置服务地址和凭证。
+▶ [观看 B 站演示视频](https://www.bilibili.com/video/BV1JpsP63EhY/) · **快速开始**：选择开发板 → 打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/) → 配置 Wi-Fi → 绑定设备。
+各板支持的形态与能力不同，在线功能依赖小钛绑定与信令平台、TiRTC 音视频及 AI/微信服务；接入自建平台需另行配置服务地址和凭证。
 
 ## 选择开发板和固件
 
-按实物型号、PCB（印刷电路板）版本和屏幕变体选板。同一芯片的固件也不能随意混用。
-板卡 ID 是构建与固件文件名中的唯一标识；当前版本、准确文件名和发布说明统一见[固件下载](docs/downloads.md)。
+按实物型号、PCB（印刷电路板）版本和屏幕变体选板；同一芯片的固件不能随意混用。
 
 | 开发板图片 | 型号与板卡 ID | 形态与主要能力 | 下载与指南 |
 |---|---|---|---|
@@ -30,9 +23,8 @@
 | <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite 开发板" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342C 屏幕<br>`m5stack-cores3-lite` | 320×240 触摸屏<br>微信语音通话、网页看画面对讲、AI 对话、多人对讲 | [下载固件](docs/downloads.md#m5stack-cores3-lite)<br>[烧录指南](docs/boards/m5stack-cores3-lite/README.md#烧录) |
 | <img src="docs/images/boards/mgkfb-bk7258.webp" alt="觅感 AI 玩具开发板 BK7258 双屏眼睛" width="180"> | 觅感 AI 玩具开发板 BK7258<br>双屏眼睛 · 8 MiB Flash<br>`mgkfb-bk7258` | 双屏眼睛 + 实体按键<br>微信语音通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#mgkfb-bk7258)<br>[烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录) |
 
-M5 仅支持 ILI9342C 屏幕；觅感 BK7258 固件适用于 8 MiB Flash、
-双屏眼睛开发板。各板规格、功能与依赖见[完整开发板目录](docs/boards/README.md)，历史版本见
-[GitHub Releases](https://github.com/tangeai/xiaotai/releases)。
+M5 仅支持 ILI9342C 屏幕；觅感 BK7258 适用于 8 MiB Flash、双屏眼睛开发板。
+完整规格与历史版本见[完整开发板目录](docs/boards/README.md)与[固件下载](docs/downloads.md)。
 
 ## 烧录
 
@@ -40,9 +32,11 @@ M5 仅支持 ILI9342C 屏幕；觅感 BK7258 固件适用于 8 MiB Flash、
 
 1. 用支持数据传输的 USB 线连接开发板与电脑，关闭占用串口的终端软件。
 2. 打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/)，选择芯片平台并点击 **连接设备** 选中串口。
-3. 在 **小钛固件** 中选中对应板型与下载页一致的 `xiaotai` 版本（如 `v1.2.0`），确认起始地址为 `0x0` 后点击 **开始烧录**。
+3. 在 **小钛固件** 中选中对应板型与当前正式版（如 `v1.2.0`），确认起始地址为 `0x0` 后点击 **开始烧录**。
 
-各板 USB 接口、进入下载模式的方法和操作截图见上表的烧录指南。已有发布镜像时可选 **本地 BIN**（ESP32 选 `_merged.bin`，BK7258 选 `_all-app.bin`，均从 `0x0` 写入）。ESP32 完整镜像会覆盖 Wi-Fi 和绑定信息；BK7258 首次烧录前请备份原厂校准资料，避免全片擦除。
+![小钛网页烧录与串口日志工作台（界面示例，实际烧录请选择下载页当前正式版）](docs/images/flashing/xiaotai-lckfb-esp32s3.png)
+
+各板 USB 接口与进入下载模式的方法见上表烧录指南。已有发布镜像时可选 **本地 BIN**（ESP32 选 `_merged.bin`，BK7258 选 `_all-app.bin`，均从 `0x0` 写入）。ESP32 完整镜像会覆盖 Wi-Fi 和绑定信息；BK7258 首次烧录前请备份原厂校准资料，避免全片擦除。
 
 ## 首次体验
 
@@ -115,20 +109,14 @@ SDK（软件开发工具包）和工具链。测试、打包与发布要求见[�
 
 ## 相关仓库
 
-以下仓库为同一产品的其他硬件线；上表五块开发板的固件下载与开发入口均在本仓库（`tangeai/xiaotai`）。
+以下仓库为同一产品的其他硬件线；上表五块开发板的固件下载与开发入口均在本仓库（`tangeai/xiaotai`）：
 
-| 项目 | 仓库 |
-|---|---|
-| 小钛 ESP32 | [tangeai/xiaotai-esp32](https://github.com/tangeai/xiaotai-esp32) |
-| 小钛 Lierda（利尔达） | [tangeai/xiaotai-lierda](https://github.com/tangeai/xiaotai-lierda) |
-
-各仓库支持的型号、构建方式和固件下载以各自 README 为准。
+- 小钛 ESP32：[tangeai/xiaotai-esp32](https://github.com/tangeai/xiaotai-esp32)
+- 小钛 Lierda（利尔达）：[tangeai/xiaotai-lierda](https://github.com/tangeai/xiaotai-lierda)
 
 ## 下一步
 
-- [架构与二次开发](ARCHITECTURE.md)：代码分层、媒体生命周期与扩展方式。
-- [参与开发](CONTRIBUTING.md)：新增板卡、测试与发布流程。
-- [完整文档](docs/README.md)：板卡、产品、工程和调试资料索引。
+- 刷完晒图、配网排查或讨论新板适配：前往 [GitHub Discussions](https://github.com/tangeai/xiaotai/discussions)。
+- 了解代码分层、媒体生命周期与贡献规范：见顶部导航中的架构与参与开发文档。
 
-本项目自有源码和文档采用 [MIT License](LICENSE)。第三方依赖和资源遵守各自许可证，
-详见[第三方资产清单](THIRD_PARTY.md)。
+本项目自有源码和文档采用 [MIT License](LICENSE)，第三方依赖与资源详见[第三方资产清单](THIRD_PARTY.md)。
