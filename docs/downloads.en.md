@@ -99,7 +99,7 @@ For the **8 MiB Flash, dual-eye-display** board.
 - [Archived pre-release v1.2.0-beta.1](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1)
 
 - [v1.0.0: five historical complete BINs](https://github.com/tangeai/xiaotai/releases/tag/v1.0.0).
-- [v1.1.0: five historical complete BINs](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0). LCKFB S3 build.68 has a known AI SDK issue. The release notes describe the archive as a pre-release. GitHub does not mark it as one.
+- [v1.1.0: five historical complete BINs](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0). LCKFB S3 build.68 has a known AI SDK issue; marked as a pre-release.
 
 Archives retain actual embedded versions and hashes. They are for historical reproduction; current use is v1.2.0 above.
 

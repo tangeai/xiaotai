@@ -98,7 +98,7 @@ M5Stack CoreS3-Lite / M5Stack CoreS3-Lite
 - [v1.2.0-beta.1 历史测试版](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0-beta.1)
 
 - [v1.0.0：五板历史完整 BIN](https://github.com/tangeai/xiaotai/releases/tag/v1.0.0)。
-- [v1.1.0：五板历史完整 BIN](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0)。立创 S3 的 build.68 有已知 AI SDK 问题。发布正文将此归档列为预发布，GitHub 页面未标记为预发布。
+- [v1.1.0：五板历史完整 BIN](https://github.com/tangeai/xiaotai/releases/tag/v1.1.0)。立创 S3 的 build.68 有已知 AI SDK 问题，已标记为预发布。
 
 归档保留实际内嵌版本与哈希，供复现历史使用；当前使用上方 v1.2.0。
 
