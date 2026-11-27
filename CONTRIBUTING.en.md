@@ -97,7 +97,7 @@ Each rule is maintained at the authoritative location below; other documents lin
 | SDK, compiler, ABI, native artifacts, and flash layout | Target board guide, native build scripts, and dependency manifests | Native builds and board contract checks |
 | Product state, interaction, room refresh, and media parameters | [Requirements (Chinese)](docs/product/PRODUCT_REQUIREMENTS.md), [Interaction profiles (Chinese)](docs/product/PRODUCT_INTERACTION_PROFILES.md), [Media contract (Chinese)](docs/product/MEDIA_CONTRACT.md) | Product public-interface and platform regression tests |
 | Documentation, translation scope, and internal retention | [Documentation requirements](#documentation-requirements), [Translation checks](#translation-and-synchronization-checks) | Layout/link checks; manual bilingual review |
-| Third-party sources and permission actions | [Third-party checklist](THIRD_PARTY.en.md) and bundled licenses | Source/path checks; manual permission-evidence review |
+| Third-party sources and bundled licenses | [Third-party checklist](THIRD_PARTY.en.md) and bundled licenses | Source and path checks |
 | Test layers, coverage, and hardware evidence | [Testing](tests/README.en.md) | `bash tools/check.sh`; target-board HIL |
 
 Board IDs use lowercase hyphenated names and are permanent build and package identifiers. Public model names help users match hardware. Keep native CMake project and BIN/ELF names, such as `lckfb_esp32s3_xiaotai.bin`; do not rename them just to match the board ID.

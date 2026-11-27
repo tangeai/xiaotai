@@ -201,14 +201,13 @@ The 1.1.0 test firmware adds AI audio analysis: triggered raw MIC1 16 kHz PCM re
 
 Recognition pauses during calls, live view, AI conversations, and room activity. MIC3 playback reference is excluded; thresholds and acoustics still require M5 hardware validation.
 
-The historical ILI9342C release is **v1.0.1 · build.48**. The current beta still needs hardware acceptance; historical results do not validate it.
+This board has hardware-use records. The current version is on [Downloads](../../downloads.en.md#m5stack-cores3-lite).
 
 See [Release records (Chinese)](FREEZE.md) for features/fixes and [Validation (Chinese)](../../../boards/m5stack/cores3-lite/VALIDATION.md) for build identity, scope, and historical logs.
 
 - Capture, AI interruption, and double-talk need ongoing testing. Unstable recognition of the short Chinese phrase “好的” and possible loss of initial speech remain unresolved.
 - This version does not offer experimental recording export to TF cards. Diagnose with `voice-diag`, `status`, and `face-animation`.
 - AEC and UI processing headroom during playback remains tight. Weak networks, repeated switching, and long runs need continued regression. See [Audio performance review (Chinese)](AUDIO_PERFORMANCE_REVIEW.md).
-- Only the ILI9342C complete image is provided; see Downloads for availability.
 - SD card, IMU, magnetometer, proximity sensor, and RTC are not integrated into XiaoTai features.
 
 ## Serial time-server configuration

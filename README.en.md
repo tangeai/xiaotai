@@ -58,13 +58,21 @@ Binding succeeds when the device appears in the list and returns to its home scr
 
 Follow your board guide to start an AI conversation using the screen or physical buttons. Open live view and two-way audio from the web device page. For WeChat calls, follow the device prompts to add a WeChat contact first. After a session ends, the device should return to standby and be ready for another session.
 
-Device-to-device calls, group intercom, and video support depend on the board; see its guide.
+WeChat video support, device-to-device calls, and group intercom depend on the board; see its guide. For example, LCKFB ShiZhanPai ESP32-S3 currently supports WeChat voice calls while using its camera for browser live view.
 
 ### 4. Recovery and troubleshooting
 
 To change networks or rebind a touchscreen device, open “设备设置 → 重置设备” (Device settings → Reset device), confirm, then configure Wi-Fi and bind again. For devices without touch input, use the physical buttons or serial commands described in the board guide. Do not perform an arbitrary full-chip erase.
 
 If something goes wrong, check the troubleshooting section of the board guide first. When reporting a problem, include the board ID, firmware version, steps, and symptoms. For audio or video issues, specify the affected direction, such as “no sound from browser to device.” Include serial logs if available.
+
+## Get involved
+
+Pick the entry point that fits you:
+
+- **Flash and try it**: If you have one of the boards above, flash it from the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/). Share photos or ask setup questions in [GitHub Discussions](https://github.com/tangeai/xiaotai/discussions) rather than opening an issue for usage help.
+- **Help without writing firmware**: Submit serial logs, board photos matching the exact PCB revision, flashing troubleshooting notes, or fixes for Chinese/English documentation mismatches.
+- **Write code or add a board**: Start with issues labeled [`good first issue`](https://github.com/tangeai/xiaotai/labels/good%20first%20issue), or follow [Adding a board](CONTRIBUTING.en.md#adding-a-board) to register new hardware.
 
 ## Build from source
 
@@ -91,6 +99,8 @@ ESP32-S3 / ESP32-P4 use **ESP-IDF v5.5.5**. Run `. tools/activate_esp_idf.sh` be
 
 ## Related repositories
 
+The repositories below cover other hardware lines of the same product. Firmware downloads and development for the five boards listed above stay in this repository (`tangeai/xiaotai`).
+
 | Project | Repository |
 |---|---|
 | XiaoTai ESP32 | [tangeai/xiaotai-esp32](https://github.com/tangeai/xiaotai-esp32) |
@@ -104,4 +114,4 @@ Refer to each repository's README for supported models, build instructions, and 
 - [Contributing](CONTRIBUTING.en.md): adding boards, testing, and releases.
 - [Documentation](docs/README.en.md): board, product, engineering, and debugging references.
 
-This project's own source code and documentation use the [MIT License](LICENSE). Third-party dependencies and assets retain their respective licenses; see the [third-party checklist](THIRD_PARTY.en.md).
+This project's own source code and documentation use the [MIT License](LICENSE). Third-party dependencies and assets retain their respective licenses; see [Third-party assets](THIRD_PARTY.en.md).

@@ -10,7 +10,7 @@ The Release title must exactly match its tag, for example `v1.2.0-beta.1`. Put b
 
 ## Timeline and versions
 
-These unified milestones follow source history without rewriting board version history. This maintainer-authorized migration removes legacy non-version tags after backing up tag objects, commit mappings, and a recovery bundle. Only the first three version tags below remain afterward.
+These unified milestones follow source history without rewriting board version history. Current downloads use only the unified version tags in the table below. Older per-board Releases have been removed from GitHub, and their asset URLs no longer work.
 
 Create annotated tags that state when and why a historical milestone was recorded; never backdate their creation to imply an original release date.
 
@@ -25,11 +25,11 @@ Create annotated tags that state when and why a historical milestone was recorde
 
 `v1.0.0` and `v1.1.0` are retrospective source tags with archives of actual historical complete BINs. Each board retains its original embedded version, build source, and hash; not all images were compiled from the unified tag.
 
-M5 archives contain only ILI9342C; v1.1.0 reuses its older build.48. LCKFB S3 build.68 still has a known issue, so v1.1.0 remains pre-release. Original Release pages remain evidence; old asset URLs expired with their tags, and the download page links to the new archives.
+M5 archives contain only ILI9342C; v1.1.0 reuses its older build.48. LCKFB S3 build.68 still has a known issue, so v1.1.0 should stay a pre-release. Older per-board Releases have been removed. The download page replaces those entries with the unified archives.
 
-Reproduce historical source using the commit SHA in those notes, not deleted board tags.
+Reproduce historical source using the commit SHA in those notes.
 
-Keep version tags immutable; this one-time cleanup does not authorize routine tag deletion.
+Keep version tags immutable. A one-time cleanup of old per-board Releases does not authorize routine tag deletion.
 
 Use `1.2.1` for compatible fixes, `1.3.0` for compatible features, and `2.0.0` for breaking changes; build counts do not determine minor versions.
 
@@ -89,7 +89,7 @@ Host checks and native builds with pending hardware testing permit only pre-rele
 
 After publication, check tag targets, pre-release state, asset set and names, and download every BIN to verify SHA-256. Update beta navigation only after remote verification, never labeling the beta as stable. Do not overwrite historical releases or assets.
 
-`v1.0.0` is a historical stable archive, while `v1.1.0` remains a pre-release due to known issues and the current stable release is `v1.2.0`, and `v1.2.0-beta.*` stay pre-releases.
+`v1.0.0` is a historical stable archive. `v1.1.0` should be marked pre-release because of a known issue; GitHub currently lists it as a normal release and that flag still needs to be set. The current stable release is `v1.2.0`, and `v1.2.0-beta.*` stay pre-releases.
 
 Hardware acceptance applies to exact BIN bytes. An accepted BIN may be promoted to stable by external renaming without changing its hash. Changing embedded versions or recompiling requires new validation. Include only accepted boards/variants in stable releases; never borrow another variant's results.
 

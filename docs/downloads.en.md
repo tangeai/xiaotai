@@ -2,7 +2,7 @@
 
 [中文](downloads.md) · [English](downloads.en.md)
 
-Current distribution: **v1.2.0 — stable**. See the historical archives below for `v1.0.0` and `v1.1.0`. Legacy board tags and their invalid download links have been removed.
+Current distribution: **v1.2.0 — stable**. See the historical archives below for `v1.0.0` and `v1.1.0`. Download from this page. Older per-board Releases have been removed.
 
 [Release notes, SHA-256 and known issues](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0) · [Release policy](development/release-policy.en.md)
 
@@ -107,6 +107,6 @@ Archives retain actual embedded versions and hashes. They are for historical rep
 
 Start with [Architecture](../ARCHITECTURE.en.md) and the board guides for SDKs, native project paths, build and debugging steps. Use [source setup](../README.en.md#build-from-source) and `tools/build.py --board <board-id>`; select the correct M5 screen variant.
 
-For unified distributions, check out the version tag. Historical board tags were removed; use source commit SHAs from archived release records. The main branch may contain unreleased changes.
+For unified distributions, check out the version tag. Use source commit SHAs from archived release records. The main branch may contain unreleased changes.
 
 Online features depend on binding/signaling, TiRTC, and the AI or WeChat services used. Configure service addresses and credentials as described in the [project overview](../README.en.md). Validate modified firmware using [Testing](../tests/README.en.md) and follow [Contributing](../CONTRIBUTING.en.md).

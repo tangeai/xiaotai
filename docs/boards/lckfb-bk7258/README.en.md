@@ -10,7 +10,7 @@ Board ID: `lckfb-bk7258`. Touchscreen and buttons control browser-based (H5) liv
 
 See [Downloads](../../downloads.en.md#lckfb-bk7258) for firmware for **LCKFB BK7258**.
 
-The current beta awaits hardware acceptance; historical results do not validate this image.
+This board has hardware-use records. The current download is v1.2.0.
 
 Build identities, scope, and outstanding checks are in [Validation (Chinese)](VALIDATION.md) and [release notes](../../downloads.en.md#lckfb-bk7258).
 
