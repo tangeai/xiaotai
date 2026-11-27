@@ -55,8 +55,6 @@ M5 仅支持 ILI9342C 屏幕；觅感 BK7258 适用于 8 MiB Flash、双屏眼�
 - **不改代码也能帮忙**：欢迎补充串口日志、与 PCB 版本一致的板卡实拍照片、烧录排查步骤，或修正中英文文档不一致的地方。
 - **提交代码或适配新板**：想改代码可先看标有 [`good first issue`](https://github.com/tangeai/xiaotai/labels/good%20first%20issue) 的任务；想接入新开发板，请按[新增开发板](CONTRIBUTING.md#新增开发板)准备资料并提交登记。
 
-<img src="docs/images/xiaotai-weixin.png" alt="微信搜一搜「探鸽小钛」公众号二维码" width="360">
-
 ## 从源码编译
 
 不修改固件时，无需安装开发环境。二次开发先下载源码并查看板卡清单：
