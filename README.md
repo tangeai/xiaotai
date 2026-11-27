@@ -9,7 +9,8 @@
 ![探鸽小钛功能示意：运行小钛固件的设备可接入 AI 聊天、微信通话、设备对讲和远程实时音视频](docs/images/xiaotai.gif)
 
 ▶ [观看 B 站演示视频](https://www.bilibili.com/video/BV1JpsP63EhY/) · **快速开始**：选择开发板 → 打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/) → 配置 Wi-Fi → 绑定设备。
-各板支持的形态与能力不同，在线功能依赖小钛绑定与信令平台、TiRTC 音视频及 AI/微信服务；接入自建平台需另行配置服务地址和凭证。
+
+**在线服务说明**：个人可在 [xiaotai.chat](https://xiaotai.chat) 自助注册并绑定设备，测试设备当前暂无用量与时长限制；微信语音通话已由「探鸽小钛」小程序接入，无需个人额外申请资质；也支持更换自有模型接口或自建业务服务器。
 
 ## 选择开发板和固件
 
@@ -17,9 +18,9 @@
 
 | 开发板图片 | 型号与板卡 ID | 形态与主要能力 | 下载与指南 |
 |---|---|---|---|
-| <img src="docs/images/boards/lckfb-esp32s3.webp" alt="立创·实战派 ESP32-S3 开发板" width="180"> | 立创·实战派 ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | 320×240 触摸屏<br>微信语音通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#lckfb-esp32s3)<br>[烧录指南](docs/boards/lckfb-esp32s3/README.md#烧录) |
-| <img src="docs/images/boards/lckfb-bk7258.webp" alt="立创·实战派 BK7258 开发板" width="180"> | 立创·实战派 BK7258<br>`lckfb-bk7258` | 触摸屏 + 按键<br>微信语音通话、网页看画面对讲、AI 对话、多人对讲 | [下载固件](docs/downloads.md#lckfb-bk7258)<br>[烧录指南](docs/boards/lckfb-bk7258/README.md#烧录) |
-| <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10.webp" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="180"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | 4.3 寸 800×480 触摸屏<br>微信音视频通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)<br>[烧录指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录) |
+| <img src="docs/images/boards/lckfb-esp32s3.webp" alt="立创·实战派 ESP32-S3 开发板" width="128"> <img src="docs/images/boards/lckfb-esp32s3-running.webp" alt="立创·实战派 ESP32-S3 正在运行小钛" width="136"> | 立创·实战派 ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | 320×240 触摸屏<br>微信语音通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#lckfb-esp32s3)<br>[烧录指南](docs/boards/lckfb-esp32s3/README.md#烧录) |
+| <img src="docs/images/boards/lckfb-bk7258.webp" alt="立创·实战派 BK7258 开发板，屏幕正在运行小钛" width="300"> | 立创·实战派 BK7258<br>`lckfb-bk7258` | 触摸屏 + 按键<br>微信语音通话、网页看画面对讲、AI 对话、多人对讲 | [下载固件](docs/downloads.md#lckfb-bk7258)<br>[烧录指南](docs/boards/lckfb-bk7258/README.md#烧录) |
+| <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10.webp" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="128"> <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10-running.webp" alt="微雪 ESP32-P4 正在运行小钛" width="210"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | 4.3 寸 800×480 触摸屏<br>微信音视频通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)<br>[烧录指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录) |
 | <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite 开发板" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342C 屏幕<br>`m5stack-cores3-lite` | 320×240 触摸屏<br>微信语音通话、网页看画面对讲、AI 对话、多人对讲 | [下载固件](docs/downloads.md#m5stack-cores3-lite)<br>[烧录指南](docs/boards/m5stack-cores3-lite/README.md#烧录) |
 | <img src="docs/images/boards/mgkfb-bk7258.webp" alt="觅感 AI 玩具开发板 BK7258 双屏眼睛" width="180"> | 觅感 AI 玩具开发板 BK7258<br>双屏眼睛 · 8 MiB Flash<br>`mgkfb-bk7258` | 双屏眼睛 + 实体按键<br>微信语音通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#mgkfb-bk7258)<br>[烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录) |
 
