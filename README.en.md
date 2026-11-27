@@ -29,46 +29,19 @@ M5 supports only the ILI9342C display controller; MGKFB BK7258 targets the 8 MiB
 Flash directly from desktop Chrome or Edge (typically 2–3 minutes) without installing a build toolchain:
 
 1. Connect the board to your computer with a data-capable USB cable and close any serial monitor using that port.
-2. Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/), select the chip platform, and click **连接设备** (Connect) to pick the board's serial port.
-3. Under **小钛固件** (XiaoTai firmware), choose your board and the current stable release (such as `v1.2.0`), verify address `0x0`, and start flashing.
+2. Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/), select the chip family, and click **Connect device** to pick the board's serial port.
+3. Under **Xiaotai firmware**, choose your board and the current `xiaotai` release (such as `v1.2.0`), verify address `0x0`, and click **Start flashing**.
 
-![XiaoTai Web Flasher and serial console (UI example; select the current stable release when flashing)](docs/images/flashing/xiaotai-lckfb-esp32s3.png)
+![XiaoTai Web Flasher and serial console (LCKFB ESP32-S3 with v1.2.0 · xiaotai selected)](docs/images/flashing/xiaotai-lckfb-esp32s3.en.png)
 
-See each board's flashing guide above for USB ports and download mode. For a downloaded release, choose **本地 BIN** (local BIN) with `_merged.bin` for ESP32 or `_all-app.bin` for BK7258 at `0x0`. ESP32 full images overwrite Wi-Fi and binding settings; for BK7258, back up factory calibration first and avoid full-chip erase.
+See each board's flashing guide above for USB ports and download mode. For a downloaded release, choose **Local BIN** with `_merged.bin` for ESP32 or `_all-app.bin` for BK7258 at `0x0`. ESP32 full images overwrite Wi-Fi and binding settings; for BK7258, back up factory calibration first and avoid full-chip erase.
 
 ## First use
 
-### 1. Configure Wi-Fi
-
-After flashing and restarting, a device without a usable network configuration displays or speaks a setup prompt and broadcasts an open `XiaoTai-XXXX` hotspot. Connect your phone or computer; a “no internet” warning is expected.
-
-If the setup page does not open automatically, visit `http://192.168.6.1`, select a 2.4 GHz Wi-Fi network, enter the router password, and submit. If the hotspot reappears, the connection failed. Check the password and signal, then retry.
-
-### 2. Bind the device
-
-An already bound device is ready to use once it comes online. If binding is required, the device displays or reads out a six-digit verification code.
-
-Reconnect your phone or computer to the internet, sign in to the [XiaoTai devices page](https://xiaotai.chat/devices), and enter the code under “添加设备” (Add device). If it expires, use the newly generated code.
-
-Binding succeeds when the device appears in the list and returns to its home screen, eye display, or ready state.
-
-### 3. Start using the device
-
-Follow your board guide to start an AI conversation using the screen or physical buttons. Open live view and two-way audio from the web device page. For WeChat calls, follow the device prompts to add a WeChat contact first. After a session ends, the device should return to standby and be ready for another session.
-
-WeChat video support, device-to-device calls, and group intercom depend on the board; see its guide. For example, LCKFB ShiZhanPai ESP32-S3 currently supports WeChat voice calls while using its camera for browser live view.
-
-### 4. Recovery and troubleshooting
-
-To change networks or rebind a touchscreen device, open “设备设置 → 重置设备” (Device settings → Reset device), confirm, then configure Wi-Fi and bind again. For devices without touch input, use the physical buttons or serial commands described in the board guide. Do not perform an arbitrary full-chip erase.
-
-If something goes wrong, check the troubleshooting section of the board guide first. When reporting a problem, include the board ID, firmware version, steps, and symptoms. For audio or video issues, specify the affected direction, such as “no sound from browser to device.” Include serial logs if available.
-
-### Quick FAQ
-
-- **Do I need ESP-IDF or a build toolchain?** No. Use the Chrome/Edge Web Flasher above to try a release; you only need a local toolchain when modifying firmware from source.
-- **Does LCKFB ESP32-S3 support WeChat video calls?** Currently it supports WeChat voice calls while using its camera for browser live view; see Waveshare ESP32-P4 for WeChat audio/video calls.
-- **Serial port not found or Wi-Fi setup fails?** Check your USB data cable, serial driver, and 2.4 GHz Wi-Fi, then check the board guide's troubleshooting section or ask in Discussions with your board ID and symptoms.
+1. **Configure Wi-Fi**: After reboot, connect to the open `XiaoTai-XXXX` hotspot ("no internet" is expected). Visit `http://192.168.6.1` if the portal does not open, then submit your 2.4 GHz Wi-Fi credentials.
+2. **Bind the device**: Reconnect to the internet, open the [XiaoTai devices page](https://xiaotai.chat/devices), and enter the six-digit code shown or spoken by the device under Add device.
+3. **Start using**: Start AI chat or WeChat calls on the device, and open live view and two-way audio on the web page. Boards such as LCKFB ESP32-S3 use WeChat voice calls while streaming camera video to browser live view; see each board guide for details.
+4. **Reset and troubleshoot**: To change Wi-Fi or rebind, use Device settings → Reset device on touchscreens (see the board guide for button/serial reset) and avoid arbitrary full-chip erase. Check the board guide's troubleshooting section first; include board ID, firmware version, audio/video direction, and serial logs when reporting issues.
 
 ## Get involved
 
