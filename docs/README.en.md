@@ -22,7 +22,7 @@ Each board guide covers flashing, first use, specifications, media parameters, d
 - [Architecture and development](../ARCHITECTURE.en.md): product layers, session and media lifecycles, and directory boundaries.
 - [Unified release policy](development/release-policy.en.md): version timeline, BIN names, and release gates.
 - [Contributing](../CONTRIBUTING.en.md): adaptation workflow, tests, documentation, and releases.
-- [Third-party checklist](../THIRD_PARTY.en.md): dependency sources, permission status, and outstanding actions.
+- [Third-party assets](../THIRD_PARTY.en.md): distribution notes for the project SDK, model, and bundled components.
 - [ESP32 and BK7258 serial commands](development/SERIAL_COMMANDS.en.md): status, Wi-Fi setup, calls, service addresses, and NTP time-server configuration.
 - [BK7258 Opus packet loss concealment](development/bk-opus-plc.en.md) covers host replay, playback integration and board validation.
 - [Development pitfalls](development/pitfalls.en.md): lasting implementation constraints and regression entry points.

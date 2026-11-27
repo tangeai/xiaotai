@@ -1,0 +1,53 @@
+name: 新开发板适配登记 / New Board Request
+description: 登记尚未支持的开发板型号或新 PCB 版本，提供硬件资料以便评估或自行适配
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先阅读 [新增开发板流程](https://github.com/tangeai/xiaotai/blob/main/CONTRIBUTING.md#%E6%96%B0%E5%A2%9E%E5%BC%80%E5%8F%91%E6%9D%BF)。不确定项请填 `unknown`，不要从同芯片的其他板卡猜测。
+
+  - type: input
+    id: model
+    attributes:
+      label: 完整销售型号与 PCB 版本 / Model & PCB Revision
+      placeholder: 例如：XX 开发板 ESP32-S3, PCB V1.1
+    validations:
+      required: true
+
+  - type: input
+    id: soc
+    attributes:
+      label: 主控芯片、Flash 与 PSRAM / SoC, Flash & PSRAM
+      placeholder: 例如：ESP32-S3-WROOM-1-N16R8（16 MB Flash / 8 MB PSRAM）
+    validations:
+      required: true
+
+  - type: textarea
+    id: peripherals
+    attributes:
+      label: 屏幕、音频、摄像头与按键 / Peripherals
+      description: 列出已知的屏幕型号/分辨率、麦克风与功放/编解码芯片、摄像头型号、物理按键
+      placeholder: |
+        - 屏幕：...
+        - 音频：...
+        - 摄像头：...
+        - 按键：...
+    validations:
+      required: true
+
+  - type: textarea
+    id: docs_links
+    attributes:
+      label: 官方文档与原理图链接 / Official Docs & Schematics
+      description: 提供官方 Wiki、原理图、引脚表链接；有正反面实物照片可直接粘贴到下方
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: willingness
+    attributes:
+      label: 参与方式 / How you can help
+      options:
+        - label: 我手头有这块实板，可以帮忙测试固件并提供串口日志
+        - label: 我愿意按 CONTRIBUTING.md 尝试提交 board.json 与板级适配 PR

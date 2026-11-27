@@ -1,0 +1,74 @@
+name: 问题反馈 / Bug Report
+description: 反馈固件缺陷、烧录失败、配网或音视频异常（使用咨询请优先前往 Discussions）
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提交前请先核对目标板卡指南的“排查”一节。纯使用咨询或配网求助请优先发在 [GitHub Discussions](https://github.com/tangeai/xiaotai/discussions)。
+
+  - type: dropdown
+    id: board_id
+    attributes:
+      label: 板卡 ID / Board ID
+      description: 选择你正在使用的开发板（与实物型号和 PCB 版本核对）
+      options:
+        - lckfb-esp32s3 (立创·实战派 ESP32-S3, PCB V1.0.1)
+        - lckfb-bk7258 (立创·实战派 BK7258)
+        - waveshare-esp32p4-touch-lcd-43c-v10 (微雪 ESP32-P4-WIFI6-Touch-LCD-4.3, PCB V1.0)
+        - m5stack-cores3-lite (M5Stack CoreS3-Lite, ILI9342C)
+        - mgkfb-bk7258 (觅感 BK7258 双屏眼睛, 8 MiB Flash)
+        - 其他 / Other（请在下方说明）
+    validations:
+      required: true
+
+  - type: input
+    id: firmware_version
+    attributes:
+      label: 固件版本 / Firmware Version
+      description: 发行版本或串口启动日志中的内嵌版本，以及烧录方式（网页烧录 / 本地 BIN / 源码编译）
+      placeholder: 例如：v1.2.0（1.2.0+build.98），Chrome 网页烧录
+    validations:
+      required: true
+
+  - type: dropdown
+    id: direction
+    attributes:
+      label: 操作或音视频方向 / Direction (if applicable)
+      description: 音视频、通话或对讲异常时务必注明方向
+      options:
+        - 不涉及音视频方向（烧录 / 启动 / 配网 / 绑定 / 界面）
+        - 设备 → 网页/对端（对方听不到或看不到）
+        - 网页/对端 → 设备（设备无声或无画面）
+        - 双向异常（通话中断 / 回声 / 互相听不到）
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 操作步骤 / Steps to Reproduce
+      description: 按顺序列出你的操作步骤
+      placeholder: |
+        1. 使用 Chrome 打开网页烧录工具并写入 v1.2.0
+        2. 连接 XiaoTai-XXXX 热点配置 2.4 GHz Wi-Fi
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 实际现象与预期 / Actual vs Expected Behavior
+      description: 描述看到的现象、屏幕提示或播报内容
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 串口日志 / Serial Logs (可选但强烈建议)
+      description: 波特率 115200 抓取的启动和复现阶段日志（请先脱敏 Wi-Fi 密码与个人凭证）
+      render: text
+    validations:
+      required: false

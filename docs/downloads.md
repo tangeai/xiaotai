@@ -3,7 +3,7 @@
 [中文](downloads.md) · [English](downloads.en.md)
 
 当前统一发行：**v1.2.0 — 正式版**。历史归档见下方的 `v1.0.0` 和 `v1.1.0`。
-旧板卡 tag 及其失效下载链接已清理。
+请从本页下载。按板卡命名的旧 Release 已删除。
 
 [发布说明、SHA-256 与已知问题](https://github.com/tangeai/xiaotai/releases/tag/v1.2.0) · [发布规范](development/release-policy.md)
 
@@ -108,7 +108,7 @@ M5Stack CoreS3-Lite / M5Stack CoreS3-Lite
 按[源码编译说明](../README.md#从源码编译)获取仓库，使用 `tools/build.py --board <board-id>` 构建；
 M5 还需选择对应屏幕变体。
 
-复现统一发行时检出版本 tag；旧板卡 tag 已清理，历史源码使用归档发布记录中的提交 SHA。
+复现统一发行时检出版本 tag。复现旧源码使用归档发布记录中的提交 SHA。
 主分支可能包含尚未发布的修改。
 
 在线功能依赖绑定与信令平台、TiRTC 以及所用的 AI 或微信服务。服务地址和授权配置见

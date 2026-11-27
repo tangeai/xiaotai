@@ -4,13 +4,16 @@
 
 [中文](README.md) · [English](README.en.md)
 
-XiaoTai is open-source AI (artificial intelligence) audio and video firmware for devices with or without a display. It supports **AI chat, WeChat calls, device intercom, and remote viewing in a browser**. Download firmware to try it, or build your own device from source.
+Flash open-source firmware from your desktop browser to turn a dev board into a device for **WeChat calls, browser live view and two-way audio, device intercom, and AI (artificial intelligence) chat**.
+No local toolchain is required to try a release; you can also build your own device from source.
+
+**[Web Flasher](https://xiaotai.chat/web-flasher/)** · **[v1.2.0 Downloads](docs/downloads.en.md)** · **[Showcase & Q&A (Discussions)](https://github.com/tangeai/xiaotai/discussions)**
 
 ![XiaoTai features: AI chat, WeChat calls, device intercom, and remote real-time audio and video](docs/images/xiaotai.gif)
 
-**Quick start: choose a board → flash firmware from your browser → configure Wi-Fi → bind the device.** Features vary by board. See its guide for supported features and known limitations.
+**Quick start: choose a board → flash from your browser → configure Wi-Fi → bind the device.** Features vary by board. See its guide for supported features and known limitations.
 
-Online features require a device binding and signaling platform, TiRTC real-time audio and video services, and AI or WeChat service configuration. This repository provides device firmware.
+Online features require the XiaoTai binding and signaling platform, TiRTC real-time audio and video services, and AI or WeChat service configuration. This repository provides device firmware.
 
 Follow the steps below to try a release package; connecting to a self-hosted platform requires separate service addresses and credentials.
 
@@ -20,13 +23,13 @@ Match the physical model, PCB (printed circuit board) revision, and display vari
 
 See [Firmware downloads](docs/downloads.en.md) for current versions, exact filenames, and release notes.
 
-| Board image | Model and board ID | Download entry | Guide |
+| Board image | Model and board ID | Form factor & key features | Download & guide |
 |---|---|---|---|
-| <img src="docs/images/boards/lckfb-bk7258.webp" alt="LCKFB ShiZhanPai BK7258 board" width="180"> | LCKFB ShiZhanPai BK7258<br>`lckfb-bk7258` | [Firmware and release notes](docs/downloads.en.md#lckfb-bk7258) | [Flashing guide](docs/boards/lckfb-bk7258/README.en.md#flashing) |
-| <img src="docs/images/boards/lckfb-esp32s3.webp" alt="LCKFB ShiZhanPai ESP32-S3 board" width="180"> | LCKFB ShiZhanPai ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | [Firmware and release notes](docs/downloads.en.md#lckfb-esp32s3) | [Flashing guide](docs/boards/lckfb-esp32s3/README.en.md#flashing) |
-| <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10.webp" alt="Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 board" width="180"> | Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | [Firmware and release notes](docs/downloads.en.md#waveshare-esp32p4-touch-lcd-43c-v10) | [Flashing guide](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.en.md#flashing) |
-| <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite board" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342C display<br>`m5stack-cores3-lite` | [Firmware and release notes](docs/downloads.en.md#m5stack-cores3-lite) | [Flashing guide](docs/boards/m5stack-cores3-lite/README.en.md#flashing) |
-| <img src="docs/images/boards/mgkfb-bk7258.webp" alt="MGKFB BK7258 AI toy board with dual-eye displays" width="180"> | MGKFB BK7258 AI toy board<br>Dual-eye displays · 8 MiB Flash<br>`mgkfb-bk7258` | [Firmware and release notes](docs/downloads.en.md#mgkfb-bk7258) | [Flashing guide](docs/boards/mgkfb-bk7258/README.en.md#flashing) |
+| <img src="docs/images/boards/lckfb-esp32s3.webp" alt="LCKFB ShiZhanPai ESP32-S3 board" width="180"> | LCKFB ShiZhanPai ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | 320×240 touchscreen<br>WeChat voice calls, browser live view & intercom, AI chat | [Downloads](docs/downloads.en.md#lckfb-esp32s3)<br>[Flashing guide](docs/boards/lckfb-esp32s3/README.en.md#flashing) |
+| <img src="docs/images/boards/lckfb-bk7258.webp" alt="LCKFB ShiZhanPai BK7258 board" width="180"> | LCKFB ShiZhanPai BK7258<br>`lckfb-bk7258` | Touchscreen + buttons<br>WeChat voice calls, browser live view & intercom, AI chat, group intercom | [Downloads](docs/downloads.en.md#lckfb-bk7258)<br>[Flashing guide](docs/boards/lckfb-bk7258/README.en.md#flashing) |
+| <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10.webp" alt="Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 board" width="180"> | Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | 4.3" 800×480 touchscreen<br>WeChat audio/video calls, browser live view & intercom, AI chat | [Downloads](docs/downloads.en.md#waveshare-esp32p4-touch-lcd-43c-v10)<br>[Flashing guide](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.en.md#flashing) |
+| <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite board" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342C display<br>`m5stack-cores3-lite` | 320×240 touchscreen<br>WeChat voice calls, browser live view & intercom, AI chat, group intercom | [Downloads](docs/downloads.en.md#m5stack-cores3-lite)<br>[Flashing guide](docs/boards/m5stack-cores3-lite/README.en.md#flashing) |
+| <img src="docs/images/boards/mgkfb-bk7258.webp" alt="MGKFB BK7258 AI toy board with dual-eye displays" width="180"> | MGKFB BK7258 AI toy board<br>Dual-eye displays · 8 MiB Flash<br>`mgkfb-bk7258` | Dual-eye displays + physical buttons<br>WeChat voice calls, browser live view & intercom, AI chat | [Downloads](docs/downloads.en.md#mgkfb-bk7258)<br>[Flashing guide](docs/boards/mgkfb-bk7258/README.en.md#flashing) |
 
 M5 supports only the ILI9342C display controller. MGKFB BK7258 firmware is for the board with 8 MiB Flash and dual-eye displays.
 
@@ -34,9 +37,13 @@ See the [complete board catalog](docs/boards/README.en.md) for specifications, f
 
 ## Flash the firmware
 
-Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/) in desktop Chrome or Edge. Select the chip platform, connect the serial port and choose your exact board and the `xiaotai` release listed on the downloads page. See the flashing guide in the table above for your board’s USB port, download mode and screenshots.
+Flash directly from desktop Chrome or Edge (typically 2–3 minutes) without installing a build toolchain:
 
-To use a downloaded release, choose **本地 BIN** (local BIN). Use one complete `_merged.bin` for ESP32-S3/P4 or the board-specific `_all-app.bin` for BK7258, starting at `0x0`. An ESP32 full image overwrites saved Wi-Fi and binding settings. For BK7258, back up factory calibration and avoid full-chip erase.
+1. Connect the board to your computer with a data-capable USB cable and close any serial monitor using that port.
+2. Open the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/), select the chip platform, and click **连接设备** (Connect) to pick the board's serial port.
+3. Under **小钛固件** (XiaoTai firmware), choose your board and the matching `xiaotai` release (such as `v1.2.0`), verify address `0x0`, and start flashing.
+
+See the flashing guide in the table above for your board’s USB port, download mode, and screenshots. To use a downloaded release, choose **本地 BIN** (local BIN) with `_merged.bin` for ESP32 or `_all-app.bin` for BK7258 at `0x0`. ESP32 full images overwrite Wi-Fi and binding settings; for BK7258, back up factory calibration first and avoid full-chip erase.
 
 ## First use
 
@@ -58,13 +65,27 @@ Binding succeeds when the device appears in the list and returns to its home scr
 
 Follow your board guide to start an AI conversation using the screen or physical buttons. Open live view and two-way audio from the web device page. For WeChat calls, follow the device prompts to add a WeChat contact first. After a session ends, the device should return to standby and be ready for another session.
 
-Device-to-device calls, group intercom, and video support depend on the board; see its guide.
+WeChat video support, device-to-device calls, and group intercom depend on the board; see its guide. For example, LCKFB ShiZhanPai ESP32-S3 currently supports WeChat voice calls while using its camera for browser live view.
 
 ### 4. Recovery and troubleshooting
 
 To change networks or rebind a touchscreen device, open “设备设置 → 重置设备” (Device settings → Reset device), confirm, then configure Wi-Fi and bind again. For devices without touch input, use the physical buttons or serial commands described in the board guide. Do not perform an arbitrary full-chip erase.
 
 If something goes wrong, check the troubleshooting section of the board guide first. When reporting a problem, include the board ID, firmware version, steps, and symptoms. For audio or video issues, specify the affected direction, such as “no sound from browser to device.” Include serial logs if available.
+
+### Quick FAQ
+
+- **Do I need ESP-IDF or a build toolchain?** No. Use the Chrome/Edge Web Flasher above to try a release; you only need a local toolchain when modifying firmware from source.
+- **Does LCKFB ESP32-S3 support WeChat video calls?** Currently it supports WeChat voice calls while using its camera for browser live view; see Waveshare ESP32-P4 for WeChat audio/video calls.
+- **Serial port not found or Wi-Fi setup fails?** Check your USB data cable, serial driver, and 2.4 GHz Wi-Fi, then check the board guide's troubleshooting section or ask in Discussions with your board ID and symptoms.
+
+## Get involved
+
+Pick the entry point that fits you:
+
+- **Flash and try it**: If you have one of the boards above, flash it from the [XiaoTai Web Flasher](https://xiaotai.chat/web-flasher/). Share photos or ask setup questions in [GitHub Discussions](https://github.com/tangeai/xiaotai/discussions) rather than opening an issue for usage help.
+- **Help without writing firmware**: Submit serial logs, board photos matching the exact PCB revision, flashing troubleshooting notes, or fixes for Chinese/English documentation mismatches.
+- **Write code or add a board**: Start with issues labeled [`good first issue`](https://github.com/tangeai/xiaotai/labels/good%20first%20issue), or follow [Adding a board](CONTRIBUTING.en.md#adding-a-board) to register new hardware.
 
 ## Build from source
 
@@ -91,6 +112,8 @@ ESP32-S3 / ESP32-P4 use **ESP-IDF v5.5.5**. Run `. tools/activate_esp_idf.sh` be
 
 ## Related repositories
 
+The repositories below cover other hardware lines of the same product. Firmware downloads and development for the five boards listed above stay in this repository (`tangeai/xiaotai`).
+
 | Project | Repository |
 |---|---|
 | XiaoTai ESP32 | [tangeai/xiaotai-esp32](https://github.com/tangeai/xiaotai-esp32) |
@@ -104,4 +127,4 @@ Refer to each repository's README for supported models, build instructions, and 
 - [Contributing](CONTRIBUTING.en.md): adding boards, testing, and releases.
 - [Documentation](docs/README.en.md): board, product, engineering, and debugging references.
 
-This project's own source code and documentation use the [MIT License](LICENSE). Third-party dependencies and assets retain their respective licenses; see the [third-party checklist](THIRD_PARTY.en.md).
+This project's own source code and documentation use the [MIT License](LICENSE). Third-party dependencies and assets retain their respective licenses; see [Third-party assets](THIRD_PARTY.en.md).

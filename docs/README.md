@@ -24,7 +24,7 @@
 - [架构与二次开发](../ARCHITECTURE.md)：产品分层、会话与媒体生命周期、目录边界。
 - [统一发行规则](development/release-policy.md)：版本时间线、BIN 命名与发布门槛。
 - [参与开发](../CONTRIBUTING.md)：适配流程、测试、文档与发布要求。
-- [第三方依赖核对清单](../THIRD_PARTY.md)：依赖来源、授权状态与待办事项。
+- [第三方资产清单](../THIRD_PARTY.md)：自有 SDK、模型和随包组件的分发说明。
 - [ESP32 与 BK7258 串口命令](development/SERIAL_COMMANDS.md)：状态查询、配网、通话、服务地址和 NTP 时间服务器设置。
 - [BK7258 Opus 丢包补偿实践](development/bk-opus-plc.md)，从 PC 回放到播放线程接入和板级验收。
 - [二次开发易错点](development/pitfalls.md)：长期有效的实现约束与回归入口。

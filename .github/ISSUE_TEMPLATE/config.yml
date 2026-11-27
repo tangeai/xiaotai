@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 使用求助与晒图 / Usage Help & Showcase (Discussions)
+    url: https://github.com/tangeai/xiaotai/discussions
+    about: 烧录配网求助、设备晒图、开发板适配讨论请优先前往 GitHub Discussions。
+  - name: 固件下载与板卡指南 / Firmware Downloads & Guides
+    url: https://github.com/tangeai/xiaotai/blob/main/docs/downloads.md
+    about: 核对板卡型号、PCB 版本、当前正式版固件与各板排查步骤。
