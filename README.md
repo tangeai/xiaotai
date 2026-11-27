@@ -51,7 +51,6 @@ M5 仅支持 ILI9342C 屏幕；觅感 BK7258 适用于 8 MiB Flash、双屏眼�
 欢迎按自己的方式参与小钛项目：
 
 - **直接烧录体验**：手里有上表开发板时，打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/)即可体验。欢迎在 [GitHub Discussions](https://github.com/tangeai/xiaotai/discussions) 晒出你的设备或发帖求助；使用问题请优先发在 Discussions，不要直接堆进 Issues。
-- **关注动态**：欢迎关注「**探鸽小钛**」微信公众号获取固件更新、玩法分享与社区活动通知。
 - **不改代码也能帮忙**：欢迎补充串口日志、与 PCB 版本一致的板卡实拍照片、烧录排查步骤，或修正中英文文档不一致的地方。
 - **提交代码或适配新板**：想改代码可先看标有 [`good first issue`](https://github.com/tangeai/xiaotai/labels/good%20first%20issue) 的任务；想接入新开发板，请按[新增开发板](CONTRIBUTING.md#新增开发板)准备资料并提交登记。
 
