@@ -4,15 +4,17 @@
 
 [中文](README.md) · [English](README.en.md)
 
-探鸽小钛是面向带屏和无屏设备的开源 AI（人工智能）音视频固件，支持 **AI 聊天、微信通话、
-设备对讲和网页远程查看**。可直接下载固件体验，也可从源码开发自己的设备。
+用电脑浏览器把开源固件刷到开发板上，就能实现 **微信通话、网页实时看画面与对讲、设备互呼和 AI（人工智能）聊天**。
+无需先装编译环境，可直接通过网页烧录体验，也可从源码开发自己的设备。
+
+**[网页一键烧录](https://xiaotai.chat/web-flasher/)** · **[v1.2.0 固件下载](docs/downloads.md)** · **[晒图与求助 (Discussions)](https://github.com/tangeai/xiaotai/discussions)**
 
 ![探鸽小钛功能示意：运行小钛固件的设备可接入 AI 聊天、微信通话、设备对讲和远程实时音视频](docs/images/xiaotai.gif)
 
-**快速开始：选择开发板 → 网页烧录固件 → 配置 Wi-Fi → 绑定设备。**
-各板支持的功能不同，具体范围和已知限制见对应指南。
+**快速开始：选择开发板 → 浏览器烧录固件 → 配置 Wi-Fi → 绑定设备。**
+各板支持的形态与能力不同，具体范围和已知限制见对应指南。
 
-在线功能依赖设备绑定与信令平台、TiRTC 实时音视频服务，以及 AI 或微信服务配置。
+在线功能依赖小钛设备绑定与信令平台、TiRTC 实时音视频服务，以及 AI 或微信服务配置。
 本仓库提供设备固件；使用发布包可按下文体验，接入自建平台则需另行配置服务地址和凭证。
 
 ## 选择开发板和固件
@@ -20,13 +22,13 @@
 按实物型号、PCB（印刷电路板）版本和屏幕变体选板。同一芯片的固件也不能随意混用。
 板卡 ID 是构建与固件文件名中的唯一标识；当前版本、准确文件名和发布说明统一见[固件下载](docs/downloads.md)。
 
-| 开发板图片 | 型号与板卡 ID | 固定下载入口 | 文档入口 |
+| 开发板图片 | 型号与板卡 ID | 形态与主要能力 | 下载与指南 |
 |---|---|---|---|
-| <img src="docs/images/boards/lckfb-bk7258.webp" alt="立创·实战派 BK7258 开发板" width="180"> | 立创·实战派 BK7258<br>`lckfb-bk7258` | [下载固件与发布说明](docs/downloads.md#lckfb-bk7258) | [烧录指南](docs/boards/lckfb-bk7258/README.md#烧录) |
-| <img src="docs/images/boards/lckfb-esp32s3.webp" alt="立创·实战派 ESP32-S3 开发板" width="180"> | 立创·实战派 ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | [下载固件与发布说明](docs/downloads.md#lckfb-esp32s3) | [烧录指南](docs/boards/lckfb-esp32s3/README.md#烧录) |
-| <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10.webp" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="180"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | [下载固件与发布说明](docs/downloads.md#waveshare-esp32p4-touch-lcd-43c-v10) | [烧录指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录) |
-| <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite 开发板" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342C 屏幕<br>`m5stack-cores3-lite` | [下载固件与发布说明](docs/downloads.md#m5stack-cores3-lite) | [烧录指南](docs/boards/m5stack-cores3-lite/README.md#烧录) |
-| <img src="docs/images/boards/mgkfb-bk7258.webp" alt="觅感 AI 玩具开发板 BK7258 双屏眼睛" width="180"> | 觅感 AI 玩具开发板 BK7258<br>双屏眼睛 · 8 MiB Flash<br>`mgkfb-bk7258` | [下载固件与发布说明](docs/downloads.md#mgkfb-bk7258) | [烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录) |
+| <img src="docs/images/boards/lckfb-esp32s3.webp" alt="立创·实战派 ESP32-S3 开发板" width="180"> | 立创·实战派 ESP32-S3<br>PCB V1.0.1<br>`lckfb-esp32s3` | 320×240 触摸屏<br>微信语音通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#lckfb-esp32s3)<br>[烧录指南](docs/boards/lckfb-esp32s3/README.md#烧录) |
+| <img src="docs/images/boards/lckfb-bk7258.webp" alt="立创·实战派 BK7258 开发板" width="180"> | 立创·实战派 BK7258<br>`lckfb-bk7258` | 触摸屏 + 按键<br>微信语音通话、网页看画面对讲、AI 对话、多人对讲 | [下载固件](docs/downloads.md#lckfb-bk7258)<br>[烧录指南](docs/boards/lckfb-bk7258/README.md#烧录) |
+| <img src="docs/images/boards/waveshare-esp32p4-touch-lcd-43c-v10.webp" alt="微雪 ESP32-P4-WIFI6-Touch-LCD-4.3 开发板" width="180"> | 微雪 ESP32-P4-WIFI6-Touch-LCD-4.3<br>PCB V1.0<br>`waveshare-esp32p4-touch-lcd-43c-v10` | 4.3 寸 800×480 触摸屏<br>微信音视频通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#waveshare-esp32p4-touch-lcd-43c-v10)<br>[烧录指南](docs/boards/waveshare-esp32p4-touch-lcd-43c-v10/README.md#烧录) |
+| <img src="docs/images/boards/m5stack-cores3-lite.webp" alt="M5Stack CoreS3-Lite 开发板" width="180"> | M5Stack CoreS3-Lite<br>K128-Lite · ILI9342C 屏幕<br>`m5stack-cores3-lite` | 320×240 触摸屏<br>微信语音通话、网页看画面对讲、AI 对话、多人对讲 | [下载固件](docs/downloads.md#m5stack-cores3-lite)<br>[烧录指南](docs/boards/m5stack-cores3-lite/README.md#烧录) |
+| <img src="docs/images/boards/mgkfb-bk7258.webp" alt="觅感 AI 玩具开发板 BK7258 双屏眼睛" width="180"> | 觅感 AI 玩具开发板 BK7258<br>双屏眼睛 · 8 MiB Flash<br>`mgkfb-bk7258` | 双屏眼睛 + 实体按键<br>微信语音通话、网页看画面对讲、AI 对话 | [下载固件](docs/downloads.md#mgkfb-bk7258)<br>[烧录指南](docs/boards/mgkfb-bk7258/README.md#烧录) |
 
 M5 仅支持 ILI9342C 屏幕；觅感 BK7258 固件适用于 8 MiB Flash、
 双屏眼睛开发板。各板规格、功能与依赖见[完整开发板目录](docs/boards/README.md)，历史版本见
@@ -34,9 +36,13 @@ M5 仅支持 ILI9342C 屏幕；觅感 BK7258 固件适用于 8 MiB Flash、
 
 ## 烧录
 
-用电脑上的 Chrome 或 Edge 打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/)，选择芯片平台，点击 **连接设备** 并选中开发板的串口。选择 **小钛固件** 后，选中板型，再选与下载页一致的 `xiaotai` 发行版本。各板使用的 USB 接口、进入下载模式的方法和操作截图见上表的烧录指南。
+使用电脑上的 Chrome 或 Edge 浏览器即可直接烧录（通常约 2~3 分钟），无需安装编译工具链：
 
-已有发布镜像时选 **本地 BIN**。ESP32-S3 / ESP32-P4 选择对应板型的 `_merged.bin`，BK7258 选择对应板型的 `_all-app.bin`，均从 `0x0` 写入一个完整镜像。ESP32 完整镜像会覆盖 Wi-Fi 和绑定信息。BK7258 首次烧录前请备份原厂校准资料，避免全片擦除。
+1. 用支持数据传输的 USB 线连接开发板与电脑，关闭占用串口的终端软件。
+2. 打开[小钛网页烧录工具](https://xiaotai.chat/web-flasher/)，选择芯片平台并点击 **连接设备** 选中串口。
+3. 在 **小钛固件** 中选中对应板型与下载页一致的 `xiaotai` 版本（如 `v1.2.0`），确认起始地址为 `0x0` 后点击 **开始烧录**。
+
+各板 USB 接口、进入下载模式的方法和操作截图见上表的烧录指南。已有发布镜像时可选 **本地 BIN**（ESP32 选 `_merged.bin`，BK7258 选 `_all-app.bin`，均从 `0x0` 写入）。ESP32 完整镜像会覆盖 Wi-Fi 和绑定信息；BK7258 首次烧录前请备份原厂校准资料，避免全片擦除。
 
 ## 首次体验
 
@@ -67,6 +73,12 @@ M5 仅支持 ILI9342C 屏幕；觅感 BK7258 固件适用于 8 MiB Flash、
 
 遇到问题，先查看板卡指南的“排查”一节。反馈时提供板卡 ID、固件版本、操作步骤和现象；
 音视频问题请注明方向，例如“网页到设备无声”。能获取串口日志时一并附上。
+
+### 常见疑问
+
+- **需要安装 ESP-IDF 或编译环境吗？** 不需要。直接体验请使用上方的 Chrome / Edge 网页烧录；只有二次开发修改固件时才需按下方说明搭建环境。
+- **立创·实战派 ESP32-S3 支持微信视频通话吗？** 当前为微信语音通话，板载摄像头画面用于网页端实时查看；如需微信音视频通话可参考微雪 ESP32-P4。
+- **刷机找不到串口或配网失败怎么办？** 先核对数据线、串口驱动和 2.4 GHz Wi-Fi，查看对应板卡指南的“排查”一节；仍未解决可携带板卡 ID 与现象到 Discussions 提问。
 
 ## 参与
 
